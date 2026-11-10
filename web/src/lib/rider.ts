@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { paymentMethodLabel } from "@/lib/payment-methods";
-import { isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
+import { isCustomerLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
 import type { CashHandover } from "@/lib/warehouse-live";
 import { parseCodEnabled } from "@/lib/rider-cod";
 
@@ -23,6 +23,8 @@ interface RiderQueueRow extends Omit<TaskView, "desk"> {
     estimatedDeliveryDate?: string | null;
     totalUsd: number;
     shippingAddress: string | null;
+    /** Split delivery: this leg carries only part of the order (its lines are `items`). */
+    partial?: boolean;
     items: { productId: string; productName: string; productNameFr?: string | null; variant: string; variantFr?: string | null; qty: number; priceUsd: number }[];
   } | null;
 }
@@ -49,7 +51,7 @@ export interface RiderWorkStats {
 export type RiderTaskStatus = "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
 
 /** The order the legs are shown in: what meets the customer first, then warehouse runs. */
-export const RIDER_KIND_ORDER: LegKind[] = ["delivery", "replacement_delivery", "return_pickup", "pickup", "transfer", "return_transfer", "return_to_seller"];
+export const RIDER_KIND_ORDER: LegKind[] = ["delivery", "express", "replacement_delivery", "return_pickup", "pickup", "transfer", "return_transfer", "return_to_seller"];
 
 function addressText(raw: string | null | undefined): string {
   if (!raw) return "—";
@@ -137,6 +139,10 @@ function toRiderTask(row: RiderQueueRow) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     needsCode: !!row.needsCode,
+    /** An express run: the rider goes from the seller straight to the customer, takes the cash and the customer's code. */
+    express: row.kind === "express",
+    /** A partial delivery of a split order: `completesOrder` false (more follows) or the order says so. */
+    partial: o?.partial === true || row.completesOrder === false,
     collectOld: !!row.collectOld,
     sellerName: row.sellerName,
     products: items.map((it) => ({
@@ -149,7 +155,7 @@ function toRiderTask(row: RiderQueueRow) {
       qty: it.qty,
     })),
     stepsDone,
-    codAmount: row.kind === "delivery" ? row.codAmountUsd : 0,
+    codAmount: isCustomerLeg(row.kind) ? row.codAmountUsd : 0,
   };
 }
 

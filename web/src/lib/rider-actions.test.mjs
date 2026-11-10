@@ -46,3 +46,35 @@ test("the reasons offered are the ones the server and the app know, each in Fren
   assert.deepEqual(m.stepPayload("t1", "picked_up"), { taskId: "t1", status: "picked_up" });
   assert.deepEqual(m.stepPayload("t1", "in_transit"), { taskId: "t1", status: "in_transit" });
 });
+
+test("an express run: the rider is told to go seller -> customer, ask the code, take the cash", () => {
+  const task = { kind: "express", needsCode: true, codAmount: 12.5 };
+  const en = m.riderBrief(task, false, { cash: "$12.50" });
+  assert.equal(en.length, 4);
+  assert.match(en[0], /straight to the customer/);
+  assert.ok(en.some((l) => /4-digit code/.test(l)));
+  assert.ok(en.some((l) => /Collect \$12\.50 in cash/.test(l)));
+  const fr = m.riderBrief(task, true, { cash: "12,50 $" });
+  assert.match(fr[0], /directement chez le client/);
+  assert.ok(fr.some((l) => /code à 4 chiffres/.test(l)));
+  assert.ok(fr.some((l) => /Encaissez 12,50 \$ en espèces/.test(l)));
+});
+
+test("the code is not mentioned while the platform does not require it; no cash line without cash", () => {
+  const lines = m.riderBrief({ kind: "express", needsCode: true, codAmount: 0 }, false, { requireCode: false });
+  assert.ok(!lines.some((l) => /code/.test(l)));
+  assert.ok(!lines.some((l) => /cash/.test(l)));
+});
+
+test("a plain delivery meets the customer too; a partial one says only some items; a warehouse leg says nothing", () => {
+  assert.ok(m.riderBrief({ kind: "delivery", needsCode: true }, false)[0].includes("in person"));
+  assert.ok(!m.riderBrief({ kind: "delivery" }, false).some((l) => /Express/.test(l)));
+  assert.ok(m.riderBrief({ kind: "delivery", partial: true }, false).some((l) => /Partial delivery/.test(l)));
+  assert.ok(m.riderBrief({ kind: "delivery", partial: true }, true).some((l) => /Livraison partielle/.test(l)));
+  for (const kind of ["pickup", "transfer", "return_pickup", "return_to_seller"]) assert.deepEqual(m.riderBrief({ kind, needsCode: true, codAmount: 5 }, false), [], kind);
+});
+
+test("an express run is delivered by the rider, not handed over to a warehouse", () => {
+  assert.equal(m.nextStep({ status: "in_transit", hubBound: false }), "deliver");
+  assert.equal(m.nextStep({ status: "assigned", hubBound: false }), "picked_up");
+});

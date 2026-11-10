@@ -55,6 +55,13 @@ function labels(task: RiderTask, fr: boolean) {
         go: fr ? `Je pars vers ${to}` : `On my way to ${to}`,
         goToast: fr ? "En route vers l'autre entrepôt" : "On the way to the other warehouse",
       };
+    case "express":
+      return {
+        picked: fr ? `Colis récupéré chez ${from}` : `Collected from ${from}`,
+        pickedToast: fr ? "Marqué collecté" : "Marked as picked up",
+        go: fr ? "Je pars vers le client" : "On my way to the customer",
+        goToast: fr ? "En route vers le client" : "On the way to the customer",
+      };
     case "return_pickup":
       return {
         picked: fr ? "Colis repris chez le client" : "Collected from the customer",
@@ -194,8 +201,12 @@ export function FailedForm({ task, onDone }: { task: RiderTask; onDone: () => vo
       />
       <p className="text-[11px] text-slate-400">
         {fr
-          ? "Un nouveau trajet est créé automatiquement ; après 3 échecs d'une collecte ou d'une livraison, la commande est annulée et remboursée."
-          : "A new leg is created automatically; after 3 failed attempts of a pickup or a delivery the order is cancelled and refunded."}
+          ? task.kind === "express"
+            ? "Pas encore collecté : la course express est rouverte. Déjà collecté : vous rapportez le colis à l'entrepôt, puis une livraison normale suit."
+            : "Un nouveau trajet est créé automatiquement ; après 3 échecs d'une collecte ou d'une livraison, la commande est annulée et remboursée."
+          : task.kind === "express"
+            ? "Not collected yet: the express run is reopened. Already collected: you bring the parcel to the warehouse and a normal delivery follows."
+            : "A new leg is created automatically; after 3 failed attempts of a pickup or a delivery the order is cancelled and refunded."}
       </p>
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <button

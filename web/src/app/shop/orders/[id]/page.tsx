@@ -21,6 +21,8 @@ import { useShop } from "@/context/shop-context";
 import { isMobileMoneyMethod } from "@/lib/shop-live";
 import { refundedTotal } from "@/lib/shop-packages";
 import { dayLabel } from "@/lib/delivery-estimate";
+import { ExpressBadge, PartialDelivery, panelLines } from "@/components/shop/partial-delivery";
+import { openCustomerLeg } from "@/lib/split-delivery";
 
 function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -96,10 +98,13 @@ function OrderDetail() {
       fulfilment: r?.fulfilment ?? "open",
       cancelReason: r?.cancelReason ?? null,
       refundedUsd: r?.refundedUsd ?? 0,
+      deliveredAt: r?.deliveredAt ?? null,
     };
   });
   const refunded = refundedTotal(productEntries);
   const showCode = code && hasDeliveryCodeStage(order.status);
+  // Split delivery: once a part is delivered the rider belongs to that part; show them again only while another leg is on the road.
+  const riderOnRoad = !order.partiallyDelivered || !!openCustomerLeg(raw?.tracking?.legs);
   const steps = raw ? customerJourney(raw, hubs, fr) : [];
   const destHub = raw?.destinationHubId ? hubs.get(raw.destinationHubId) : undefined;
   const requests = rt.disputes.filter((d) => d.orderId === order.id);
@@ -110,7 +115,7 @@ function OrderDetail() {
     <div className="space-y-6">
       <PageHeader
         title={order.reference}
-        subtitle={`${fr ? "Passée le" : "Placed"} ${order.date} · ${orderStatusLabel(order.status, fr)}`}
+        subtitle={`${fr ? "Passée le" : "Placed"} ${order.date} · ${orderStatusLabel(order.status, fr)}${order.partiallyDelivered ? ` · ${fr ? "livrée en partie" : "partly delivered"}` : ""}`}
         backHref="/shop/orders"
         actions={
           <div className="flex flex-wrap gap-2">
@@ -136,6 +141,15 @@ function OrderDetail() {
         }
       />
 
+      {order.deliveryMode === "express" && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700" data-testid="express-order">
+          <ExpressBadge fr={fr} />
+          <span>{fr ? "Un livreur l'apporte directement du vendeur chez vous." : "A rider brings it straight from the seller to you."}</span>
+        </div>
+      )}
+
+      {raw && <PartialDelivery order={raw} lines={panelLines(raw.items, fr)} legs={raw.tracking?.legs} fr={fr} audience="customer" />}
+
       {waitingApproval && (
         <div role="status" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
           {fr
@@ -153,7 +167,7 @@ function OrderDetail() {
         </div>
       )}
 
-      {order.rider && order.rider.phone && (
+      {order.rider && order.rider.phone && riderOnRoad && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
           <div>
             <p className="text-sm font-medium text-blue-900">{fr ? "Votre livreur" : "Your rider"}: {order.rider.name}</p>

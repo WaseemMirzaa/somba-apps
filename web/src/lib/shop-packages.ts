@@ -8,6 +8,8 @@ export interface PackageLine {
   sellerId?: string | null;
   sellerName?: string | null;
   fulfilment?: ItemFulfilment | null;
+  /** Split delivery: when the customer received this line (null = still coming). */
+  deliveredAt?: string | null;
   refundedUsd?: number | null;
   qty?: number;
   priceUsd?: number;
@@ -92,6 +94,8 @@ export function packageStatus(
   if (order.status === "cancelled") return "cancelled";
   if (order.status === "pending" && order.paymentMethod !== "cod") return "pending";
   const live = lines.filter((l) => !isCancelledLine(l));
+  // Split delivery: this seller's parcel already reached the customer while the rest of the order is still on its way.
+  if (live.length > 0 && live.every((l) => !!l.deliveredAt)) return "delivered";
   if (live.length > 0 && live.every((l) => fulfilmentOf(l) === "received")) {
     return DELIVERY_STAGES.includes(order.status) ? (order.status as PackageStatus) : "at_hub";
   }

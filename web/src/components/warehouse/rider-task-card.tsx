@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { LEG_KIND, pickL } from "@/lib/logistics";
 import { useCodEnabled, type RiderTask, type RiderTaskStatus } from "@/lib/rider";
 import { showTaskCash } from "@/lib/rider-cod";
+import { riderBrief } from "@/lib/rider-actions";
 
 export const RIDER_STATUS_LABEL: Record<RiderTaskStatus, { en: string; fr: string }> = {
   assigned: { en: "Assigned", fr: "Assigné" },
@@ -48,7 +49,8 @@ export function RiderTaskCard({
       <Link href={`/rider/tasks/${task.id}`} className="block">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-slate-900">{task.orderId}</span>
-          <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
+          <Badge variant={task.kind === "express" ? "purple" : "primary"}>{pickL(LEG_KIND[task.kind], fr)}</Badge>
+          {task.partial && <Badge variant="info">{fr ? "Livraison partielle" : "Partial delivery"}</Badge>}
           <Badge variant={riderStatusVariant(task.status)}>{fr ? label.fr : label.en}</Badge>
           {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
           {showTaskCash(codEnabled, task) && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
@@ -73,6 +75,11 @@ export function RiderTaskCard({
             {task.readyAt ? (fr ? " · prêt" : " · ready") : ""}
           </span>
         </p>
+        {task.kind === "express" && (
+          <p className="mt-1 text-xs font-medium text-violet-800" data-testid="express-hint">
+            {riderBrief(task, fr)[0]}
+          </p>
+        )}
         <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-400">
           <Package className="h-3.5 w-3.5" />
           {task.legItemsText(fr) !== "—" ? task.legItemsText(fr) : `${task.items} ${fr ? "article(s)" : "item(s)"}`}

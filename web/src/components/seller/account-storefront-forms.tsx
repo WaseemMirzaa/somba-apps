@@ -7,6 +7,8 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useSellerAccess, useSellerData } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
+import { usePublicSettings } from "@/lib/shop-live";
+import Link from "next/link";
 
 const fieldClass = "input-premium w-full px-4 py-2 text-sm";
 
@@ -126,7 +128,7 @@ export function HandlingForm() {
     setError(null);
     try {
       await updateStore({ handlingDays: n });
-      toast(fr ? "Délai de préparation enregistré" : "Handling time saved");
+      toast(fr ? "Délai de traitement enregistré" : "Handling time saved");
     } catch (e) {
       const msg = errMessage(e);
       setError(msg);
@@ -140,12 +142,12 @@ export function HandlingForm() {
     <div className="space-y-4">
       <p className="text-sm text-slate-500">
         {fr
-          ? "Nombre de jours dont vous avez besoin pour préparer un colis. Il s'ajoute au délai de livraison annoncé aux clients."
+          ? "Jours dont votre boutique a besoin pour traiter un colis, quel que soit le produit. Ils s'ajoutent au délai de préparation de chaque produit et à celui de l'itinéraire dans la livraison annoncée aux clients."
           : "How many days you need to get a parcel ready. It is added to the delivery estimate shoppers see."}
       </p>
       <div className="max-w-[10rem]">
         <label className="mb-1 block text-xs font-medium text-slate-600">{fr ? "Jours (0 à 14)" : "Days (0 to 14)"}</label>
-        <input type="number" min={0} max={14} step={1} className={fieldClass} value={days} onChange={(e) => setDays(e.target.value)} disabled={!canEdit} aria-label={fr ? "Délai de préparation en jours" : "Handling time in days"} />
+        <input type="number" min={0} max={14} step={1} className={fieldClass} value={days} onChange={(e) => setDays(e.target.value)} disabled={!canEdit} aria-label={fr ? "Délai de traitement en jours" : "Handling time in days"} />
         {!ok && <p className="mt-1 text-xs text-red-600">{fr ? "Un nombre entier de jours de 0 à 14." : "A whole number of days from 0 to 14."}</p>}
       </div>
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -154,6 +156,87 @@ export function HandlingForm() {
           {fr ? "Enregistrer" : "Save"}
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Express delivery: a rider goes straight from the store to the customer when both are in the same commune. Shown only while
+ * the platform has express delivery switched on (`expressDeliveryEnabled`). The store needs a pinned pickup location: the server
+ * says so when it is missing, and that message is shown as a notice (the same toast every other store setting uses).
+ */
+export function ExpressForm() {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
+  const { toast } = useToast();
+  const { seller, updateStore } = useSellerData();
+  const access = useSellerAccess();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canEdit = access.can("storefront") && !access.suspended;
+  const on = seller?.expressDelivery === true;
+  const pinned = seller?.pickupLat != null && seller?.pickupLng != null;
+
+  async function toggle() {
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = await updateStore({ expressDelivery: !on });
+      // What the server says it saved (an older server does not send the field: then it is what was asked for).
+      const now = typeof (saved as { expressDelivery?: unknown }).expressDelivery === "boolean" ? (saved as { expressDelivery: boolean }).expressDelivery : !on;
+      toast(now ? (fr ? "Livraison express activée" : "Express delivery on") : fr ? "Livraison express désactivée" : "Express delivery off");
+    } catch (e) {
+      // The API's own sentence, e.g. "Pin your pickup location on the map (Store settings) before offering express delivery."
+      const msg = errMessage(e);
+      setError(msg);
+      toast(msg, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4" data-testid="express-form">
+      <p className="text-sm text-slate-500">
+        {fr
+          ? "Quand votre boutique et le client sont dans la même commune, un livreur peut aller directement de chez vous chez le client, sans passer par un entrepôt. Le colis arrive plus vite ; vous le remettez au livreur dès qu'il est prêt."
+          : "When your store and the customer are in the same commune, a rider can go straight from your store to the customer, with no warehouse in between. The parcel arrives sooner; you hand it to the rider as soon as it is packed."}
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          aria-label={fr ? "Livraison express" : "Express delivery"}
+          disabled={!canEdit || busy}
+          onClick={() => void toggle()}
+          className={`relative h-6 w-11 rounded-full transition-colors disabled:opacity-60 ${on ? "bg-emerald-500" : "bg-slate-300"}`}
+        >
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+        </button>
+        <span className="text-sm text-slate-700">{on ? (fr ? "Activée" : "On") : fr ? "Désactivée" : "Off"}</span>
+      </div>
+      {!pinned && (
+        <p role="note" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {fr ? "Placez d'abord votre lieu de collecte sur la carte (Informations de la boutique ci-dessus) : l'express en a besoin." : "Pin your pickup location on the map first (Store details above): express needs it."}
+        </p>
+      )}
+      {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      <Link href="/seller/orders" className="inline-block text-xs text-[var(--primary)] hover:underline">{fr ? "Voir mes commandes express →" : "See my express orders →"}</Link>
+    </div>
+  );
+}
+
+/** The storefront card for {@link ExpressForm}: nothing at all while the platform has express delivery off. */
+export function ExpressSection() {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
+  const settings = usePublicSettings();
+  if (!settings.expressDeliveryEnabled) return null;
+  return (
+    <div className="card-premium p-6">
+      <h2 className="mb-4 font-semibold">{fr ? "Livraison express" : "Express delivery"}</h2>
+      <ExpressForm />
     </div>
   );
 }

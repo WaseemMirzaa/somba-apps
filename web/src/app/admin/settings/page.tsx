@@ -15,6 +15,7 @@ import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { codOffered } from "@/lib/cod-visibility";
 import { errMessage } from "@/lib/seller-labels";
+import { DELIVERY_MODEL_FIELDS, DELIVERY_MODEL_TITLE, rangeProblem } from "@/lib/delivery-settings";
 
 type Values = Record<string, string>;
 
@@ -87,6 +88,11 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
       { key: "requireVerifiedForCheckout", kind: "toggle", label: "Require a verified phone or email to check out", labelFr: "Exiger un téléphone ou e-mail vérifié pour commander", hint: "On: orders and wallet top-ups need a verified phone or email. Turn it off until SMTP or SMS verification is configured, or customers cannot verify and cannot check out.", hintFr: "Activé : commandes et recharges exigent un téléphone ou e-mail vérifié. Désactivez tant que l'e-mail (SMTP) ou le SMS n'est pas configuré, sinon les clients ne peuvent ni vérifier ni commander." },
       { key: "hubAddress", kind: "text", label: "Hub address", labelFr: "Adresse du hub", hint: "Where parcels are brought (shown to sellers/riders).", hintFr: "Où les colis sont déposés (affiché aux vendeurs/livreurs).", inputMode: "text" },
     ],
+  },
+  {
+    title: DELIVERY_MODEL_TITLE.en,
+    titleFr: DELIVERY_MODEL_TITLE.fr,
+    fields: DELIVERY_MODEL_FIELDS,
   },
   {
     title: "Catalogue",
@@ -190,14 +196,9 @@ export default function AdminSettingsPage() {
     });
     const field = GROUPS.flatMap((g) => g.fields).find((f) => f.key === key);
     if (field?.kind === "text" && field.range) {
-      const raw = (draftRef.current[key] ?? "").trim();
-      const n = Number(raw.replace(",", "."));
-      const { min, max, integer } = field.range;
-      if (!raw || !Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n))) {
-        setErrors((er) => ({
-          ...er,
-          [key]: fr ? `Saisissez ${integer ? "un nombre entier" : "un nombre"} entre ${min} et ${max}.` : `Enter ${integer ? "a whole number" : "a number"} between ${min} and ${max}.`,
-        }));
+      const problem = rangeProblem(field.range, draftRef.current[key] ?? "", fr);
+      if (problem) {
+        setErrors((er) => ({ ...er, [key]: problem }));
         setSavingKey(null);
         return false;
       }
@@ -237,6 +238,8 @@ export default function AdminSettingsPage() {
   const anyDirty = GROUPS.some((g) => g.fields.some((f) => dirty(f.key)));
   // Cash on delivery is not offered unless the server value is "true": then the toggle gives way to a read-only line and the cap is hidden.
   const codOff = !codOffered(saved.codEnabled);
+  // Express fees, days and distance only matter while express delivery is on.
+  const expressOn = String(saved.expressDeliveryEnabled ?? "") === "true";
 
   return (
     <div className="space-y-6">
@@ -255,7 +258,7 @@ export default function AdminSettingsPage() {
             <div key={g.title} className="card-premium space-y-4 p-6">
               <h3 className="font-semibold">{fr ? g.titleFr : g.title}</h3>
               <div className="grid gap-5 lg:grid-cols-2">
-                {g.fields.filter((f) => !(codOff && f.key === "codCapUsd")).map((f) => {
+                {g.fields.filter((f) => !(codOff && f.key === "codCapUsd")).filter((f) => !((f as { express?: boolean }).express && !expressOn)).map((f) => {
                   const err = errors[f.key];
                   const busy = savingKey === f.key;
                   if (codOff && f.key === "codEnabled") {

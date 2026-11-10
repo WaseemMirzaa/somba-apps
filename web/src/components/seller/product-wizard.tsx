@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { DetailSection } from "@/components/ui/info-grid";
 import { Button } from "@/components/ui/button";
 import { MAX_GROUPS, MAX_OPTIONS, readVariants, type VariantGroup } from "@/lib/variants";
-import { DELIVERY_DAYS } from "@/lib/delivery-estimate";
+import { PREP_DAYS, isPrepDays, prepDaysOf } from "@/lib/delivery-estimate";
+import { usePublicSettings } from "@/lib/shop-live";
 import { ProductImage } from "@/components/seller/product-image";
 import { ProductGalleryEditor } from "@/components/seller/product-gallery-editor";
 import { MAX_IMAGES, gramsToKgText, optionCombos, parseKg, skuProblem, sumUnits } from "@/lib/seller-products";
@@ -41,7 +42,7 @@ type FormState = {
   originalPrice: string;
   stock: string;
   /** The seller's delivery time for this product, in days. */
-  deliveryDays: string;
+  prepDays: string;
   /** The gallery, cover first (max 8). */
   images: string[];
   sku: string;
@@ -80,7 +81,7 @@ function categoryValueOf(p: Pick<Product, "categoryId" | "category">, list: { id
   return p.categoryId ?? list.find((c) => c.name === p.category)?.id ?? `name:${p.category}`;
 }
 
-function initialForm(p: SellerProductRow | null | undefined, categoryValue: string): FormState {
+function initialForm(p: SellerProductRow | null | undefined, categoryValue: string, localDays: number): FormState {
   const compare = p ? compareAtOf(p) : null;
   return {
     // Only what is really written (or translated) in each language: the API's fallback copy is shown as empty.
@@ -93,7 +94,8 @@ function initialForm(p: SellerProductRow | null | undefined, categoryValue: stri
     price: p ? String(listPriceOf(p)) : "",
     originalPrice: compare ? String(compare) : "",
     stock: p ? String(p.stock) : "",
-    deliveryDays: String(p?.deliveryDays ?? DELIVERY_DAYS.fallback),
+    // `prepDays` from the server; an old server only has `deliveryDays` (= prep + the platform's local days).
+    prepDays: String(p ? prepDaysOf(p, localDays) : PREP_DAYS.fallback),
     images: p?.images && p.images.length ? [...p.images] : p?.image ? [p.image] : [],
     sku: p?.sku ?? "",
     brand: p?.brand ?? "",
@@ -105,8 +107,8 @@ function initialForm(p: SellerProductRow | null | undefined, categoryValue: stri
 }
 
 /** The validated fields, and the step each one lives on. */
-type FieldKey = "title" | "category" | "price" | "originalPrice" | "stock" | "deliveryDays" | "options" | "sku" | "brand" | "weight" | "optionStock";
-const FIELD_STEP: Record<FieldKey, number> = { title: 0, category: 0, price: 2, originalPrice: 2, stock: 2, deliveryDays: 2, options: 2, sku: 2, brand: 2, weight: 2, optionStock: 2 };
+type FieldKey = "title" | "category" | "price" | "originalPrice" | "stock" | "prepDays" | "options" | "sku" | "brand" | "weight" | "optionStock";
+const FIELD_STEP: Record<FieldKey, number> = { title: 0, category: 0, price: 2, originalPrice: 2, stock: 2, prepDays: 2, options: 2, sku: 2, brand: 2, weight: 2, optionStock: 2 };
 const FIELD_KEYS = Object.keys(FIELD_STEP) as FieldKey[];
 
 /**
@@ -122,6 +124,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const { categories } = useRealtime();
   const { createProduct, updateProduct } = useSellerData();
   const { plan, used, max, atLimit } = useSellerPlan();
+  const settings = usePublicSettings();
   const fr = locale === "fr";
   const editing = !!product;
 
@@ -139,7 +142,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const [descTab, setDescTab] = useState<Lang>("en");
   // What the seller saw when the form opened: an edit sends only what differs from it, even if a push (a sale, a
   // finished translation) changes the listing while the form is open.
-  const [initial] = useState<FormState>(() => initialForm(product, product ? categoryValueOf(product, categories) : ""));
+  const [initial] = useState<FormState>(() => initialForm(product, product ? categoryValueOf(product, categories) : "", settings.localDeliveryDays));
   const [form, setForm] = useState<FormState>(initial);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -169,7 +172,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const priceNum = Number(form.price);
   const origNum = Number(form.originalPrice);
   const stockNum = Number(form.stock);
-  const daysNum = Number(form.deliveryDays);
+  const daysNum = Number(form.prepDays);
 
   const groups = toGroups(form.options);
   const optionsError = (() => {
@@ -233,9 +236,9 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
       form.stock.trim() === "" || !Number.isInteger(stockNum) || stockNum < 0
         ? (fr ? "Le stock doit être un entier supérieur ou égal à 0." : "Stock must be a whole number, 0 or more.")
         : "",
-    deliveryDays:
-      !Number.isInteger(daysNum) || daysNum < DELIVERY_DAYS.min || daysNum > DELIVERY_DAYS.max
-        ? (fr ? `Le délai de livraison doit être un nombre entier de ${DELIVERY_DAYS.min} à ${DELIVERY_DAYS.max} jours.` : `Delivery time must be a whole number of days from ${DELIVERY_DAYS.min} to ${DELIVERY_DAYS.max}.`)
+    prepDays:
+      !isPrepDays(form.prepDays)
+        ? (fr ? `Le délai de préparation doit être un nombre entier de ${PREP_DAYS.min} à ${PREP_DAYS.max} jours.` : `Preparation time must be a whole number of days from ${PREP_DAYS.min} to ${PREP_DAYS.max}.`)
         : "",
     options: optionsError,
     sku: skuProblem(form.sku, fr) ?? "",
@@ -249,7 +252,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
   const stepValid = [
     !errors.title && !errors.category,
     !uploading,
-    !errors.price && !errors.originalPrice && !errors.stock && !errors.deliveryDays && !errors.options && !errors.sku && !errors.brand && !errors.weight && !errors.optionStock,
+    !errors.price && !errors.originalPrice && !errors.stock && !errors.prepDays && !errors.options && !errors.sku && !errors.brand && !errors.weight && !errors.optionStock,
     true,
   ];
   const allValid = FIELD_KEYS.every((k) => !errors[k]) && !uploading;
@@ -301,7 +304,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
           patch.originalPrice = form.originalPrice.trim() ? origNum : null;
         }
         if (stockNum !== Number(before.stock)) patch.stock = stockNum;
-        if (daysNum !== Number(before.deliveryDays)) patch.deliveryDays = daysNum;
+        if (daysNum !== Number(before.prepDays)) patch.prepDays = daysNum;
         if (JSON.stringify(groups) !== JSON.stringify(toGroups(before.options))) patch.variants = groups;
         if (Object.keys(patch).length > 0) await updateProduct(product.id, patch);
         toast(fr ? "Modifications enregistrées" : "Changes saved");
@@ -320,7 +323,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
           category: chosen?.name ?? category,
           ...(categoryId ? { categoryId } : {}),
           stock: stockNum,
-          deliveryDays: daysNum,
+          prepDays: daysNum,
           ...(form.images.length ? { images: form.images, image: form.images[0] } : {}),
           ...(form.sku.trim() ? { sku: form.sku.trim() } : {}),
           ...(form.brand.trim() ? { brand: form.brand.trim() } : {}),
@@ -563,11 +566,11 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               {fieldErr("stock")}
             </div>
             <div>
-              <label className={label} htmlFor="pw-delivery-days">{fr ? "Délai de livraison (jours) *" : "Delivery time (days) *"}</label>
-              <input id="pw-delivery-days" type="number" min={DELIVERY_DAYS.min} max={DELIVERY_DAYS.max} step="1" className={input} value={form.deliveryDays} onChange={(e) => { set({ deliveryDays: e.target.value }); }} onBlur={() => touch("deliveryDays")} />
-              {fieldErr("deliveryDays")}
+              <label className={label} htmlFor="pw-prep-days">{fr ? "Délai de préparation (jours) *" : "Preparation time (days) *"}</label>
+              <input id="pw-prep-days" type="number" min={PREP_DAYS.min} max={PREP_DAYS.max} step="1" className={input} value={form.prepDays} onChange={(e) => { set({ prepDays: e.target.value }); }} onBlur={() => touch("prepDays")} />
+              {fieldErr("prepDays")}
               <p className="mt-1 text-xs text-slate-500">
-                {fr ? "Du paiement à la remise au client. Le client voit la date estimée ; il ne la choisit pas." : "From payment to handover. Shoppers see the estimated date; they don't choose it."}
+                {fr ? "Le délai de livraison de l'itinéraire est ajouté pour vous. Le client voit la date estimée ; il ne la choisit pas." : "Delivery time for the route is added for you. Shoppers see the estimated date; they don't choose it."}
               </p>
             </div>
           </div>
@@ -710,7 +713,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
               [fr ? "Prix" : "Price", form.price ? formatCurrency(priceNum, locale) : ""],
               [fr ? "Prix barré" : "Compare-at", form.originalPrice ? formatCurrency(origNum, locale) : ""],
               [fr ? "Stock" : "Stock", form.stock],
-              [fr ? "Délai de livraison" : "Delivery time", form.deliveryDays ? daysLabel(Number(form.deliveryDays), fr) : ""],
+              [fr ? "Délai de préparation" : "Preparation time", isPrepDays(form.prepDays) ? daysLabel(daysNum, fr) : ""],
               ["SKU", form.sku.trim()],
               [fr ? "Marque" : "Brand", form.brand.trim()],
               [fr ? "Poids" : "Weight", weightNum ? `${weightNum} kg` : ""],

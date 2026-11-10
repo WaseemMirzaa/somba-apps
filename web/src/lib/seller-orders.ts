@@ -18,6 +18,7 @@ export type LegKind =
   | "pickup"
   | "transfer"
   | "delivery"
+  | "express"
   | "return_pickup"
   | "return_transfer"
   | "return_to_seller"
@@ -43,6 +44,10 @@ export interface TrackingLeg {
   hops?: number;
   /** The transfer run (manifest) the parcel travels in. */
   runReference?: string | null;
+  /** Split delivery: the lines this leg carries, whether it completes the order, and whose parcels it holds. */
+  items?: { orderItemId?: string; name?: string; nameFr?: string | null; qty: number }[];
+  completesOrder?: boolean;
+  sellerIds?: (string | null)[] | null;
 }
 
 export interface OrderTracking {
@@ -60,6 +65,8 @@ export interface ServerSellerOrder {
   status: string;
   packageStatus: string;
   paymentMethod: string;
+  /** `express`: a rider takes the parcel from the store straight to the customer. */
+  deliveryMode?: "standard" | "express";
   estimatedDeliveryDate?: string | null;
   createdAt: string;
   customerName: string;
@@ -84,6 +91,7 @@ const LEG_KIND: Record<LegKind, { en: string; fr: string }> = {
   pickup: { en: "Pickup from your location", fr: "Enlèvement chez vous" },
   transfer: { en: "Transfer between warehouses", fr: "Transfert entre entrepôts" },
   delivery: { en: "Delivery to the customer", fr: "Livraison au client" },
+  express: { en: "Express delivery to the customer", fr: "Livraison express au client" },
   return_pickup: { en: "Return pickup from the customer", fr: "Enlèvement du retour chez le client" },
   return_transfer: { en: "Return transfer between warehouses", fr: "Transfert du retour entre entrepôts" },
   return_to_seller: { en: "Return to you", fr: "Retour vers vous" },
@@ -148,6 +156,13 @@ export function latestLeg(tracking: OrderTracking | null | undefined, kind: LegK
   return legs.reduce((a, b) => (b.createdAt > a.createdAt ? b : a));
 }
 
+/** The newest leg that brings the order to its customer: the warehouse's delivery or an express run. */
+export function latestCustomerLeg(tracking: OrderTracking | null | undefined): TrackingLeg | null {
+  const a = latestLeg(tracking, "delivery");
+  const b = latestLeg(tracking, "express");
+  return a && b ? (b.createdAt > a.createdAt ? b : a) : (a ?? b);
+}
+
 interface StepInput {
   orderStatus: string;
   packageStatus: string;
@@ -160,10 +175,18 @@ export function shippingStep(o: StepInput): ShippingStep {
   if (o.orderStatus === "returned" || o.packageStatus === "returned") return "returned";
   if (o.orderStatus === "delivered" || o.packageStatus === "delivered") return "delivered";
 
-  const delivery = latestLeg(o.tracking, "delivery");
+  const delivery = latestCustomerLeg(o.tracking);
   const transfer = latestLeg(o.tracking, "transfer");
   const pickup = latestLeg(o.tracking, "pickup");
 
+  // Express: the rider goes from the seller straight to the customer, so there is no warehouse step at all.
+  if (delivery?.kind === "express") {
+    if (delivery.status === "in_transit" || o.orderStatus === "out_for_delivery") return "out_for_delivery";
+    if (delivery.status === "picked_up") return "picked_up";
+    if (delivery.status === "failed") return "delivery_failed";
+    if (delivery.status === "assigned") return "rider_assigned";
+    return o.packageStatus === "ready" ? "ready" : "awaiting_pickup";
+  }
   if (delivery) {
     if (delivery.status === "in_transit" || o.orderStatus === "out_for_delivery") return "out_for_delivery";
     if (delivery.status === "picked_up") return "out_for_delivery";
@@ -211,7 +234,7 @@ export function buildJourney(o: JourneyInput, fr: boolean): JourneyEvent[] {
   const closed = o.orderStatus === "cancelled" || o.packageStatus === "cancelled";
   const pickup = latestLeg(o.tracking, "pickup");
   const transfer = latestLeg(o.tracking, "transfer");
-  const delivery = latestLeg(o.tracking, "delivery");
+  const delivery = latestCustomerLeg(o.tracking);
   const rider = (l: TrackingLeg | null) => (l?.riderFirstName ? T(`Rider: ${l.riderFirstName}`, `Livreur : ${l.riderFirstName}`) : undefined);
   const failed = (l: TrackingLeg | null) =>
     l && (l.attempts > 1 || l.failureReason)
@@ -221,6 +244,8 @@ export function buildJourney(o: JourneyInput, fr: boolean): JourneyEvent[] {
   const pickupAssigned = !!pickup && pickup.status !== "unassigned";
   const pickupTaken = !!pickup && (pickup.status === "picked_up" || pickup.status === "in_transit" || pickup.status === "delivered");
   const atOrigin = (!!pickup && pickup.status === "delivered") || ["at_hub", "shipped", "out_for_delivery", "delivered"].includes(o.packageStatus);
+
+  if (delivery?.kind === "express") return buildExpressJourney(o, delivery, fr);
 
   const events: JourneyEvent[] = [
     { time: localDateTime(o.createdAt), label: T("Placed", "Commandée"), done: true },
@@ -247,6 +272,28 @@ export function buildJourney(o: JourneyInput, fr: boolean): JourneyEvent[] {
   );
   if (closed) events.push({ time: "", label: T("Cancelled", "Annulée"), done: true });
   if (o.orderStatus === "returned") events.push({ time: "", label: T("Returned", "Retournée"), done: true });
+  return events;
+}
+
+/** An express order: ready, a rider takes it from you, and brings it straight to the customer. */
+function buildExpressJourney(o: JourneyInput, leg: TrackingLeg, fr: boolean): JourneyEvent[] {
+  const T = (en: string, frText: string) => (fr ? frText : en);
+  const closed = o.orderStatus === "cancelled" || o.packageStatus === "cancelled";
+  const taken = leg.status === "picked_up" || leg.status === "in_transit" || leg.status === "delivered";
+  const events: JourneyEvent[] = [
+    { time: localDateTime(o.createdAt), label: T("Placed", "Commandée"), done: true },
+    { time: "", label: T("Confirmed", "Confirmée"), done: o.orderStatus !== "pending" && o.orderStatus !== "cancelled" },
+    { time: stamp(o.readyAt), label: T("Package ready (you)", "Colis prêt (vous)"), done: ["ready", "at_hub", "shipped", "out_for_delivery", "delivered"].includes(o.packageStatus) || taken },
+    {
+      time: stamp(leg.status !== "unassigned" ? leg.updatedAt : null),
+      label: T("Express rider assigned", "Livreur express assigné"),
+      detail: leg.riderFirstName ? T(`Rider: ${leg.riderFirstName}`, `Livreur : ${leg.riderFirstName}`) : undefined,
+      done: leg.status !== "unassigned",
+    },
+    { time: stamp(leg.pickedUpAt), label: T("Collected from you, on the way to the customer", "Collecté chez vous, en route vers le client"), done: taken },
+    { time: stamp(leg.deliveredAt), label: T("Delivered to the customer", "Livré au client"), done: leg.status === "delivered" || o.orderStatus === "delivered" },
+  ];
+  if (closed) events.push({ time: "", label: T("Cancelled", "Annulée"), done: true });
   return events;
 }
 

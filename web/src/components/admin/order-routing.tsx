@@ -14,11 +14,13 @@ import { deliveryAreaText, useStoredAreaChain } from "@/lib/areas";
 import type { TrackingLegView } from "@/lib/realtime/types";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
+import { isExpressOrder } from "@/lib/split-delivery";
 import { errMsg, useServerList } from "@/lib/admin-live";
 import {
   LEG_KIND,
   LEG_STATUS,
   fmtDateTime,
+  isCustomerLeg,
   legStatusVariant,
   pickL,
   useHubs,
@@ -127,12 +129,12 @@ export function OrderRouting({ order, sellers }: { order: Order; sellers: Seller
 
   const rows = legs.map((l) => {
     const raw = l as unknown as Record<string, unknown>;
-    const from = l.fromHub?.name ?? l.from?.name ?? (l.kind === "pickup" ? (l.sellerName ?? sellerName.get(l.sellerId ?? "") ?? (fr ? "Vendeur" : "Seller")) : hubName(l.fromHubId));
+    const from = l.fromHub?.name ?? l.from?.name ?? (l.kind === "pickup" || l.kind === "express" ? (l.sellerName ?? sellerName.get(l.sellerId ?? "") ?? (fr ? "Vendeur" : "Seller")) : hubName(l.fromHubId));
     const to =
       l.to?.name ??
-      (l.kind === "delivery" || l.kind === "replacement_delivery" ? (order.customerName || (fr ? "Client" : "Customer")) : l.kind === "return_to_seller" ? (fr ? "Vendeur" : "Seller") : hubName(l.toHubId));
+      (isCustomerLeg(l.kind ?? "") || l.kind === "replacement_delivery" ? (order.customerName || (fr ? "Client" : "Customer")) : l.kind === "return_to_seller" ? (fr ? "Vendeur" : "Seller") : hubName(l.toHubId));
     const fromPos = l.fromHub?.lat != null ? { lat: l.fromHub.lat as number, lng: l.fromHub.lng as number } : hubPos(l.fromHubId);
-    const toPos = l.kind === "delivery" || l.kind === "replacement_delivery" ? pin : l.toHub?.lat != null ? { lat: l.toHub.lat as number, lng: l.toHub.lng as number } : hubPos(l.toHubId);
+    const toPos = isCustomerLeg(l.kind ?? "") || l.kind === "replacement_delivery" ? pin : l.toHub?.lat != null ? { lat: l.toHub.lat as number, lng: l.toHub.lng as number } : hubPos(l.toHubId);
     return {
       id: l.id,
       kind: l.kind ?? "delivery",
@@ -247,6 +249,14 @@ export function OrderRouting({ order, sellers }: { order: Order; sellers: Seller
             : quote.fallback === "no_riders"
               ? fr ? "Aucun entrepôt proche n'a de livreur : la commande reste sur l'entrepôt de la zone et les admins sont alertés." : "No warehouse nearby has a rider: the order stays on the covering warehouse and admins are alerted."
               : fr ? `${quote.coveringHubName ?? "L'entrepôt de la zone"} n'a aucun livreur actif : l'entrepôt de la province le plus proche a pris le relais.` : `${quote.coveringHubName ?? "The covering warehouse"} has no active rider: the nearest warehouse of the province stood in.`}
+        </p>
+      )}
+
+      {isExpressOrder(order) && (
+        <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900" data-testid="express-route">
+          {fr
+            ? "Commande express : un livreur va du vendeur directement chez le client, sans passage par un entrepôt (l'entrepôt gestionnaire suit la livraison)."
+            : "Express order: a rider goes from the seller straight to the customer, with no warehouse hop (the managing warehouse oversees it)."}
         </p>
       )}
 

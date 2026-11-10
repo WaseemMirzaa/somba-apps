@@ -196,3 +196,20 @@ test("the delivery code lockout sentences are French (RD-01)", () => {
   assert.match(fr("Only a warehouse supervisor or an operations administrator can unlock a delivery code."), /^Seul un superviseur/);
   assert.equal(localizeApiError("This delivery code is not locked.", "en"), "This delivery code is not locked.");
 });
+
+test("the delivery model's errors read in French", () => {
+  const cases = [
+    ["Part of this order was already delivered. Contact support to stop the rest.", /déjà été livrée/],
+    ["An express parcel is still with the seller. Cancel the order instead.", /encore chez le vendeur/],
+    ["Preparation time (days) must be a whole number between 0 and 30.", /délai de préparation/],
+    ["Pin your pickup location on the map (Store settings) before offering express delivery.", /livraison express/],
+    ["Express delivery must be true or false.", /livraison express/],
+    ["Local delivery days must be a whole number between 0 and 30.", /livraison locale/],
+    ["Maximum express fee must be a number between 0 and 500.", /plafond des frais express/],
+    ["An express delivery that is delivered cannot become failed.", /Une livraison express « delivered » ne peut pas passer à « failed »/],
+  ];
+  for (const [en, re] of cases) {
+    assert.equal(localizeApiError(en, "en"), en);
+    assert.match(localizeApiError(en, "fr"), re, en);
+  }
+});

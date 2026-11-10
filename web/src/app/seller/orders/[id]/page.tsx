@@ -28,6 +28,8 @@ import { canMarkReady, cancellableLines, waitingForOtherSellers } from "@/lib/se
 import { CancelItemsDialog } from "@/components/seller/cancel-items-dialog";
 import { formatCurrency } from "@/lib/utils";
 import { dayLabel } from "@/lib/delivery-estimate";
+import { ExpressBadge, PartialDelivery } from "@/components/shop/partial-delivery";
+import type { TrackingLegView } from "@/lib/realtime/types";
 import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
@@ -112,6 +114,26 @@ export default function SellerOrderDetailPage() {
         }
       />
 
+      {order.deliveryMode === "express" && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700" data-testid="express-order">
+          <ExpressBadge fr={fr} />
+          <span>
+            {fr
+              ? "Un livreur vient chercher ce colis chez vous et le livre directement au client, sans passer par un entrepôt. Marquez « colis prêt » pour l'appeler."
+              : "A rider collects this parcel from you and takes it straight to the customer, with no warehouse in between. Mark “package ready” to call the rider."}
+          </span>
+        </div>
+      )}
+
+      <PartialDelivery
+        order={{ status: order.orderStatus }}
+        lines={order.items_detail.map((it) => ({ id: it.itemId, name: it.name, qty: it.qty, fulfilment: it.fulfilment, deliveredAt: it.deliveredAt }))}
+        legs={order.tracking?.legs as unknown as TrackingLegView[] | undefined}
+        partial={order.packageStatus === "delivered" && order.orderStatus !== "delivered" && order.orderStatus !== "cancelled" && order.orderStatus !== "returned"}
+        fr={fr}
+        audience="seller"
+      />
+
       {shared && (
         <p role="note" className="rounded-lg bg-blue-50 px-4 py-2 text-sm text-blue-800">
           {fr
@@ -138,6 +160,7 @@ export default function SellerOrderDetailPage() {
             { label: fr ? "Votre colis" : "Your package", value: <Badge variant={packageStatusVariant(order.packageStatus)}>{packageStatusLabel(order.packageStatus, fr)}</Badge> },
             { label: fr ? "Statut de commande" : "Order Status", value: <Badge variant={orderStatusVariant(order.orderStatus)}>{orderStatusLabel(order.orderStatus, fr)}</Badge> },
             { label: fr ? "Expédition" : "Shipping", value: shippingStepLabel(step, fr) },
+            ...(order.deliveryMode === "express" ? [{ label: fr ? "Mode de livraison" : "Delivery mode", value: <ExpressBadge fr={fr} /> }] : []),
             { label: fr ? "À livrer avant le" : "Deliver by", value: dayLabel(order.estimatedDeliveryDate, fr) ?? "—" },
             ...(shared ? [{ label: fr ? "Vendeurs" : "Sellers", value: fr ? `Commande partagée · ${order.sellerCount} vendeurs` : `Shared order · ${order.sellerCount} sellers` }] : []),
             { label: fr ? "Montant (vos articles)" : "Amount (your items)", value: formatCurrency(order.amount, locale) },

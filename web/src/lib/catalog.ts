@@ -1,6 +1,7 @@
 "use client";
 import { readVariants, readVariantLabels, type VariantGroup, type VariantLabels } from "@/lib/variants";
 import { pickText, type Lang, type TranslationStatus } from "@/lib/i18n-fields";
+import { prepDaysOf } from "@/lib/delivery-estimate";
 
 import { useMemo } from "react";
 import { useRealtime } from "@/context/realtime-context";
@@ -46,8 +47,11 @@ export interface ShopProduct {
   sellerOnVacation: boolean;
   sellerVacationUntil: string | null;
   sellerVacationNotice: { en: string; fr: string } | null;
-  /** `deliveryDays` plus the store's handling time. */
+  /** The seller's preparation days; the route (platform transit) is added on top. */
+  prepDays: number;
+  /** Prep + the store's handling time + the platform's local days. */
   totalDeliveryDays: number;
+  sellerExpressDelivery: boolean;
   sellerHandlingDays: number;
   /** Options the shopper must choose (empty = none). These labels are the purchase keys. */
   variants: VariantGroup[];
@@ -133,7 +137,9 @@ export function toShopProduct(p: Product): ShopProduct {
     sellerOnVacation: !!p.sellerOnVacation,
     sellerVacationUntil: p.sellerVacationUntil ?? null,
     sellerVacationNotice: p.sellerVacationNotice ?? null,
+    prepDays: prepDaysOf(p),
     totalDeliveryDays: p.totalDeliveryDays ?? p.deliveryDays ?? 3,
+    sellerExpressDelivery: !!p.sellerExpressDelivery,
     sellerHandlingDays: p.sellerHandlingDays ?? 0,
     variants: readVariants(p.variants),
     variantLabels: readVariantLabels(p.variantLabels),
@@ -212,7 +218,9 @@ export function productDetailFrom(p: ShopProduct) {
     sellerOnVacation: p.sellerOnVacation,
     sellerVacationUntil: p.sellerVacationUntil,
     sellerVacationNotice: p.sellerVacationNotice,
+    prepDays: p.prepDays,
     totalDeliveryDays: p.totalDeliveryDays,
+    sellerExpressDelivery: p.sellerExpressDelivery,
     sellerHandlingDays: p.sellerHandlingDays,
     sku: p.sku,
     brand: p.brand,

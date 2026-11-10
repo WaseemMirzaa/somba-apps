@@ -13,6 +13,20 @@
 export type ErrLocale = "en" | "fr";
 
 const EXACT: Record<string, string> = {
+  // ── delivery model: preparation, split delivery, express ──
+  "Part of this order was already delivered. Contact support to stop the rest.": "Une partie de cette commande a déjà été livrée. Contactez l'assistance pour arrêter le reste.",
+  "An express parcel is still with the seller. Cancel the order instead.": "Un colis express est encore chez le vendeur. Annulez plutôt la commande.",
+  "Preparation time (days) must be a whole number between 0 and 30.": "Le délai de préparation (jours) doit être un nombre entier entre 0 et 30.",
+  "Pin your pickup location on the map (Store settings) before offering express delivery.": "Placez votre lieu de collecte sur la carte (Paramètres de la boutique) avant de proposer la livraison express.",
+  "Express delivery must be true or false.": "La livraison express doit être « vrai » ou « faux ».",
+  "Local delivery days must be a whole number between 0 and 30.": "Les jours de livraison locale doivent être un nombre entier entre 0 et 30.",
+  "Split delivery hours must be a whole number between 0 and 720.": "Les heures avant livraison partielle doivent être un nombre entier entre 0 et 720.",
+  "Express delivery days must be a whole number between 0 and 30.": "Les jours de livraison express doivent être un nombre entier entre 0 et 30.",
+  "Express base fee must be a number between 0 and 100.": "Les frais de base express doivent être un nombre entre 0 et 100.",
+  "Express fee per km must be a number between 0 and 50.": "Les frais express par km doivent être un nombre entre 0 et 50.",
+  "Maximum express fee must be a number between 0 and 500.": "Le plafond des frais express doit être un nombre entre 0 et 500.",
+  "Express maximum distance must be a number between 0 and 100.": "La distance maximale express doit être un nombre entre 0 et 100.",
+
   // ── generic / auth ──
   "Request failed.": "La requête a échoué.",
   "Socket not connected.": "Connexion perdue. Réessayez dans un instant.",
@@ -494,6 +508,7 @@ const PATTERNS: Rule[] = [
   [/^Choose a (.+) for "(.+)"\.$/, (m) => `Choisissez : ${m[1]} pour « ${m[2]} ».`],
   [/^Your wallet balance is too low for the price difference \(\$([\d.,]+)\)\. Top up your wallet and try again\.$/, (m) => `Le solde de votre portefeuille est trop bas pour la différence de prix ($${m[1]}). Rechargez-le et réessayez.`],
   [/^Can't move from (\w+) to (\w+)\.$/, (m) => `Passage impossible de « ${m[1]} » à « ${m[2]} ».`],
+  [/^An express delivery that is (\w+) cannot become (\w+)\.$/, (m) => `Une livraison express « ${m[1]} » ne peut pas passer à « ${m[2]} ».`],
   [/^A campaign that is (\w+) cannot become (\w+)\.$/, (m) => `Une campagne « ${m[1]} » ne peut pas passer à « ${m[2]} ».`],
   [/^Only (\d+) of "(.+)" \((.+)\) left in stock\.$/, (m) => `Il ne reste que ${m[1]} × « ${m[2]} » (${m[3]}) en stock.`],
   [/^Only (\d+) of "(.+)" left in stock\.$/, (m) => `Il ne reste que ${m[1]} × « ${m[2]} » en stock.`],

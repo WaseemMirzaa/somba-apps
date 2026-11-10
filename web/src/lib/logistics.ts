@@ -13,17 +13,14 @@ import type { Area, AreaChain } from "@/lib/areas";
 import { isSellerAreaRefusal, notServedFromAck, notServedFromError, type NotServedInfo } from "@/lib/not-served";
 import { formatTransit } from "@/lib/quote-text";
 import { canUnlockDeliveryCode } from "@/lib/code-lock";
+import type { DeliveryMode } from "@/lib/realtime/types";
+import type { LegKind, L } from "@/lib/leg-kinds";
 
 export { formatTransit };
+export type { DeliveryMode };
+export type { LegKind, L } from "@/lib/leg-kinds";
+export { pickL, LEG_KIND, LEG_KIND_SHORT, LEG_KINDS, HUB_BOUND, RIDER_FINISHED, CUSTOMER_KINDS, isHubBound, isCustomerLeg, meetsCustomer } from "@/lib/leg-kinds";
 
-export type LegKind =
-  | "pickup"
-  | "transfer"
-  | "delivery"
-  | "return_pickup"
-  | "return_transfer"
-  | "return_to_seller"
-  | "replacement_delivery";
 
 export type LegStatus = "unassigned" | "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
 
@@ -110,6 +107,10 @@ export interface TaskView {
   hop?: number | null;
   hops?: number | null;
   finalHubId?: string | null;
+  /** Split delivery: the sellers whose parcels this customer leg carries (null = a legacy leg that carries everything). */
+  sellerIds?: (string | null)[] | null;
+  /** True when delivering this leg completes the order; false = a partial delivery, more follows. */
+  completesOrder?: boolean;
 }
 
 export interface Hub {
@@ -207,7 +208,8 @@ export interface DeskQueue {
 export interface Custody {
   hubId: string;
   inbound: TaskView[];
-  onHand: (TaskView & { since: string; waitingFor: string })[];
+  /** `splitAt`: when a multi-seller order's oldest waiting parcel is due to leave alone (null = no split pending). */
+  onHand: (TaskView & { since: string; waitingFor: string; splitAt?: string | null })[];
   outbound: TaskView[];
   counts: Record<string, number>;
 }
@@ -242,6 +244,17 @@ export interface DeliveryQuote {
   interCityDays?: number;
   /** A flat fee of the area replaced base + per km. */
   feeOverrideUsd?: number | null;
+  /** Delivery model: `express` = a rider goes straight from the seller to the customer (no warehouse hop). */
+  deliveryMode?: DeliveryMode;
+  express?: boolean;
+  /** Preparation, route and total days of the deciding seller; null without lines. */
+  prepDays?: number | null;
+  routeDays?: number | null;
+  estimateDays?: number | null;
+  /** YYYY-MM-DD, Kinshasa time: the day `orders:create` will stamp. Absent on an old server. */
+  estimatedDeliveryDate?: string | null;
+  /** A multi-seller order leaves with what arrived after this many hours (0 = never split). */
+  splitAfterHours?: number;
 }
 
 /** One seller's pickup: the warehouse that collects it and the hops it travels to the delivery warehouse. */
@@ -259,6 +272,9 @@ export interface QuoteOrigin {
   hops?: QuoteHop[];
   /** Hours this seller's parcels spend on the road between warehouses. */
   transitHours?: number;
+  prepDays?: number | null;
+  routeDays?: number | null;
+  estimatedDeliveryDate?: string | null;
 }
 
 /** One transfer between two warehouses on a route: its lane's transit time, and the lane's own cost (null = standard fee). */
@@ -270,32 +286,6 @@ export interface QuoteHop {
   transitHours?: number;
   costUsd?: number | null;
 }
-
-type L = { en: string; fr: string };
-export const pickL = (l: L | undefined, fr: boolean, fallback = "") => (l ? (fr ? l.fr : l.en) : fallback);
-
-export const LEG_KIND: Record<LegKind, L> = {
-  pickup: { en: "Seller pickup", fr: "Collecte vendeur" },
-  transfer: { en: "Transfer between warehouses", fr: "Transfert entre entrepôts" },
-  delivery: { en: "Customer delivery", fr: "Livraison client" },
-  return_pickup: { en: "Return pickup", fr: "Collecte de retour" },
-  return_transfer: { en: "Return transfer", fr: "Transfert de retour" },
-  return_to_seller: { en: "Return to seller", fr: "Retour au vendeur" },
-  replacement_delivery: { en: "Replacement delivery", fr: "Livraison de remplacement" },
-};
-
-/** Short names for the desk tabs. */
-export const LEG_KIND_SHORT: Record<LegKind, L> = {
-  pickup: { en: "Pickups", fr: "Collectes" },
-  transfer: { en: "Transfers", fr: "Transferts" },
-  delivery: { en: "Deliveries", fr: "Livraisons" },
-  return_pickup: { en: "Return pickups", fr: "Collectes de retour" },
-  return_transfer: { en: "Return transfers", fr: "Transferts de retour" },
-  return_to_seller: { en: "Back to seller", fr: "Retours vendeur" },
-  replacement_delivery: { en: "Replacements", fr: "Remplacements" },
-};
-
-export const LEG_KINDS = Object.keys(LEG_KIND) as LegKind[];
 
 export const LEG_STATUS: Record<LegStatus, L> = {
   unassigned: { en: "Unassigned", fr: "Non assignée" },
@@ -323,17 +313,6 @@ export function legStatusVariant(s: string): "success" | "warning" | "info" | "d
   }
 }
 
-/** Legs that finish when hub staff scan the parcel in. */
-export const HUB_BOUND: LegKind[] = ["pickup", "transfer", "return_pickup", "return_transfer"];
-/** Legs that finish when the rider hands the parcel over. */
-export const RIDER_FINISHED: LegKind[] = ["delivery", "replacement_delivery", "return_to_seller"];
-
-export const isHubBound = (k: LegKind | string) => (HUB_BOUND as string[]).includes(k);
-
-/** Legs that meet the customer face to face. */
-export const meetsCustomer = (k: LegKind | string) =>
-  k === "delivery" || k === "replacement_delivery" || k === "return_pickup";
-
 export const TIER_LABEL: Record<WarehouseTier, L> = {
   operator: { en: "Operator", fr: "Opérateur" },
   supervisor: { en: "Supervisor", fr: "Superviseur" },
@@ -357,7 +336,8 @@ export { legItemName, legItemsText } from "@/lib/leg-items";
 
 /** Customer-facing journey: ordered stages of an order built from its legs (order flow only). */
 export function orderJourney(legs: TaskView[]): TaskView[] {
-  const order: LegKind[] = ["pickup", "transfer", "delivery"];
+  // An express order has one leg, seller -> customer: no warehouse hop in between.
+  const order: LegKind[] = ["pickup", "express", "transfer", "delivery"];
   return legs
     .filter((l) => l.orderFlow !== false && order.includes(l.kind))
     .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || a.createdAt.localeCompare(b.createdAt));

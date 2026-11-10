@@ -1,12 +1,9 @@
 // Run: npm test (from web/). Transpiles order-journey.ts with the project's own `typescript` and imports it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import ts from "typescript";
+import { loadTs } from "./ts-load.mjs";
 
-const src = readFileSync(new URL("./order-journey.ts", import.meta.url), "utf8");
-const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-const { customerJourney } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+const { customerJourney } = await loadTs("order-journey");
 
 const hubs = new Map([
   ["L", { id: "L", name: "Entrepôt Limete", city: "Kinshasa" }],
@@ -120,4 +117,75 @@ test("old shape (nested fromHub/toHub only) still reads, French labels included"
   assert.equal(hop.label, "En transfert vers Entrepôt Kikwit");
   assert.match(hop.hint, /Entrepôt Limete → Entrepôt Kikwit · chauffeur Patrick/);
   assert.equal(hop.state, "current");
+});
+
+test("an express order has no warehouse step: seller -> rider -> customer", () => {
+  const order = {
+    status: "shipped",
+    deliveryMode: "express",
+    items: [{ sellerId: "s1", sellerName: "Limete Shop", fulfilment: "received" }],
+    originHubIds: ["L"],
+    destinationHubId: "L",
+    createdAt: "2026-10-26T08:00:00Z",
+    updatedAt: "2026-10-26T09:00:00Z",
+  };
+  const steps = customerJourney(order, hubs, false);
+  assert.deepEqual(steps.map((x) => x.key), ["placed", "pickup-s1", "express", "delivered"]);
+  assert.ok(!steps.some((x) => /warehouse|Entrepôt|At /i.test(x.label)), "no warehouse in an express journey");
+  assert.equal(steps[1].state, "done"); // the rider has it
+  assert.equal(steps[2].state, "current"); // on its way to the customer
+  assert.equal(steps[3].state, "todo");
+  const fr = customerJourney(order, hubs, true);
+  assert.match(fr[2].label, /directement depuis le vendeur/);
+});
+
+test("express: before the rider comes the seller is packing, and a delivered order is all done", () => {
+  const base = { deliveryMode: "express", items: [{ sellerId: "s1", sellerName: "Shop", fulfilment: "open" }], originHubIds: [], destinationHubId: null, createdAt: "2026-10-26T08:00:00Z", updatedAt: "2026-10-26T09:00:00Z" };
+  const packing = customerJourney({ ...base, status: "confirmed" }, hubs, false);
+  assert.equal(packing[1].state, "current");
+  assert.match(packing[1].hint, /packing/);
+  const done = customerJourney({ ...base, status: "delivered", items: [{ sellerId: "s1", sellerName: "Shop", fulfilment: "received" }] }, hubs, false);
+  assert.deepEqual(done.map((x) => x.state), ["done", "done", "done", "done"]);
+  // An express leg in the tracking is enough, even without deliveryMode.
+  const byLeg = customerJourney({ ...base, deliveryMode: undefined, status: "processing", tracking: { legs: [{ id: "x", kind: "express", status: "assigned", createdAt: "2026-10-26T08:00:00Z" }] } }, hubs, false);
+  assert.ok(byLeg.some((x) => x.key === "express"));
+});
+
+test("a split order: a partial leg on the road makes the delivery step current with a hint", () => {
+  const order = {
+    status: "shipped",
+    items: [{ sellerId: "s1", sellerName: "A", fulfilment: "received" }, { sellerId: "s2", sellerName: "B", fulfilment: "ready" }],
+    originHubIds: ["L"],
+    destinationHubId: "L",
+    createdAt: "2026-10-26T08:00:00Z",
+    updatedAt: "2026-10-26T09:00:00Z",
+    tracking: { legs: [{ id: "d1", kind: "delivery", status: "in_transit", createdAt: "2026-10-26T10:00:00Z", completesOrder: false }] },
+  };
+  const steps = customerJourney(order, hubs, false);
+  const delivery = steps.find((x) => x.key === "delivery");
+  assert.equal(delivery.state, "current");
+  assert.match(delivery.hint, /on its way/);
+  assert.equal(steps.find((x) => x.key === "warehouse").state, "done");
+  assert.equal(steps.at(-1).state, "todo"); // the order is not delivered yet
+});
+
+test("a split order: after the first part was delivered the hint says so (English and French)", () => {
+  const order = {
+    status: "shipped",
+    partiallyDelivered: true,
+    items: [{ sellerId: "s1", sellerName: "A", fulfilment: "received" }, { sellerId: "s2", sellerName: "B", fulfilment: "received" }],
+    originHubIds: ["L"],
+    destinationHubId: "L",
+    createdAt: "2026-10-26T08:00:00Z",
+    updatedAt: "2026-10-26T09:00:00Z",
+    tracking: { legs: [{ id: "d1", kind: "delivery", status: "delivered", createdAt: "2026-10-26T10:00:00Z" }] },
+  };
+  assert.match(customerJourney(order, hubs, false).find((x) => x.key === "delivery").hint, /Part of your order was delivered/);
+  assert.match(customerJourney(order, hubs, true).find((x) => x.key === "delivery").hint, /Une partie de votre commande a été livrée/);
+});
+
+test("an ordinary order is unchanged: no hint on the delivery step", () => {
+  const steps = customerJourney({ ...base, status: "out_for_delivery", destinationHubId: "L" }, hubs, false);
+  assert.equal(steps.find((x) => x.key === "delivery").hint, undefined);
+  assert.equal(steps.find((x) => x.key === "delivery").state, "current");
 });

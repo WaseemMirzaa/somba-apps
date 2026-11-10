@@ -1,6 +1,7 @@
 import type { Order, TrackingLegView } from "@/lib/realtime/types";
 import type { Step, StepState } from "@/lib/after-sale";
 import type { PublicHub } from "@/lib/shop-engage";
+import { customerLegs, isExpressOrder, openCustomerLeg } from "@/lib/split-delivery";
 
 /**
  * The parcel's journey as the customer can follow it: seller -> origin warehouse -> (transfer) -> destination
@@ -13,9 +14,13 @@ import type { PublicHub } from "@/lib/shop-engage";
  * When the order carries `tracking.legs`, every transfer leg is one hop of the route and gets its own steps
  * ("In transfer to Entrepôt Kinshasa", "At Entrepôt Kinshasa", …); each hop has its own driver. An order without
  * transfer legs keeps the single "Transfer origin → destination" step.
+ *
+ * An express order skips the warehouses: the seller hands the parcel to a rider who brings it to the customer.
+ * A split order (`partiallyDelivered`, or a customer leg already on the road while the order is still `shipped`) shows
+ * the delivery step as current with a hint: part of the order is on its way or was delivered.
  */
 export function customerJourney(
-  order: Pick<Order, "status" | "items" | "originHubIds" | "destinationHubId" | "createdAt" | "updatedAt"> & Partial<Pick<Order, "tracking">>,
+  order: Pick<Order, "status" | "items" | "originHubIds" | "destinationHubId" | "createdAt" | "updatedAt"> & Partial<Pick<Order, "tracking" | "deliveryMode" | "partiallyDelivered">>,
   hubs: Map<string, PublicHub>,
   fr: boolean,
 ): Step[] {
@@ -39,6 +44,7 @@ export function customerJourney(
 
   const steps: Step[] = [];
   steps.push({ key: "placed", label: t("Order confirmed", "Commande confirmée"), state: rank >= 1 || ended ? "done" : "current", at: order.createdAt });
+  if (isExpressOrder(order)) return expressSteps(order, steps, { t, ended, rank, status, sellers });
 
   const dest = order.destinationHubId ?? null;
   const origins = order.originHubIds ?? [];
@@ -77,15 +83,60 @@ export function customerJourney(
     });
   }
   const transfersDone = hopLegs.every((l) => l.status === "delivered");
+  // Split delivery: a customer leg is on the road, or part of the order was delivered, while the order itself is still `shipped`.
+  const roadLeg = openCustomerLeg(order.tracking?.legs);
+  const deliveredLegs = customerLegs(order.tracking?.legs).filter((l) => l.status === "delivered");
+  const partial = !ended && rank < 5 && (order.partiallyDelivered === true || deliveredLegs.length > 0 || (!!roadLeg && rank < 4));
+  const partialHint = deliveredLegs.length > 0 || order.partiallyDelivered === true
+    ? t("Part of your order was delivered. The rest is coming.", "Une partie de votre commande a été livrée. Le reste arrive.")
+    : t("Part of your order is on its way.", "Une partie de votre commande est en route.");
   steps.push({
     key: "warehouse",
     label: t(`At ${hubName(dest)}, ready to leave`, `À ${hubName(dest)}, prêt au départ`),
-    state: ended ? "todo" : rank >= 4 ? "done" : rank === 3 && transfersDone ? "current" : "todo",
+    state: ended ? "todo" : rank >= 4 || partial ? "done" : rank === 3 && transfersDone ? "current" : "todo",
   });
   steps.push({
     key: "delivery",
     label: t(`Out for delivery from ${hubName(dest)}`, `En livraison depuis ${hubName(dest)}`),
-    state: ended ? "todo" : rank >= 5 ? "done" : rank === 4 ? "current" : "todo",
+    hint: partial ? partialHint : undefined,
+    state: ended ? "todo" : rank >= 5 ? "done" : rank === 4 || partial ? "current" : "todo",
+  });
+  steps.push({
+    key: "delivered",
+    label: t("Delivered to you", "Livré chez vous"),
+    state: status === "delivered" || status === "returned" ? "done" : "todo",
+    at: status === "delivered" ? order.updatedAt : null,
+  });
+  if (status === "cancelled") steps.push({ key: "cancelled", label: t("Order cancelled", "Commande annulée"), state: "bad", at: order.updatedAt });
+  if (status === "returned") steps.push({ key: "returned", label: t("Order returned", "Commande retournée"), state: "bad", at: order.updatedAt });
+  return steps;
+}
+
+/**
+ * An express order: ordered, packed by the seller, collected by a rider, on its way, delivered. There is no warehouse
+ * in between. The order status tells where it is (`processing` = rider assigned, `shipped` = collected,
+ * `out_for_delivery`, `delivered`); the seller's line state tells when the rider was asked (`ready`) and has it (`received`).
+ */
+function expressSteps(
+  order: Pick<Order, "createdAt" | "updatedAt" | "items">,
+  steps: Step[],
+  ctx: { t: (en: string, fr: string) => string; ended: boolean; rank: number; status: string; sellers: { id: string; name: string; lines: Order["items"] }[] },
+): Step[] {
+  const { t, ended, rank, status, sellers } = ctx;
+  const live = sellers.flatMap((s) => s.lines).filter((l) => l.fulfilment !== "cancelled");
+  const name = sellers[0]?.name ?? "Somba&Teka";
+  const ready = live.some((l) => l.fulfilment === "ready" || l.fulfilment === "received") || rank >= 2;
+  const collected = live.length > 0 && live.every((l) => l.fulfilment === "received") || rank >= 3;
+  steps.push({
+    key: `pickup-${sellers[0]?.id ?? "none"}`,
+    label: t(`${name} hands your parcel to an express rider`, `${name} remet votre colis à un livreur express`),
+    hint: collected ? undefined : ready ? t("A rider is coming to collect it.", "Un livreur vient le chercher.") : t("The seller is packing your order.", "Le vendeur prépare votre commande."),
+    state: ended ? (collected ? "done" : "todo") : collected ? "done" : ready || rank >= 1 ? "current" : "todo",
+  });
+  steps.push({
+    key: "express",
+    label: t("On its way to you, straight from the seller", "En route vers vous, directement depuis le vendeur"),
+    state: ended ? "todo" : rank >= 5 ? "done" : rank >= 3 ? "current" : "todo",
   });
   steps.push({
     key: "delivered",

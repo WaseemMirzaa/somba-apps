@@ -12,6 +12,8 @@ import { LoadError, SectionLoader } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { sellerRequest, useLiveQuery } from "@/lib/seller-api";
+import { ExpressBadge } from "@/components/shop/partial-delivery";
+import { isExpressOrder } from "@/lib/split-delivery";
 import { downloadText, shippingStep, shippingStepLabel, shippingStepVariant, type ServerSellerOrder } from "@/lib/seller-orders";
 import {
   errMessage,
@@ -96,6 +98,7 @@ export default function SellerOrdersPage() {
           step: shippingStep({ orderStatus: o.status, packageStatus: o.packageStatus, tracking }),
           rider: tracking?.riderFirstName ?? null,
           sellerCount: o.sellerCount,
+          express: isExpressOrder({ deliveryMode: o.deliveryMode, tracking }),
           date: localDay(o.createdAt),
         };
       }),
@@ -176,6 +179,7 @@ export default function SellerOrdersPage() {
                       <Link href={`/seller/orders/${row.id}`} className="font-medium text-[var(--primary)] hover:underline">
                         {String(row.id)}
                       </Link>
+                      {row.express === true && <ExpressBadge fr={fr} className="mt-1" />}
                       {(row.sellerCount as number) > 1 && (
                         <p className="text-xs text-slate-500">
                           {fr ? `Commande partagée · ${row.sellerCount} vendeurs` : `Shared order · ${row.sellerCount} sellers`}

@@ -112,7 +112,9 @@ export function DeliveryQuoteCard({
     <div className="rounded-xl border border-[var(--border)] bg-slate-50/60 p-4 text-sm" data-testid="delivery-quote">
       <p className="mb-2 flex items-center gap-2 font-semibold text-slate-800">
         <Truck className="h-4 w-4 text-[var(--primary)]" />
-        {fr ? "Livraison depuis l'entrepôt de votre zone" : "Delivered from your area's warehouse"}
+        {quote?.deliveryMode === "express"
+          ? fr ? "Livraison express : directement depuis le vendeur" : "Express delivery: straight from the seller"
+          : fr ? "Livraison depuis l'entrepôt de votre zone" : "Delivered from your area's warehouse"}
       </p>
       {loading && !quote && <p className="text-slate-500">{fr ? "Calcul des frais de livraison…" : "Working out your delivery fee…"}</p>}
       {error && !quote && <p role="alert" className="text-red-600">{error}</p>}
@@ -123,7 +125,13 @@ export function DeliveryQuoteCard({
               {fr ? "Zone de livraison" : "Delivery area"}: <span className="font-medium">{areaName(quote.destinationArea, fr)}</span>
             </p>
           )}
-          {quote.destinationHub && (
+          {quote.deliveryMode === "express" && (
+            <p className="text-violet-800" data-testid="quote-express">
+              {fr ? "Un livreur apporte votre colis directement depuis la boutique du vendeur, sans passer par un entrepôt." : "A rider brings your parcel straight from the seller's store, with no warehouse in between."}
+              {quote.pinned && quote.distanceKm > 0 ? ` · ${quote.distanceKm.toLocaleString(fr ? "fr-FR" : "en-GB", { maximumFractionDigits: 1 })} km` : ""}
+            </p>
+          )}
+          {quote.deliveryMode !== "express" && quote.destinationHub && (
             <p className="text-slate-700">
               {fr ? "Entrepôt de livraison" : "Delivery warehouse"}: <span className="font-medium">{quote.destinationHubName ?? quote.destinationHub.name}</span>
               {quote.destinationHub.city ? ` · ${quote.destinationHub.city}` : ""}
@@ -134,7 +142,7 @@ export function DeliveryQuoteCard({
             <span>{fr ? "Livraison jusqu'à chez vous" : "Delivery to your door"}</span>
             <span>{quote.deliveryUsd === 0 ? (fr ? "Gratuit" : "Free") : formatCurrency(quote.deliveryUsd, locale)}</span>
           </div>
-          {(quote.origins ?? []).length > 0 && (
+          {quote.deliveryMode !== "express" && (quote.origins ?? []).length > 0 && (
             <div className="space-y-0.5 text-xs text-slate-500" data-testid="quote-origins">
               <p>
                 {fr ? "Collecte chez le vendeur" : "Collected from the seller"}:{" "}

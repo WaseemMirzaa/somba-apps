@@ -75,3 +75,10 @@ test("refunded total, cancelled counts and when packages are shown", () => {
   assert.equal(shouldShowPackages([line("a", "open"), line("a", "open")]), false);
   assert.equal(shouldShowPackages([line("a", "open"), line("b", "open")]), true);
 });
+
+test("split delivery: a seller whose lines were all delivered shows Delivered while the order is still on its way", () => {
+  const delivered = [{ sellerId: "a", fulfilment: "received", deliveredAt: "2026-11-10T09:00:00Z" }];
+  const waiting = [{ sellerId: "b", fulfilment: "received", deliveredAt: null }];
+  const pkgs = buildPackages({ status: "shipped", paymentMethod: "wallet" }, [...delivered, ...waiting]);
+  assert.deepEqual(pkgs.map((p) => p.status), ["delivered", "shipped"]);
+});
