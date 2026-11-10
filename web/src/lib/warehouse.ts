@@ -171,6 +171,7 @@ export function waitingForText(w: string | null | undefined, fr: boolean): strin
     pickup: { en: "pickup", fr: "collecte" },
     transfer: { en: "transfer", fr: "transfert" },
     delivery: { en: "delivery", fr: "livraison" },
+    express: { en: "express delivery", fr: "livraison express" },
     return_transfer: { en: "return transfer", fr: "transfert de retour" },
     return_to_seller: { en: "return to seller", fr: "retour au vendeur" },
     replacement_delivery: { en: "replacement delivery", fr: "livraison de remplacement" },

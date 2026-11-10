@@ -14,6 +14,8 @@ import { RIDER_STATUS_LABEL, riderStatusVariant } from "@/components/warehouse/r
 import { TaskActions } from "@/components/warehouse/rider-task-actions";
 import { useCodEnabled, useRiderData } from "@/lib/rider";
 import { riderPaymentLabel, showTaskCash } from "@/lib/rider-cod";
+import { riderBrief } from "@/lib/rider-actions";
+import { usePublicSettings } from "@/lib/shop-live";
 import { formatCurrency } from "@/lib/utils";
 import { paymentMethodLabel } from "@/lib/seller-labels";
 import { variantDisplay } from "@/lib/i18n-fields";
@@ -26,6 +28,7 @@ export default function RiderTaskDetailPage() {
   const { getRiderTask, refresh, loading } = useRiderData();
   const task = getRiderTask(id);
   const codEnabled = useCodEnabled();
+  const settings = usePublicSettings();
 
   if (!task) {
     return (
@@ -38,6 +41,8 @@ export default function RiderTaskDetailPage() {
   const label = RIDER_STATUS_LABEL[task.status];
   const statusLabel = fr ? label.fr : label.en;
   const done = task.status === "delivered" || task.status === "failed";
+  // Cash and the customer's code only when they will really be asked for (COD offered, the code setting on).
+  const brief = riderBrief({ ...task, codAmount: showTaskCash(codEnabled, task) ? task.codAmount : 0 }, fr, { requireCode: settings.requireDeliveryCode, cash: formatCurrency(task.codAmount, locale) });
   const mapsUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 
   return (
@@ -48,8 +53,17 @@ export default function RiderTaskDetailPage() {
         <Badge variant={riderStatusVariant(task.status)}>{statusLabel}</Badge>
         {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts} sur 3` : `Attempt ${task.attempts} of 3`}</Badge>}
         {showTaskCash(codEnabled, task) && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
-        <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
+        <Badge variant={task.kind === "express" ? "purple" : "primary"}>{pickL(LEG_KIND[task.kind], fr)}</Badge>
+        {task.partial && <Badge variant="info">{fr ? "Livraison partielle" : "Partial delivery"}</Badge>}
       </div>
+
+      {!done && brief.length > 0 && (
+        <ul className="space-y-1 rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm text-violet-900" data-testid="rider-brief">
+          {brief.map((b) => (
+            <li key={b}>{b}</li>
+          ))}
+        </ul>
+      )}
 
       {task.failureReason && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">

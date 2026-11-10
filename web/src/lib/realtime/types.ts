@@ -72,6 +72,9 @@ export interface OrderItem {
   fulfilment?: ItemFulfilment;
   readyAt?: string | null;
   receivedAt?: string | null;
+  /** Split delivery: when the customer leg carrying this line was delivered (null = still coming), and which leg that was (staff views). */
+  deliveredAt?: string | null;
+  deliveryTaskId?: string | null;
   /** Why the seller cancelled this line. */
   cancelReason?: string | null;
   /** Money refunded for this line alone (seller cancellation). */
@@ -81,6 +84,9 @@ export interface OrderItem {
   /** Commission on this line in USD, frozen when the order was placed. */
   commissionUsd?: number;
 }
+
+/** How an order reaches its customer: through the warehouse, or `express` straight from the seller. */
+export type DeliveryMode = "standard" | "express";
 
 export type ItemFulfilment = "open" | "ready" | "received" | "cancelled";
 
@@ -107,6 +113,10 @@ export interface SellerOrderView {
   status: OrderStatus;
   packageStatus: PackageStatus;
   paymentMethod: Order["paymentMethod"];
+  /** `express` = a rider takes the parcel from this store straight to the customer, no warehouse hop. */
+  deliveryMode?: DeliveryMode;
+  /** The seller's tracking: only the legs that carry their parcel. */
+  tracking?: OrderTracking | null;
   /** Expected delivery day (YYYY-MM-DD): order day + the slowest line's seller-set delivery time. */
   estimatedDeliveryDate?: string | null;
   createdAt: string;
@@ -143,6 +153,10 @@ export interface TrackingLegView {
   toHubName?: string | null;
   runId?: string | null;
   runReference?: string | null;
+  /** Customer legs of a split order: whose parcels they carry, the lines, and whether delivering it completes the order. */
+  sellerIds?: (string | null)[] | null;
+  items?: { orderItemId?: string; productId?: string; name?: string | null; nameFr?: string | null; qty: number; variant?: string | null }[] | null;
+  completesOrder?: boolean;
 }
 
 export interface OrderTracking {
@@ -169,6 +183,10 @@ export interface Order {
   totalUsd: number;
   /** Legacy (history only): zones are gone, delivery is routed through warehouses. */
   zoneId?: string | null;
+  /** `express`: one seller in the customer's commune, a rider goes straight from the store to the door. */
+  deliveryMode?: DeliveryMode;
+  /** Split delivery (customer view): part of the order was delivered and the rest is still coming. */
+  partiallyDelivered?: boolean;
   /** The warehouse nearest the customer: it makes the last leg. */
   destinationHubId?: string | null;
   /** One origin warehouse per seller on the order. */
@@ -223,8 +241,12 @@ export interface Product {
   sellerOnVacation?: boolean;
   sellerVacationUntil?: string | null;
   sellerHandlingDays?: number;
-  /** `deliveryDays` + the store's handling time. */
+  /** Seller preparation days (0 to 30); older servers send only `deliveryDays` (= prep + the platform's local days). */
+  prepDays?: number;
+  /** Prep + the store's handling time + the platform's local days. */
   totalDeliveryDays?: number;
+  /** The store offers express delivery (the platform switch decides whether an order can use it). */
+  sellerExpressDelivery?: boolean;
   sellerVacationNotice?: { en: string; fr: string } | null;
   /** The stored listing price (before flash sale / campaign). */
   basePrice?: number;
@@ -337,6 +359,8 @@ export interface DeliveryTask {
   hop?: number | null;
   hops?: number | null;
   finalHubId?: string | null;
+  sellerIds?: (string | null)[] | null;
+  completesOrder?: boolean;
 }
 
 export interface AppNotification {

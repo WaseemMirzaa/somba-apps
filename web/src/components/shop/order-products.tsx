@@ -7,6 +7,8 @@ import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
 import { localizeVariant, pickText, variantDisplay } from "@/lib/i18n-fields";
 import type { PackageStatus } from "@/lib/realtime/types";
+import { isPartiallyDelivered } from "@/lib/split-delivery";
+import { fmtDateTime } from "@/lib/logistics";
 import { buildPackages, isCancelledLine, shouldShowPackages, type PackageLine } from "@/lib/shop-packages";
 
 // Order item variants come from the data layer as free-form English tokens (e.g. "Default", "256GB Black"): the
@@ -58,7 +60,7 @@ export function packageStatusLabel(status: PackageStatus, fr: boolean): string {
   return fr ? STATUS_LABEL[status].fr : STATUS_LABEL[status].en;
 }
 
-function ProductRow({ item }: { item: OrderProductEntry }) {
+function ProductRow({ item, showDelivered }: { item: OrderProductEntry; showDelivered?: boolean }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const name = pickText(fr, item.name, item.nameFr);
@@ -74,6 +76,11 @@ function ProductRow({ item }: { item: OrderProductEntry }) {
           {name}
         </Link>
         <p className="text-xs text-slate-500">{variantDisplay(item.variant, fr ? item.variantFr : null, fr)}</p>
+        {showDelivered && !cancelled && (
+          <p className={`text-xs font-medium ${item.deliveredAt ? "text-emerald-700" : "text-amber-800"}`} data-testid="line-delivery">
+            {item.deliveredAt ? (fr ? `Livré le ${fmtDateTime(item.deliveredAt, true)}` : `Delivered ${fmtDateTime(item.deliveredAt, false)}`) : fr ? "Pas encore livré" : "Still coming"}
+          </p>
+        )}
         {cancelled && (
           <div className="mt-1 space-y-0.5 text-xs">
             <p className="font-medium text-red-700">
@@ -115,10 +122,12 @@ export function OrderProducts({
 }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  // Split delivery: some lines reached the customer, the others are still coming.
+  const partial = isPartiallyDelivered({ status: order.status, items });
   if (!shouldShowPackages(items)) {
     return (
       <div className="space-y-4">
-        {items.map((item, i) => <ProductRow key={`${item.productId}-${item.variant}-${i}`} item={item} />)}
+        {items.map((item, i) => <ProductRow key={`${item.productId}-${item.variant}-${i}`} item={item} showDelivered={partial} />)}
       </div>
     );
   }
@@ -135,7 +144,7 @@ export function OrderProducts({
             <Badge variant={STATUS_VARIANT[pkg.status]}>{packageStatusLabel(pkg.status, fr)}</Badge>
           </header>
           <div className="space-y-4">
-            {pkg.items.map((item, i) => <ProductRow key={`${item.productId}-${item.variant}-${i}`} item={item} />)}
+            {pkg.items.map((item, i) => <ProductRow key={`${item.productId}-${item.variant}-${i}`} item={item} showDelivered={partial} />)}
           </div>
         </section>
       ))}

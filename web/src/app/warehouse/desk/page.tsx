@@ -17,7 +17,7 @@ import { deskActions, parcelCode, useDeskQueue, useHubScope, type DeskTask } fro
 import { errorMessage } from "@/lib/warehouse-live";
 import { cn } from "@/lib/utils";
 
-type TabId = "pickup" | "transfer_out" | "transfer_in" | "transfer" | "delivery" | "return_pickup" | "replacement_delivery" | "return_transfer" | "return_to_seller";
+type TabId = "pickup" | "transfer_out" | "transfer_in" | "transfer" | "delivery" | "express" | "return_pickup" | "replacement_delivery" | "return_transfer" | "return_to_seller";
 
 const STATUS_FILTERS = ["open", "all", "unassigned", "assigned", "picked_up", "in_transit", "delivered", "failed"] as const;
 
@@ -34,7 +34,7 @@ function DeskContent() {
   const [query, setQuery] = useState("");
   const kindParam = params.get("kind");
   const [tab, setTab] = useState<TabId>(
-    (kindParam as TabId | null) && (kindParam === "transfer" || kindParam === "pickup" || kindParam === "delivery" || kindParam === "return_pickup" || kindParam === "replacement_delivery" || kindParam === "return_transfer" || kindParam === "return_to_seller")
+    (kindParam as TabId | null) && (kindParam === "transfer" || kindParam === "pickup" || kindParam === "delivery" || kindParam === "express" || kindParam === "return_pickup" || kindParam === "replacement_delivery" || kindParam === "return_transfer" || kindParam === "return_to_seller")
       ? (kindParam as TabId)
       : "pickup",
   );
@@ -56,6 +56,7 @@ function DeskContent() {
     }
     list.push(
       { id: "delivery", kind: "delivery", label: pickL(LEG_KIND_SHORT.delivery, fr), match: (t) => t.kind === "delivery" },
+      { id: "express", kind: "express", label: pickL(LEG_KIND_SHORT.express, fr), match: (t) => t.kind === "express" },
       { id: "return_pickup", kind: "return_pickup", label: pickL(LEG_KIND_SHORT.return_pickup, fr), match: (t) => t.kind === "return_pickup" },
       { id: "replacement_delivery", kind: "replacement_delivery", label: pickL(LEG_KIND_SHORT.replacement_delivery, fr), match: (t) => t.kind === "replacement_delivery" },
       { id: "return_transfer", kind: "return_transfer", label: pickL(LEG_KIND_SHORT.return_transfer, fr), match: (t) => t.kind === "return_transfer" },

@@ -30,3 +30,40 @@ export function dayLabel(ymd: string | null | undefined, fr: boolean): string | 
   if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
   return new Date(`${ymd}T12:00:00Z`).toLocaleDateString(fr ? "fr-FR" : "en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 }
+
+/**
+ * Delivery time = the seller's preparation + the platform's transit (api/src/common/delivery/estimate.ts).
+ * The seller sets `prepDays` (0 to 30); the route (`localDeliveryDays`, lanes, express) is added by the platform.
+ */
+export const PREP_DAYS = { min: 0, max: 30, fallback: 2 } as const;
+/** The platform's default for hub -> customer days, used until the public setting `localDeliveryDays` is read. */
+export const LOCAL_DAYS_FALLBACK = 1;
+
+/** A whole number 0 to 30 (a blank or non-numeric value is not one). */
+export function isPrepDays(value: unknown): value is number {
+  if (value === null || value === undefined || value === "") return false;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= PREP_DAYS.min && n <= PREP_DAYS.max;
+}
+
+/**
+ * A product's preparation days: its `prepDays` when the server sends it (0 is a real answer); an old server only
+ * sends the legacy `deliveryDays` (= prep + local), so the platform's local days come off it; else the default.
+ */
+export function prepDaysOf(p: { prepDays?: unknown; deliveryDays?: unknown } | null | undefined, localDays: number = LOCAL_DAYS_FALLBACK): number {
+  if (p && isPrepDays(p.prepDays)) return Number(p.prepDays);
+  const legacy = Number(p?.deliveryDays);
+  if (p && p.deliveryDays !== null && p.deliveryDays !== undefined && Number.isFinite(legacy) && legacy >= 1) {
+    const local = Number.isFinite(localDays) && localDays >= 0 ? Math.round(localDays) : LOCAL_DAYS_FALLBACK;
+    return Math.min(PREP_DAYS.max, Math.max(PREP_DAYS.min, Math.round(legacy) - local));
+  }
+  return PREP_DAYS.fallback;
+}
+
+/**
+ * The expected day to show: the server's own date when it sent one (the quote's `estimatedDeliveryDate`, the day
+ * `orders:create` will stamp), otherwise the client's estimate from the lines.
+ */
+export function chooseEstimate(serverDay: string | null | undefined, fallback: () => string): string {
+  return serverDay && /^\d{4}-\d{2}-\d{2}$/.test(serverDay) ? serverDay : fallback();
+}

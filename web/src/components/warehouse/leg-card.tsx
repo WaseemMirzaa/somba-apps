@@ -15,6 +15,7 @@ import {
   endpointName,
   fmtDateTime,
   legItemsText,
+  isCustomerLeg,
   legStatusVariant,
   mapsLink,
   pickL,
@@ -55,7 +56,8 @@ export function LegBadges({ task }: { task: TaskView }) {
   const lockText = codeLockLabel(task, fr, now);
   return (
     <>
-      <Badge variant="primary">{pickL(LEG_KIND[task.kind], fr)}</Badge>
+      <Badge variant={task.kind === "express" ? "purple" : "primary"}>{pickL(LEG_KIND[task.kind], fr)}</Badge>
+      {isCustomerLeg(task.kind) && task.completesOrder === false && <Badge variant="info">{fr ? "Livraison partielle" : "Partial delivery"}</Badge>}
       <Badge variant={legStatusVariant(task.status)}>{pickL(LEG_STATUS[task.status], fr)}</Badge>
       {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
       {codOffered && task.codAmountUsd > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmountUsd, fr ? "fr" : "en")}</Badge>}

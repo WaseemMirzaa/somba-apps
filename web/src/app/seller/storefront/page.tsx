@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { StoreProfileForm } from "@/components/seller/store-profile-form";
 import { StoreBrandingForm } from "@/components/seller/store-branding-form";
-import { HandlingForm, PoliciesForm, VacationForm } from "@/components/seller/account-storefront-forms";
+import { ExpressSection, HandlingForm, PoliciesForm, VacationForm } from "@/components/seller/account-storefront-forms";
 import { useLocale } from "@/context/locale-context";
 
 export default function SellerStorefrontPage() {
@@ -17,8 +17,8 @@ export default function SellerStorefrontPage() {
         title={fr ? "Paramètres vitrine" : "Storefront Settings"}
         subtitle={
           fr
-            ? "Nom, lieu de collecte sur la carte, vacances, délai de préparation, politiques, logo, bannière et description"
-            : "Your store name, pickup location on the map, vacation, handling time, policies, logo, banner and description"
+            ? "Nom, lieu de collecte sur la carte, vacances, délai de traitement, livraison express, politiques, logo, bannière et description"
+            : "Your store name, pickup location on the map, vacation, handling time, express delivery, policies, logo, banner and description"
         }
         actions={<Link href="/seller/storefront/preview" className="text-sm text-[var(--primary)]">{fr ? "Aperçu →" : "Preview →"}</Link>}
       />
@@ -31,9 +31,10 @@ export default function SellerStorefrontPage() {
         <VacationForm />
       </div>
       <div className="card-premium p-6">
-        <h2 className="mb-4 font-semibold">{fr ? "Délai de préparation" : "Handling time"}</h2>
+        <h2 className="mb-4 font-semibold">{fr ? "Délai de traitement" : "Handling time"}</h2>
         <HandlingForm />
       </div>
+      <ExpressSection />
       <div className="card-premium p-6">
         <h2 className="mb-4 font-semibold">{fr ? "Politiques de la boutique" : "Store policies"}</h2>
         <PoliciesForm />

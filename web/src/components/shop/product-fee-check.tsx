@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LocateFixed } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
-import { addressPin, useDeliveryQuote } from "@/lib/logistics";
+import { addressPin, useDeliveryQuote, type DeliveryQuote } from "@/lib/logistics";
 import { NotServedNotice } from "@/components/shop/delivery-quote";
 import { quoteFallbackNote } from "@/lib/quote-text";
 import { formatCurrency } from "@/lib/utils";
@@ -13,7 +13,7 @@ import { formatCurrency } from "@/lib/utils";
  * "What would delivery cost me?" on the product page: the server quotes it (the warehouse of the area + distance) for one of
  * the shopper's pinned addresses, or for the device location when nobody is signed in.
  */
-export function ProductFeeCheck({ productId, fr, locale }: { productId: string; fr: boolean; locale: string }) {
+export function ProductFeeCheck({ productId, fr, locale, onQuote }: { productId: string; fr: boolean; locale: string; /** The server's quote for this address (its `estimatedDeliveryDate` is the date to show), or null while there is none. */ onQuote?: (q: DeliveryQuote | null) => void }) {
   const rt = useRealtime();
   const [addressId, setAddressId] = useState("");
   const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
@@ -28,6 +28,10 @@ export function ProductFeeCheck({ productId, fr, locale }: { productId: string; 
     lines,
     enabled: !!chosen || !!geo,
   });
+
+  useEffect(() => {
+    onQuote?.(quote);
+  }, [quote, onQuote]);
 
   function locate() {
     if (!navigator.geolocation) return;

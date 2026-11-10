@@ -17,6 +17,7 @@ import {
   Boxes,
   Warehouse,
   ScanLine,
+  Zap,
 } from "lucide-react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -144,6 +145,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
         <StatCard title={pickL(LEG_KIND_SHORT.pickup, fr)} value={byKind("pickup")} icon={Warehouse} />
         <StatCard title={pickL(LEG_KIND_SHORT.transfer, fr)} value={byKind("transfer") + byKind("return_transfer")} icon={Truck} />
         <StatCard title={pickL(LEG_KIND_SHORT.delivery, fr)} value={byKind("delivery") + byKind("replacement_delivery")} icon={Truck} />
+        <StatCard title={pickL(LEG_KIND_SHORT.express, fr)} value={byKind("express")} icon={Zap} />
         <StatCard title={fr ? "Retours en cours" : "Returns in progress"} value={byKind("return_pickup") + byKind("return_to_seller")} icon={RotateCcw} />
         <StatCard title={fr ? "Ouverts > 24 h" : "Open > 24 h"} value={aged24} icon={PackageX} />
         <StatCard title={fr ? "Trajets échoués" : "Failed legs"} value={failed.length} icon={AlertTriangle} />

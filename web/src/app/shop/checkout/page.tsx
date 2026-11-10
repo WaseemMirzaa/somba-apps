@@ -22,7 +22,8 @@ import { addressPin, useDeliveryQuote } from "@/lib/logistics";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
-import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
+import { chooseEstimate, dayLabel, estimateFor } from "@/lib/delivery-estimate";
+import { ExpressBadge } from "@/components/shop/partial-delivery";
 import { AddressMapPicker } from "@/components/shop/address-map-picker";
 import type { AddressGeo, PickedMeta, PickedParts } from "@/lib/google-maps";
 import { useVerificationStatus } from "@/lib/shop-live";
@@ -245,7 +246,9 @@ function CheckoutContent() {
         {/* The sellers set each product's delivery time; the shopper only sees the resulting estimate. */}
         <div className="mb-4 flex items-center gap-2 rounded-xl border p-4 text-sm" data-testid="delivery-estimate">
           <span className="font-semibold">{fr ? "Livraison estimée :" : "Estimated delivery:"}</span>
-          <span>{dayLabel(estimateFor(lines.map((l) => l.deliveryDays), new Date(), quote?.extraDays ?? Math.ceil((quote?.transitHours ?? 0) / 24)), fr)}</span>
+          {/* The server's own date (what the order will be stamped with) when the quote has it; else the lines' total times plus the route's extra days. */}
+          <span>{dayLabel(chooseEstimate(quote?.estimatedDeliveryDate, () => estimateFor(lines.map((l) => l.deliveryDays), new Date(), quote?.extraDays ?? Math.ceil((quote?.transitHours ?? 0) / 24))), fr)}</span>
+          {quote?.deliveryMode === "express" && <ExpressBadge fr={fr} className="ml-auto" />}
         </div>
         <label className="mb-4 flex items-center gap-3 rounded-xl border p-4">
           <input type="checkbox" checked={openBox} onChange={(e) => setOpenBox(e.target.checked)} />

@@ -23,7 +23,8 @@ import { useSocketEvent, usePublicSettings, useProductReviews, useStoreFollow } 
 import { useCampaignView } from "@/lib/shop-engage";
 import { ProductFeeCheck } from "@/components/shop/product-fee-check";
 import { ContactSeller } from "@/components/shop/contact-seller";
-import { dayLabel, estimateFor } from "@/lib/delivery-estimate";
+import { chooseEstimate, dayLabel, estimateFor } from "@/lib/delivery-estimate";
+import type { DeliveryQuote } from "@/lib/logistics";
 import { daysLabel, isMachineText, labeledGroups, langOf, pickText } from "@/lib/i18n-fields";
 import { TranslatableText } from "@/components/shop/translatable-text";
 import { AttachmentGallery } from "@/components/seller/attachments";
@@ -49,6 +50,9 @@ export default function ShopProductDetailPage() {
   const { toast } = useToast();
   const settings = usePublicSettings();
   const [qty, setQty] = useState(1);
+  // The server's quote for the chosen address: its date wins over the product's own estimate.
+  const [quoteDay, setQuoteDay] = useState<string | null>(null);
+  const onQuote = useCallback((q: DeliveryQuote | null) => setQuoteDay(q?.estimatedDeliveryDate ?? null), []);
   const [picks, setPicks] = useState<Record<string, string>>({});
   const [pickError, setPickError] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(0);
@@ -335,18 +339,18 @@ export default function ShopProductDetailPage() {
           </div>
 
           <div className="space-y-2 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-            <ProductFeeCheck productId={product.id} fr={fr} locale={locale} />
+            <ProductFeeCheck productId={product.id} fr={fr} locale={locale} onQuote={onQuote} />
             <div className="flex items-center gap-2 text-sm">
               <Truck className="h-4 w-4 text-[var(--primary)]" />
               <span data-testid="product-delivery-estimate">
                 {fr
-                  ? `Livraison en ${daysLabel(product.totalDeliveryDays, true)} · prévue le ${dayLabel(estimateFor([product.totalDeliveryDays]), fr)}`
-                  : `Delivery in ${daysLabel(product.totalDeliveryDays, false)} · expected ${dayLabel(estimateFor([product.totalDeliveryDays]), fr)}`}
+                  ? `Livraison en ${daysLabel(product.totalDeliveryDays, true)} · prévue le ${dayLabel(chooseEstimate(quoteDay, () => estimateFor([product.totalDeliveryDays])), fr)}`
+                  : `Delivery in ${daysLabel(product.totalDeliveryDays, false)} · expected ${dayLabel(chooseEstimate(quoteDay, () => estimateFor([product.totalDeliveryDays])), fr)}`}
               </span>
             </div>
-            {product.sellerHandlingDays > 0 && (
+            {product.prepDays + product.sellerHandlingDays > 0 && (
               <p className="text-xs text-slate-500">
-                {fr ? `Dont ${product.sellerHandlingDays} j de préparation par le vendeur` : `Includes ${product.sellerHandlingDays} day${product.sellerHandlingDays === 1 ? "" : "s"} for the seller to prepare it`}
+                {fr ? `Dont ${product.prepDays + product.sellerHandlingDays} j de préparation par le vendeur` : `Includes ${product.prepDays + product.sellerHandlingDays} day${product.prepDays + product.sellerHandlingDays === 1 ? "" : "s"} for the seller to prepare it`}
               </p>
             )}
             {settings.returnWindowDays > 0 && (

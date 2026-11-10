@@ -96,3 +96,19 @@ test("the analytics client never asks for or shows pay (riders are salaried)", (
   const files = ["./warehouse-ops.ts", "../components/warehouse/hub-ops-settings.tsx", "../components/warehouse/ops-performance.tsx"].map((p) => readFileSync(new URL(p, import.meta.url), "utf8")).join("\n");
   assert.doesNotMatch(files, /earning|salary|wage|commission|payout|perTask|Usd\b/i);
 });
+
+test("custody: when a waiting parcel leaves alone (splitAt), in both languages", () => {
+  const now = new Date("2026-11-10T10:00:00Z");
+  assert.equal(lib.splitAtText(null, false, now), null);
+  assert.equal(lib.splitAtText(undefined, true, now), null);
+  assert.equal(lib.splitAtText("not a date", false, now), null);
+  assert.match(lib.splitAtText("2026-11-11T08:30:00Z", false, now), /^Leaves alone after /);
+  assert.match(lib.splitAtText("2026-11-11T08:30:00Z", true, now), /^Part seul après /);
+  assert.match(lib.splitAtText("2026-11-10T09:00:00Z", false, now), /next pass/);
+  assert.match(lib.splitAtText("2026-11-10T09:00:00Z", true, now), /prochaine passe/);
+});
+
+test("an express leg cannot go back to its seller (its parcel is still with the seller)", () => {
+  assert.equal(lib.canReturnLeg({ kind: "express", status: "unassigned" }), false);
+  assert.equal(lib.canReturnLeg({ kind: "delivery", status: "unassigned" }), true);
+});

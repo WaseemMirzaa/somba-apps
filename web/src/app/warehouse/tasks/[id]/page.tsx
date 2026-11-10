@@ -16,7 +16,7 @@ import { LegBadges, LegRoute } from "@/components/warehouse/leg-card";
 import { OpsLoading } from "@/components/warehouse/ops-state";
 import { useLocale } from "@/context/locale-context";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
-import { LEG_KIND, LEG_STATUS, endpointName, fmtDateTime, legItemsText, legStatusVariant, mapsLink, pickL, isHubBound } from "@/lib/logistics";
+import { LEG_KIND, LEG_STATUS, endpointName, fmtDateTime, legItemsText, legStatusVariant, mapsLink, pickL, isHubBound, isCustomerLeg } from "@/lib/logistics";
 import { addressText, findLeg, isOpenLeg, legAgeHours, parcelCode, riderLabel, useDeskQueue } from "@/lib/warehouse";
 import { EXCEPTION_STATUS, EXCEPTION_TYPE, pick, useOpsQuery, type ExceptionRow } from "@/lib/warehouse-live";
 import { formatCurrency } from "@/lib/utils";
@@ -84,6 +84,23 @@ export default function WarehouseLegDetailPage() {
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <strong>{fr ? "Dernière tentative échouée : " : "Last attempt failed: "}</strong>
           {task.failureReason}
+        </div>
+      )}
+      {task.kind === "express" && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900" data-testid="express-note">
+          {fr
+            ? "Livraison express : le livreur va du vendeur directement chez le client. Le colis ne passe pas par l'entrepôt ; votre entrepôt suit la course."
+            : "Express delivery: the rider goes from the seller straight to the customer. The parcel does not pass through the warehouse; your warehouse oversees the run."}
+        </div>
+      )}
+      {isCustomerLeg(task.kind) && task.completesOrder === false && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900" data-testid="partial-note">
+          <p className="font-semibold">{fr ? "Livraison partielle" : "Partial delivery"}</p>
+          <p>
+            {fr
+              ? `Cette livraison ne porte qu'une partie de la commande : ${legItemsText(task.items, true)}. Le reste suivra dans une autre livraison.`
+              : `This delivery carries only part of the order: ${legItemsText(task.items, false)}. The rest follows in another delivery.`}
+          </p>
         </div>
       )}
       {task.collectOld && (

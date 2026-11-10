@@ -16,6 +16,8 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useSocketEvent } from "@/lib/shop-live";
 import { dayLabel } from "@/lib/delivery-estimate";
+import { PartialDelivery, ExpressBadge, panelLines } from "@/components/shop/partial-delivery";
+import { openCustomerLeg } from "@/lib/split-delivery";
 import type { RiderLocation } from "@/lib/realtime/types";
 
 function Tracking() {
@@ -42,6 +44,7 @@ function Tracking() {
   const onTheWay = order.status === "out_for_delivery";
   const lastSeen = seenAt && seenAt.orderId === order.id ? seenAt.at : null;
   const steps = customerJourney(raw, hubs, fr);
+  const riderOnRoad = !order.partiallyDelivered || !!openCustomerLeg(raw.tracking?.legs);
   const destHub = raw.destinationHubId ? hubs.get(raw.destinationHubId) : undefined;
   const sellers = [...new Map((raw.items ?? []).filter((i) => i.sellerId).map((i) => [i.sellerId as string, i.sellerName ?? ""])).entries()];
 
@@ -56,19 +59,32 @@ function Tracking() {
         </div>
       )}
 
+      {order.deliveryMode === "express" && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700" data-testid="express-order">
+          <ExpressBadge fr={fr} />
+          <span>{fr ? "Un livreur l'apporte directement du vendeur chez vous." : "A rider brings it straight from the seller to you."}</span>
+        </div>
+      )}
+
+      <PartialDelivery order={raw} lines={panelLines(raw.items, fr)} legs={raw.tracking?.legs} fr={fr} audience="customer" />
+
       <DetailSection title={fr ? "Le trajet de votre colis" : "Your parcel's journey"}>
         <StepList steps={steps} fr={fr} />
         <p className="mt-2 text-xs text-slate-500">
-          {fr
-            ? "Votre colis passe par l'entrepôt Somba de la zone du vendeur, puis par celui de votre zone."
-            : "Your parcel goes through the Somba warehouse of the seller's area, then the one of your area."}
+          {order.deliveryMode === "express"
+            ? fr
+              ? "Votre colis ne passe par aucun entrepôt : un livreur le prend chez le vendeur et vous l'apporte."
+              : "Your parcel does not go through a warehouse: a rider takes it from the seller and brings it to you."
+            : fr
+              ? "Votre colis passe par l'entrepôt Somba de la zone du vendeur, puis par celui de votre zone."
+              : "Your parcel goes through the Somba warehouse of the seller's area, then the one of your area."}
         </p>
         {order.estimatedDeliveryDate && order.status !== "delivered" && order.status !== "cancelled" && (
           <p className="mt-1 text-sm text-slate-700">{fr ? "Livraison estimée :" : "Estimated delivery:"} <strong>{dayLabel(order.estimatedDeliveryDate, fr)}</strong></p>
         )}
       </DetailSection>
 
-      {order.rider && (
+      {order.rider && riderOnRoad && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4" data-testid="rider-card">
           <div>
             <p className="text-sm font-medium text-blue-900">{fr ? "Votre livreur" : "Your rider"}: {order.rider.name}</p>

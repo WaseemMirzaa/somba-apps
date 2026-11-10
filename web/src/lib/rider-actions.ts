@@ -53,3 +53,33 @@ export const failedPayload = (taskId: string, reason: string, notes: string): { 
 
 /** The body of `delivery:updateStatus` for a plain step. */
 export const stepPayload = (taskId: string, status: "picked_up" | "in_transit"): { taskId: string; status: "picked_up" | "in_transit" } => ({ taskId, status });
+
+/** The kinds of leg that end at the customer's door (a warehouse delivery or an express run). */
+const CUSTOMER_LEG_KINDS = ["delivery", "express"];
+
+/**
+ * What the rider is reminded of before they set off, as short lines: an express run goes seller -> customer with no
+ * warehouse in between, the customer's code is asked at the door, cash is taken, a partial delivery carries only
+ * some of the order. Empty for legs that end at a warehouse.
+ */
+export function riderBrief(
+  task: { kind: string; needsCode?: boolean; codAmount?: number; partial?: boolean },
+  fr: boolean,
+  opts: { requireCode?: boolean; cash?: string } = {},
+): string[] {
+  const out: string[] = [];
+  if (task.kind === "express") {
+    out.push(
+      fr
+        ? "Livraison express : collectez le colis chez le vendeur puis allez directement chez le client, sans passer par l'entrepôt."
+        : "Express: collect the parcel from the seller, then go straight to the customer. No warehouse in between.",
+    );
+  }
+  if (CUSTOMER_LEG_KINDS.includes(task.kind)) {
+    out.push(fr ? "Vous remettez le colis au client en main propre." : "You hand the parcel to the customer in person.");
+    if (task.needsCode && opts.requireCode !== false) out.push(fr ? "Demandez le code à 4 chiffres du client." : "Ask the customer for their 4-digit code.");
+    if ((task.codAmount ?? 0) > 0) out.push(fr ? `Encaissez ${opts.cash ?? ""} en espèces.`.replace("  ", " ") : `Collect ${opts.cash ?? ""} in cash.`.replace("  ", " "));
+    if (task.partial) out.push(fr ? "Livraison partielle : seuls ces articles sont à remettre, le reste suit." : "Partial delivery: hand over only these items, the rest follows.");
+  }
+  return out;
+}

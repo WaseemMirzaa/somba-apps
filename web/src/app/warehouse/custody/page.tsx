@@ -12,6 +12,7 @@ import type { Custody } from "@/lib/logistics";
 import { fmtDateTime, isHubBound } from "@/lib/logistics";
 import { useHubScope, waitingForText, type DeskTask } from "@/lib/warehouse";
 import { useOpsQuery } from "@/lib/warehouse-live";
+import { splitAtText } from "@/lib/warehouse-ops-format";
 
 /** The parcels in this warehouse's custody: on their way in, on the shelves, on their way out (`logistics:custody`). */
 export default function WarehouseCustodyPage() {
@@ -53,6 +54,11 @@ export default function WarehouseCustodyPage() {
               <p className="px-1 text-xs text-slate-500">
                 {fr ? "Au dépôt depuis " : "On the shelf since "}
                 {fmtDateTime((t as unknown as { since?: string }).since, fr)} · {waitingForText((t as unknown as { waitingFor?: string }).waitingFor, fr)}
+                {splitAtText((t as unknown as { splitAt?: string | null }).splitAt, fr) && (
+                  <span className="ml-2 font-medium text-amber-700" data-testid="custody-split-at">
+                    · {splitAtText((t as unknown as { splitAt?: string | null }).splitAt, fr)}
+                  </span>
+                )}
               </p>
             )}
           </div>

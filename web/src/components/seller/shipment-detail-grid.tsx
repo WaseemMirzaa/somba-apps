@@ -45,7 +45,9 @@ export function ShipmentDetailGrid({ shipment, locale, showOrderLink = true, var
   ) : (
     shipment.orderId
   );
-  const pickup = shipment.legs.filter((l) => l.kind === "pickup").at(-1);
+  // An express order has no pickup leg: the rider who collects from the seller is the one who delivers.
+  const express = shipment.legs.some((l) => l.kind === "express");
+  const pickup = shipment.legs.filter((l) => l.kind === (express ? "express" : "pickup")).at(-1);
 
   return (
     <DetailGrid>
@@ -70,7 +72,7 @@ export function ShipmentDetailGrid({ shipment, locale, showOrderLink = true, var
         <InfoGrid
           items={[
             {
-              label: fr ? "Livreur d'enlèvement" : "Pickup rider",
+              label: express ? (fr ? "Livreur express" : "Express rider") : fr ? "Livreur d'enlèvement" : "Pickup rider",
               value: pickup?.riderFirstName ?? (fr ? "Pas encore assigné" : "Not assigned yet"),
             },
             {
@@ -78,7 +80,7 @@ export function ShipmentDetailGrid({ shipment, locale, showOrderLink = true, var
               value: shipment.readyAt ? localDateTime(shipment.readyAt) : fr ? "Pas encore marqué prêt" : "Not marked ready yet",
             },
             { label: fr ? "Collecté chez vous" : "Picked up from you", value: when(pickup?.pickedUpAt) },
-            { label: fr ? "Arrivé à l'entrepôt" : "At the warehouse", value: when(pickup?.receivedAt ?? pickup?.deliveredAt) },
+            ...(express ? [] : [{ label: fr ? "Arrivé à l'entrepôt" : "At the warehouse", value: when(pickup?.receivedAt ?? pickup?.deliveredAt) }]),
             {
               label: fr ? "Adresse de collecte" : "Pickup address",
               value: shipment.pickupAddress || (

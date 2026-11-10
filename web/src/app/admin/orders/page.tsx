@@ -1,5 +1,7 @@
 "use client";
 
+import { ExpressBadge } from "@/components/shop/partial-delivery";
+import { isExpressOrder, isPartiallyDelivered } from "@/lib/split-delivery";
 import { localDay } from "@/lib/dates";
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -52,12 +54,16 @@ export default function AdminOrdersPage() {
         amount: o.totalUsd,
         paymentMethod: o.paymentMethod,
         status: o.status,
+        // Delivery model: `express` (seller straight to customer) and a split order with part delivered.
+        express: isExpressOrder(o),
+        partial: isPartiallyDelivered(o),
         date: localDay(o.createdAt),
       };
     });
   }, [rt.orders, rt.products, fr]);
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const [methodFilter, setMethodFilter] = useState("");
+  const [modeFilter, setModeFilter] = useState<"" | "express" | "partial">("");
 
   const filtered = useMemo(
     () =>
@@ -65,8 +71,9 @@ export default function AdminOrdersPage() {
         searchFields: ["id", "customer", "sellerSearch", "customerId"],
         dateField: "date",
         statusField: "status",
-      }).filter((o) => !methodFilter || o.paymentMethod === methodFilter),
-    [orderEntities, filters, methodFilter]
+      }).filter((o) => !methodFilter || o.paymentMethod === methodFilter)
+        .filter((o) => !modeFilter || (modeFilter === "express" ? o.express : o.partial)),
+    [orderEntities, filters, methodFilter, modeFilter]
   );
 
   return (
@@ -88,6 +95,19 @@ export default function AdminOrdersPage() {
       />
 
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <label htmlFor="orders-mode-filter" className="text-xs font-medium text-slate-600">
+          {fr ? "Livraison" : "Delivery"}
+        </label>
+        <select
+          id="orders-mode-filter"
+          className="input-premium px-3 py-2 text-sm"
+          value={modeFilter}
+          onChange={(e) => setModeFilter(e.target.value as "" | "express" | "partial")}
+        >
+          <option value="">{fr ? "Toutes" : "All"}</option>
+          <option value="express">{fr ? "Express" : "Express"}</option>
+          <option value="partial">{fr ? "Livrées en partie" : "Part delivered"}</option>
+        </select>
         <label htmlFor="orders-payment-filter" className="text-xs font-medium text-slate-600">
           {fr ? "Mode de paiement" : "Payment method"}
         </label>
@@ -164,9 +184,13 @@ export default function AdminOrdersPage() {
                 key: "status",
                 label: t("status"),
                 render: (row) => (
-                  <Badge variant={ORDER_STATUS_BADGE[row.status as string] ?? "default"}>
-                    {orderStatusLabel(String(row.status), fr)}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge variant={ORDER_STATUS_BADGE[row.status as string] ?? "default"}>
+                      {orderStatusLabel(String(row.status), fr)}
+                    </Badge>
+                    {row.express === true && <ExpressBadge fr={fr} />}
+                    {row.partial === true && <Badge variant="info">{fr ? "Livrée en partie" : "Part delivered"}</Badge>}
+                  </div>
                 ),
               },
               { key: "date", label: t("date") },

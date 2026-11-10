@@ -11,6 +11,7 @@ import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { LoadMore } from "@/components/ui/load-more";
 import { useRealtime } from "@/context/realtime-context";
 import { cancelledCount } from "@/lib/shop-packages";
+import { ExpressBadge } from "@/components/shop/partial-delivery";
 
 function OrdersList() {
   const { locale } = useLocale();
@@ -48,6 +49,10 @@ function OrdersList() {
             return (
               <div className="space-y-1">
                 <Badge variant={row.status === "cancelled" ? "danger" : row.status === "delivered" ? "success" : "info"}>{statusLabel(String(row.status))}</Badge>
+                {row.deliveryMode === "express" && <ExpressBadge fr={fr} className="ml-1" />}
+                {row.partiallyDelivered === true && (
+                  <p className="text-xs text-sky-800" data-testid="order-partial">{fr ? "Une partie livrée" : "Part delivered"}</p>
+                )}
                 {n > 0 && (
                   <p className="text-xs text-red-700">
                     {fr

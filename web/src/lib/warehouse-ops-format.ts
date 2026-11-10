@@ -112,7 +112,7 @@ export function ageText(hours: number, fr: boolean): string {
   return `${Math.floor(hours / 24)} ${fr ? "j" : "d"}`;
 }
 
-/** May a stuck leg go back to its seller? The customer-bound leg, still at the warehouse (no rider has collected it), outside a run. */
+/** May a stuck leg go back to its seller? The customer-bound leg (never an express one: its parcel is still with the seller), still at the warehouse (no rider has collected it), outside a run. */
 export function canReturnLeg(t: { kind: string; status: string; runId?: string | null }): boolean {
   return (t.kind === "delivery" || t.kind === "replacement_delivery") && (t.status === "unassigned" || t.status === "assigned") && !t.runId;
 }
@@ -147,3 +147,17 @@ export function hoursText(h: number | null | undefined, fr: boolean): string {
 }
 
 export const pctText = (p: number | null | undefined): string => (p == null ? "—" : `${p}%`);
+
+/**
+ * Custody of a multi-seller order (`logistics:custody` -> `onHand[].splitAt`): when the oldest parcel waiting for the others
+ * has waited long enough that the parcels already here leave alone. Null when nothing is pending (single-seller order,
+ * splitting turned off, or the parcel is not waiting for the others). A moment already past is picked up by the next 5-minute pass.
+ */
+export function splitAtText(splitAt: string | null | undefined, fr: boolean, now: Date = new Date()): string | null {
+  if (!splitAt) return null;
+  const at = new Date(splitAt);
+  if (Number.isNaN(at.getTime())) return null;
+  if (at.getTime() <= now.getTime()) return fr ? "Part seul à la prochaine passe (toutes les 5 min)" : "Leaves alone on the next pass (every 5 min)";
+  const when = at.toLocaleString(fr ? "fr-FR" : "en-GB", { dateStyle: "medium", timeStyle: "short" });
+  return fr ? `Part seul après ${when}` : `Leaves alone after ${when}`;
+}

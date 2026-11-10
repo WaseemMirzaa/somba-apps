@@ -30,7 +30,10 @@ import {
   useServerList,
   type PaymentRow,
 } from "@/lib/admin-live";
-import { LEG_STATUS, pickL } from "@/lib/logistics";
+import { LEG_STATUS, isCustomerLeg, pickL } from "@/lib/logistics";
+import { ExpressBadge, PartialDelivery, panelLines } from "@/components/shop/partial-delivery";
+import { isExpressOrder } from "@/lib/split-delivery";
+import type { TrackingLegView } from "@/lib/realtime/types";
 import {
   PACKAGE_STATUS_BADGE,
   PACKAGE_STATUS_LABEL,
@@ -84,7 +87,11 @@ export default function AdminOrderDetailPage() {
   const mayAddress = canSeeOrderAddress(role);
   const listHref = mayAct ? "/admin/orders" : getAdminHome((persona.department ?? "super") as AdminDepartment);
   const live = rt.orders.find((o) => o.id === id || o.reference === id);
-  const task = rt.deliveries.find((d) => live && d.orderId === live.id && (!d.kind || d.kind === "delivery"));
+  // The legs that bring parcels to the customer: one delivery (or express run), several when the order was split.
+  const customerTasks = rt.deliveries
+    .filter((d) => live && d.orderId === live.id && (!d.kind || isCustomerLeg(d.kind)))
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  const task = customerTasks.at(-1);
   const payment = rt.payments.find((p) => live && p.orderId === live.id && (p as PaymentRow).purpose !== "topup");
   const sellerList = useServerList<Seller>("sellers:list", { pushEvents: ["seller:updated"] });
   const [confirm, setConfirm] = useState<{ kind: "status"; status: string } | { kind: "refund" } | null>(null);
@@ -220,8 +227,34 @@ export default function AdminOrderDetailPage() {
           mayAct ? { label: t("orders"), href: "/admin/orders" } : { label: t("orders") },
           { label: order.id },
         ]}
-        actions={<Badge variant={ORDER_STATUS_BADGE[order.status] ?? "info"}>{orderStatusLabel}</Badge>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {isExpressOrder(live) && <ExpressBadge fr={fr} />}
+            <Badge variant={ORDER_STATUS_BADGE[order.status] ?? "info"}>{orderStatusLabel}</Badge>
+          </div>
+        }
       />
+
+      {mayAct && (
+        <PartialDelivery
+          order={live}
+          lines={panelLines(live.items, fr)}
+          legs={customerTasks.map<TrackingLegView>((d) => ({
+            id: d.id,
+            kind: d.kind ?? "delivery",
+            status: d.status,
+            riderFirstName: (d.riderName ?? "").split(" ")[0] || null,
+            createdAt: d.createdAt,
+            deliveredAt: d.deliveredAt ?? null,
+            pickedUpAt: d.pickedUpAt ?? null,
+            completesOrder: d.completesOrder,
+            sellerIds: d.sellerIds ?? null,
+            items: d.items ?? [],
+          }))}
+          fr={fr}
+          audience="staff"
+        />
+      )}
 
       <DetailGrid>
         <DetailGridSection title={fr ? "Actions" : "Actions"} span={3}>
@@ -294,6 +327,7 @@ export default function AdminOrderDetailPage() {
             { label: fr ? "Statut" : "Status", value: orderStatusLabel },
             { label: fr ? "Articles" : "Items", value: order.itemsCount },
             { label: fr ? "Livraison estimée" : "Estimated delivery", value: dayLabel(live.estimatedDeliveryDate, fr) ?? "—" },
+            ...(isExpressOrder(live) ? [{ label: fr ? "Mode de livraison" : "Delivery mode", value: <ExpressBadge fr={fr} /> }] : []),
           ]} />
         </DetailGridSection>
 
@@ -322,7 +356,7 @@ export default function AdminOrderDetailPage() {
         {mayAct && (
         <DetailGridSection title={fr ? "Logistique" : "Logistics"}>
           <InfoGrid items={[
-            { label: fr ? "Livraison" : "Delivery task", value: task ? pickL(LEG_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
+            { label: customerTasks.length > 1 ? (fr ? `Livraisons (${customerTasks.length})` : `Deliveries (${customerTasks.length})`) : task?.kind === "express" ? (fr ? "Livraison express" : "Express delivery") : fr ? "Livraison" : "Delivery task", value: task ? pickL(LEG_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
             { label: fr ? "Livreur assigné" : "Rider assigned", value: live.riderId ? (fr ? "Oui" : "Yes") : "—" },
             ...(codOffered ? [{ label: fr ? "COD à encaisser" : "COD to collect", value: task && task.codAmountUsd > 0 ? formatCurrency(task.codAmountUsd, locale) : "—" }] : []),
             ...(codOffered && task?.codCollectedAt

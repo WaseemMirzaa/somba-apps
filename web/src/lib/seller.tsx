@@ -1,5 +1,6 @@
 "use client";
 
+import { isExpressOrder } from "@/lib/split-delivery";
 import {
   createContext,
   useCallback,
@@ -91,6 +92,8 @@ export type SellerStore = Seller & {
   vacationUntil?: string | null;
   onVacation?: boolean;
   handlingDays?: number | null;
+  /** Express delivery: a rider goes straight from this store to a customer in the same commune. Needs a pinned pickup location. */
+  expressDelivery?: boolean;
   returnsPolicy?: string | null;
   returnsPolicyFr?: string | null;
   shippingPolicy?: string | null;
@@ -285,6 +288,8 @@ export interface ProductInput {
   sourceLang?: "en" | "fr";
   /** Option types the shopper picks, e.g. [{ name: "Size", options: ["40", "41"] }]; [] removes them. */
   variants?: { name: string; options: string[] }[];
+  /** Preparation time in days (0 to 30); the platform adds the route's delivery time. */
+  prepDays?: number;
 }
 
 export type StoreGateState =
@@ -629,6 +634,8 @@ function buildSellerData(input: BuildInput) {
       sellerCount: o.sellerCount,
       otherSellersPacking: o.otherSellersPacking,
       estimatedDeliveryDate: o.estimatedDeliveryDate ?? null,
+      /** `express`: a rider takes the parcel from the store straight to the customer. */
+      deliveryMode: isExpressOrder(o) ? ("express" as const) : ("standard" as const),
       shippingStatus,
       readyAt: ready,
       date,
@@ -663,6 +670,8 @@ function buildSellerData(input: BuildInput) {
         commissionPct: it.commissionPct ?? null,
         couponDiscountUsd: (it as { couponDiscountUsd?: number }).couponDiscountUsd ?? 0,
         readyAt: it.readyAt ?? null,
+        /** Split delivery: when the customer received this line (null = still coming). */
+        deliveredAt: it.deliveredAt ?? null,
       })),
       timeline,
     };
@@ -1149,6 +1158,8 @@ export interface StorePatch {
   /** ISO date, or a bare YYYY-MM-DD (end of that day); null / "" reopens. */
   vacationUntil?: string | null;
   handlingDays?: number;
+  /** Needs a pinned pickup location (`pickupLat` / `pickupLng`): the server refuses it otherwise. */
+  expressDelivery?: boolean;
   returnsPolicy?: string | null;
   returnsPolicyFr?: string | null;
   shippingPolicy?: string | null;

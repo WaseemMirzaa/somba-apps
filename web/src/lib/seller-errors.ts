@@ -44,6 +44,20 @@ add(
   "Votre boutique est suspendue : vous pouvez lire les messages mais pas répondre.",
 );
 
+// ── Delivery model: preparation, split delivery, express (contracts/logistics.md §15-16) ──
+add("Part of this order was already delivered. Contact support to stop the rest", "Une partie de cette commande a déjà été livrée. Contactez l'assistance pour arrêter le reste.");
+add("An express parcel is still with the seller. Cancel the order instead", "Un colis express est encore chez le vendeur. Annulez plutôt la commande.");
+add("Preparation time (days) must be a whole number between 0 and 30", "Le délai de préparation (jours) doit être un nombre entier entre 0 et 30.");
+add("Pin your pickup location on the map (Store settings) before offering express delivery", "Placez votre lieu de collecte sur la carte (Paramètres de la boutique) avant de proposer la livraison express.");
+add("Express delivery must be true or false", "La livraison express doit être « vrai » ou « faux ».");
+add("Local delivery days must be a whole number between 0 and 30", "Les jours de livraison locale doivent être un nombre entier entre 0 et 30.");
+add("Split delivery hours must be a whole number between 0 and 720", "Les heures avant livraison partielle doivent être un nombre entier entre 0 et 720.");
+add("Express delivery days must be a whole number between 0 and 30", "Les jours de livraison express doivent être un nombre entier entre 0 et 30.");
+add("Express base fee must be a number between 0 and 100", "Les frais de base express doivent être un nombre entre 0 et 100.");
+add("Express fee per km must be a number between 0 and 50", "Les frais express par km doivent être un nombre entre 0 et 50.");
+add("Maximum express fee must be a number between 0 and 500", "Le plafond des frais express doit être un nombre entre 0 et 500.");
+add("Express maximum distance must be a number between 0 and 100", "La distance maximale express doit être un nombre entre 0 et 100.");
+
 // ── Logistics (contracts/logistics.md §10) ─────────────────────────────────────────────────────────────────────────
 add("Your warehouse assigns your tasks. You cannot accept a task yourself", "Votre entrepôt vous assigne vos tâches. Vous ne pouvez pas en accepter une vous-même.");
 add("Your account is not linked to a warehouse. Ask an administrator", "Votre compte n'est lié à aucun entrepôt. Contactez un administrateur.");
@@ -384,6 +398,7 @@ const RULES: Rule[] = [
   [/^Your (.+) plan allows (\d+) listings?: upgrade it to add more\.?$/i, (m) => `Votre formule ${m[1]} autorise ${m[2]} annonce(s) : passez à une formule supérieure pour en ajouter.`],
   [/^Your (.+) plan does not include (.+)\. Upgrade your plan to use it\.?$/i, (m) => `Votre formule ${m[1]} n'inclut pas cette fonction (${m[2]}). Passez à une formule supérieure pour l'utiliser.`],
   [/^Your (.+) plan allows (\d+) team members?\. Upgrade your plan to invite more\.?$/i, (m) => `Votre formule ${m[1]} autorise ${m[2]} membre(s) d'équipe. Passez à une formule supérieure pour en inviter davantage.`],
+  [/^An express delivery that is (.+) cannot become (.+)\.?$/i, (m) => `Une livraison express « ${m[1]} » ne peut pas passer à « ${m[2]} ».`],
   [/^A campaign that is (.+) cannot become (.+)\.?$/i, (m) => `Une campagne « ${m[1]} » ne peut pas passer à « ${m[2]} ».`],
   [/^The flash price must be below the normal price \((.+)\)\.?$/i, (m) => `Le prix flash doit être inférieur au prix normal (${m[1]}).`],
   [/^This coupon only applies to products from (.+)\.?$/i, (m) => `Ce coupon ne s'applique qu'aux produits de ${m[1]}.`],

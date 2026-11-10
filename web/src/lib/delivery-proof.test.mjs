@@ -22,3 +22,8 @@ test("proof is looked up only for a delivered handover to the customer", () => {
 test("the 'not for your role' answer is the server's own not-found sentence", () => {
   assert.equal(PROOF_DENIED, "Delivery task not found.");
 });
+
+test("an express run is handed to the customer: its proof is looked up once delivered", () => {
+  assert.equal(takesProof({ kind: "express", status: "delivered" }), true);
+  assert.equal(takesProof({ kind: "express", status: "in_transit" }), false);
+});

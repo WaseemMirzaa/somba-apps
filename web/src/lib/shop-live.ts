@@ -51,6 +51,11 @@ export interface PublicSettings {
   /** This server can send verification codes by SMS / links by e-mail (false = say so instead of "sent"). */
   smsVerification: boolean;
   emailVerification: boolean;
+  /** Delivery model: platform days from the warehouse to the customer, and the split / express switches. */
+  localDeliveryDays: number;
+  /** A multi-seller order leaves with what arrived once its oldest parcel waited this long (0 = never split). */
+  splitDeliveryAfterHours: number;
+  expressDeliveryEnabled: boolean;
 }
 
 const EMPTY_SETTINGS: PublicSettings = {
@@ -69,6 +74,9 @@ const EMPTY_SETTINGS: PublicSettings = {
   requirePinnedAddress: false,
   smsVerification: true,
   emailVerification: true,
+  localDeliveryDays: 1,
+  splitDeliveryAfterHours: 24,
+  expressDeliveryEnabled: false,
 };
 
 const num = (v: string | undefined, d: number) => {
@@ -93,6 +101,9 @@ function parseSettings(raw: Record<string, string>): PublicSettings {
     requirePinnedAddress: raw.requirePinnedAddress === "true",
     smsVerification: raw.smsVerification !== "off",
     emailVerification: raw.emailVerification !== "off",
+    localDeliveryDays: num(raw.localDeliveryDays, 1),
+    splitDeliveryAfterHours: num(raw.splitDeliveryAfterHours, 24),
+    expressDeliveryEnabled: raw.expressDeliveryEnabled === "true",
   };
 }
 
@@ -168,6 +179,9 @@ export function usePublicSettings(): PublicSettings {
         requirePinnedAddress: raw.requirePinnedAddress ?? str("requirePinnedAddress"),
         smsVerification: raw.smsVerification ?? (cur.smsVerification ? "on" : "off"),
         emailVerification: raw.emailVerification ?? (cur.emailVerification ? "on" : "off"),
+        localDeliveryDays: raw.localDeliveryDays ?? str("localDeliveryDays"),
+        splitDeliveryAfterHours: raw.splitDeliveryAfterHours ?? str("splitDeliveryAfterHours"),
+        expressDeliveryEnabled: raw.expressDeliveryEnabled ?? str("expressDeliveryEnabled"),
       });
     });
   });

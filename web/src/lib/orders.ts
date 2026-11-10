@@ -1,5 +1,6 @@
 "use client";
 
+import { isExpressOrder, isPartiallyDelivered } from "@/lib/split-delivery";
 import { useEffect, useMemo, useState } from "react";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useRealtime } from "@/context/realtime-context";
@@ -41,6 +42,10 @@ export interface OrderDetail {
   status: string;
   /** Expected delivery day (YYYY-MM-DD), from the sellers' delivery times. */
   estimatedDeliveryDate: string | null;
+  /** `express`: a rider goes straight from the seller to the customer. */
+  deliveryMode: "standard" | "express";
+  /** Split delivery: part of the order was delivered, the rest is still coming. */
+  partiallyDelivered: boolean;
   /** Who to call while the parcel is on its way (the server sends it only then). */
   rider: { name: string; phone: string | null } | null;
   itemsCount: number;
@@ -121,6 +126,8 @@ export function toOrderDetail(o: Order, payment?: Payment): OrderDetail {
     paymentStatus: ended && paymentStatus === "paid" ? "refunded" : paymentStatus,
     status: o.status,
     estimatedDeliveryDate: o.estimatedDeliveryDate ?? null,
+    deliveryMode: isExpressOrder(o) ? "express" : "standard",
+    partiallyDelivered: isPartiallyDelivered(o),
     rider: o.rider ?? null,
     itemsCount: o.items?.reduce((s, i) => s + i.qty, 0) ?? 0,
     items: (o.items ?? []).map((it) => ({

@@ -160,8 +160,8 @@ export default function SellerProductImportPage() {
       <DetailSection title={fr ? "1. Récupérez le modèle" : "1. Get the template"}>
         <p className="text-sm text-slate-600">
           {fr
-            ? "Colonnes : name, nameFr, description, descriptionFr, price, originalPrice, category, stock, sku, brand, weightKg, images (liens séparés par |), deliveryDays, variants (Taille=S|M|L;Couleur=Noir|Blanc). Les noms de colonnes peuvent être en français ou en anglais ; seules « name » et « price » sont obligatoires."
-            : "Columns: name, nameFr, description, descriptionFr, price, originalPrice, category, stock, sku, brand, weightKg, images (links separated by |), deliveryDays, variants (Size=S|M|L;Colour=Black|White). Column names may be English or French; only “name” and “price” are required."}
+            ? "Colonnes : name, nameFr, description, descriptionFr, price, originalPrice, category, stock, sku, brand, weightKg, images (liens séparés par |), prepDays (délai de préparation en jours, 0 à 30 ; le délai de livraison de l'itinéraire est ajouté), variants (Taille=S|M|L;Couleur=Noir|Blanc). Les noms de colonnes peuvent être en français ou en anglais ; seules « name » et « price » sont obligatoires."
+            : "Columns: name, nameFr, description, descriptionFr, price, originalPrice, category, stock, sku, brand, weightKg, images (links separated by |), prepDays (preparation time in days, 0 to 30; the route's delivery time is added for you), variants (Size=S|M|L;Colour=Black|White). Column names may be English or French; only “name” and “price” are required."}
         </p>
         <div className="mt-3">
           <Button variant="secondary" onClick={() => void downloadTemplate()} disabled={busy === "template"}>
