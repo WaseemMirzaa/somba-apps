@@ -28,6 +28,8 @@ Map<String, dynamic> legJson(
   bool withOrder = true,
   String riderId = 'r',
   bool legacy = false, // an old payload: no kind, no endpoints
+  bool partial = false, // a customer leg that carries only part of the order (`order.partial`)
+  List<Map<String, dynamic>>? orderItems, // the leg's own lines in the order snapshot
 }) {
   final tid = id ?? 't-$kind-$status';
   final (from, to, fromHub, toHub, fromHubId, toHubId) = switch (kind) {
@@ -36,9 +38,10 @@ Map<String, dynamic> legJson(
     'return_pickup' => (customerEp, _destHub, null, _destHub, null, 'h2'),
     'return_transfer' => (_destHub, _originHub, _destHub, _originHub, 'h2', 'h1'),
     'return_to_seller' => (_originHub, sellerEp, _originHub, null, 'h1', null),
+    'express' => (sellerEp, customerEp, null, null, null, null), // seller -> customer, no warehouse
     _ => (_destHub, customerEp, _destHub, null, 'h2', null), // delivery, replacement_delivery
   };
-  final meetsCustomer = kind == 'delivery' || kind == 'replacement_delivery' || kind == 'return_pickup';
+  final meetsCustomer = kind == 'delivery' || kind == 'express' || kind == 'replacement_delivery' || kind == 'return_pickup';
   final json = <String, dynamic>{
     'id': tid,
     'orderId': 'o-$tid',
@@ -48,7 +51,7 @@ Map<String, dynamic> legJson(
     'hubId': 'h2',
     'codAmountUsd': cod,
     'address': meetsCustomer ? kCustomerAddress : (toHub?['address'] ?? 'Entrepôt'),
-    'pickupAddress': kind == 'pickup' ? 'Boutique Les Merveilles de Kinshasa — 27, avenue Kasa-Vubu' : 'Entrepôt de Gombe, Boulevard du 30 Juin 8',
+    'pickupAddress': kind == 'pickup' || kind == 'express' ? 'Boutique Les Merveilles de Kinshasa — 27, avenue Kasa-Vubu' : 'Entrepôt de Gombe, Boulevard du 30 Juin 8',
     'attempts': attempts,
     'failureReason': failure,
     'readyAt': kind == 'pickup' ? '2026-10-24T08:00:00.000Z' : null,
@@ -58,8 +61,8 @@ Map<String, dynamic> legJson(
       'kind': kind,
       'fromHubId': fromHubId,
       'toHubId': toHubId,
-      'sellerId': kind == 'pickup' || kind == 'return_to_seller' ? 's1' : null,
-      'sellerName': kind == 'pickup' || kind == 'return_to_seller' ? 'Boutique Les Merveilles de Kinshasa' : null,
+      'sellerId': kind == 'pickup' || kind == 'return_to_seller' || kind == 'express' ? 's1' : null,
+      'sellerName': kind == 'pickup' || kind == 'return_to_seller' || kind == 'express' ? 'Boutique Les Merveilles de Kinshasa' : null,
       'parentTaskId': null,
       'disputeId': kind.startsWith('return') ? 'd1' : null,
       'replacementId': kind == 'replacement_delivery' ? 'rp1' : null,
@@ -73,7 +76,7 @@ Map<String, dynamic> legJson(
         {'orderItemId': 'i2', 'productId': 'p2', 'name': 'Écouteurs sans fil', 'qty': 1},
       ],
       'collectOld': kind == 'replacement_delivery',
-      'needsCode': kind == 'delivery',
+      'needsCode': kind == 'delivery' || kind == 'express',
       'orderFlow': !kind.startsWith('return') && kind != 'replacement_delivery',
     },
   };
@@ -85,17 +88,19 @@ Map<String, dynamic> legJson(
       'estimatedDeliveryDate': '2026-10-28',
       'totalUsd': 87.5,
       'shippingAddress': meetsCustomer ? kCustomerAddress : null,
-      'items': [
-        {'productName': 'Chaussures de course Air Comfort Pro', 'qty': 2},
-        {'productName': 'Écouteurs sans fil', 'qty': 1},
-      ],
+      if (partial) 'partial': true,
+      'items': orderItems ??
+          [
+            {'productName': 'Chaussures de course Air Comfort Pro', 'qty': 2},
+            {'productName': 'Écouteurs sans fil', 'qty': 1},
+          ],
     };
   }
   return json;
 }
 
-DeliveryTaskDto leg(String kind, {String? id, String status = 'assigned', double cod = 0, String? failure, int attempts = 1, bool legacy = false}) =>
-    DeliveryTaskDto.fromJson(legJson(kind, id: id, status: status, cod: cod, failure: failure, attempts: attempts, legacy: legacy));
+DeliveryTaskDto leg(String kind, {String? id, String status = 'assigned', double cod = 0, String? failure, int attempts = 1, bool legacy = false, bool partial = false}) =>
+    DeliveryTaskDto.fromJson(legJson(kind, id: id, status: status, cod: cod, failure: failure, attempts: attempts, legacy: legacy, partial: partial));
 
 Map<String, dynamic> ticketJson(
   String id, {

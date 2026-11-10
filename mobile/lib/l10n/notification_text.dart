@@ -83,6 +83,10 @@ const Map<String, String> _titles = {
   'Dispute opened': 'Litige ouvert',
   'Dispute resolved': 'Litige résolu',
   'Dispute closed': 'Litige clôturé',
+  'Part of your order is on its way': 'Une partie de votre commande est en route',
+  'Part of your order was delivered': 'Une partie de votre commande a été livrée',
+  'Items could not be delivered': 'Articles non livrés',
+  'Task updated': 'Tâche mise à jour',
   'Exchange requested': 'Échange demandé',
   'Replacement requested': 'Remplacement demandé',
 };

@@ -21,6 +21,7 @@ import 'strings.dart';
     'Ticket resolved' => 'Ticket résolu',
     'Ticket closed' => 'Ticket clôturé',
     'Ticket reopened' => 'Ticket rouvert',
+    'Task updated' => 'Tâche mise à jour',
     _ => _assignedMany(title) ?? title,
   };
   var b = body;
@@ -61,6 +62,7 @@ String _legFr(String kind) => switch (kind) {
       'pickup' => 'la collecte',
       'transfer' => 'le transfert',
       'delivery' => 'la livraison',
+      'express delivery' => 'la livraison express',
       'return pickup' => 'la collecte du retour',
       'return transfer' => 'le transfert du retour',
       'return to seller' => 'le retour au vendeur',

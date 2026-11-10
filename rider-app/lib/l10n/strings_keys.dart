@@ -204,6 +204,9 @@ extension StringsKeys on Strings {
   String legReturnTransferTitle(Object? name) => t('leg_return_transfer_title', {'name': name});
   String legReturnSellerTitle(Object? name) => t('leg_return_seller_title', {'name': name});
   String get legReplacementTitle => t('leg_replacement_title');
+  String get kindExpress => t('kind_express');
+  String get partOfOrder => t('part_of_order');
+  String legExpressTitle(Object? name) => t('leg_express_title', {'name': name});
   String get collectOld => t('collect_old');
   String get theSeller => t('the_seller');
   String get theWarehouse => t('the_warehouse');

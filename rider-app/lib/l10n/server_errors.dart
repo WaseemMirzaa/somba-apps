@@ -229,7 +229,11 @@ final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
   (RegExp(r"^We don['’]t deliver to (.+) yet\.$"), (m) => m[1] == 'this area' ? 'Nous ne livrons pas encore dans cette zone.' : 'Nous ne livrons pas encore à ${m[1]}.'),
   (RegExp(r'^An? (\w+) cannot be added under an? (\w+)\.$'), (m) => 'Le niveau « ${_areaLevel(m[1]!)} » ne peut pas être ajouté sous le niveau « ${_areaLevel(m[2]!)} ».'),
   (RegExp(r'^This area is already covered by (.+)\.$'), (m) => 'Cette zone est déjà couverte par ${m[1]}.'),
-  (RegExp(r'^A (.+) delivery cannot become (.+)\.$'), (m) => 'Une livraison « ${_taskStatus(m[1]!)} » ne peut pas passer à « ${_taskStatus(m[2]!)} ».'),
+  // "A pickup that is picked up cannot become assigned." / "An express delivery that is assigned cannot become delivered." (A or An)
+  (RegExp(r'^An? (.+?) that is (.+?) cannot become (.+)\.$'),
+      (m) => '${_legKind(m[1]!)} « ${_taskStatus(m[2]!)} » ne peut pas passer à « ${_taskStatus(m[3]!)} ».'),
+  (RegExp(r'^An? (.+) delivery cannot become (.+)\.$'), (m) => 'Une livraison « ${_taskStatus(m[1]!)} » ne peut pas passer à « ${_taskStatus(m[2]!)} ».'),
+  (RegExp(r'^Part of this order was already delivered\. Contact support to stop the rest\.$'), (m) => 'Une partie de cette commande a déjà été livrée. Contactez le support pour arrêter le reste.'),
   (RegExp(r'^You can attach up to (\d+) photos\.$'), (m) => 'Vous pouvez joindre jusqu’à ${m[1]} photos.'),
   (RegExp(r'^Request failed \((\d+)\)\.$'), (m) => 'La requête a échoué (${m[1]}).'),
   (RegExp(r'^email must be an email$'), (m) => 'Saisissez un e-mail valide.'),
@@ -255,4 +259,17 @@ String _taskStatus(String s) => switch (s) {
       'delivered' => 'livrée',
       'failed' => 'échouée',
       _ => s,
+    };
+
+/// A leg's kind with its French article, as the server names it in a status error ("express delivery").
+String _legKind(String k) => switch (k) {
+      'pickup' => 'Une collecte',
+      'transfer' => 'Un transfert',
+      'delivery' => 'Une livraison',
+      'express delivery' => 'Une livraison express',
+      'return pickup' => 'Une collecte de retour',
+      'return transfer' => 'Un transfert de retour',
+      'return to seller' => 'Un retour au vendeur',
+      'replacement delivery' => 'Une livraison de remplacement',
+      _ => 'Une étape « $k »',
     };

@@ -4,6 +4,10 @@ import 'strings.dart';
 // A message may be listed in one map only. A message with a number or a name in it goes to `_patternsFr` instead.
 
 const Map<String, String> kServerErrorsLogistics = {
+  'Part of this order was already delivered. Contact support to stop the rest.':
+      'Une partie de cette commande a déjà été livrée. Contactez le support pour arrêter le reste.',
+  'An express parcel is still with the seller. Cancel the order instead.':
+      'Un colis express est encore chez le vendeur. Annulez plutôt la commande.',
   'Pin your delivery address on the map.': 'Placez votre adresse de livraison sur la carte.',
   'Delivery is not available right now: no warehouse is open.': 'La livraison n’est pas disponible pour le moment : aucun entrepôt n’est ouvert.',
   'This order has no destination warehouse.': 'Cette commande n’a pas d’entrepôt de destination.',

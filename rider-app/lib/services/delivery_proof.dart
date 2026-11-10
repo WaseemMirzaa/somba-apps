@@ -29,9 +29,9 @@ class DeliveryProof {
   static const _keep = Object();
 }
 
-/// Which legs take proof: the handover to the customer (a delivery or a replacement), never a leg that ends at a warehouse.
+/// Which legs take proof: the handover to the customer (a delivery, an express run or a replacement), never a leg that ends at a warehouse.
 extension DeliveryProofRules on DeliveryTaskDto {
-  bool get takesProof => kind == LegKind.delivery || kind == LegKind.replacementDelivery;
+  bool get takesProof => isCustomerLeg || kind == LegKind.replacementDelivery;
 }
 
 /// Takes the photo with the camera. Tests swap in a fake.

@@ -2,6 +2,7 @@ import '../services/models.dart';
 
 /// One stop on a parcel's way to the customer: picked up from the seller -> at the seller's warehouse -> in transfer
 /// (only when the parcels come from another warehouse) -> at the customer's warehouse -> out for delivery -> delivered.
+/// Express orders skip the warehouse: picked up -> out for delivery -> delivered.
 /// A parcel relayed through other warehouses has one `in_transfer` step per hop, each followed by an `at_hub` step
 /// at the relay warehouse (the last hop is followed by `at_destination`).
 class JourneyStep {
@@ -70,9 +71,33 @@ List<JourneyStep> orderJourney(OrderDto o) {
   bool reached(OrderLeg l) => const {'picked_up', 'in_transit', 'delivered'}.contains(l.status) || l.pickedUpAt != null;
   bool finished(OrderLeg l) => l.status == 'delivered' || l.receivedAt != null || l.deliveredAt != null;
 
+  // Express goes straight from the seller to the customer: no warehouse, no transfer. Its journey is three steps.
+  final expressLegs = kind('express');
+  if (o.isExpress || expressLegs.isNotEmpty) {
+    final pickedUp = expressLegs.isNotEmpty ? expressLegs.any(reached) : out || allReceived;
+    final outNow = expressLegs.isNotEmpty ? expressLegs.any((l) => l.status == 'in_transit' || finished(l)) : out;
+    final steps = <JourneyStep>[
+      JourneyStep('picked_up', done: pickedUp, at: latest(expressLegs.map((l) => l.pickedUpAt))),
+      JourneyStep('out_for_delivery', done: outNow || delivered, at: latest(expressLegs.map((l) => l.pickedUpAt)) ?? (o.status == 'out_for_delivery' ? o.updatedAt : null)),
+      JourneyStep('delivered', done: delivered, at: latest(expressLegs.map((l) => l.deliveredAt)) ?? (delivered ? o.updatedAt : null)),
+    ];
+    final started = o.status == 'processing' || o.status == 'shipped' || out || allReady;
+    var marked = false;
+    return [
+      for (final st in steps)
+        if (!marked && !st.done && started)
+          () {
+            marked = true;
+            return st.asCurrent();
+          }()
+        else
+          st,
+    ];
+  }
+
   final pickups = kind('pickup');
   final transfers = kind('transfer');
-  final deliveries = kind('delivery');
+  final deliveries = o.customerLegs.where((l) => !l.isExpress).toList();
 
   // A parcel relayed through other warehouses: the number of hops comes from the legs (each knows `hops`) and from the
   // planned routes; with none of that the route is one hop, exactly as before.

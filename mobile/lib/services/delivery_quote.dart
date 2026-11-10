@@ -36,6 +36,13 @@ class DeliveryQuote {
     this.interCityDays = 0,
     this.transitHours = 0,
     this.extraDays,
+    this.deliveryMode = 'standard',
+    this.express = false,
+    this.prepDays,
+    this.routeDays,
+    this.estimateDays,
+    this.estimatedDeliveryDate,
+    this.splitAfterHours,
   });
 
   final double feeUsd;
@@ -87,6 +94,27 @@ class DeliveryQuote {
 
   /// Days the server adds to the delivery estimate for the transfers (null on older servers).
   final int? extraDays;
+
+  /// `standard` | `express`. Express goes straight from the store to the customer: no warehouse, no transfer fee.
+  final String deliveryMode;
+  final bool express;
+
+  /// The server's own estimate (the seller's preparation + the platform's transit): the preparation days of the seller
+  /// who decides, the route days, their sum, and the day it gives (YYYY-MM-DD, Kinshasa) which is exactly what
+  /// `orders:create` stamps. All null on an older server (then the app adds the days up itself).
+  final int? prepDays;
+  final int? routeDays;
+  final int? estimateDays;
+  final String? estimatedDeliveryDate;
+
+  /// Hours after which parts of a multi-seller order that have arrived are delivered without waiting for the rest.
+  final int? splitAfterHours;
+
+  /// The estimated day to show when the server gave a well-formed one, else null (the caller falls back).
+  String? get serverEstimateDay => estimatedDeliveryDate != null && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(estimatedDeliveryDate!) ? estimatedDeliveryDate : null;
+
+  /// The order is delivered express (the flag, or the mode on a server that sends only one of them).
+  bool get isExpress => express || deliveryMode == 'express';
 
   /// The days to add to the estimate shown: the server's own number, else the lanes' transit time in whole days, else
   /// the inter-city allowance.
@@ -170,9 +198,18 @@ class DeliveryQuote {
       interCityDays: j['interCityDays'] is num ? (j['interCityDays'] as num).toInt() : 0,
       transitHours: _num(j['transitHours']),
       extraDays: j['extraDays'] is num ? (j['extraDays'] as num).toInt() : null,
+      deliveryMode: j['deliveryMode'] == 'express' ? 'express' : 'standard',
+      express: j['express'] == true,
+      prepDays: _int(j['prepDays']),
+      routeDays: _int(j['routeDays']),
+      estimateDays: _int(j['estimateDays']),
+      estimatedDeliveryDate: textOrNull(j['estimatedDeliveryDate']),
+      splitAfterHours: _int(j['splitAfterHours']),
     );
   }
 }
+
+int? _int(Object? v) => v is num ? v.toInt() : null;
 
 double _num(Object? v) => v is num ? v.toDouble() : (double.tryParse('${v ?? ''}') ?? 0);
 
@@ -191,7 +228,15 @@ class QuoteOrigin {
     this.coveringHubName,
     this.transitHours = 0,
     this.hops = const [],
+    this.prepDays,
+    this.routeDays,
+    this.estimatedDeliveryDate,
   });
+
+  /// This seller's own preparation days, route days and the day its parcels give (null on an older server).
+  final int? prepDays;
+  final int? routeDays;
+  final String? estimatedDeliveryDate;
 
   final String sellerId;
 
@@ -231,6 +276,9 @@ class QuoteOrigin {
         coveringHubName: textOrNull(j['coveringHubName']),
         transitHours: _num(j['transitHours']),
         hops: j['hops'] is List ? [for (final h in j['hops'] as List) if (h is Map) QuoteHop.fromJson(_map(h))] : const [],
+        prepDays: _int(j['prepDays']),
+        routeDays: _int(j['routeDays']),
+        estimatedDeliveryDate: textOrNull(j['estimatedDeliveryDate']),
       );
 }
 

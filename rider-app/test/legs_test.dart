@@ -88,7 +88,7 @@ void main() {
         expect(t.to, isNotNull, reason: kind);
         expect(t.items.map((i) => i.qty), [2, 1], reason: kind);
         expect(t.endsAtHub, LegKind.hubBound.contains(kind), reason: kind);
-        expect(t.needsCode, kind == 'delivery', reason: kind);
+        expect(t.needsCode, kind == 'delivery' || kind == 'express', reason: kind);
         expect(t.collectOld, kind == 'replacement_delivery', reason: kind);
         expect(t.orderFlow, !kind.startsWith('return') && kind != 'replacement_delivery', reason: kind);
       }

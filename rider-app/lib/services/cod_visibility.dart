@@ -16,4 +16,4 @@ bool showCashSummary(bool codEnabled) => codEnabled;
 bool showTaskCash(bool codEnabled, DeliveryTaskDto t) => t.collectsCash && (codEnabled || t.isActive);
 
 /// "Already paid online, no cash to collect": a COD word, so it follows the setting too.
-bool showPrepaidNote(bool codEnabled, DeliveryTaskDto t) => codEnabled && t.isActive && t.kind == LegKind.delivery && !t.collectsCash;
+bool showPrepaidNote(bool codEnabled, DeliveryTaskDto t) => codEnabled && t.isActive && t.isCustomerLeg && !t.collectsCash;

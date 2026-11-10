@@ -63,4 +63,26 @@ extension StringsLogistics on Strings {
   String journeyRun(Object? ref) => t('journey_run', {'ref': ref});
   String get journeyTitle => t('journey_title');
   String get journeyWaiting => t('journey_waiting');
+
+  String checkoutExpress(Object? fee) => t('checkout_express', {'fee': fee});
+  String get deliveryEstimateHintExpress => t('delivery_estimate_hint_express');
+  String get orderExpressNote => t('order_express_note');
+  String get orderPartDelivered => t('order_part_delivered');
+  String orderPartCounts(int done, int total, int left) => t('order_part_counts', {'done': done, 'total': total, 'left': left});
+  String get lineDelivered => t('line_delivered');
+  String get lineComing => t('line_coming');
+  String get deliveriesTitle => t('deliveries_title');
+  String deliveryLegN(int n, int total) => t('delivery_leg_n', {'n': n, 'total': total});
+  String get deliveryLegExpress => t('delivery_leg_express');
+  String deliveryLegItems(int n) => n == 1 ? t('delivery_leg_items_one') : t('delivery_leg_items', {'n': n});
+  String get deliveryLegLast => t('delivery_leg_last');
+
+  /// What a customer leg is doing, from its status (`unassigned` | `assigned` | `picked_up` | `in_transit` | `delivered` | `failed`).
+  String deliveryLegStatus(String status) => switch (status) {
+        'assigned' => t('delivery_leg_assigned'),
+        'picked_up' || 'in_transit' => t('delivery_leg_onway'),
+        'delivered' => t('delivery_leg_delivered'),
+        'failed' => t('delivery_leg_failed'),
+        _ => t('delivery_leg_planned'),
+      };
 }

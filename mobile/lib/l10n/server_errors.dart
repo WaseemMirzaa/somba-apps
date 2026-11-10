@@ -228,7 +228,10 @@ final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
   (RegExp(r'^Top-up method must be one of: (.+)\.$'), (m) => 'Le moyen de recharge doit être l’un des suivants : ${m[1]}.'),
   (RegExp(r'^An order that is (.+) cannot be marked ready\.$'), (m) => 'Une commande « ${m[1]} » ne peut pas être marquée comme prête.'),
   (RegExp(r'^A (\w+) parcel cannot be received\.$'), (m) => 'Un colis « ${m[1]} » ne peut pas être réceptionné.'),
-  (RegExp(r'^A (.+) delivery cannot become (.+)\.$'), (m) => 'Une livraison « ${m[1]} » ne peut pas passer à « ${m[2]} ».'),
+  // "A pickup that is picked up cannot become assigned." / "An express delivery that is assigned cannot become delivered." (the article is A or An)
+  (RegExp(r'^An? (.+?) that is (.+?) cannot become (.+)\.$'),
+      (m) => '${_legKind(m[1]!)} « ${_legStatus(m[2]!)} » ne peut pas passer à « ${_legStatus(m[3]!)} ».'),
+  (RegExp(r'^An? (.+) delivery cannot become (.+)\.$'), (m) => 'Une livraison « ${_legStatus(m[1]!)} » ne peut pas passer à « ${_legStatus(m[2]!)} ».'),
   (RegExp(r'^Minimum order \$([\d.,]+)\.$'), (m) => 'Commande minimum de ${m[1]} \$.'),
   (RegExp(r'^Request failed \((\d+)\)\.$'), (m) => 'La requête a échoué (${m[1]}).'),
   // class-validator messages (sign-up / reset forms)
@@ -255,5 +258,25 @@ String _payStatus(String s) => switch (s) {
       'failed' => 'échoué',
       'pending' => 'en attente',
       'refunded' => 'remboursé',
+      _ => s,
+    };
+
+/// A delivery leg's kind with its French article ("Une livraison express").
+String _legKind(String k) => switch (k) {
+      'pickup' => 'Un ramassage',
+      'transfer' => 'Un transfert',
+      'delivery' => 'Une livraison',
+      'express delivery' => 'Une livraison express',
+      'return to seller' => 'Un retour au vendeur',
+      _ => 'Une étape « $k »',
+    };
+
+String _legStatus(String s) => switch (s) {
+      'unassigned' => 'disponible',
+      'assigned' => 'assignée',
+      'picked up' => 'récupérée',
+      'in transit' => 'en route',
+      'delivered' => 'livrée',
+      'failed' => 'échouée',
       _ => s,
     };

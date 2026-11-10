@@ -172,6 +172,10 @@ class ProductDto {
   final int sellerHandlingDays;
   final int? totalDeliveryDays;
 
+  /// The seller's preparation time in days (0-30); null on servers from before the prep + transit model, where
+  /// [deliveryDays] stands for the whole delivery time.
+  final int? prepDays;
+
   /// When this copy was received (see `nextStamp`): a newer `store:vacation` push beats it, an older one does not.
   final int stamp;
 
@@ -212,6 +216,7 @@ class ProductDto {
     this.sellerVacationNotice,
     this.sellerHandlingDays = 0,
     this.totalDeliveryDays,
+    this.prepDays,
     int? stamp,
   })  : basePrice = basePrice ?? price,
         stamp = stamp ?? nextStamp();
@@ -261,6 +266,7 @@ class ProductDto {
       sellerVacationNotice: j['sellerOnVacation'] == true ? readBilingual(j['sellerVacationNotice']) : null,
       sellerHandlingDays: ((j['sellerHandlingDays'] is num ? (j['sellerHandlingDays'] as num).toInt() : 0)).clamp(0, 14),
       totalDeliveryDays: j['totalDeliveryDays'] is num && (j['totalDeliveryDays'] as num) >= 1 ? (j['totalDeliveryDays'] as num).round() : null,
+      prepDays: j['prepDays'] is num && (j['prepDays'] as num) >= 0 ? (j['prepDays'] as num).round().clamp(0, 30) : null,
     );
   }
 }
@@ -460,6 +466,8 @@ class AddressDto {
 AreaDto? _areaAt(List<AreaDto> chain, String level) => areaAt(chain, level);
 
 class OrderItemDto {
+  /// The line's id (what a leg's `items[].orderItemId` points at); empty on older servers.
+  final String id;
   final String productId;
   final String productName;
 
@@ -491,7 +499,12 @@ class OrderItemDto {
   /// Money refunded to the wallet for this line (0 when none).
   final double refundedUsd;
 
+  /// When this line reached the customer (a split order delivers part by part); null until then. `fulfilment` stays
+  /// `received` for a delivered line, so old clients keep working.
+  final DateTime? deliveredAt;
+
   OrderItemDto({
+    this.id = '',
     required this.productId,
     required this.productName,
     this.productNameFr = '',
@@ -507,9 +520,13 @@ class OrderItemDto {
     this.receivedAt,
     this.cancelReason,
     this.refundedUsd = 0,
+    this.deliveredAt,
   }) : listPriceUsd = listPriceUsd ?? priceUsd;
 
   bool get isCancelled => fulfilment == 'cancelled';
+
+  /// This line has reached the customer.
+  bool get isDelivered => !isCancelled && deliveredAt != null;
 
   /// The line's name in [lang]: the French snapshot when French is asked and present, else the stored name.
   String displayName(String lang) => pickLang(lang, productName, productNameFr);
@@ -523,6 +540,7 @@ class OrderItemDto {
   static DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
 
   factory OrderItemDto.fromJson(Map<String, dynamic> j) => OrderItemDto(
+        id: textOrNull(j['id']) ?? '',
         productId: j['productId'] as String? ?? '',
         productName: j['productName'] as String? ?? '',
         productNameFr: textOrNull(j['productNameFr']) ?? '',
@@ -538,6 +556,7 @@ class OrderItemDto {
         receivedAt: _date(j['receivedAt']),
         cancelReason: j['cancelReason'] as String?,
         refundedUsd: (j['refundedUsd'] as num?)?.toDouble() ?? 0,
+        deliveredAt: _date(j['deliveredAt']),
       );
 }
 
@@ -561,6 +580,8 @@ String packageStatusOf(OrderDto o, List<OrderItemDto> items) {
   final live = items.where((i) => !i.isCancelled).toList();
   if (live.isEmpty || o.status == 'cancelled') return 'cancelled';
   if (o.status == 'pending' && o.paymentMethod != 'cod') return 'pending';
+  // A split order delivers part by part: this seller's package is delivered once all its lines reached the customer.
+  if (live.every((i) => i.deliveredAt != null)) return 'delivered';
   if (live.every((i) => i.fulfilment == 'received')) {
     return const {'shipped', 'out_for_delivery', 'delivered', 'returned'}.contains(o.status) ? o.status : 'at_hub';
   }
@@ -629,6 +650,14 @@ class OrderDto {
   /// (`routeBySeller`): more than two ids means the parcel is relayed through other warehouses. Empty on older servers.
   final Map<String, List<String>> routeBySeller;
 
+  /// `standard` | `express`: express goes straight from the store to the customer, with no warehouse hop. Older
+  /// servers send none (standard).
+  final String deliveryMode;
+
+  /// What the server says about a split delivery: part of the order has reached the customer and the rest has not.
+  /// Null on servers that do not say; [partiallyDelivered] then works it out from the lines.
+  final bool? partiallyDeliveredRaw;
+
   OrderDto({
     required this.id,
     required this.reference,
@@ -651,7 +680,26 @@ class OrderDto {
     this.originHubIds = const [],
     this.legs = const [],
     this.routeBySeller = const {},
+    this.deliveryMode = 'standard',
+    this.partiallyDeliveredRaw,
   });
+
+  bool get isExpress => deliveryMode == 'express';
+
+  /// Part of the order was delivered and the rest is still coming (a split delivery).
+  bool get partiallyDelivered {
+    final said = partiallyDeliveredRaw;
+    if (said != null) return said;
+    final live = items.where((i) => !i.isCancelled).toList();
+    return live.any((i) => i.deliveredAt != null) && live.any((i) => i.deliveredAt == null);
+  }
+
+  /// The delivered lines, and the live lines that are still coming (cancelled lines are in neither).
+  List<OrderItemDto> get deliveredItems => items.where((i) => i.isDelivered).toList();
+  List<OrderItemDto> get comingItems => items.where((i) => !i.isCancelled && i.deliveredAt == null).toList();
+
+  /// The legs that carry parcels to the customer (`delivery`, and `express` straight from the store), oldest first.
+  List<OrderLeg> get customerLegs => legs.where((l) => l.isCustomerLeg).toList();
 
   /// Cash on delivery: the server keeps the order `pending` until the rider collects the money, but it is already
   /// being prepared (nothing to approve on a phone), so the app treats it like a confirmed order.
@@ -719,6 +767,8 @@ class OrderDto {
         destinationHubId: textOrNull(j['destinationHubId']),
         legs: OrderLeg.listFrom(j['tracking']),
         routeBySeller: _routes(j['routeBySeller']),
+        deliveryMode: j['deliveryMode'] == 'express' ? 'express' : 'standard',
+        partiallyDeliveredRaw: j['partiallyDelivered'] is bool ? j['partiallyDelivered'] as bool : null,
         originHubIds: j['originHubIds'] is List ? [for (final e in j['originHubIds'] as List) if (e is String && e.isNotEmpty) e] : const [],
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
         updatedAt: j['updatedAt'] is String ? DateTime.tryParse(j['updatedAt'] as String)?.toLocal() : null,
@@ -766,10 +816,29 @@ class OrderLeg {
     this.driverFirstName,
     this.runId,
     this.runReference,
+    this.sellerIds,
+    this.items = const [],
+    this.completesOrder,
   });
 
   final String kind;
   final String status;
+
+  /// On a customer leg: the sellers whose parcels it carries (null = every seller, or an older server), what it carries
+  /// and whether delivering it finishes the order (null on older servers, where the one delivery leg always does).
+  final List<String?>? sellerIds;
+  final List<LegItem> items;
+  final bool? completesOrder;
+
+  /// A leg that goes to the customer: the delivery from the warehouse, or the express run straight from the store.
+  bool get isCustomerLeg => kind == 'delivery' || kind == 'express';
+  bool get isExpress => kind == 'express';
+
+  /// Not delivered and not failed yet.
+  bool get isOpen => status != 'delivered' && status != 'failed' && status != 'cancelled';
+
+  /// A leg that carries only part of the order.
+  bool get isPartial => completesOrder == false;
 
   /// Which hop of the route this transfer is, and how many there are (null on older servers: one hop).
   final int? hop;
@@ -806,6 +875,9 @@ class OrderLeg {
         driverFirstName: _firstName(j['riderFirstName'] ?? j['driverFirstName'] ?? j['riderName'] ?? j['driverName']),
         runId: textOrNull(j['runId']),
         runReference: textOrNull(j['runReference']),
+        sellerIds: j['sellerIds'] is List ? [for (final e in j['sellerIds'] as List) e is String && e.isNotEmpty ? e : null] : null,
+        items: j['items'] is List ? [for (final e in j['items'] as List) if (e is Map) LegItem.fromJson(e.map((k, v) => MapEntry(k.toString(), v)))] : const [],
+        completesOrder: j['completesOrder'] is bool ? j['completesOrder'] as bool : null,
       );
 
   /// The flat `fromHubId` / `fromHubName` / `toHubId` / `toHubName` are what the server sends; a warehouse sent only as an
@@ -823,6 +895,17 @@ class OrderLeg {
     if (list is! List) return const [];
     return [for (final e in list) if (e is Map) OrderLeg.fromJson(e.map((k, v) => MapEntry(k.toString(), v)))];
   }
+}
+
+/// One line (and how many of it) a customer leg carries.
+class LegItem {
+  const LegItem({required this.orderItemId, this.qty = 1});
+
+  final String orderItemId;
+  final int qty;
+
+  factory LegItem.fromJson(Map<String, dynamic> j) =>
+      LegItem(orderItemId: textOrNull(j['orderItemId']) ?? '', qty: j['qty'] is num ? (j['qty'] as num).toInt() : 1);
 }
 
 /// The rider's name and phone number (the phone may be missing).

@@ -26,13 +26,13 @@ const kFailReasonIds = ['unreachable', 'wrong_address', 'refused', 'payment', 'o
   switch (t.status) {
     case 'assigned':
       return ('picked_up', switch (t.kind) {
-        LegKind.pickup => 'act_picked_up_seller',
+        LegKind.pickup || LegKind.express => 'act_picked_up_seller',
         LegKind.returnPickup => 'act_picked_up_customer',
         _ => 'act_picked_up',
       });
     case 'picked_up':
       return ('in_transit', switch (t.kind) {
-        LegKind.delivery || LegKind.replacementDelivery => 'act_in_transit',
+        LegKind.delivery || LegKind.express || LegKind.replacementDelivery => 'act_in_transit',
         LegKind.returnToSeller => 'act_in_transit_seller',
         _ => 'act_in_transit_hub',
       });
@@ -361,6 +361,8 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
             Pill(_kindLabel(s, t), key: ValueKey('kind-${t.id}'), color: AppColors.violet.withValues(alpha: 0.12), textColor: AppColors.violet),
             if (t.attempts > 1) _attemptPill(s, t),
             if (t.readyAt != null && t.kind == LegKind.pickup) Pill(s.sellerReady, color: AppColors.success.withValues(alpha: 0.14), textColor: AppColors.success),
+            if (t.isExpress) Pill(s.kindExpress, key: ValueKey('express-${t.id}'), color: AppColors.accent.withValues(alpha: 0.18), textColor: const Color(0xFF92610A)),
+            if (t.partial) Pill(s.partOfOrder, key: ValueKey('partial-${t.id}'), color: AppColors.info.withValues(alpha: 0.14), textColor: AppColors.info),
             if (t.receivedAt != null && t.kind == LegKind.delivery) Pill(s.receivedAtHub, color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
           ]),
         ),
@@ -379,7 +381,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
             ]),
           ),
         if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(s, t)),
-        if (t.deliverByText != null && t.kind == LegKind.delivery) _line(Icons.event_available_rounded, s.deliverBy(t.deliverByText)),
+        if (t.deliverByText != null && t.isCustomerLeg) _line(Icons.event_available_rounded, s.deliverBy(t.deliverByText)),
         if (t.isActive && nav?.kind == NavKind.customer && nav?.pin != null && t.status != 'assigned') _line(Icons.push_pin_rounded, s.pinExact),
         if (t.isActive && nav != null)
           Padding(
@@ -454,7 +456,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
           Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.alreadyPaid, style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         if (t.isActive && t.needsCode && store.requireDeliveryCode && t.status != 'assigned')
           Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.codeHint, key: ValueKey('code-hint-${t.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
-        if (t.status == 'in_transit') _gpsRow(s, toCustomer: t.kind == LegKind.delivery || t.kind == LegKind.replacementDelivery),
+        if (t.status == 'in_transit') _gpsRow(s, toCustomer: t.isCustomerLeg || t.kind == LegKind.replacementDelivery),
         if (next != null) ...[
           const SizedBox(height: 12),
           _cardAction(
@@ -675,6 +677,18 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
           _title(Icons.storefront_rounded, s.legReturnSellerTitle(seller)),
           _line(Icons.location_on_rounded, to?.address ?? t.pickupAddress ?? s.addressMissing),
           if (fetchAtHub != null) fetchAtHub,
+        ];
+      case LegKind.express:
+        // Straight from the store to the customer: collect at the store first, then the customer's door.
+        final from = t.from;
+        final storeAddr = from?.address ?? t.pickupAddress;
+        final beforePickup = t.status == 'assigned';
+        return [
+          _title(Icons.bolt_rounded, s.legExpressTitle(seller)),
+          if (beforePickup && storeAddr != null) _line(Icons.storefront_rounded, s.collectAt(storeAddr)),
+          if (customer != null) customer,
+          _line(Icons.location_on_rounded, t.isFinished ? (t.address.isEmpty ? s.addressMissing : t.address) : s.deliverTo(t.address.isEmpty ? s.addressMissing : t.address)),
+          if (phone != null) phone,
         ];
       case LegKind.replacementDelivery:
         return [
