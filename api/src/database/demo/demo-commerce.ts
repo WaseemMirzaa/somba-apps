@@ -84,6 +84,14 @@ export const ADDRESSES = {
     lat: -4.3532,
     lng: 15.3441,
   },
+  kasavubu: {
+    label: 'Home (Kasa-Vubu)',
+    line1: '5 Avenue Kasa-Vubu, quartier Ndolo',
+    commune: 'Kasa-Vubu',
+    code: 'CD-KN-KSV',
+    lat: -4.3401,
+    lng: 15.3079,
+  },
   kalamu: {
     label: 'Home',
     line1: '31 Avenue Kalemie',
@@ -116,7 +124,7 @@ const BOOK: Record<string, AddrKey[]> = {
   'customer.full': ['gombe', 'maluku'],
   'customer.fr': ['ngaliema'],
   'customer.fraud': ['gombe2'],
-  'reviewer.1': ['limete'],
+  'reviewer.1': ['limete', 'kasavubu'],
   'reviewer.2': ['kalamu'],
   'reviewer.3': ['bandalungwa'],
   'reviewer.4': ['kintambo'],
@@ -156,6 +164,8 @@ export interface OrderSpec {
   afterBackdate?: (c: Scenario) => Promise<void>;
   /** Paid in cash at the door: made only while `codEnabled` is on. */
   cod?: boolean;
+  /** Same-commune express delivery: made only while `expressDeliveryEnabled` is on. */
+  express?: boolean;
 }
 
 /** What a scenario step gets to work with. */
@@ -267,8 +277,9 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
   const driver = new Driver(ctx);
   const all = [...orderSpecs(), ...orderTypeSpecs()];
   const skipped = all.filter((s) => s.cod && !ctx.codOn);
+  const skippedExpress = all.filter((s) => s.express && !ctx.expressOn);
   const specs = all
-    .filter((s) => !s.cod || ctx.codOn)
+    .filter((s) => (!s.cod || ctx.codOn) && (!s.express || ctx.expressOn))
     .sort((a, b) => b.placedAgoH - a.placedAgoH);
   let made = 0;
   for (const spec of specs) {
@@ -334,10 +345,23 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
       });
       if (spec.caseAgoH !== undefined)
         await placeCases(ds, current.id, spec.caseAgoH * H);
+      if (spec.express) {
+        const mode = (
+          await ds.getRepository(Order).findOne({ where: { id: current.id } })
+        )?.deliveryMode;
+        if (mode !== 'express')
+          throw new Error(
+            `Order ${spec.key} was meant to be an express order but is "${mode}": check that store C offers express and that the customer's address is pinned in the store's commune.`,
+          );
+      }
       if (spec.afterBackdate) await spec.afterBackdate(scenario);
     }
   }
   log(`✓ orders: ${made} created, ${specs.length - made} already there`);
+  if (skippedExpress.length)
+    log(
+      `! ${skippedExpress.length} express-delivery order(s) NOT made: express delivery is off on this server. To get them, run the seed with --with-express (seed-demo.sh --with-express, or DEMO_WITH_EXPRESS=1); that switches expressDeliveryEnabled on. Switch it on only once the rider app that knows express is installed.`,
+    );
   if (skipped.length)
     log(
       `! ${skipped.length} cash-on-delivery order(s) NOT made: cash on delivery is off on this server. To get them, run the seed with --with-cod (seed-demo.sh --with-cod, or DEMO_WITH_COD=1); that switches the setting on, and the removal leaves it on.`,

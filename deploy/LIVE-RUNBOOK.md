@@ -88,6 +88,11 @@ Cash on delivery is off, so the two cash-on-delivery demo orders are skipped. `b
 `DEMO_WITH_COD=1`) switches `codEnabled` on and makes them; it is the only setting the seed ever changes, and the removal leaves it on
 (turn it off as in section 7).
 
+Express delivery is off too, so the express demo orders of store C are skipped. `seed-demo.sh --with-express` (or
+`DEMO_WITH_EXPRESS=1`) switches `expressDeliveryEnabled` on and makes them (it changes only that setting; the removal leaves it on).
+**Do that only once the client has installed the current rider app build** (section 9): it is the one that knows the express job.
+The two flags can be given together.
+
 **While the demo is installed, real visitors can see it** (stores, products, notices to real admins), and
 `admin.super@demo.sombateka.test` can do everything. Remove it before real customers arrive (section 5).
 
@@ -192,6 +197,8 @@ Settings** (Super Admin), not with `set-secret.sh`:
 `localDeliveryDays`, `splitDeliveryAfterHours`, `expressDeliveryEnabled`, `expressDeliveryDays`, `expressBaseUsd`,
 `expressPerKmUsd`, `expressMaxUsd`, `expressMaxKm`. They arrive with the delivery-model pull requests: until those are merged and
 deployed (section 1) they do not exist on the server, and their exact labels on the page are whatever that change ships. The
+**`expressDeliveryEnabled` should stay `false` until the current rider app build is installed on the riders' phones** (an older
+build cannot run an express job). The demo seed's `--with-express` switches it on (section 3). The
 existing ones sit in the same page under **Checkout and delivery** (`deliveryBaseUsd`, `deliveryPerKmUsd`, `deliveryMaxUsd`,
 `deliveryTransferUsd`, `allowInterCityDelivery`, `interCityTransferDays`).
 

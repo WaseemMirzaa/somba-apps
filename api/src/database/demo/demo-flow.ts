@@ -183,6 +183,34 @@ export class Driver {
       );
       return true;
     }
+    if (kind === 'express') {
+      // The seller's own rider goes straight to the customer: ready (which releases the held-back leg), assigned, collected, on the road, delivered.
+      if (s < at('ready')) return false;
+      await this.ready(task);
+      if (s === at('ready')) return false;
+      let t = await fresh();
+      if (t.status === 'unassigned')
+        await this.logistics.assign(t.id, rider.id, actor);
+      t = await fresh();
+      if (s < at('out')) return false;
+      if (t.status === 'assigned')
+        await this.delivery.updateStatus(t.id, 'picked_up', rider.id);
+      t = await fresh();
+      if (t.status === 'picked_up')
+        await this.delivery.updateStatus(t.id, 'in_transit', rider.id);
+      if (s === at('out')) return false;
+      t = await fresh();
+      const code = await this.delivery.getProofCode(t.id);
+      await this.delivery.updateStatus(
+        t.id,
+        'delivered',
+        rider.id,
+        undefined,
+        code ?? undefined,
+        t.codAmountUsd > 0 ? t.codAmountUsd : undefined,
+      );
+      return true;
+    }
     // A leg the demo does not drive by hand (return and replacement legs have their own helper below).
     return false;
   }
@@ -421,7 +449,7 @@ export async function backdateOrder(
     if (taskIds.length)
       await q(
         ds,
-        `UPDATE delivery_tasks SET deliveredAt = ?, updatedAt = ? WHERE id IN (${taskIds.map(() => '?').join(',')}) AND status = 'delivered' AND kind = 'delivery'`,
+        `UPDATE delivery_tasks SET deliveredAt = ?, updatedAt = ? WHERE id IN (${taskIds.map(() => '?').join(',')}) AND status = 'delivered' AND kind IN ('delivery','express')`,
         [when, when, ...taskIds],
       );
     await q(ds, 'UPDATE orders SET updatedAt = ? WHERE id = ? AND status = ?', [

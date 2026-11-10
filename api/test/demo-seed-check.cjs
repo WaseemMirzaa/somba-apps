@@ -401,6 +401,36 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     }
   } else console.log('  (cash on delivery is off on this server: the cash orders are not made and not checked. Seed with --with-cod to get them.)');
 
+  // Express (store C, Kasa-Vubu): only when the server has express on.
+  if (settings?.expressDeliveryEnabled === 'true') {
+    const nm = { pack: ['USB Fast Charger'], out: ['Rechargeable Stand Fan'], done: ['Steam Iron'] };
+    if (S['seller.c']) {
+      const c = await sellerOrders('seller.c');
+      const p = c.find((o) => o.items.length === 1 && o.items[0].productName === 'USB Fast Charger' && o.items[0].qty === 2);
+      ok(p?.packageStatus === 'to_pack', 'express: a paid order waiting for store C to press Package Ready', JSON.stringify(p?.packageStatus));
+      ok(legsOf(p).some((l) => l.kind === 'express' && l.status === 'unassigned' && !l.readyAt), 'express: its express leg is held back until the package is ready');
+    }
+    if (S['reviewer.1']) {
+      const orders = list(await req(S['reviewer.1'].sock, 'orders:list', { limit: 100 }));
+      const out = orders.find((o) => has(o, nm.out));
+      ok(out?.deliveryMode === 'express' && out.status === 'out_for_delivery' && legsOf(out).some((l) => l.kind === 'express' && l.status === 'in_transit'), 'express: an order out for delivery (express leg in transit)', JSON.stringify([out?.deliveryMode, out?.status]));
+      const code = out ? data(await req(S['reviewer.1'].sock, 'orders:deliveryCode', { orderId: out.id })) : null;
+      ok(code && /^\d{4}$/.test(String(code.code ?? '')), 'express: the customer has the 4-digit code', JSON.stringify(code));
+      const done = orders.find((o) => has(o, nm.done));
+      ok(done?.deliveryMode === 'express' && done.status === 'delivered' && (done.items ?? []).every((i) => !!i.deliveredAt), 'express: a delivered order, lines stamped delivered', JSON.stringify([done?.deliveryMode, done?.status]));
+      if (settings?.codEnabled === 'true') {
+        const x = orders.find((o) => has(o, ['Electric Kettle 1.7 L', 'USB Fast Charger']) && o.paymentMethod === 'cod');
+        ok(x?.deliveryMode === 'express', 'express: a cash-on-delivery express order to pack', JSON.stringify([x?.deliveryMode, x?.paymentMethod]));
+      }
+    }
+    if (S['rider']) {
+      const t = data(await req(S['rider'].sock, 'rider:tasks', {}));
+      const arr = Array.isArray(t) ? t : (t?.tasks ?? t?.items ?? []);
+      ok(arr.some((x) => x.kind === 'express' && x.status === 'in_transit'), 'express: the rider has the express job on the road');
+      ok(arr.some((x) => x.kind === 'express' && x.status === 'delivered'), 'express: and a delivered one');
+    }
+  } else console.log('  (express delivery is off on this server: the express orders are not made and not checked. Seed with --with-express to get them.)');
+
   // Preparation and handling time.
   if (S['seller.g']) {
     const ps = list(await req(S['seller.g'].sock, 'products:list', { mine: true, limit: 50 }));

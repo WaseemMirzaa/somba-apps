@@ -2,7 +2,7 @@
 
 This puts a complete set of test data on a running Somba&Teka server, so you can try the customer app and the seller portal (and the admin and warehouse portals) with real-looking stores, orders and messages.
 
-- It only **adds**. It never wipes anything, never touches your real admin, your real warehouse or the geography, and never changes a setting, with one opt-in exception: `--with-cod` switches cash on delivery on (see "Cash on delivery" below).
+- It only **adds**. It never wipes anything, never touches your real admin, your real warehouse or the geography, and never changes a setting, with two opt-in exceptions: `--with-cod` switches cash on delivery on and `--with-express` switches express delivery on (see "Cash on delivery" below).
 - Run it twice and the second run adds nothing.
 - One command removes it again, and leaves your real customers, orders and stores exactly as they were.
 
@@ -38,6 +38,7 @@ sudo cat /etc/somba/demo-credentials.txt   # every account, its password, its tw
 
 | What you want | Command |
 |---|---|
+| Add the demo and also switch **express delivery** on (see "Express delivery") | `bash /opt/somba/deploy/seed-demo.sh --with-express` |
 | Add the demo and also switch **cash on delivery** on (see "Cash on delivery") | `bash /opt/somba/deploy/seed-demo.sh --with-cod` (or `DEMO_WITH_COD=1 bash ...`) |
 | Give every demo account a new password | `bash /opt/somba/deploy/seed-demo.sh reset` |
 | Choose the password yourself (12+ characters) | `DEMO_PASSWORD='your-long-password' bash /opt/somba/deploy/seed-demo.sh reset` |
@@ -58,7 +59,7 @@ If you later switch on the platform rule "staff two-factor required", the demo a
 
 - **35 accounts**: 10 customers, 6 admins (one per department plus the super admin), warehouse manager, supervisor and operator, a rider, a supervisor and a rider for a second demo warehouse, 8 store owners and 5 team members of store A.
 - **8 stores** and **45 listings** in every state, in 8 categories, with **96 pictures** (about 7 MB, Unsplash and drawn logos, credits in `deploy/demo/images/CREDITS.md`).
-- **38 orders** (40 with cash on delivery) in every state, with their legs, riders and warehouse scans, wallet payments, refunds, returns, an exchange, a replacement, a dispute, 16 reviews (8 with photos), questions, chats (with photos), support tickets, a payout, campaigns, a flash sale, promo codes, banners, fraud alerts, warehouse incidents and stock. Twelve of them are the "orders to process" of the next section: work waiting for each active store, a split delivery, a failed attempt and (with `--with-cod`) cash on delivery.
+- **38 orders** (40 with cash on delivery, 43 with express too) in every state, with their legs, riders and warehouse scans, wallet payments, refunds, returns, an exchange, a replacement, a dispute, 16 reviews (8 with photos), questions, chats (with photos), support tickets, a payout, campaigns, a flash sale, promo codes, banners, fraud alerts, warehouse incidents and stock. Twelve of them are the "orders to process" of the next section: work waiting for each active store, a split delivery, a failed attempt and (with `--with-cod`) cash on delivery.
 - A second warehouse, **Entrepôt Maluku (démo)**, that serves only the commune of Maluku, so one order can travel between two warehouses. It is the only change near real routing: a real customer pinned in Maluku would be routed to it while the demo is installed.
 
 ## Orders to process, per store
@@ -102,12 +103,29 @@ Production has cash on delivery **off** (setting `codEnabled`), so by default th
 bash /opt/somba/deploy/seed-demo.sh --with-cod      # or: DEMO_WITH_COD=1 bash /opt/somba/deploy/seed-demo.sh
 ```
 
-It sets `codEnabled=true`, says so loudly, and from then on **real customers can also choose cash at the door**. This is the only setting the demo ever changes. Without the flag the seed never changes a setting; if COD was already switched on (by you, in Admin > Settings or section 7 of `LIVE-RUNBOOK.md`) the cash orders are made without the flag. The removal leaves the setting as it is and prints how to turn it off again: **Admin > Settings > Checkout and delivery > Cash on delivery** (or `LIVE-RUNBOOK.md` section 7).
+It sets `codEnabled=true`, says so loudly, and from then on **real customers can also choose cash at the door**. These two flags (`--with-cod` and `--with-express`) are the only settings the demo ever changes, one setting each. Without the flag the seed never changes a setting; if COD was already switched on (by you, in Admin > Settings or section 7 of `LIVE-RUNBOOK.md`) the cash orders are made without the flag. The removal leaves the setting as it is and prints how to turn it off again: **Admin > Settings > Checkout and delivery > Cash on delivery** (or `LIVE-RUNBOOK.md` section 7).
 
 | Order | What to try |
 |---|---|
 | Leather handbag, cash (`reviewer.3`, Bandalungwa, store A) | Waiting to be packed. `seller.a`: **Package Ready**. The customer owes the full amount at the door: when `rider` delivers, the app asks to confirm the exact cash. |
 | Argan hair oil + ground coffee, cash (`customer.full`, Gombe, store A) | Delivered 2 days ago. The cash is recorded on the delivery leg (amount, time, rider) and the payment is marked collected. Admin finance shows it as cash to hand over. |
+
+### Express delivery (store C)
+
+Express delivery sends a rider **straight from the seller to the customer** (no warehouse) when seller and customer are in the same commune. Store C (Ndolo Électro) has express switched on and its pickup pin is in Kasa-Vubu; `reviewer.1` has a second pinned address there (Avenue Kasa-Vubu). Express is off in production (setting `expressDeliveryEnabled`) until the current **rider app build, which knows the express job**, is installed on the riders' phones, so the express orders are made only with the explicit opt-in:
+
+```bash
+bash /opt/somba/deploy/seed-demo.sh --with-express      # or: DEMO_WITH_EXPRESS=1 bash ...   (may be combined with --with-cod)
+```
+
+It sets **only** `expressDeliveryEnabled=true`, says so loudly, and from then on a real order from any store that offers express, to a customer in the same commune, gets an express rider: **install the current rider app first**. Without the flag the seed skips the orders and prints the flag; if express was already on they are made without it. The removal leaves the setting as it is and prints how to turn it off (**Admin > Settings > Checkout and delivery > Express delivery**). Store C's toggle needs no clean-up: the store is a demo store and goes with the demo.
+
+| Order (`reviewer.1`, Kasa-Vubu) | What to try |
+|---|---|
+| Charger x2 | Paid, waiting. `seller.c`: **Package Ready**. The express leg is then released and given to the demo rider (`rider`) by auto-assignment; with auto-assignment off the warehouse desk assigns it. |
+| Stand fan | Out for delivery: the rider collected it and is on the road, with a 4-digit code on the customer's order screen. `rider`: finish it with the code and the cash if any. |
+| Steam iron | Delivered about a day ago (code checked). |
+| Kettle + charger, cash (only with COD on too) | Express and cash together: waiting to be packed; the rider collects the full amount at the door. |
 
 ### Preparation time
 
@@ -117,7 +135,6 @@ Demo listings carry a preparation time from 0 to 5 days (food and oils 0, clothe
 
 - **Mobile-money and card orders** need pawaPay or Stripe keys (`MM_PROVIDER` is `none` in production): put the keys in with `set-secret.sh`, see `LIVE-RUNBOOK.md` sections 6 and 7. Then place an order in the customer app with that method, or ask for the sandbox provider (`https://api.sandbox.pawapay.io`).
 - **Awaiting-payment orders** only exist while a mobile-money or card payment is being confirmed, so they appear once those keys are in and a customer starts a payment. The demo cannot fake that state honestly.
-- **Express delivery** is not part of this seed yet.
 
 ## The scenarios
 

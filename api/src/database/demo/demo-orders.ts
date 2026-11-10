@@ -299,6 +299,49 @@ export function orderTypeSpecs(): OrderSpec[] {
       afterBackdate: (c) => failedOnce(c),
     },
 
+    // ── Express (store C, same commune as the customer: Kasa-Vubu). Only while express delivery is on. ──
+    {
+      // Paid, waiting for store C to press Package Ready; the seller's rider is then sent straight to the customer.
+      key: 'X-1',
+      customer: 'reviewer.1',
+      lines: [{ sku: 'MC-CHG', qty: 2 }],
+      address: 'kasavubu',
+      stage: 'placed',
+      placedAgoH: 2,
+      express: true,
+    },
+    {
+      // The demo rider collected it from the seller and is on the road to the customer (code set).
+      key: 'X-2',
+      customer: 'reviewer.1',
+      lines: [{ sku: 'MC-FAN' }],
+      address: 'kasavubu',
+      stage: 'out',
+      placedAgoH: 5,
+      express: true,
+    },
+    {
+      key: 'X-3',
+      customer: 'reviewer.1',
+      lines: [{ sku: 'MC-IRN' }],
+      address: 'kasavubu',
+      stage: 'delivered',
+      placedAgoH: 30,
+      deliveredAgoH: 27,
+      express: true,
+    },
+    {
+      // Cash on delivery and express together: waiting to be packed; the customer pays the rider at the door.
+      key: 'X-C1',
+      customer: 'reviewer.1',
+      lines: [{ sku: 'MC-KTL' }, { sku: 'MC-CHG' }],
+      address: 'kasavubu',
+      stage: 'placed',
+      placedAgoH: 1,
+      express: true,
+      cod: true,
+    },
+
     // ── Cash on delivery (only while cash on delivery is on) ──
     {
       key: 'C-1',

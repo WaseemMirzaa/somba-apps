@@ -809,6 +809,22 @@ export async function planRemoval(
         'Cash on delivery is ON (setting codEnabled). The removal does not change settings, so it stays on: real customers can pay cash at the door. Switch it off in Admin > Settings > Checkout and delivery > Cash on delivery (or see deploy/LIVE-RUNBOOK.md section 7) if the platform should not offer it.',
       );
   }
+  // Express delivery: the same, for the platform setting `--with-express` may have switched on.
+  if (ids.orders.length) {
+    const express = await ds
+      .getRepository(Order)
+      .createQueryBuilder('x')
+      .where('x.id IN (:...o)', { o: ids.orders.slice(0, CHUNK) })
+      .andWhere("x.deliveryMode = 'express'")
+      .getCount();
+    const on = await ds
+      .getRepository(Setting)
+      .findOne({ where: { key: 'expressDeliveryEnabled' } });
+    if (express && on?.value === 'true')
+      notes.push(
+        'Express delivery is ON (setting expressDeliveryEnabled). The removal does not change settings, so it stays on: real orders from stores that offer express, in their own commune, get an express rider. Switch it off in Admin > Settings > Checkout and delivery > Express delivery (or: UPDATE settings SET value=\'false\' WHERE key=\'expressDeliveryEnabled\') unless the current rider app is installed.',
+      );
+  }
   const pub = uniq([
     ...manifestNames,
     ...(await referencedUploads(ds, ids)).map((n) => n),

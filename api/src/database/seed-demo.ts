@@ -143,6 +143,11 @@ async function main(app: INestApplicationContext) {
   const { warnings, mainHub } = await preflight(ds, withCod);
   for (const w of warnings) log(`! ${w}`);
   const codOn = await settleCod(ds, withCod);
+  const expressOn = await settleExpress(
+    ds,
+    process.env.DEMO_WITH_EXPRESS === '1' ||
+      process.argv.includes('--with-express'),
+  );
 
   const images = new DemoImages();
   const copied = images.install();
@@ -177,6 +182,7 @@ async function main(app: INestApplicationContext) {
     products: new Map(),
     created: counts,
     codOn,
+    expressOn,
     area: async (code: string) => {
       const a = await app.get(GeoService).getByCode(code);
       if (!a) throw new Error(`Area ${code} is missing from the geography.`);
@@ -439,6 +445,49 @@ async function settleCod(ds: DataSource, withCod: boolean): Promise<boolean> {
   return false;
 }
 
+/**
+ * Express delivery is off until the rider app that knows the express job is installed, so the express orders need an explicit
+ * opt-in too (`--with-express`, or DEMO_WITH_EXPRESS=1). It sets ONLY `expressDeliveryEnabled`, says so, and the removal leaves
+ * it as it is. Returns whether express is on.
+ */
+async function settleExpress(ds: DataSource, want: boolean): Promise<boolean> {
+  const repo = ds.getRepository(Setting);
+  const row = await repo.findOne({ where: { key: 'expressDeliveryEnabled' } });
+  if (want && row?.value !== 'true') {
+    if (row)
+      await repo.update({ key: 'expressDeliveryEnabled' }, { value: 'true' });
+    else
+      await repo.save(
+        repo.create({ key: 'expressDeliveryEnabled', value: 'true' }),
+      );
+    log('');
+    log(
+      '!!! EXPRESS DELIVERY WAS SWITCHED ON (setting expressDeliveryEnabled = true), because you asked for --with-express.',
+    );
+    log(
+      '!!! Any real order from a store that offers express, in its own commune, now gets an express rider. Only do this once the',
+    );
+    log(
+      '!!! current rider app build (it knows the express job) is installed. The demo removal does NOT switch it back off:',
+    );
+    log(
+      '!!! turn it off in Admin > Settings > Checkout and delivery > Express delivery when you are done testing.',
+    );
+    log('');
+    return true;
+  }
+  if (row?.value === 'true') {
+    log(
+      '• express delivery is on: the express orders are made (the seed did not change that setting).',
+    );
+    return true;
+  }
+  log(
+    '• express delivery is off, so the express orders are skipped. To get them: bash /opt/somba/deploy/seed-demo.sh --with-express (this switches the setting on; see deploy/DEMO-SEED.md).',
+  );
+  return false;
+}
+
 function roleLabelOf(a: DemoAccount): string {
   const map: Record<string, string> = {
     customer: 'customer',
@@ -602,6 +651,11 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
     if (!c.seller.handlingDays)
       await storefront.update(c, { handlingDays: days } as never);
   }
+  // Store C offers express delivery (its pickup pin is in Kasa-Vubu, where a demo customer has a pinned address). Harmless while the
+  // platform setting is off; the store is a demo store, so the removal takes the toggle away with it.
+  const C = await ctxOf('C');
+  if (!C.seller.expressDelivery && C.seller.pickupLat != null)
+    await storefront.update(C, { expressDelivery: true } as never);
   const G = await ctxOf('G');
   const wantBack = new Date(Date.now() + 45 * 86_400_000)
     .toISOString()
