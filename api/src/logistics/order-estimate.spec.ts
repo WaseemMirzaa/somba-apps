@@ -49,4 +49,29 @@ describe('estimateOrder (per seller: prep + handling + route)', () => {
     expect(estimateOrder(route([]), [{ sellerId: 'x', prepDays: 1, handlingDays: 0 }], NOW).estimateDays).toBe(2);
     expect(estimateOrder(route([]), [], NOW)).toMatchObject({ prepDays: null, routeDays: null, estimateDays: null, estimatedDeliveryDate: null, days: 3, date: localDay(NOW, 3) });
   });
+
+  describe('express (A6)', () => {
+    const express = (days: number, start: Date | null = null) => ({ origins: [origin('a')], localDeliveryDays: 1, deliveryMode: 'express', expressDays: days, expressStart: start }) as never;
+
+    it('the route is expressDeliveryDays, not the local days, and the mode is recorded', () => {
+      const e = estimateOrder(express(0), [{ sellerId: 'a', prepDays: 1, handlingDays: 1 }], NOW);
+      expect(e).toMatchObject({ deliveryMode: 'express', prepDays: 2, routeDays: 0, estimateDays: 2, estimatedDeliveryDate: localDay(NOW, 2) });
+      expect(estimateOrder(express(2), [{ sellerId: 'a', prepDays: 0, handlingDays: 0 }], NOW)).toMatchObject({ routeDays: 2, estimateDays: 2 });
+    });
+
+    it('counts from the warehouse\'s next working moment when it is closed now: a 21:00 order with 0 days is not "today"', () => {
+      const evening = new Date('2026-10-23T20:00:00Z'); // 21:00 in Kinshasa, Friday 23 Oct
+      const opens = new Date('2026-10-24T07:00:00Z'); // 08:00 Saturday in Kinshasa
+      const e = estimateOrder(express(0, opens), [{ sellerId: 'a', prepDays: 0, handlingDays: 0 }], evening);
+      expect(e.estimatedDeliveryDate).toBe('2026-10-24');
+      expect(localDay(evening, 0)).toBe('2026-10-23');
+      // a start in the past (the warehouse is open) changes nothing
+      expect(estimateOrder(express(0, new Date('2026-10-23T08:00:00Z')), [{ sellerId: 'a', prepDays: 0, handlingDays: 0 }], evening).estimatedDeliveryDate).toBe('2026-10-23');
+    });
+
+    it('a standard route ignores the express fields', () => {
+      const e = estimateOrder({ origins: [origin('a')], localDeliveryDays: 1, deliveryMode: 'standard', expressDays: 5, expressStart: null } as never, [{ sellerId: 'a', prepDays: 1, handlingDays: 0 }], NOW);
+      expect(e).toMatchObject({ deliveryMode: 'standard', routeDays: 1, estimateDays: 2 });
+    });
+  });
 });

@@ -36,10 +36,13 @@ export interface OrderEstimate {
 
 /**
  * The delivery estimate of an order: `min(30, max over sellers of (prep + handling + route))`, where a seller's route is the
- * platform's local days plus the days ITS parcels spend on lanes / between cities (or `expressDeliveryDays` for express).
+ * platform's local days plus the days ITS parcels spend on lanes / between cities (or `expressDeliveryDays` for express, counted from the managing warehouse's next working moment).
  * Pure: the same function backs `delivery:quote` and `orders:create`, so the date the shopper sees is the date that is stamped.
  */
-export function estimateOrder(route: Pick<Route, 'origins' | 'localDeliveryDays'> & Partial<Pick<Route, 'interCity'>>, lines: EstimateLine[], now = new Date()): OrderEstimate {
+export function estimateOrder(route: Pick<Route, 'origins' | 'localDeliveryDays'> & Partial<Pick<Route, 'interCity' | 'deliveryMode' | 'expressDays' | 'expressStart'>>, lines: EstimateLine[], now = new Date()): OrderEstimate {
+  const express = route.deliveryMode === 'express';
+  // An express order counts from the managing warehouse's next working moment (a rider cannot start before it opens).
+  if (express && route.expressStart && route.expressStart.getTime() > now.getTime()) now = route.expressStart;
   const origins = route.origins ?? [];
   const bySeller = new Map<string | null, { prep: number; handling: number }>();
   for (const l of lines) {
@@ -50,7 +53,7 @@ export function estimateOrder(route: Pick<Route, 'origins' | 'localDeliveryDays'
   const parts: (EstimatePart & { sellerId: string | null })[] = [];
   for (const [sellerId, v] of bySeller) {
     const origin = origins.find((o) => (o.sellerId ?? null) === sellerId);
-    parts.push({ sellerId, prep: v.prep, handling: v.handling, route: routeDaysFor({ local: route.localDeliveryDays ?? 1, extraDays: origin?.extraDays ?? 0 }) });
+    parts.push({ sellerId, prep: v.prep, handling: v.handling, route: routeDaysFor({ local: route.localDeliveryDays ?? 1, extraDays: origin?.extraDays ?? 0, express, expressDays: route.expressDays }) });
   }
   const { days, date, deciding } = estimateFromParts(parts, now);
   const sellers = parts.map((p) => {
@@ -59,7 +62,7 @@ export function estimateOrder(route: Pick<Route, 'origins' | 'localDeliveryDays'
   });
   const d = deciding ? sellers[parts.indexOf(deciding as (typeof parts)[number])] : null;
   return {
-    deliveryMode: 'standard',
+    deliveryMode: express ? 'express' : 'standard',
     prepDays: d?.prepDays ?? null,
     routeDays: d?.routeDays ?? null,
     estimateDays: d?.estimateDays ?? null,

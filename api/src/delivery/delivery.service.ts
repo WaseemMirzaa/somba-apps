@@ -9,7 +9,7 @@ import { SettingsService } from '../content/settings.service';
 import { cents, HALF_CENT, usd } from '../warehouse/cash.service';
 import { pageOf } from '../common/paging';
 import { tasksOfHub } from '../logistics/hub-scope';
-import { CUSTOMER_KINDS, isCustomerKind, isHubBound, isOrderFlow, kindLabel, riderNext } from '../logistics/leg-rules';
+import { CUSTOMER_KINDS, isCustomerKind, isHubBound, isOrderFlow, kindWithArticle, riderNext } from '../logistics/leg-rules';
 import { Actor, LogisticsService } from '../logistics/logistics.service';
 import { RunsService } from '../logistics/runs.service';
 import { DESK_ROLES, tierAllows } from '../logistics/tiers';
@@ -108,8 +108,8 @@ export class DeliveryService {
       throw new BadRequestException('This parcel is part of a transfer run. Manage it from the run.');
     }
     if (!riderNext(kind, task.status).includes(status)) {
-      // "A pickup that is picked up cannot become assigned.": the leg's own name, the words of the statuses (see the logistics contract §10).
-      throw new BadRequestException(`A ${kindLabel(kind)} that is ${task.status.replace('_', ' ')} cannot become ${String(status).replace('_', ' ')}.`);
+      // "A pickup that is picked up cannot become assigned.": the leg's own name, the words of the statuses (see the logistics contract §10); "An express delivery that is picked up cannot become assigned." takes its article from the label.
+      throw new BadRequestException(`${kindWithArticle(kind).replace(/^./, (c) => c.toUpperCase())} that is ${task.status.replace('_', ' ')} cannot become ${String(status).replace('_', ' ')}.`);
     }
     const now = new Date();
     const failure = status === 'failed' ? String(reason ?? '').trim().slice(0, 200) || 'Customer not reachable' : null;

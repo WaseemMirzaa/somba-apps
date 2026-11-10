@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
 import { AgedAlert, DeliveryTask, User } from '../database/entities';
 import { NotificationsService } from '../notifications/notifications.service';
-import { DEFAULT_HUB_OPS, HubOps, LAST_LEVEL, ageHours, dueLevels } from './hub-ops-rules';
+import { DEFAULT_HUB_OPS, HubOps, LAST_LEVEL, ageHours, ageStart, dueLevels } from './hub-ops-rules';
 import { HubOpsSettingsService } from './hub-ops-settings.service';
 import { OPEN_STATUSES, kindLabel } from './leg-rules';
 import { tasksOfHub } from './hub-scope';
@@ -59,7 +59,7 @@ export class AgedParcelsService {
       const seen = new Map<string, Set<number>>();
       for (const a of done) seen.set(a.taskId, (seen.get(a.taskId) ?? new Set()).add(a.level));
       for (const task of page) {
-        const age = ageHours(task.createdAt, now);
+        const age = ageHours(ageStart(task), now);
         const due = dueLevels(age, opsOf(task.hubId).agedLevels);
         if (!due.length) continue;
         out.checked++;
@@ -138,13 +138,13 @@ export class AgedParcelsService {
   }> {
     const ops = hubId ? await this.hubOps.ops(hubId) : DEFAULT_HUB_OPS;
     const saved = await this.hubOps.allSaved();
-    const open = await this.tasks.find({ where: tasksOfHub({ status: In([...OPEN_STATUSES]) }, hubId), select: ['id', 'hubId', 'createdAt'], order: { createdAt: 'ASC' }, take: 2000 });
+    const open = await this.tasks.find({ where: tasksOfHub({ status: In([...OPEN_STATUSES]) }, hubId), select: ['id', 'hubId', 'kind', 'createdAt', 'readyAt'], order: { createdAt: 'ASC' }, take: 2000 });
     const alerts = open.length ? await this.alerts.find({ where: { taskId: In(open.map((t) => t.id)) } }) : [];
     const counts: [number, number, number] = [0, 0, 0];
     const byTask: Record<string, { level: number; alertedAt: Date | null }> = {};
     for (const t of open) {
       const levels = (hubId ? ops : t.hubId ? (saved.get(t.hubId) ?? DEFAULT_HUB_OPS) : DEFAULT_HUB_OPS).agedLevels;
-      const level = dueLevels(ageHours(t.createdAt, now), levels).length;
+      const level = dueLevels(ageHours(ageStart(t), now), levels).length;
       if (!level) continue;
       counts[level - 1]++;
       const mine = alerts.filter((a) => a.taskId === t.id);

@@ -29,7 +29,7 @@ SUITES=("$@")
 if [ ${#SUITES[@]} -eq 0 ]; then
   SUITES=(socket account authz flows cod-cash-smoke race-smoke warehouse-stock-smoke coverage-smoke warehouse-routing-smoke
           warehouse-areas-smoke rider-account-smoke i18n-smoke commerce-smoke seller-platform-smoke
-          warehouse-ops-smoke delivery-split-smoke gap-features-smoke kyc-smoke multi-seller-smoke p0-fixes-smoke
+          warehouse-ops-smoke delivery-split-smoke delivery-express-smoke gap-features-smoke kyc-smoke multi-seller-smoke p0-fixes-smoke
           rider-compliance-smoke statements-smoke after-sale-smoke r2f-smoke staff-2fa-fraud-smoke)
 fi
 

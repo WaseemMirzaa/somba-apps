@@ -812,15 +812,20 @@ export class OrdersService {
    * `rider: { name, phone }` so they can call. Never for other statuses (the field is absent, not null).
    */
   async withRiders(orders: Order[]): Promise<(Order & { rider?: RiderContact })[]> {
-    // A split order has a customer leg on the road while the order itself still reads "processing": the rider of that leg is shown
-    // for as long as the leg is on the road (picked up or in transit), whatever the order's status. Otherwise the status rule applies.
+    // The rider is shown only while a customer leg (delivery or express) is on the road (picked up or in transit), whatever the order's status:
+    // after a partial leg is delivered the order still reads shipped / out for delivery, but nobody is on the road. The order-status rule
+    // is only the fallback for orders whose customer legs are all legacy (`sellerIds` null, made before split delivery) or not planned yet.
     const candidates = orders.filter((o) => !['cancelled', 'returned', 'delivered'].includes(o.status));
     const onRoad = candidates.length
-      ? await this.orders.manager.find(DeliveryTask, { where: { orderId: In(candidates.map((o) => o.id)), kind: In([...CUSTOMER_KINDS]), status: In(['picked_up', 'in_transit']) }, select: ['id', 'orderId', 'riderId'], order: { createdAt: 'DESC' } })
+      ? await this.orders.manager.find(DeliveryTask, { where: { orderId: In(candidates.map((o) => o.id)), kind: In([...CUSTOMER_KINDS]) }, select: ['id', 'orderId', 'riderId', 'status', 'sellerIds'], order: { createdAt: 'DESC' } })
       : [];
     const legRider = new Map<string, string>();
-    for (const t of onRoad) if (t.riderId && !legRider.has(t.orderId)) legRider.set(t.orderId, t.riderId);
-    const riderOf = (o: Order): string | null => legRider.get(o.id) ?? (RIDER_VISIBLE.includes(o.status) ? o.riderId : null);
+    const modern = new Set<string>(); // orders that have a customer leg that knows its sellers
+    for (const t of onRoad) {
+      if (t.sellerIds) modern.add(t.orderId);
+      if (t.riderId && ['picked_up', 'in_transit'].includes(t.status) && !legRider.has(t.orderId)) legRider.set(t.orderId, t.riderId);
+    }
+    const riderOf = (o: Order): string | null => legRider.get(o.id) ?? (!modern.has(o.id) && RIDER_VISIBLE.includes(o.status) ? o.riderId : null);
     const ids = [...new Set(orders.map(riderOf).filter((x): x is string => !!x))];
     if (!ids.length) return orders;
     const riders = new Map((await this.orders.manager.find(User, { where: { id: In(ids) } })).map((u) => [u.id, u]));
@@ -838,7 +843,7 @@ export class OrdersService {
    * lines to the warehouse that collects from them, because `origins` follows no line order). `tracking` is null before the
    * first delivery task exists. Never carries a phone, an address or the handover code of anyone else.
    */
-  async customerViews(orders: Order[]): Promise<(Order & { rider?: RiderContact; tracking: SellerTracking | null; hubs: { destination: HubName | null; origins: HubName[]; bySeller: Record<string, HubName> } })[]> {
+  async customerViews(orders: Order[]): Promise<(Order & { rider?: RiderContact; tracking: SellerTracking | null; partiallyDelivered: boolean; hubs: { destination: HubName | null; origins: HubName[]; bySeller: Record<string, HubName> } })[]> {
     const withRider = await this.withRiders(orders);
     if (!orders.length) return [];
     const hubIds = [...new Set(orders.flatMap((o) => hubsOfOrder(o)))];
@@ -855,6 +860,8 @@ export class OrdersService {
     return withRider.map((o) =>
       Object.assign(Object.create(Object.getPrototypeOf(o)), o, {
         tracking: tracking.get(o.id) ?? null,
+        // Some live line reached the customer while another has not (a split order between its legs). A fully delivered order is simply delivered.
+        partiallyDelivered: isPartiallyDelivered(o.items),
         hubs: {
           destination: (o.destinationHubId && names.get(o.destinationHubId)) || null,
           origins: (Array.isArray(o.originHubIds) ? o.originHubIds : []).map((id) => names.get(id)).filter((h): h is HubName => !!h),
@@ -1072,7 +1079,10 @@ export class OrdersService {
     // A split order: parts of it may already be with the customer, and the leg that failed may carry only part of what is left.
     const delivered = anyDelivered(order.items);
     const completes = await this.logistics.completesOrder(task);
-    if (task.attempts >= max) {
+    // An express parcel the rider already collected is in their hands: it goes back to the warehouse (a `pickup` leg of the same rider) and a
+    // normal delivery follows, whatever the attempt count. The order is never cancelled around goods on the road, and it keeps its status.
+    const collected = task.kind === 'express' && !!task.pickedUpAt;
+    if (task.attempts >= max && !collected) {
       if (delivered || !completes) {
         await this.giveUpLeg(order, task, reason);
         return;
@@ -1102,7 +1112,7 @@ export class OrdersService {
     }
     // Back to "confirmed" (the customer may still cancel; the re-opened leg moves the order forward again). A leg that does not finish
     // the order, or an order that is partly delivered, keeps its status: the order is further along than this one leg, and cannot be cancelled.
-    const keepStatus = delivered || !completes;
+    const keepStatus = delivered || !completes || collected;
     if (!keepStatus) order.status = 'confirmed';
     order.riderId = null;
     const saved = await this.orders.save(order);
@@ -1111,7 +1121,7 @@ export class OrdersService {
     pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Delivery attempt failed',
-      body: `${saved.reference}: ${reason}. We will try again (attempt ${next.attempts} of ${max}).${keepStatus ? '' : ' You can also cancel the order.'}`,
+      body: `${saved.reference}: ${reason}. We will try again (attempt ${collected ? Math.min(max, task.attempts + 1) : next.attempts} of ${max}).${keepStatus ? '' : ' You can also cancel the order.'}`,
       type: 'order',
       entityId: saved.id,
     });

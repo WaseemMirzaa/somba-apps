@@ -1,10 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { GeoArea, Hub, Seller, User } from '../database/entities';
 import { SettingsService } from '../content/settings.service';
 import { GeoPoint, haversineKm, isGeoPoint, normPlace } from '../common/geo/geo';
-import { FeeConfig, FEE_SETTING_KEYS, deliveryFee, feeConfigFrom } from './fee';
+import { ExpressFeeConfig, FeeBreakdown, FeeConfig, FEE_SETTING_KEYS, EXPRESS_SETTING_KEYS, deliveryFee, expressFee, expressFeeConfigFrom, feeConfigFrom } from './fee';
+import { HubOpsSettingsService } from './hub-ops-settings.service';
+import { nextWorkingMoment } from './hub-ops-rules';
 import { AreaChainView, AreaView, Covering, GeoService } from '../geo/geo.service';
 import { parseShipping } from '../geo/address-input';
 import { areaKeys } from '../geo/area-model';
@@ -92,6 +94,15 @@ export interface Route {
   interCityDays: number;
   /** The platform's local transit days (`localDeliveryDays`, default 1): hub -> customer. */
   localDeliveryDays: number;
+  /**
+   * `express` when a rider goes straight from the seller to the customer (same commune, see {@link RoutingService.expressFor}): the fee is the express
+   * fee (seller pin -> customer pin, `distanceKm` is that distance), there is no transfer, no hops, no extra days and no flat area fee.
+   */
+  deliveryMode: 'standard' | 'express';
+  /** Platform days of an express route (`expressDeliveryDays`); 0 on a standard route. */
+  expressDays: number;
+  /** An express order counts its days from this moment: the managing warehouse's next working moment. Null on a standard route. */
+  expressStart: Date | null;
 }
 
 export interface RouteInput {
@@ -128,6 +139,7 @@ export class RoutingService {
     private readonly settings: SettingsService,
     private readonly geo: GeoService,
     private readonly lanes: LanesService,
+    @Optional() private readonly hubOps?: HubOpsSettingsService,
   ) {}
 
   /** Every warehouse with the number of active riders it has. */
@@ -149,6 +161,12 @@ export class RoutingService {
   async feeConfig(): Promise<FeeConfig> {
     const all = await this.settings.all();
     return feeConfigFrom(Object.fromEntries(FEE_SETTING_KEYS.map((k) => [k, all[k]])));
+  }
+
+  /** The express fee numbers (`expressBaseUsd` / `expressPerKmUsd` / `expressMaxUsd`). */
+  async expressFeeConfig(): Promise<ExpressFeeConfig> {
+    const all = await this.settings.all();
+    return expressFeeConfigFrom(Object.fromEntries(EXPRESS_SETTING_KEYS.map((k) => [k, all[k]])));
   }
 
   /** The inter-city switch and the days it adds. */
@@ -271,6 +289,50 @@ export class RoutingService {
     return (await this.hubFor(area.id, point, hubs))?.hub ?? destination;
   }
 
+  // ── express ──────────────────────────────────────────────────────────────────
+  /**
+   * Does this order go EXPRESS (a rider takes the parcel from the seller straight to the customer, skipping the warehouse)? It is
+   * automatic, the customer is not asked. Every one of these must hold, else it is a standard order:
+   *  - the platform switch `expressDeliveryEnabled` is on;
+   *  - exactly one seller, who has `expressDelivery` on;
+   *  - the seller has a pickup area AND a pin, and the customer's address has a pin (without both there is no distance);
+   *  - both are in the same commune (the commune above the pickup area and above the delivery area);
+   *  - one warehouse manages both ends (origin = destination) and neither end is a stand-in for a warehouse with no riders;
+   *  - the distance seller pin -> customer pin is within `expressMaxKm` (0 = no limit).
+   * Returns the fee and the days, or null. Pure data in, never writes.
+   */
+  async expressFor(p: {
+    keys: string[];
+    sellers: Map<string, Seller>;
+    origins: Pick<RouteOrigin, 'hubId' | 'fallback'>[];
+    destination: RoutedHub;
+    destinationFallback: RouteFallback;
+    deliveryAreaId: string;
+    customerPoint: GeoPoint | null;
+  }): Promise<{ fee: FeeBreakdown; days: number; start: Date } | null> {
+    const all = await this.settings.all();
+    if (all.expressDeliveryEnabled !== 'true') return null;
+    if (p.keys.length !== 1 || p.keys[0] === NO_SELLER) return null;
+    const seller = p.sellers.get(p.keys[0]);
+    if (!seller?.expressDelivery || !seller.pickupAreaId) return null;
+    const sellerPin = isGeoPoint({ lat: seller.pickupLat, lng: seller.pickupLng }) ? { lat: seller.pickupLat as number, lng: seller.pickupLng as number } : null;
+    if (!sellerPin || !p.customerPoint) return null;
+    const ix = await this.geo.index();
+    const sellerCommune = ix.ancestorAt(seller.pickupAreaId, 'commune');
+    const customerCommune = ix.ancestorAt(p.deliveryAreaId, 'commune');
+    if (!sellerCommune || !customerCommune || sellerCommune.id !== customerCommune.id) return null;
+    const origin = p.origins[0];
+    if (!origin || origin.fallback || p.destinationFallback || origin.hubId !== p.destination.id) return null;
+    const km = haversineKm(sellerPin, p.customerPoint);
+    const maxKm = Number(all.expressMaxKm);
+    if (Number.isFinite(maxKm) && maxKm > 0 && km > maxKm) return null;
+    const days = Number(all.expressDeliveryDays);
+    const fee = expressFee(await this.expressFeeConfig(), km);
+    // Days are counted from the moment a rider of the managing warehouse can start (a 21:00 order with 0 days is not "today").
+    const start = this.hubOps ? nextWorkingMoment(await this.hubOps.ops(p.destination.id), new Date()) : new Date();
+    return { fee, days: Number.isFinite(days) && days >= 0 ? Math.min(30, Math.round(days)) : 0, start };
+  }
+
   // ── the route ────────────────────────────────────────────────────────────────
   /** The full route and fee for an address and the sellers of the lines. Throws when the address (or a seller) is not served. */
   async route(input: RouteInput): Promise<Route> {
@@ -364,12 +426,18 @@ export class RoutingService {
     const transitDays = Math.ceil(transitHours / 24);
     const extraDays = interCity ? (transitDays > 0 ? transitDays : ic.days) : transitDays;
     const [destinationArea, destinationAreaChain] = await Promise.all([this.geo.view(area.id) as Promise<AreaView>, this.geo.chainView(area.id)]);
+    // An order that qualifies goes express: the express fee replaces the whole standard fee (no transfer, no flat area fee).
+    const express = await this.expressFor({ keys, sellers: rows, origins, destination, destinationFallback: dest.fallback, deliveryAreaId: area.id, customerPoint: point });
+    const standard = !express;
     return {
-      feeUsd: fee.feeUsd,
-      deliveryUsd: fee.deliveryUsd,
-      transferUsd: fee.transferUsd,
+      deliveryMode: express ? 'express' : 'standard',
+      expressDays: express?.days ?? 0,
+      expressStart: express?.start ?? null,
+      feeUsd: express ? express.fee.feeUsd : fee.feeUsd,
+      deliveryUsd: express ? express.fee.deliveryUsd : fee.deliveryUsd,
+      transferUsd: express ? 0 : fee.transferUsd,
       defaultTransferUsd: cfg.transferUsd,
-      distanceKm: fee.distanceKm,
+      distanceKm: express ? express.fee.distanceKm : fee.distanceKm,
       destinationHubId: destination.id,
       destinationHubName: destination.name,
       destinationHub: { id: destination.id, name: destination.name, city: destination.city },
@@ -381,17 +449,17 @@ export class RoutingService {
       originBySeller,
       origins,
       routeBySeller,
-      transitHours,
-      extraDays,
+      transitHours: standard ? transitHours : 0,
+      extraDays: standard ? extraDays : 0,
       unconnected,
-      transfer,
+      transfer: standard ? transfer : false,
       pinned: !!point,
       fallback: dest.fallback,
       coveringHubId: dest.fallback ? dest.coveringHub.id : null,
       coveringHubName: dest.fallback ? dest.coveringHub.name : null,
-      feeOverrideUsd: dest.covering.feeOverrideUsd ?? null,
-      interCity,
-      interCityDays: interCity ? ic.days : 0,
+      feeOverrideUsd: standard ? (dest.covering.feeOverrideUsd ?? null) : null,
+      interCity: standard ? interCity : false,
+      interCityDays: standard && interCity ? ic.days : 0,
       localDeliveryDays: ic.localDays,
     };
   }

@@ -53,6 +53,14 @@ describe('sellers and pickup areas', () => {
     await expect(svc.updateProfile('u1', { pickupAreaId: 'nope' })).rejects.toThrow('Area not found.');
   });
 
+  it('clearing the pin switches express delivery off (it prices the distance from the pin); moving the pin keeps it on', async () => {
+    await addSeller(ds, { userId: 'u1', name: 'Shop', pickupLat: -4.3031, pickupLng: 15.3033, expressDelivery: true });
+    const moved = await svc.updateProfile('u1', { pickupLat: -4.3152, pickupLng: 15.3098 });
+    expect(moved).toMatchObject({ expressDelivery: true });
+    const cleared = await svc.updateProfile('u1', { pickupLat: null, pickupLng: null });
+    expect(cleared).toMatchObject({ pickupLat: null, expressDelivery: false });
+  });
+
   it('a store in an area nobody serves can be set up but cannot list products, with the contract message', async () => {
     const seller = await addSeller(ds, { userId: 'u1', name: 'Shop' });
     const out = await svc.updateProfile('u1', { pickupAreaId: (await w.area('CD-HK-LUB')).id });

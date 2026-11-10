@@ -20,12 +20,14 @@ export type DeliveryStatus =
  * Which leg of the journey a task is. Order legs: seller -> origin warehouse (`pickup`), origin -> destination
  * warehouse (`transfer`, only when they differ), destination warehouse -> customer (`delivery`). Return legs run the
  * other way (`return_pickup` customer -> destination warehouse, `return_transfer`, `return_to_seller`).
- * `replacement_delivery` brings a replacement / exchange unit to the customer.
+ * `replacement_delivery` brings a replacement / exchange unit to the customer. `express` is the whole journey in one leg: a rider takes the
+ * parcel from the seller straight to the customer (same commune, no warehouse in between).
  */
 export type DeliveryKind =
   | 'pickup'
   | 'transfer'
   | 'delivery'
+  | 'express'
   | 'return_pickup'
   | 'return_transfer'
   | 'return_to_seller'
@@ -35,6 +37,7 @@ export const DELIVERY_KINDS: readonly DeliveryKind[] = [
   'pickup',
   'transfer',
   'delivery',
+  'express',
   'return_pickup',
   'return_transfer',
   'return_to_seller',

@@ -49,7 +49,7 @@ import {
 } from './leg-rules';
 import { DESK_ADMINS_ONLY, DESK_ROLES, isDeskAdmin, tierAllows } from './tiers';
 import { HubOpsSettingsService } from './hub-ops-settings.service';
-import { AUTO_ASSIGN_KINDS, Candidate, RETURN_TO_SELLER_REASON, canReturnToSeller, isWorkingNow, pickLeastBusy } from './hub-ops-rules';
+import { AUTO_ASSIGN_KINDS, Candidate, EXPRESS_NOT_RETURNABLE, RETURN_TO_SELLER_REASON, canReturnToSeller, isWorkingNow, pickLeastBusy } from './hub-ops-rules';
 import { pushOrderToOps } from './hub-scope';
 import { frenchLineNames } from '../translation/line-names';
 import { TranslationService } from '../translation/translation.service';
@@ -354,7 +354,8 @@ export class LogisticsService {
           break;
         case 'customer':
         case 'replacement_delivery':
-          from = hubEp(t.fromHubId ?? t.hubId);
+          // An express leg starts at the seller (no warehouse at either end); every other customer leg starts at its warehouse.
+          from = t.kind === 'express' ? sellerEp(t) : hubEp(t.fromHubId ?? t.hubId);
           to = customerEp(t);
           break;
         case 'return_pickup':
@@ -451,7 +452,7 @@ export class LogisticsService {
         const order = await this.orders.findOne({ where: { id: fresh.orderId } });
         if (order) this.emitter.toUser(order.customerId, 'order:updated', order);
       }
-      if (fresh.sellerId && ['pickup', 'return_to_seller', 'transfer', 'return_transfer'].includes(fresh.kind)) {
+      if (fresh.sellerId && ['pickup', 'express', 'return_to_seller', 'transfer', 'return_transfer'].includes(fresh.kind)) {
         const sellerUser = await this.sellerUser(fresh.sellerId);
         if (sellerUser) this.emitter.toUser(sellerUser, 'task:updated', await this.view(fresh, 'seller'));
       }
@@ -493,6 +494,9 @@ export class LogisticsService {
   private async announce(task: DeliveryTask): Promise<void> {
     await this.emitTask(task);
     await this.fire('created', task);
+    // An express leg exists from the moment of the order but cannot be collected before the seller packs it: nobody is asked to assign it
+    // yet. `markSellerReady` tells the warehouse and auto-assigns it then.
+    if (task.kind === 'express' && !task.readyAt) return;
     if (await this.autoAssign(task)) return;
     try {
       const staff = await this.staffIds(task.hubId, 'supervisor');
@@ -602,11 +606,21 @@ export class LogisticsService {
    */
   async planOrder(order: Order): Promise<DeliveryTask[]> {
     const full = order.items?.length ? order : ((await this.orders.findOne({ where: { id: order.id } })) ?? order);
-    const existing = await this.tasks.find({ where: { orderId: full.id, kind: 'pickup', disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() } });
+    // Idempotent: an order that already has its first legs (a pickup per seller, or its one express leg) is not planned again (a payment
+    // webhook after the create, a retry). The mode recorded at checkout decides which; planning never decides again (conditions may
+    // have changed during a mobile-money confirmation).
+    const existing = await this.tasks.find({ where: { orderId: full.id, kind: In(['pickup', 'express']), disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() } });
     if (existing.length) return existing;
 
     const groups = await this.groupBySeller(full);
     const hubs = await this.routing.hubsWithRiders();
+    if (full.deliveryMode === 'express') {
+      const express = await this.planExpress(full, groups, hubs);
+      if (express) return express;
+      // The recorded hub is gone (deleted since checkout): the order is a standard one after all.
+      await this.orders.update({ id: full.id }, { deliveryMode: 'standard' });
+      full.deliveryMode = 'standard';
+    }
     // The route recorded when the order was placed (and the fee quoted) wins while that warehouse still works; only an
     // order from before routes were recorded is routed now. Nothing already in progress is rerouted.
     let destination: RoutedHub | undefined = full.destinationHubId ? hubs.find((h) => h.id === full.destinationHubId && h.active) : undefined;
@@ -652,6 +666,39 @@ export class LogisticsService {
     await this.orders.update({ id: full.id }, { destinationHubId: destination.id, originHubIds: originIds, originBySeller, routeBySeller });
     for (const t of created) await this.announce(t);
     return created;
+  }
+
+  /**
+   * An EXPRESS order: ONE leg from the seller to the customer, managed by the warehouse the route recorded (origin = destination).
+   * It carries the whole order, the full cash to collect (it always completes the order), a handover code and, like every customer
+   * leg, a proof photo. It is not auto-assigned until the seller marks the package ready (see {@link markSellerReady}).
+   * Returns null when the order's warehouse no longer exists (the caller then plans it as a standard order).
+   */
+  private async planExpress(order: Order, groups: Map<string, OrderItem[]>, hubs: RoutedHub[]): Promise<DeliveryTask[] | null> {
+    const hub = order.destinationHubId ? hubs.find((h) => h.id === order.destinationHubId) : undefined;
+    const keys = [...groups.keys()];
+    if (!hub || keys.length !== 1 || keys[0] === NO_SELLER) return null;
+    const key = keys[0];
+    const seller = await this.sellerRow(key);
+    if (!seller) return null;
+    const lines = groups.get(key) ?? [];
+    const frNames = await frenchLineNames(this.items.manager, lines.map((i) => i.id));
+    const leg = await this.make({
+      kind: 'express',
+      orderId: order.id,
+      orderReference: order.reference,
+      hubId: hub.id,
+      sellerId: key,
+      sellerIds: [key],
+      address: order.shippingAddress,
+      pickupAddress: `${seller.name} — ${seller.pickupAddress || 'address not provided, contact the seller'}`,
+      codAmountUsd: await this.codFor(order),
+      itemsJson: JSON.stringify(lines.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr))),
+    });
+    // C14: after-sale (returns, replacements) runs through this warehouse, so the route is recorded as origin = destination = the managing warehouse.
+    await this.orders.update({ id: order.id }, { destinationHubId: hub.id, originHubIds: [hub.id], originBySeller: { [key]: hub.id }, routeBySeller: { [key]: [hub.id] } });
+    await this.announce(leg);
+    return [leg];
   }
 
   // ── the customer leg: one open at a time, merged while it waits, split after the limit ───────
@@ -795,9 +842,14 @@ export class LogisticsService {
     const cargo = LogisticsService.undelivered(groups, arrived);
     const frNames = await frenchLineNames(m, cargo.map((i) => i.id));
     const leg: Pick<DeliveryTask, 'id' | 'sellerIds'> = { id: '', sellerIds: arrived.map((k) => (k === NO_SELLER ? null : k)) };
+    // An express attempt that failed after the rider collected the parcel came back to the warehouse as a pickup: it was an attempt at the
+    // customer, so the delivery that follows is the next one (and the order is not given a fresh set of tries).
+    // (`attempts` of that express leg already counts the tries before it: a leg re-opened before collection carries them.)
+    const expressTries = Math.max(0, ...all.filter((t) => t.kind === 'express' && t.status === 'failed' && all.some((k) => k.kind === 'pickup' && k.parentTaskId === t.id)).map((t) => t.attempts));
     const created = await this.make(
       {
         kind: 'delivery',
+        attempts: 1 + expressTries,
         orderId: order.id,
         orderReference: order.reference,
         fromHubId: dest,
@@ -822,8 +874,15 @@ export class LogisticsService {
     const cargo = LogisticsService.undelivered(groups, keys);
     const completes = await this.completesFor(leg, order);
     const due = await this.codShare(m, order, leg, all, cargo, completes);
-    if (Math.abs(due - leg.codAmountUsd) < 0.005) return null;
-    await m.update(DeliveryTask, { id: leg.id }, { codAmountUsd: due });
+    // An express leg exists while its seller can still cancel lines: what it carries follows the live lines.
+    let itemsJson: string | null = null;
+    if (leg.kind === 'express') {
+      const frNames = await frenchLineNames(m, cargo.map((i) => i.id));
+      const json = JSON.stringify(cargo.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr)));
+      if (json !== leg.itemsJson) itemsJson = json;
+    }
+    if (Math.abs(due - leg.codAmountUsd) < 0.005 && !itemsJson) return null;
+    await m.update(DeliveryTask, { id: leg.id }, { codAmountUsd: due, ...(itemsJson ? { itemsJson } : {}) });
     return (await m.findOne(DeliveryTask, { where: { id: leg.id } })) ?? null;
   }
 
@@ -1341,6 +1400,8 @@ export class LogisticsService {
   async autoAssign(task: DeliveryTask, at: Date = new Date()): Promise<DeliveryTask | null> {
     try {
       if (!this.hubOps || !task.hubId || task.status !== 'unassigned' || task.runId || !AUTO_ASSIGN_KINDS.includes(task.kind)) return null;
+      // An express parcel is still being packed until the seller marks it ready: a rider sent earlier would only wait at the door.
+      if (task.kind === 'express' && !task.readyAt) return null;
       const ops = await this.hubOps.ops(task.hubId);
       if (!ops.autoAssign || !isWorkingNow(ops, at)) return null;
       const rider = pickLeastBusy(await this.candidatesFor(task));
@@ -1361,7 +1422,7 @@ export class LogisticsService {
     for (const [hubId, ops] of saved) {
       if (!ops.autoAssign || !isWorkingNow(ops, at)) continue;
       const waiting = await this.tasks.find({ where: { hubId, status: 'unassigned', runId: IsNull(), kind: In([...AUTO_ASSIGN_KINDS]) }, order: { createdAt: 'ASC' }, take: 500 });
-      for (const t of waiting) if (await this.autoAssign(t, at)) given++;
+      for (const t of waiting) if ((t.kind !== 'express' || t.readyAt) && (await this.autoAssign(t, at))) given++;
     }
     return given;
   }
@@ -1380,6 +1441,8 @@ export class LogisticsService {
     const task = await this.tasks.findOne({ where: { id: taskId } });
     if (!task) throw new NotFoundException('Delivery task not found.');
     if (!this.actorManages(actor, task)) throw new BadRequestException('This task belongs to another warehouse.');
+    // An express parcel never sat at a warehouse: it is still with the seller (or in the rider's hands). Nothing to send back.
+    if (task.kind === 'express') throw new BadRequestException(EXPRESS_NOT_RETURNABLE);
     const already = await this.tasks.find({ where: { parentTaskId: task.id, kind: 'return_to_seller' }, order: { createdAt: 'ASC' } });
     if (already.length) return { closed: task, legs: already };
     if (task.runId) throw new BadRequestException('This parcel is part of a transfer run. Manage it from the run.');
@@ -1493,7 +1556,7 @@ export class LogisticsService {
 
   private async afterAssigned(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>): Promise<void> {
     const orderFlow = isOrderFlow(task);
-    if (orderFlow && task.kind === 'pickup') await this.advanceOrder(task.orderId, 'processing');
+    if (orderFlow && (task.kind === 'pickup' || task.kind === 'express')) await this.advanceOrder(task.orderId, 'processing');
     if (orderFlow && isCustomerKind(task.kind)) {
       const order = await this.orders.findOne({ where: { id: task.orderId } });
       if (order && !['cancelled', 'returned', 'delivered'].includes(order.status)) {
@@ -1504,7 +1567,7 @@ export class LogisticsService {
         await this.notifications.toUser(saved.customerId, { title: 'Rider assigned', body: `${rider.name} is handling ${saved.reference}.`, type: 'delivery', entityId: saved.id });
       }
     }
-    if (task.kind === 'pickup' && task.sellerId) {
+    if ((task.kind === 'pickup' || task.kind === 'express') && task.sellerId) {
       const user = await this.sellerUser(task.sellerId);
       if (user) await this.notifications.toUser(user, { title: 'Pickup scheduled', body: `${task.orderReference}: a rider will collect your package.`, type: 'delivery', entityId: task.orderId }).catch(() => undefined);
     }
@@ -1563,10 +1626,29 @@ export class LogisticsService {
         next = status === 'delivered' && !completes;
       }
     }
+    // Express: the rider holds the parcel now, so the seller can no longer cancel it (C5) and is told it left.
+    if (task.kind === 'express' && status === 'picked_up' && isOrderFlow(task)) await this.onExpressCollected(task);
     await this.emitTask(task);
     if (status === 'picked_up' || status === 'in_transit' || status === 'delivered') await this.fire(status, task);
     // The leg ended: the parcels that waited for it are planned now (a leg that failed is planned again by `reopen`).
     if (next) await this.progressChain({ orderId: task.orderId }).catch((e) => this.logger.warn(`next leg of ${task.orderReference} failed: ${(e as Error).message}`));
+  }
+
+  /** An express rider collected the parcel from the seller: its lines are `received` (no more seller cancel) and the seller is told. */
+  private async onExpressCollected(task: DeliveryTask): Promise<void> {
+    try {
+      await this.markPackageReceived(task, task.pickedUpAt ?? new Date());
+      const user = await this.sellerUser(task.sellerId);
+      if (user) {
+        await this.notifications
+          .toUser(user, { title: 'Package collected', body: `${task.orderReference}: the rider collected your package and is taking it to the customer.`, type: 'delivery', entityId: task.orderId })
+          .catch(() => undefined);
+      }
+      const order = await this.orders.findOne({ where: { id: task.orderId } });
+      if (user && order) this.emitter.toUser(user, 'order:updated', order);
+    } catch (e) {
+      this.logger.warn(`express pickup of ${task.orderReference}: ${(e as Error).message}`);
+    }
   }
 
   /** The lines a delivered customer leg carried reached the customer: stamp them (`deliveredAt`, `deliveryTaskId`). Their fulfilment stays `received`. */
@@ -1621,6 +1703,7 @@ export class LogisticsService {
   // ── failures, voiding, readiness ─────────────────────────────────────────────
   /** A task failed: open a fresh copy for another attempt (same legs, same warehouses). */
   async reopen(failed: DeliveryTask): Promise<DeliveryTask> {
+    if (failed.kind === 'express' && isOrderFlow(failed)) return this.reopenExpress(failed);
     // A customer leg is planned again with everything that is at the warehouse now (the same code, the next attempt).
     if (isCustomerKind(failed.kind) && isOrderFlow(failed)) {
       const [planned] = await this.progressChain({ orderId: failed.orderId }, { retryOf: failed });
@@ -1653,6 +1736,55 @@ export class LogisticsService {
     });
     await this.announce(next);
     return next;
+  }
+
+  /**
+   * An express attempt failed (C4).
+   *  - Before the rider collected the parcel (`pickedUpAt` empty): it is still with the seller, so the same express leg opens again (next
+   *    attempt, same code, same readiness: it is auto-assigned straight away).
+   *  - After: the parcel is in the rider's hands, so a new rider must not be sent to the seller. A `pickup` leg is created for the SAME
+   *    rider, already `picked_up`, taking the parcel to the managing warehouse (its `parentTaskId` is the express leg). Staff scan it in
+   *    and the ordinary chain plans a normal `delivery` leg from there (see {@link planCustomerLeg}, which counts the failed attempt).
+   */
+  private async reopenExpress(failed: DeliveryTask): Promise<DeliveryTask> {
+    if (!failed.pickedUpAt) {
+      const next = await this.make({
+        kind: 'express',
+        orderId: failed.orderId,
+        orderReference: failed.orderReference,
+        address: failed.address,
+        pickupAddress: failed.pickupAddress,
+        hubId: failed.hubId,
+        sellerId: failed.sellerId,
+        sellerIds: failed.sellerIds,
+        itemsJson: failed.itemsJson,
+        codAmountUsd: failed.codAmountUsd,
+        readyAt: failed.readyAt,
+        attempts: failed.attempts + 1,
+        proofCode: (await this.proofCodeOf(failed.id)) ?? undefined,
+      });
+      await this.announce(next);
+      return next;
+    }
+    const pickup = await this.make({
+      kind: 'pickup',
+      orderId: failed.orderId,
+      orderReference: failed.orderReference,
+      sellerId: failed.sellerId,
+      riderId: failed.riderId,
+      status: 'picked_up',
+      pickedUpAt: failed.pickedUpAt,
+      readyAt: failed.readyAt,
+      toHubId: failed.hubId,
+      hubId: failed.hubId,
+      parentTaskId: failed.id,
+      pickupAddress: failed.pickupAddress,
+      address: await this.hubAddressText(failed.hubId),
+      itemsJson: failed.itemsJson,
+    });
+    await this.emitTask(pickup);
+    await this.fire('created', pickup);
+    return pickup;
   }
 
   /** Tasks that exhausted their attempts but do not cancel the order (transfers, returns, replacements): staff and admins decide. */
@@ -1725,8 +1857,9 @@ export class LogisticsService {
 
   /** The seller packed their lines: their pickup is ready for the rider. Returns the seller's pickup task (null when none). */
   async markSellerReady(orderId: string, sellerKeys: string[]): Promise<DeliveryTask | null> {
+    // A pickup to the warehouse, or the express leg that goes straight to the customer: both wait for the seller to pack.
     const pickups = await this.tasks.find({
-      where: { orderId, kind: 'pickup', sellerId: In(sellerKeys), disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() },
+      where: { orderId, kind: In(['pickup', 'express']), sellerId: In(sellerKeys), disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() },
       order: { createdAt: 'DESC' },
     });
     if (!pickups.length) return null;
@@ -1738,6 +1871,8 @@ export class LogisticsService {
       await this.notifications
         .toUsers(await this.staffIds(saved.hubId), { title: 'Parcel ready for pickup', body: `${saved.orderReference} is packed and ready.`, type: 'task', entityId: saved.id })
         .catch(() => undefined);
+      // Express legs were held back until now (C6): give it to a rider at once when the warehouse auto-assigns.
+      if (saved.kind === 'express') await this.autoAssign(saved);
     }
     return (await this.tasks.findOne({ where: { id: pickups[0].id } })) ?? pickups[0];
   }
@@ -1804,6 +1939,7 @@ export class LogisticsService {
           (x) =>
             (side ? x.kind === 'replacement_delivery' : isCustomerKind(x.kind)) &&
             x.orderId === t.orderId &&
+            x.kind !== 'express' && // an express leg that failed after collection is what brought this parcel back, not what carries it on
             (x.replacementId ?? null) === (t.replacementId ?? null) &&
             (x.exchangeId ?? null) === (t.exchangeId ?? null) &&
             (side || !x.sellerIds || x.sellerIds.some((k) => LogisticsService.keyOf(k) === LogisticsService.keyOf(t.sellerId))),

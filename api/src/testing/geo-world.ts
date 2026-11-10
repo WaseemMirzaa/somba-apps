@@ -11,7 +11,7 @@ import { SettingsService } from '../content/settings.service';
  * Test support (jest only, not built): the real DRC geography on an in-memory database, with the geo, coverage, lanes and
  * routing services wired the way the app wires them.
  */
-export async function geoWorld(ds: DataSource, opts: { emitter?: unknown; settings?: () => Record<string, string> } = {}) {
+export async function geoWorld(ds: DataSource, opts: { emitter?: unknown; settings?: () => Record<string, string>; hubOps?: unknown } = {}) {
   const emitter = (opts.emitter ?? { toRoles: () => undefined, toUser: () => undefined, toHub: () => undefined, broadcast: () => undefined }) as never;
   const areas = ds.getRepository(GeoArea);
   const rows = buildAreaRows(loadDrc(), loadGoogleNames());
@@ -21,7 +21,7 @@ export async function geoWorld(ds: DataSource, opts: { emitter?: unknown; settin
   const coverage = new CoverageService(ds.getRepository(Hub), ds.getRepository(HubCoverage), ds.getRepository(Seller), geo, emitter);
   const lanes = new LanesService(ds.getRepository(HubLane), ds.getRepository(Hub), emitter);
   const settingsSvc = { all: async () => (opts.settings ? opts.settings() : {}), get: async (k: string) => (opts.settings ? (opts.settings()[k] ?? null) : null) } as unknown as SettingsService;
-  const routing = new RoutingService(ds.getRepository(Hub), ds.getRepository(User), ds.getRepository(Seller), settingsSvc, geo, lanes);
+  const routing = new RoutingService(ds.getRepository(Hub), ds.getRepository(User), ds.getRepository(Seller), settingsSvc, geo, lanes, opts.hubOps as never);
 
   /** An area by its code (`CD-KN-GOM`). */
   const area = async (code: string): Promise<GeoArea> => {

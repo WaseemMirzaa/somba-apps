@@ -1,7 +1,11 @@
 import {
+  AUTO_ASSIGN_KINDS,
   DEFAULT_HUB_OPS,
+  EXPRESS_NOT_RETURNABLE,
   HubOps,
+  RETURNABLE_KINDS,
   ageHours,
+  ageStart,
   canReturnToSeller,
   dueLevels,
   isVoidedFailure,
@@ -9,6 +13,7 @@ import {
   levelOf,
   localClock,
   mergeHubOps,
+  nextWorkingMoment,
   pickLeastBusy,
 } from './hub-ops-rules';
 
@@ -141,9 +146,47 @@ describe('return to seller rules', () => {
     expect(canReturnToSeller({ kind: 'delivery', status: 'unassigned', runId: 'r1' })).toBe(false);
     for (const kind of ['pickup', 'transfer', 'return_pickup', 'return_transfer', 'return_to_seller'] as const) expect(canReturnToSeller({ kind, status: 'unassigned' })).toBe(false);
   });
+  it('never applies to an express leg: its parcel is still with the seller', () => {
+    for (const status of ['unassigned', 'assigned', 'picked_up', 'in_transit']) expect(canReturnToSeller({ kind: 'express', status })).toBe(false);
+    expect(RETURNABLE_KINDS).not.toContain('express');
+    expect(EXPRESS_NOT_RETURNABLE).toBe('An express parcel is still with the seller. Cancel the order instead.');
+  });
   it('does not blame a rider for a leg the system or staff closed', () => {
     for (const r of ['Returned to seller', 'Order cancelled', 'Seller cancelled', 'Parcel missing from run TR-0001.']) expect(isVoidedFailure(r)).toBe(true);
     for (const r of ['Customer not at home', null, undefined, '']) expect(isVoidedFailure(r)).toBe(false);
+  });
+});
+
+describe('express: auto-assignment kind, age start, next working moment', () => {
+  const kin = { workStart: '08:00', workEnd: '18:00', workDays: [1, 2, 3, 4, 5, 6], timezone: 'Africa/Kinshasa' };
+
+  it('an express leg is auto-assigned like the other legs a supervisor would hand out', () => {
+    expect(AUTO_ASSIGN_KINDS).toContain('express');
+  });
+
+  it('counts an express leg\'s age from readyAt (else creation); every other leg from creation', () => {
+    const createdAt = new Date('2026-11-01T00:00:00Z');
+    const readyAt = new Date('2026-11-03T00:00:00Z');
+    expect(ageStart({ kind: 'express', createdAt, readyAt })).toBe(readyAt);
+    expect(ageStart({ kind: 'express', createdAt, readyAt: null })).toBe(createdAt);
+    expect(ageStart({ kind: 'pickup', createdAt, readyAt })).toBe(createdAt);
+    expect(ageStart({ kind: 'delivery', createdAt })).toBe(createdAt);
+  });
+
+  it('is "now" while the warehouse is open', () => {
+    const at = new Date('2026-11-02T10:00:00Z'); // Monday 11:00 local
+    expect(nextWorkingMoment(kin, at)).toBe(at);
+  });
+
+  it('is today\'s opening when it has not opened yet, else the next working day\'s opening', () => {
+    // Monday 07:00 local (06:00Z): opens at 08:00 local = 07:00Z
+    expect(nextWorkingMoment(kin, new Date('2026-11-02T06:00:00Z')).toISOString()).toBe('2026-11-02T07:00:00.000Z');
+    // Monday 21:00 local (20:00Z): Tuesday 08:00 local
+    expect(nextWorkingMoment(kin, new Date('2026-11-02T20:00:00Z')).toISOString()).toBe('2026-11-03T07:00:00.000Z');
+    // Saturday 21:00 local: Sunday is off, so Monday 08:00 local
+    expect(nextWorkingMoment(kin, new Date('2026-11-07T20:00:00Z')).toISOString()).toBe('2026-11-09T07:00:00.000Z');
+    // it is open at the returned moment
+    expect(isWorkingNow(kin, nextWorkingMoment(kin, new Date('2026-11-07T20:00:00Z')))).toBe(true);
   });
 });
 
