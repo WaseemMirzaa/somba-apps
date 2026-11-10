@@ -6,7 +6,7 @@ import { LocateFixed } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
 import { addressPin, useDeliveryQuote, type DeliveryQuote } from "@/lib/logistics";
 import { NotServedNotice } from "@/components/shop/delivery-quote";
-import { quoteFallbackNote } from "@/lib/quote-text";
+import { feeOriginText, quoteFallbackNote } from "@/lib/quote-text";
 import { formatCurrency } from "@/lib/utils";
 
 /**
@@ -88,7 +88,7 @@ export function ProductFeeCheck({ productId, fr, locale, onQuote }: { productId:
       {quote && (
         <p className="text-xs text-emerald-800" data-testid="fee-check-result">
           {quote.feeUsd === 0 ? (fr ? "Livraison gratuite" : "Free delivery") : formatCurrency(quote.feeUsd, locale)}
-          {quote.destinationHub ? ` · ${fr ? "depuis" : "from"} ${quote.destinationHubName ?? quote.destinationHub.name}` : ""}
+          {feeOriginText(quote, fr) ? ` · ${feeOriginText(quote, fr)}` : ""}
           {quote.pinned && quote.distanceKm > 0 ? ` · ${quote.distanceKm.toLocaleString(fr ? "fr-FR" : "en-GB", { maximumFractionDigits: 1 })} km` : ""}
           {quote.transfer ? (fr ? " (transfert entre entrepôts inclus)" : " (includes a warehouse transfer)") : ""}
         </p>

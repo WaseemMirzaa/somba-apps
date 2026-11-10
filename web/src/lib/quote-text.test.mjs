@@ -116,3 +116,17 @@ test("hopTransitText hides unknown, zero and nonsense transit", () => {
   assert.equal(q.hopTransitText(24, true), "~24 h");
   assert.equal(q.hopTransitText(60, true), "~2 j 12 h");
 });
+
+test("an express order is labelled express, never as a warehouse delivery", async () => {
+  const { loadTs } = await import("./ts-load.mjs");
+  const q = await loadTs("quote-text");
+  assert.equal(q.deliveryLineLabel("express", "Entrepôt Kinshasa", false), "Express delivery (straight from the store)");
+  assert.equal(q.deliveryLineLabel("express", "Entrepôt Kinshasa", true), "Livraison express (directement depuis la boutique)");
+  assert.equal(q.deliveryLineLabel("standard", "Entrepôt Kinshasa", false), "Delivery (Entrepôt Kinshasa)");
+  assert.equal(q.deliveryLineLabel(undefined, null, true), "Livraison");
+  assert.equal(q.feeOriginText({ deliveryMode: "express", destinationHubName: "Entrepôt Kinshasa" }, false), "Express · straight from the store");
+  assert.equal(q.feeOriginText({ deliveryMode: "express" }, true), "Express · directement depuis la boutique");
+  assert.equal(q.feeOriginText({ destinationHubName: "Entrepôt Kinshasa" }, false), "from Entrepôt Kinshasa");
+  assert.equal(q.feeOriginText({ destinationHub: { name: "Hub B" } }, true), "depuis Hub B");
+  assert.equal(q.feeOriginText(null, false), "");
+});

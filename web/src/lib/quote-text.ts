@@ -180,3 +180,17 @@ export function quoteRoutes(q: QuoteLike | null | undefined, fr: boolean): Route
     };
   });
 }
+
+/** The delivery row of a totals list: "Delivery (Hub)", or "Express delivery (straight from the store)" for an express order, which touches no warehouse. */
+export function deliveryLineLabel(mode: string | null | undefined, hubName: string | null | undefined, fr: boolean): string {
+  if (mode === "express") return fr ? "Livraison express (directement depuis la boutique)" : "Express delivery (straight from the store)";
+  return `${fr ? "Livraison" : "Delivery"}${hasName(hubName) ? ` (${hubName})` : ""}`;
+}
+
+/** Where the parcel comes from, in the short fee check on a product page: "Express · straight from the store" or "from Hub". Empty when unknown. */
+export function feeOriginText(q: { deliveryMode?: string | null; destinationHubName?: string | null; destinationHub?: { name: string } | null } | null | undefined, fr: boolean): string {
+  if (!q) return "";
+  if (q.deliveryMode === "express") return fr ? "Express · directement depuis la boutique" : "Express · straight from the store";
+  const hub = hasName(q.destinationHubName) ? q.destinationHubName : hasName(q.destinationHub?.name) ? q.destinationHub!.name : null;
+  return hub ? `${fr ? "depuis" : "from"} ${hub}` : "";
+}

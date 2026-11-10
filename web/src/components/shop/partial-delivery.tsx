@@ -1,10 +1,11 @@
 "use client";
 
-import { PackageCheck, Truck, Zap } from "lucide-react";
+import { AlertTriangle, PackageCheck, Truck, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { fmtDateTime, LEG_STATUS, legStatusVariant, pickL } from "@/lib/logistics";
 import { pickText } from "@/lib/i18n-fields";
 import { EXPRESS_HINT, EXPRESS_LABEL, customerLegs, hasSplitLegs, legCargoText, isPartiallyDelivered, partialHint, partialTitle, splitLines, type Audience, type PanelLine } from "@/lib/split-delivery";
+import { failedAttempt, failedAttemptText } from "@/lib/delivery-code";
 import type { OrderItem, TrackingLegView } from "@/lib/realtime/types";
 
 /** "Express" next to an order: a rider goes straight from the seller to the customer. */
@@ -117,5 +118,17 @@ export function PartialDelivery({
         </div>
       )}
     </section>
+  );
+}
+
+/** "Delivery attempt 1 failed: <reason>. The rider will try again." for an order whose customer leg failed and is not over. */
+export function FailedAttemptNotice({ order, fr }: { order: { status?: string; tracking?: { legs?: readonly TrackingLegView[] | null } | null }; fr: boolean }) {
+  const a = failedAttempt(order);
+  if (!a) return null;
+  return (
+    <div role="status" data-testid="failed-attempt" className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+      <p>{failedAttemptText(a, fr)}</p>
+    </div>
   );
 }

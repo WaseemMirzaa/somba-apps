@@ -39,3 +39,23 @@ test("the other kinds keep their meaning", () => {
   assert.equal(k.meetsCustomer("return_pickup"), true);
   assert.equal(k.meetsCustomer("transfer"), false);
 });
+
+test("the 'Part of the order' badge is for customer legs only, never a pickup, transfer or return", () => {
+  for (const kind of ["pickup", "transfer", "return_pickup", "return_transfer", "return_to_seller"]) {
+    assert.equal(k.isPartialLeg(kind, false, true), false, kind);
+  }
+  assert.equal(k.isPartialLeg("delivery", false), true);
+  assert.equal(k.isPartialLeg("express", false), true);
+  assert.equal(k.isPartialLeg("delivery", true), false);
+  assert.equal(k.isPartialLeg("delivery", undefined, true), true);
+  assert.equal(k.pickL(k.PARTIAL_LABEL, false), "Part of the order");
+  assert.equal(k.pickL(k.PARTIAL_LABEL, true), "Partie de la commande");
+});
+
+test("an express leg is waiting for the seller until readyAt is set; other legs never are", () => {
+  assert.equal(k.isWaitingForSeller({ kind: "express", readyAt: null, status: "unassigned" }), true);
+  assert.equal(k.isWaitingForSeller({ kind: "express", readyAt: null, status: "assigned" }), true);
+  assert.equal(k.isWaitingForSeller({ kind: "express", readyAt: "2026-11-11T10:00:00Z", status: "unassigned" }), false);
+  assert.equal(k.isWaitingForSeller({ kind: "express", readyAt: null, status: "delivered" }), false);
+  assert.equal(k.isWaitingForSeller({ kind: "delivery", readyAt: null, status: "unassigned" }), false);
+});

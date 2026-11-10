@@ -218,6 +218,14 @@ void main() {
       expect(DeliveryTaskDto.fromJson({...legJson('delivery'), 'completesOrder': false}).partial, isTrue);
       expect(DeliveryTaskDto.fromJson(legJson('delivery')).partial, isFalse);
       expect(DeliveryTaskDto.fromJson({'id': 'old', 'kind': 'delivery'}).partial, isFalse, reason: 'an older server says nothing');
+      expect(DeliveryTaskDto.fromJson({...legJson('express'), 'completesOrder': false}).partial, isTrue, reason: 'an express leg is a customer leg');
+    });
+
+    test('"Part of the order" never shows on a seller pickup, transfer or return, even when the order is split', () {
+      for (final kind in ['pickup', 'transfer', 'return_pickup', 'return_transfer', 'return_to_seller']) {
+        expect(DeliveryTaskDto.fromJson({...legJson(kind), 'completesOrder': false}).partial, isFalse, reason: kind);
+        expect(DeliveryTaskDto.fromJson(legJson(kind, partial: true)).partial, isFalse, reason: '$kind with order.partial');
+      }
     });
 
     test('a push without the order snapshot keeps what the list knew, unless it says whether the leg completes the order', () {

@@ -548,7 +548,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       key: const ValueKey('checkout-savings'), style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
                 ),
               const SizedBox(height: 8),
-              _row(s.delivery, unpriced ? (_quote.loading ? '…' : '—') : deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
+              _row(quote?.isExpress == true ? s.deliveryExpressRow : s.delivery, unpriced ? (_quote.loading ? '…' : '—') : deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
               if (quote != null) DeliveryRouteLines(quote: quote),
               if (discount > 0) ...[
                 const SizedBox(height: 8),
@@ -648,8 +648,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget _row(String label, String value, {bool bold = false}) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: TextStyle(fontSize: bold ? 16 : 14, fontWeight: bold ? FontWeight.w800 : FontWeight.w500, color: bold ? AppColors.ink : AppColors.muted)),
+          Flexible(
+            child: Text(label,
+                style: TextStyle(fontSize: bold ? 16 : 14, fontWeight: bold ? FontWeight.w800 : FontWeight.w500, color: bold ? AppColors.ink : AppColors.muted)),
+          ),
+          const SizedBox(width: 8),
           Text(value,
               style:
                   TextStyle(fontSize: bold ? 18 : 14, fontWeight: bold ? FontWeight.w800 : FontWeight.w700, color: bold ? AppColors.primary : AppColors.ink)),

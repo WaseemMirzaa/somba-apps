@@ -122,10 +122,12 @@ It sets **only** `expressDeliveryEnabled=true`, says so loudly, and from then on
 
 | Order (`reviewer.1`, Kasa-Vubu) | What to try |
 |---|---|
-| Charger x2 | Paid, waiting. `seller.c`: **Package Ready**. The express leg is then released and given to the demo rider (`rider`) by auto-assignment; with auto-assignment off the warehouse desk assigns it. |
+| Charger x2 | Paid, waiting. `seller.c`: **Package Ready**. The express leg is released to the warehouse desk (Express tab), which shows "Waiting for the seller to pack" on it until then (a rider can already be assigned by hand). **Auto-assignment is off by default**, so the desk assigns the rider (`rider`) itself: Warehouse > Express > **Assign rider**. |
 | Stand fan | Out for delivery: the rider collected it and is on the road, with a 4-digit code on the customer's order screen. `rider`: finish it with the code and the cash if any. |
 | Steam iron | Delivered about a day ago (code checked). |
 | Kettle + charger, cash (only with COD on too) | Express and cash together: waiting to be packed; the rider collects the full amount at the door. |
+
+**Auto-assignment on "Entrepôt Kinshasa".** The warehouse the express order and the other demo orders use is the launch warehouse that `bootstrap:prod` creates, not a demo record: the demo removal does not delete it, and the seed does not change its settings (auto-assignment stays **off**, the platform default). To let the express order go to a rider the moment the seller presses Package Ready, turn it on yourself, and turn it off again after the demo if you wish: sign in as the warehouse manager (`warehouse.manager`) or an admin, open **Warehouse > Settings > How the warehouse runs** (an admin picks the warehouse in the scope bar first), tick **Auto-assignment** and save. It then hands new pickup and express legs to the least busy available rider while the warehouse is open.
 
 ### Preparation time
 

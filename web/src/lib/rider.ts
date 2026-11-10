@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { paymentMethodLabel } from "@/lib/payment-methods";
-import { isCustomerLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
+import { isCustomerLeg, isPartialLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
 import type { CashHandover } from "@/lib/warehouse-live";
 import { parseCodEnabled } from "@/lib/rider-cod";
 
@@ -142,7 +142,7 @@ function toRiderTask(row: RiderQueueRow) {
     /** An express run: the rider goes from the seller straight to the customer, takes the cash and the customer's code. */
     express: row.kind === "express",
     /** A partial delivery of a split order: `completesOrder` false (more follows) or the order says so. */
-    partial: o?.partial === true || row.completesOrder === false,
+    partial: isPartialLeg(row.kind, row.completesOrder, o?.partial),
     collectOld: !!row.collectOld,
     sellerName: row.sellerName,
     products: items.map((it) => ({

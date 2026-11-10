@@ -54,7 +54,7 @@ export default function RiderTaskDetailPage() {
         {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts} sur 3` : `Attempt ${task.attempts} of 3`}</Badge>}
         {showTaskCash(codEnabled, task) && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
         <Badge variant={task.kind === "express" ? "purple" : "primary"}>{pickL(LEG_KIND[task.kind], fr)}</Badge>
-        {task.partial && <Badge variant="info">{fr ? "Livraison partielle" : "Partial delivery"}</Badge>}
+        {task.partial && <Badge variant="info">{fr ? "Partie de la commande" : "Part of the order"}</Badge>}
       </div>
 
       {!done && brief.length > 0 && (

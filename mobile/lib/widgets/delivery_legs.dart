@@ -120,3 +120,34 @@ class DeliveryLegsPanel extends StatelessWidget {
     );
   }
 }
+
+/// "Delivery attempt 1 failed: Customer not reachable. The rider will try again." for an order whose customer leg failed and
+/// is not over. Renders nothing otherwise.
+class FailedAttemptBanner extends StatelessWidget {
+  const FailedAttemptBanner({super.key, required this.order});
+
+  final OrderDto order;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = order.failedAttempt;
+    if (a == null) return const SizedBox.shrink();
+    final s = Strings.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        key: const ValueKey('failed-attempt'),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: AppColors.amber.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(16)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.report_problem_rounded, color: AppColors.amber, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(s.deliveryAttemptFailed(a.attempt, a.reason, a.retry),
+                key: const ValueKey('failed-attempt-text'), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5, height: 1.35)),
+          ),
+        ]),
+      ),
+    );
+  }
+}

@@ -76,6 +76,14 @@ extension StringsLogistics on Strings {
   String get deliveryLegExpress => t('delivery_leg_express');
   String deliveryLegItems(int n) => n == 1 ? t('delivery_leg_items_one') : t('delivery_leg_items', {'n': n});
   String get deliveryLegLast => t('delivery_leg_last');
+  String get deliveryExpressRow => t('delivery_express_row');
+
+  /// "Delivery attempt 1 failed: Customer not reachable. The rider will try again."
+  String deliveryAttemptFailed(int n, String? reason, bool retry) {
+    final clean = (reason ?? '').trim().replaceAll(RegExp(r'[.!?\s]+$'), '');
+    final why = clean.isEmpty ? '' : ': $clean';
+    return '${t('attempt_failed', {'n': n})}$why. ${t(retry ? 'attempt_retry' : 'attempt_contact')}';
+  }
 
   /// What a customer leg is doing, from its status (`unassigned` | `assigned` | `picked_up` | `in_transit` | `delivered` | `failed`).
   String deliveryLegStatus(String status) => switch (status) {

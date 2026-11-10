@@ -634,7 +634,8 @@ class DeliveryTaskDto {
       needsCode: j['needsCode'] is bool ? j['needsCode'] as bool : null,
       orderFlow: j['orderFlow'] is bool ? j['orderFlow'] as bool : true,
       hasOrder: hasOrder,
-      partial: o['partial'] == true || j['completesOrder'] == false,
+      // "Part of the order" is a statement about a customer leg only: a seller pickup, transfer or return never carries it.
+      partial: LegKind.customerKinds.contains(kindRaw ?? LegKind.delivery) && (o['partial'] == true || j['completesOrder'] == false),
       partialKnown: o['partial'] is bool || j['completesOrder'] is bool,
     );
   }
