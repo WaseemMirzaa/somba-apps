@@ -17,7 +17,8 @@ import {
   vacationError,
   vacationNotice,
 } from './storefront';
-import { StorefrontService, touchesStorefront } from './storefront.service';
+import { EXPRESS_NEEDS_PIN, EXPRESS_NOT_BOOLEAN, StorefrontService, touchesStorefront } from './storefront.service';
+import { sellerView } from '../database/entities/seller.entity';
 import { cleanPayoutAccount, maskAccount } from './payout-account';
 import type { SellerContext } from './seller-context';
 
@@ -180,7 +181,7 @@ describe('storefront with a database', () => {
       const emitter = recordingEmitter();
       const notices: { to: string; title: string }[] = [];
       const translations = testTranslations(ds);
-      const sellersSvc = { withPlanState: async (s: Seller) => ({ id: s.id, legalName: 'Mama SARL', idNumber: 'ID-1', rccm: 'RC-1', taxNumber: 'TX-1', documentUrls: ['/uploads/x'], phone: '+243800000000', onVacation: onVacation(s), vacationUntil: s.vacationUntil, handlingDays: s.handlingDays, returnsPolicy: s.returnsPolicy }) };
+      const sellersSvc = { withPlanState: async (s: Seller) => ({ id: s.id, legalName: 'Mama SARL', idNumber: 'ID-1', rccm: 'RC-1', taxNumber: 'TX-1', documentUrls: ['/uploads/x'], phone: '+243800000000', onVacation: onVacation(s), vacationUntil: s.vacationUntil, handlingDays: s.handlingDays, expressDelivery: s.expressDelivery, returnsPolicy: s.returnsPolicy }) };
       const svc = new StorefrontService(ds.getRepository(Seller), sellersSvc as never, emitter as never, { toUser: async (to: string, n: { title: string }) => void notices.push({ to, title: n.title }) } as never, translations);
       return { svc, emitter, notices, translations };
     }
@@ -213,6 +214,69 @@ describe('storefront with a database', () => {
         const reviewer = p.to.split(',').every((r) => ['admin', 'admin_moderation', 'admin_operations'].includes(r));
         for (const k of ['legalName', 'idNumber', 'rccm', 'taxNumber', 'documentUrls', 'phone']) expect(k in p.payload).toBe(reviewer);
       }
+    });
+
+    describe('express delivery switch', () => {
+      const PIN = { pickupLat: -4.3152, pickupLng: 15.3098 };
+      const stored = async (id: string) => (await ds.getRepository(Seller).findOneByOrFail({ id })).expressDelivery;
+
+      it('turns on for a store with a pinned pickup location, tells the owner and the admins, and turns off again', async () => {
+        const { svc, emitter } = make();
+        const s = await addSeller(ds, { userId: 'owner-1', ...PIN });
+        expect(await stored(s.id)).toBe(false);
+        const on = await svc.update(ctxOf(s), { expressDelivery: true });
+        expect(on).toMatchObject({ expressDelivery: true });
+        expect(await stored(s.id)).toBe(true);
+        expect(emitter.sent.some((e) => e.to === 'user:owner-1' && e.event === 'seller:updated' && e.payload.expressDelivery === true)).toBe(true);
+        expect(emitter.sent.some((e) => e.event === 'store:vacation')).toBe(false); // not a vacation change: shoppers are not pinged
+        expect(await svc.update(ctxOf(on as never as Seller & { id: string }), { expressDelivery: false })).toMatchObject({ expressDelivery: false });
+        expect(await stored(s.id)).toBe(false);
+      });
+
+      it('is refused without a pinned pickup location, with the pin message, and saves nothing', async () => {
+        const { svc } = make();
+        const s = await addSeller(ds, { handlingDays: 1 });
+        await expect(svc.update(ctxOf(s), { expressDelivery: true, handlingDays: 3 })).rejects.toThrow(EXPRESS_NEEDS_PIN);
+        expect(EXPRESS_NEEDS_PIN).toBe('Pin your pickup location on the map (Store settings) before offering express delivery.');
+        expect(await stored(s.id)).toBe(false);
+        expect((await ds.getRepository(Seller).findOneByOrFail({ id: s.id })).handlingDays).toBe(1);
+        // half a pin is no pin
+        const half = await addSeller(ds, { pickupLat: -4.3 });
+        await expect(svc.update(ctxOf(half), { expressDelivery: true })).rejects.toThrow(EXPRESS_NEEDS_PIN);
+      });
+
+      it('a request that pins the location and switches express on together is judged by the pin it sends (and one that clears the pin is refused)', async () => {
+        const { svc } = make();
+        const s = await addSeller(ds);
+        await expect(svc.update(ctxOf(s), { expressDelivery: true, pickupLat: null, pickupLng: null } as never)).rejects.toThrow(EXPRESS_NEEDS_PIN);
+        await svc.update(ctxOf(s), { expressDelivery: true, ...PIN } as never);
+        expect(await stored(s.id)).toBe(true);
+        const pinned = await addSeller(ds, PIN);
+        await expect(svc.update(ctxOf(pinned), { expressDelivery: true, pickupLat: null, pickupLng: null } as never)).rejects.toThrow(EXPRESS_NEEDS_PIN);
+      });
+
+      it('must be true or false', async () => {
+        const { svc } = make();
+        const s = await addSeller(ds, PIN);
+        for (const bad of ['true', 1, 0, null, 'yes', {}]) await expect(svc.update(ctxOf(s), { expressDelivery: bad })).rejects.toThrow(EXPRESS_NOT_BOOLEAN);
+        expect(EXPRESS_NOT_BOOLEAN).toBe('Express delivery must be true or false.');
+        expect(await stored(s.id)).toBe(false);
+      });
+
+      it('switching off needs no pin, and an untouched switch stays as it was', async () => {
+        const { svc } = make();
+        const s = await addSeller(ds, { expressDelivery: true });
+        await svc.update(ctxOf(s), { handlingDays: 2 });
+        expect(await stored(s.id)).toBe(true);
+        await svc.update(ctxOf(s), { expressDelivery: false });
+        expect(await stored(s.id)).toBe(false);
+      });
+
+      it('is part of the seller view (sellers:mine, seller:updated, the admin lists and the public storefront all spread it)', async () => {
+        const s = await addSeller(ds, { expressDelivery: true });
+        expect(sellerView(s).expressDelivery).toBe(true);
+        expect(sellerView(await addSeller(ds)).expressDelivery).toBe(false);
+      });
     });
 
     it('a change that does not flip the state does not spam shoppers (handling time only)', async () => {
@@ -279,6 +343,7 @@ describe('storefront with a database', () => {
   it('touchesStorefront recognises the storefront fields of a sellers:update body', () => {
     expect(touchesStorefront({ vacationUntil: null })).toBe(true);
     expect(touchesStorefront({ handlingDays: 0 })).toBe(true);
+    expect(touchesStorefront({ expressDelivery: false })).toBe(true);
     expect(touchesStorefront({ returnsPolicyFr: 'x' })).toBe(true);
     expect(touchesStorefront({ name: 'x', description: 'y' })).toBe(false);
     expect(touchesStorefront(undefined)).toBe(false);

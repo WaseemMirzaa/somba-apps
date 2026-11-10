@@ -188,7 +188,12 @@ Changing coverage never reroutes an order already placed; it recomputes every st
   `routeDays_s = localDeliveryDays + extra_s` and `extra_s` is `ceil(transitHours_s / 24)` of the lanes that seller's parcels use, else the
   inter-city allowance when THAT seller's pickup city differs from the customer's, else 0. (Computed per seller, so one far seller does not slow
   the other sellers' parcels in the estimate.) `delivery:quote` returns the numbers and the date; `orders:create` stamps the same date.
-  Express (next release) replaces `routeDays` by `expressDeliveryDays`. See logistics.md §15.
+  Express replaces `routeDays` by `expressDeliveryDays`, counted from the managing warehouse's next working moment (see below). See logistics.md §15 and §17.
+- **Express** (logistics.md §17). When the seller and the customer are in the **same commune** (`ancestorAt(…, 'commune')` of the seller's pickup area and of the delivery area), the seller has express
+  on, the order has that one seller, both pins exist, one warehouse covers both ends with no stand-in, the setting `expressDeliveryEnabled` is on and the distance is within `expressMaxKm`,
+  the order is **express** and the fee is `min(expressMaxUsd, expressBaseUsd + expressPerKmUsd × km)` with km from the **seller's pin to the customer's pin**:
+  no transfer fee, no `feeOverrideUsd` (an area's flat fee is ignored; the quote's `feeOverrideUsd` is `null`), `extraDays` 0, no hops. The estimate is
+  `prep + handling + expressDeliveryDays` counted from the managing warehouse's next working moment. Any exclusion leaves the order standard with the fee above.
 - Inter-city = the seller's pickup city (else province) differs from the customer's. Refused with
   `Delivery between cities is not available right now.` when `allowInterCityDelivery` is `'false'`.
 
@@ -197,7 +202,7 @@ Changing coverage never reroutes an order already placed; it recomputes every st
 - `interCityTransferDays` (`'3'` default, whole number 0–30) — public, admin-writable
 - `localDeliveryDays` (`'1'` default, whole number 0–30) — public, admin-writable: the platform's hub -> customer days, added to every seller's preparation
 - `splitDeliveryAfterHours` (`'24'`, 0–720; 0 = never), `expressDeliveryEnabled` (`'false'`), `expressDeliveryDays` (`'0'`), `expressBaseUsd` / `expressPerKmUsd` /
-  `expressMaxUsd` (`'2'` / `'0.5'` / `'15'`), `expressMaxKm` (`'0'` = no limit) — public, admin-writable; see logistics.md §2 (used by the next release)
+  `expressMaxUsd` (`'2'` / `'0.5'` / `'15'`), `expressMaxKm` (`'0'` = no limit) — public, admin-writable; see logistics.md §2 and §17
 - Existing: `deliveryBaseUsd`, `deliveryPerKmUsd`, `deliveryMaxUsd`, `deliveryTransferUsd`
 
 ## Seed accounts (dev seed)

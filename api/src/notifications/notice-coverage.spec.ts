@@ -103,6 +103,7 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   ],
   '{}: a rider will collect your package.': [['SOM-1001: a rider will collect your package.', 'SOM-1001 : un livreur viendra récupérer votre colis.']],
   '{}: your package reached the warehouse.': [['SOM-1001: your package reached the warehouse.', 'SOM-1001 : votre colis est arrivé à l’entrepôt.']],
+  '{}: the rider collected your package and is taking it to the customer.': [['SOM-1001: the rider collected your package and is taking it to the customer.', 'SOM-1001 : le livreur a récupéré votre colis et l’emmène chez le client.']],
   '{}: the delivery address has no map pin, so it was routed to {}.': [
     ['SOM-1001: the delivery address has no map pin, so it was routed to Limete Hub.', 'SOM-1001 : l’adresse de livraison n’a pas de repère sur la carte, la commande a été dirigée vers Limete Hub.'],
   ],

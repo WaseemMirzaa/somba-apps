@@ -20,6 +20,7 @@ them to French by exact match (see "Errors" at the end for the new ones).
 order:   seller --pickup--> ORIGIN hub --transfer--> DESTINATION hub --delivery--> customer
 return:  customer --return_pickup--> DESTINATION hub --return_transfer--> ORIGIN hub --return_to_seller--> seller
 replace: seller --pickup--> ORIGIN hub --transfer--> DESTINATION hub --replacement_delivery--> customer
+express: seller --express--> customer            (same commune, seller switched express on: no warehouse in between; §17)
 ```
 
 - **Destination hub** = the active hub that covers the customer's delivery area (the most specific covered area on the way up: commune → district → city → province). If that hub has no active rider, the nearest staffed hub of the same city, then of the same province, delivers instead (`fallback`). See areas.md.
@@ -34,8 +35,10 @@ replace: seller --pickup--> ORIGIN hub --transfer--> DESTINATION hub --replaceme
 - **One open customer leg per order, and a multi-seller order can be split** (§16): the customer leg waits for every seller's parcel; once the oldest
   waiting parcel has waited longer than `splitDeliveryAfterHours` the arrived parcels go alone and the rest follows on a later leg.
 - A leg that **ends at a hub** (`pickup`, `transfer`, `return_pickup`, `return_transfer`) is finished by hub staff
-  scanning it in: "delivered" = scanned in. A leg that ends at a customer or a seller (`delivery`,
+  scanning it in: "delivered" = scanned in. A leg that ends at a customer or a seller (`delivery`, `express`,
   `replacement_delivery`, `return_to_seller`) is finished by the rider with `delivery:updateStatus`.
+- **Express** (§17): when the seller and the customer are in the same commune and the seller has express on, the order is routed express **automatically** (the customer is not asked):
+  one `express` leg takes the parcel from the seller straight to the customer, managed by the warehouse of that commune, which never holds it.
 
 ## 2. Settings (public: every client may read them; admin writes with `settings:set {key, value}`)
 
@@ -49,13 +52,13 @@ replace: seller --pickup--> ORIGIN hub --transfer--> DESTINATION hub --replaceme
 | `requireSellerPickupPin` | `'true'` = a seller cannot list a new product until the store has a pickup pin | true/false | false (prod bootstrap: true) |
 | `localDeliveryDays` | the platform's transit days from the hub to the customer; **delivery time = the seller's preparation + this (+ lane / inter-city days)** | whole 0–30. `Local delivery days must be a whole number between 0 and 30.` | 1 |
 | `splitDeliveryAfterHours` | the oldest parcel waiting at the destination hub leaves after this many hours: what arrived is delivered and the rest follows (split delivery, §16); 0 = never split | whole 0–720. `Split delivery hours must be a whole number between 0 and 720.` | 24 |
-| `expressDeliveryEnabled` | master switch for express delivery (seller -> customer in the same commune, next PR); keep `false` until the rider app that knows the `express` leg ships | true/false. `Express delivery flag must be one of: true, false.` | false |
-| `expressDeliveryDays` | the platform's days for an express delivery | whole 0–30 | 0 |
+| `expressDeliveryEnabled` | master switch for express delivery (seller -> customer in the same commune, §17); keep `false` until the rider app and the web rider portal that know the `express` leg ship | true/false. `Express delivery flag must be one of: true, false.` | false |
+| `expressDeliveryDays` | the platform's days for an express delivery, counted from the managing warehouse's next working moment | whole 0–30 | 0 |
 | `expressBaseUsd` / `expressPerKmUsd` / `expressMaxUsd` | express fee = `min(max, base + perKm × km(seller pin -> customer pin))`, no transfer fee, no area override | 0–100 / 0–50 / 0–500 | 2 / 0.5 / 15 |
 | `expressMaxKm` | express distance guard; 0 = no limit | 0–100 | 0 |
 
 All of the above are public and writable with `settings:set` (admin). A key that was never stored reads as its default (`localDeliveryDays` 1,
-`splitDeliveryAfterHours` 24, express off); the dev seed and `bootstrap:prod` store them. `splitDeliveryAfterHours` is used by the warehouse job (§16). The `express*` settings are only *stored and served* in this release: express delivery lands in the next one.
+`splitDeliveryAfterHours` 24, express off); the dev seed and `bootstrap:prod` store them. `splitDeliveryAfterHours` is used by the warehouse job (§16). The `express*` settings drive express delivery (§17).
 
 Fee = `min(max, base + perKm × km) + transfer fees`, rounded to cents (km from the delivering warehouse to the pin; 0 with no pin). A flat per-area `feeOverrideUsd` replaces `base + perKm × km`; the transfer fee is charged per hop (a lane may set its own price; with no lanes it is the single `deliveryTransferUsd`). See areas.md "Fee and estimate".
 `deliveryZones` is still in the public view for old clients; ignore it.
@@ -149,6 +152,7 @@ Table `delivery_tasks`, new columns: `kind`, `fromHubId`, `toHubId`, `sellerId`,
 | `return_transfer` | destination → origin | destination | either | **scan-in** at origin |
 | `return_to_seller` | hub → seller | that hub | that hub | rider (`delivered`) |
 | `replacement_delivery` | destination hub → customer (also collects the old unit: `collectOld`) | destination | destination | rider (`delivered`, no code) |
+| `express` | **seller** → customer (`fromHub` / `toHub` null); carries the whole order, `sellerIds` = [the seller] (§17) | the order's recorded warehouse (`hubId`) | that warehouse | rider (`delivered`, needs the customer's code when `requireDeliveryCode`, proof photo, COD = the full payment) |
 
 Status per leg: `unassigned → assigned → picked_up → in_transit → delivered | failed`.
 
@@ -275,7 +279,7 @@ withOrderLock(manager, orderId, fn)                             // common/order-
 ## 9. Notifications added (all have French in `notifications/localize.ts`)
 
 `Task to assign` (hub supervisors, or all staff if none), `Task updated` (rider: parcels were merged into their customer leg), `New task assigned to you` (rider, type `task`),
-`Pickup scheduled` and `Package at the warehouse` (seller), `Address without a map pin` and `No warehouse with riders`
+`Pickup scheduled` and `Package at the warehouse` (seller), `Package collected` (seller: an express rider collected the parcel, §17), `Address without a map pin` and `No warehouse with riders`
 (admins + destination hub staff), `Task needs attention` (admins + hub staff). Split delivery (to the customer): `Part of your order is on its way`, `Part of your order was delivered`, `Items could not be delivered`. Reused: `Rider assigned`, `Parcel at our
 warehouse`, `Delivery update`, `Parcel ready for pickup`, `Seller package ready`. Removed: `New delivery available`
 (riders are never offered tasks) and the batch notice "collect them at the warehouse".
@@ -286,7 +290,9 @@ warehouse`, `Delivery update`, `Parcel ready for pickup`, `Seller package ready`
 - `Your warehouse assigns your tasks. You cannot accept a task yourself.`
 - `A rider must collect this parcel before it can be scanned in.` (scan-in of an unassigned / assigned leg)
 - `That parcel belongs to another warehouse.` (`exceptions:create` with a `taskId` of another warehouse) / `Exception not found.` (changing another warehouse's incident)
-- Rider status change that is not allowed: `A <leg> that is <status> cannot become <status>.` The French mapping is by pattern, with these word keys: legs (`pickup`, `transfer`, `delivery`, `return pickup`, `return transfer`, `return to seller`, `replacement delivery`) and statuses (`unassigned`, `assigned`, `picked up`, `in transit`, `delivered`, `failed`): "Un <leg> qui est <statut> ne peut pas passer à <statut>." (e.g. `A pickup that is picked up cannot become assigned.`).
+- `An express parcel is still with the seller. Cancel the order instead.` (`aged:returnToSeller` on an `express` leg)
+- Store switch: `Express delivery must be true or false.` / `Pin your pickup location on the map (Store settings) before offering express delivery.` (`sellers:update { expressDelivery }`)
+- Rider status change that is not allowed: `A <leg> that is <status> cannot become <status>.` (the article follows the label: `An express delivery that is picked up cannot become assigned.`, so clients' French pattern must accept `An?`) The French mapping is by pattern, with these word keys: legs (`pickup`, `transfer`, `delivery`, `express delivery`, `return pickup`, `return transfer`, `return to seller`, `replacement delivery`) and statuses (`unassigned`, `assigned`, `picked up`, `in transit`, `delivered`, `failed`): "Un <leg> qui est <statut> ne peut pas passer à <statut>." (e.g. `A pickup that is picked up cannot become assigned.`).
 - `Your account is not linked to a warehouse. Ask an administrator.`
 - `Only supervisors and managers can assign riders.`
 - `Only managers can change staff tiers.` / `Only managers can see the staff list.` / `Only an administrator can make someone a manager.` / `You cannot change your own tier.` / `This person works at another warehouse.` / `Only warehouse staff have a tier.`
@@ -418,16 +424,16 @@ Migration `1793200000004-WarehouseOps` (`hub_ops_settings`, `aged_alerts`; Query
 
 - `products.prepDays` (0–30, default 2) is the seller's preparation time. The store's `handlingDays` (0–14) is added on top. The platform adds
   `localDeliveryDays` (hub -> customer, default 1) plus the days a seller's parcels spend on lanes (`ceil(transitHours / 24)`) or, with no lane
-  transit, the inter-city allowance when that seller crosses cities. Express (next release) uses `expressDeliveryDays` instead of the local + lane days.
+  transit, the inter-city allowance when that seller crosses cities. Express (§17) uses `expressDeliveryDays` instead of the local + lane days.
 - **Per seller**, then the slowest wins: `estimateDays = min(30, max over sellers of (prep_s + handling_s + route_s))` with
   `prep_s` = that seller's slowest product, `route_s = localDeliveryDays + extra_s`. A slow-preparing local seller and a quick far one are not
   added together. The quote's `prepDays` of the deciding seller is its product preparation **plus** its handling (the days until the parcel is handed over).
 - `orders:create` stamps `estimatedDeliveryDate = today (Kinshasa) + estimateDays`: the same date `delivery:quote` returned, which clients should show.
-  It also stores `orders.deliveryMode` (`'standard'`; `'express'` in the next release).
+  It also stores `orders.deliveryMode` (`'standard'` or `'express'`, §17).
 - **Product payloads** (every listing the API serves): `prepDays`, `sellerHandlingDays` (unchanged), `totalDeliveryDays = min(30, max(1, prep + handling + local))`,
   and the **legacy** `deliveryDays = min(30, max(1, prep + local))` (no handling) which the web wizard and older apps read and send back, so a save
   round-trips exactly. Both are clamped to at least 1 even with `localDeliveryDays = 0`. `sellerExpressDelivery: boolean` is served too (stores
-  with `sellers.expressDelivery` on; the toggle itself is next release).
+  with `sellers.expressDelivery` on; the toggle is `sellers:update { expressDelivery }`, §17).
 - **Writes** (`products:create` / `products:update`, CSV import): `prepDays` (0–30) wins. A legacy `deliveryDays` (1–30, same error as before) is
   converted to `prep = clamp(deliveryDays - localDeliveryDays, 0, 30)` and ignored when `prepDays` is also sent. `products.deliveryDays` is still
   written (`prep + local`, at least 1). Error: `Preparation time (days) must be a whole number between 0 and 30.`
@@ -443,7 +449,7 @@ Migration `1793200000004-WarehouseOps` (`hub_ops_settings`, `aged_alerts`; Query
 **Owner's rule.** A multi-seller order waits at the destination warehouse for every seller's parcel. Once the **oldest waiting parcel** has been there
 longer than `splitDeliveryAfterHours` (default 24; 0 = never), the parcels that arrived are delivered and the rest follows later.
 
-**One open customer leg per order** (`CUSTOMER_KINDS` in `leg-rules.ts`, today `['delivery']`; the next release adds `'express'` there and every place that
+**One open customer leg per order** (`CUSTOMER_KINDS` in `leg-rules.ts`, `['delivery', 'express']`; every place that
 asks "is this the delivery to the customer?" reads that list).
 - A customer leg records `delivery_tasks.sellerIds` (`null` = a legacy leg, created before this release, that carries everything) and its cargo (`itemsJson`) is
   **the live, not yet delivered lines of those sellers**, read from `order_items` (a multi-seller leg no longer carries the first seller's items only).
@@ -464,7 +470,7 @@ asks "is this the delivery to the customer?" reads that list).
   exists" (a scan-in that failed half way). It is idempotent. `warehouseOps:runNow { asOf?, only? }` (`asOf` outside production only) replies
   `{ aged, autoAssigned, split }` (`split` = customer legs the pass created); `only` is a list from `'aged' | 'assign' | 'split'` (default all), so a test that ages every parcel can leave the split step out.
 - **Proof code.** A new leg gets a new code; a retry or a merge keeps it. `orders:deliveryCode` and `codeForOrder` return the code of the **open** customer leg
-  (the order status no longer gates it), and the customer sees the rider while a customer leg is `picked_up` / `in_transit`.
+  (the order status no longer gates it), and the customer sees the rider **only** while a customer leg (`delivery` or `express`) is `picked_up` / `in_transit` (after a partial leg is delivered the rider is gone although the order still reads `shipped`); the order-status rule is only a fallback for orders whose customer legs are all legacy (`sellerIds` null) or not planned yet. The code is likewise the open customer leg's only.
 - **Lines.** Delivering a customer leg stamps its lines `deliveredAt` + `deliveryTaskId`. `fulfilment` stays `received` (old clients test it), and a seller's
   `packageStatus` can now be `delivered`. Returns still open only when the whole order is `delivered`, and seller payouts and the return window still
   wait for the whole order (finance clears per order; per-part clearance would need per-line return windows).
@@ -490,5 +496,69 @@ asks "is this the delivery to the customer?" reads that list).
 legs that carry their parcel (`orders:list` tracking, `legs[]`); `rider:tasks` shows the leg's lines and `order.partial`; the customer's tracking `legs[]` on a customer leg carry
 `sellerIds`, `items` and `completesOrder`.
 
+**Customer order view.** Every order the customer gets (`orders:list`, the `order:updated` push) carries `partiallyDelivered: boolean`: true when some live line has `deliveredAt` and another live line does not (cancelled lines ignored; a fully delivered order is simply `delivered`).
+
 **Analytics (known).** Analytics count **legs**: a split order is counted once per customer leg in the delivered / failed / on-time figures and in the per-rider counts. Orders delivered
 are not de-duplicated in this release.
+
+## 17. Express delivery: the seller's rider goes straight to the customer
+
+**Owner's rule.** When the seller and the customer are in the **same commune** and the seller has switched express on, a rider goes **straight from the seller to the customer**,
+skipping the warehouse. It is applied **automatically** when an order qualifies; the customer is not asked and cannot refuse it.
+
+**Eligibility** (`RoutingService.expressFor`, decided at `delivery:quote` and again at `orders:create`, recorded in `orders.deliveryMode`; planning never decides again). All of:
+1. `expressDeliveryEnabled` is `'true'`;
+2. exactly **one seller** on the order, with `sellers.expressDelivery` on;
+3. the seller has a **pickup area** and a **pin**, and the customer's address has a **pin** (without both there is no distance);
+4. **same commune**: the commune above the seller's pickup area (`ancestorAt(…, 'commune')`) is the commune above the delivery area (an area with no commune above it never qualifies);
+5. one warehouse manages both ends (origin hub = destination hub) and **neither end is a stand-in** (`fallback` null: the covering warehouse has riders);
+6. distance seller pin -> customer pin ≤ `expressMaxKm` (0 = no limit).
+
+Anything else is a **standard** order, exactly as before.
+
+**Fee.** `min(expressMaxUsd, expressBaseUsd + expressPerKmUsd × km)`, km = haversine **seller pin -> customer pin**, rounded to cents. No transfer fee and **no flat area fee**
+(`feeOverrideUsd` is ignored and quoted `null`). **Estimate.** `prep + handling + expressDeliveryDays`, counted from the managing warehouse's **next working moment**
+(`hub_ops_settings`: today at opening time when it has not opened yet, else the next working day's opening; the current moment while it is open), so a 21:00 order with 0 days is not "today".
+
+**`delivery:quote`** (changed fields on an express quote; every existing field keeps its meaning): `deliveryMode: 'express'`, `express: true`, `transfer: false`, `transferUsd: 0`,
+`hops: []` on the origin, `extraDays: 0`, `feeOverrideUsd: null`, `distanceKm` = seller -> customer, `routeDays` = `expressDeliveryDays`, `estimatedDeliveryDate` = what `orders:create` stamps.
+A standard quote has `deliveryMode: 'standard'`, `express: false`.
+
+**`orders:create`** records `orders.deliveryMode` and the route with **destination hub = origin hub = the managing hub** (`originBySeller[seller]` = `routeBySeller[seller][0]` = that hub),
+so after-sale (returns, replacements) runs through it.
+
+**The `express` leg** (`planOrder` → `planExpress`, one per order; `planOrder` is idempotent over existing order-flow `pickup` **or** `express` legs):
+`hubId` = the managing hub, `fromHubId`/`toHubId` null, `sellerId` = the seller, `sellerIds` = [seller], cargo = every line, `codAmountUsd` = the **full payment** (it always completes the order),
+a 4-digit code, the proof photo, and the same statuses as a delivery leg. It is in `CUSTOMER_KINDS`, `CODE_KINDS`, `PROOF_KINDS` and `AUTO_ASSIGN_KINDS`, an order-flow kind, **not** in
+`OUTBOUND_KINDS` (nothing to scan out) and **not** in `RETURNABLE_KINDS`: `aged:returnToSeller` answers `An express parcel is still with the seller. Cancel the order instead.`
+
+**Lifecycle.**
+- Created with the order but **held back**: it is not auto-assigned, and staff are not asked to assign it, until the seller marks the package ready. `orders:sellerReady` / `markSellerReady`
+  find the seller's `pickup` **or** `express` leg, stamp `readyAt`, tell the warehouse ("Parcel ready for pickup") and auto-assign it when the warehouse uses auto-assignment
+  (the sweeper's `autoAssignWaiting` skips an express leg with no `readyAt`). **Aged-parcel alerts count from `readyAt ?? createdAt`** (preparation days are not an alarm).
+- Rider assigned: order -> `processing` (the seller also gets the task push over `task:updated` and the existing `Pickup scheduled`). `picked_up` -> order `shipped`;
+  `in_transit` -> `out_for_delivery`; `delivered` -> `delivered`.
+- **On `picked_up` (the rider collected it):** the seller's lines become `received` (the seller can no longer cancel what the rider holds) and the seller is told **`Package collected`**
+  (`<ref>: the rider collected your package and is taking it to the customer.`).
+- On `delivered`: the code (when required) and the **exact cash** are checked (the shared customer-leg path), the lines get `deliveredAt` + `deliveryTaskId`, the payment is marked
+  collected once (receipt for the cash) and the order is finished. While it waits, a seller part-cancel recomputes what the leg carries and collects.
+- `codeForOrder`, `resetCodeLock`, the cash check and `repeatDelivered` work on `express` through `isCustomerKind`; the customer sees the rider while the leg is `picked_up` / `in_transit`.
+
+**Failure (C4).** The rider fails the leg:
+- **before collecting** (`pickedUpAt` null): the parcel is still with the seller, so the **same express leg opens again** (`attempts + 1`, same code, still ready, so auto-assigned straight away);
+- **after collecting:** a **`pickup` leg for the same rider** is created, already `picked_up` (`toHubId` = `hubId` = the managing hub, `parentTaskId` = the express leg, the express cargo).
+  Staff scan it in and the ordinary chain plans a **normal `delivery` leg** from the warehouse. The order **keeps its status** and the customer is not told they can cancel; this holds even
+  at the attempt limit (an order is never cancelled around goods in a rider's hands). The delivery leg's `attempts` = 1 + the converted express leg's `attempts` (the failed attempt
+  counts), then it is retried and gives up like any delivery.
+- At the limit **before collection** the order is cancelled and refunded as for any delivery (the goods are still with the seller).
+
+**Store toggle.** `sellers:update { expressDelivery: boolean }` (a storefront key, `touchesStorefront`; the same `storefront` permission as vacation and handling). Needs a pinned pickup location
+(a pin sent in the same request counts): `Pin your pickup location on the map (Store settings) before offering express delivery.`; a non-boolean is `Express delivery must be true or false.`
+Clearing the pin switches express off. `expressDelivery` is in `sellers:mine`, `seller:updated`, the admin seller views and the public `sellers:storefront.seller`, and products carry `sellerExpressDelivery`.
+
+**Notifications (French in `localize.ts`).** New: `Package collected` (seller). Existing and reused: `Pickup scheduled` (seller), `Parcel ready for pickup` (warehouse), `Rider assigned`,
+`Delivery update`, `Delivery attempt failed`. `kindLabel('express')` = `express delivery` (French `livraison express`).
+
+**What clients must handle.** The new leg `kind: 'express'` (rider app: it meets the customer, needs the code, proof photo and cash, and its pickup end is the seller: `from.type === 'seller'`;
+web rider portal `RIDER_FINISHED`; the customer journey); `orders.deliveryMode`, the quote's `deliveryMode` / `express`; `sellerExpressDelivery` and `expressDelivery`; the new errors above and the `An?`
+status-error pattern; a rider's task list can show a `pickup` leg that is already `picked_up` (an express parcel coming back). Keep `expressDeliveryEnabled` `false` until those clients ship.

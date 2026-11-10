@@ -7,6 +7,8 @@ import {
   isCustomerKind,
   isHubBound,
   isOrderFlow,
+  kindLabel,
+  kindWithArticle,
   managingHub,
   movesForward,
   orderStatusFor,
@@ -166,8 +168,9 @@ describe('warehouse tiers', () => {
 
 describe('CUSTOMER_KINDS: the legs that end at the customer', () => {
   it('is the one list every "is this the delivery to the customer?" test reads', () => {
-    expect([...CUSTOMER_KINDS]).toEqual(['delivery']);
+    expect([...CUSTOMER_KINDS]).toEqual(['delivery', 'express']);
     expect(isCustomerKind('delivery')).toBe(true);
+    expect(isCustomerKind('express')).toBe(true);
     expect(isCustomerKind(null)).toBe(true); // a task that predates legs is a delivery
     expect(isCustomerKind(undefined)).toBe(true);
     for (const k of ['pickup', 'transfer', 'return_pickup', 'return_transfer', 'return_to_seller', 'replacement_delivery']) expect(isCustomerKind(k)).toBe(false);
@@ -176,10 +179,57 @@ describe('CUSTOMER_KINDS: the legs that end at the customer', () => {
   it('feeds the rules built on it', () => {
     for (const k of CUSTOMER_KINDS) {
       expect(CODE_KINDS).toContain(k);
-      expect(OUTBOUND_KINDS).toContain(k);
       expect(isOrderFlow({ kind: k, disputeId: null, replacementId: null, exchangeId: null })).toBe(true);
       expect(orderStatusFor(k, 'in_transit')).toBe('out_for_delivery');
       expect(orderStatusFor(k, 'delivered')).toBe('delivered');
     }
+  });
+});
+
+describe('express leg (seller -> customer, no warehouse)', () => {
+  it('is an order-flow leg that needs the customer code, but never leaves a warehouse', () => {
+    expect(isOrderFlow({ kind: 'express', disputeId: null, replacementId: null, exchangeId: null })).toBe(true);
+    expect(isOrderFlow({ kind: 'express', disputeId: 'd1', replacementId: null, exchangeId: null })).toBe(false);
+    expect(CODE_KINDS).toContain('express');
+    expect(OUTBOUND_KINDS).not.toContain('express');
+    expect(isHubBound('express')).toBe(false);
+    // staff have nothing to scan in or out: it never touches a warehouse
+    expect(canScanOutAt(task('express', { status: 'assigned', hubId: 'h1' }), 'h1')).toBe(false);
+    expect(canScanInAt(task('express', { status: 'picked_up', hubId: 'h1' }), 'h1')).toBe(false);
+  });
+
+  it('is managed by the warehouse recorded on it, and only that warehouse\'s riders fit', () => {
+    expect(managingHub('express', null, null)).toBeNull();
+    expect(managingHub('express', 'h1', null)).toBe('h1');
+    expect(riderHubIds(task('express', { hubId: 'h1' }))).toEqual(['h1']);
+    expect(riderFits(task('express', { hubId: 'h1' }), 'h1')).toBe(true);
+    expect(riderFits(task('express', { hubId: 'h1' }), 'h2')).toBe(false);
+    expect(touchesHub(task('express', { hubId: 'h1' }), 'h1')).toBe(true);
+  });
+
+  it('moves like a delivery leg: assigned -> picked_up -> in_transit -> delivered, or failed', () => {
+    expect(riderNext('express', 'assigned')).toEqual(['picked_up', 'failed']);
+    expect(riderNext('express', 'picked_up')).toEqual(['in_transit', 'failed']);
+    expect(riderNext('express', 'in_transit')).toEqual(['delivered', 'failed']);
+    expect(riderNext('express', 'delivered')).toEqual([]);
+  });
+
+  it('maps its statuses to the order: assigned -> processing, picked_up -> shipped, in_transit -> out_for_delivery, delivered -> delivered', () => {
+    expect(orderStatusFor('express', 'unassigned')).toBeNull();
+    expect(orderStatusFor('express', 'assigned')).toBe('processing');
+    expect(orderStatusFor('express', 'picked_up')).toBe('shipped');
+    expect(orderStatusFor('express', 'in_transit')).toBe('out_for_delivery');
+    expect(orderStatusFor('express', 'delivered')).toBe('delivered');
+    expect(orderStatusFor('express', 'failed')).toBeNull();
+    // a delivery leg's assignment does not move the order (its pickup already did)
+    expect(orderStatusFor('delivery', 'assigned')).toBeNull();
+  });
+
+  it('is labelled "express delivery", with the right article in the status error', () => {
+    expect(kindLabel('express')).toBe('express delivery');
+    expect(kindWithArticle('express')).toBe('an express delivery');
+    expect(kindWithArticle('pickup')).toBe('a pickup');
+    expect(kindWithArticle('delivery')).toBe('a delivery');
+    expect(kindWithArticle('return_to_seller')).toBe('a return to seller');
   });
 });

@@ -2459,12 +2459,12 @@ export class RealtimeGateway
   @SubscribeMessage('sellers:update')
   async sellersUpdate(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { name?: string; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; pickupAreaId?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
+    @MessageBody() body: { name?: string; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; pickupAreaId?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null; expressDelivery?: boolean },
   ) {
     try {
       const user = this.requireUser(client);
       const ctx = await this.kit.ctx.resolve(user, 'storefront');
-      // Vacation mode, handling time and policies are validated first, so a bad value saves nothing.
+      // Vacation mode, handling time, the express switch and policies are validated first, so a bad value saves nothing.
       if (touchesStorefront(body)) await this.kit.storefront.update(ctx, body as never);
       return ok(
         await this.sellersSvc.updateProfile(ctx.actor.id, {

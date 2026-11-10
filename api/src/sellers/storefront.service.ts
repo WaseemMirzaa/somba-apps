@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { Seller } from '../database/entities';
 import { str } from '../common/validate';
+import { cleanPoint } from '../common/geo/geo';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SellersService } from '../ops/sellers.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -19,6 +20,8 @@ import type { SellerContext } from './seller-context';
 export interface StorefrontPatch {
   vacationUntil?: unknown;
   handlingDays?: unknown;
+  /** Offer express delivery (a rider takes the parcel from the store straight to a customer in the same commune). Needs a pinned pickup location. */
+  expressDelivery?: unknown;
   returnsPolicy?: unknown;
   returnsPolicyFr?: unknown;
   shippingPolicy?: unknown;
@@ -26,7 +29,10 @@ export interface StorefrontPatch {
 }
 
 const POLICY_FIELDS = ['returnsPolicy', 'shippingPolicy'] as const;
-export const STOREFRONT_KEYS: (keyof StorefrontPatch)[] = ['vacationUntil', 'handlingDays', 'returnsPolicy', 'returnsPolicyFr', 'shippingPolicy', 'shippingPolicyFr'];
+
+export const EXPRESS_NEEDS_PIN = 'Pin your pickup location on the map (Store settings) before offering express delivery.';
+export const EXPRESS_NOT_BOOLEAN = 'Express delivery must be true or false.';
+export const STOREFRONT_KEYS: (keyof StorefrontPatch)[] = ['vacationUntil', 'handlingDays', 'expressDelivery', 'returnsPolicy', 'returnsPolicyFr', 'shippingPolicy', 'shippingPolicyFr'];
 
 /** Does a `sellers:update` body touch storefront settings? */
 export const touchesStorefront = (body: unknown): boolean =>
@@ -63,6 +69,16 @@ export class StorefrontService implements OnModuleInit, OnModuleDestroy {
     const wasAway = onVacation(seller);
     if (patch.vacationUntil !== undefined) seller.vacationUntil = cleanVacationUntil(patch.vacationUntil);
     if (patch.handlingDays !== undefined) seller.handlingDays = cleanHandlingDays(patch.handlingDays);
+    if (patch.expressDelivery !== undefined) {
+      if (typeof patch.expressDelivery !== 'boolean') throw new BadRequestException(EXPRESS_NOT_BOOLEAN);
+      if (patch.expressDelivery) {
+        // The pin may arrive in the same request (`sellers:update` saves the profile right after this), so a body that moves it is judged by what it sends.
+        const sent = patch as { pickupLat?: unknown; pickupLng?: unknown };
+        const pin = sent.pickupLat !== undefined || sent.pickupLng !== undefined ? cleanPoint(sent.pickupLat, sent.pickupLng) : cleanPoint(seller.pickupLat, seller.pickupLng);
+        if (!pin) throw new BadRequestException(EXPRESS_NEEDS_PIN);
+      }
+      seller.expressDelivery = patch.expressDelivery;
+    }
 
     // Policies are authored in either language; the other one is an author row or filled in by a machine.
     const text = (v: unknown, label: string): string | null | undefined =>

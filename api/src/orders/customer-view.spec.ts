@@ -78,3 +78,48 @@ describe('customer view of an order', () => {
     expect(list[1]).not.toHaveProperty('rider');
   });
 });
+
+describe('OrdersService.customerViews: partiallyDelivered', () => {
+  const at = new Date('2026-11-01T10:00:00Z');
+  const order = (lines: { fulfilment?: string; deliveredAt?: Date | null }[]) => ({ id: 'o1', customerId: 'c1', status: 'confirmed', items: lines.map((l, i) => ({ id: `i${i}`, fulfilment: 'received', deliveredAt: null, ...l })) }) as never;
+  const viewOf = async (o: never) => (await make().svc.customerViews([o]))[0];
+
+  it('is true when some live line was delivered and another was not', async () => {
+    expect((await viewOf(order([{ deliveredAt: at }, {}]))).partiallyDelivered).toBe(true);
+  });
+
+  it('is false when nothing, or everything live, was delivered (a cancelled line does not count)', async () => {
+    expect((await viewOf(order([{}, {}]))).partiallyDelivered).toBe(false);
+    expect((await viewOf(order([{ deliveredAt: at }, { deliveredAt: at }]))).partiallyDelivered).toBe(false);
+    expect((await viewOf(order([{ deliveredAt: at }, { fulfilment: 'cancelled' }]))).partiallyDelivered).toBe(false);
+    expect((await viewOf(order([{ deliveredAt: at }, { fulfilment: 'cancelled' }, {}]))).partiallyDelivered).toBe(true);
+  });
+});
+
+describe('OrdersService.withRiders: the rider is shown only while a customer leg is on the road', () => {
+  const make2 = (legs: object[]) => {
+    const manager = {
+      find: async (entity: { name: string }) => (entity.name === 'DeliveryTask' ? legs : [{ id: 'r1', name: 'Rita Rider', phone: '+243900000009' }]),
+    };
+    return new OrdersService({ manager } as never, {} as never, {} as never, { registerFailedHandler: () => undefined } as never, {} as never, {} as never, { registerFanout: () => undefined, registerUserView: () => undefined } as never, { registerOrderSettledHandler: () => undefined } as never, {} as never, {} as never, {} as never);
+  };
+  const order = { id: 'o1', status: 'out_for_delivery', riderId: 'r1' } as never;
+  const leg = (status: string, sellerIds: string[] | null, kind = 'delivery') => ({ orderId: 'o1', kind, status, riderId: 'r1', sellerIds });
+
+  it('shows the rider of a delivery or express leg that is picked up or in transit', async () => {
+    for (const kind of ['delivery', 'express']) for (const status of ['picked_up', 'in_transit']) {
+      expect(((await make2([leg(status, ['s1'], kind)]).withRiders([order]))[0] as { rider?: unknown }).rider).toMatchObject({ name: 'Rita Rider' });
+    }
+  });
+
+  it('hides the rider once the partial leg is delivered, although the order still reads out_for_delivery', async () => {
+    const [v] = await make2([leg('delivered', ['s1'])]).withRiders([order]);
+    expect((v as { rider?: unknown }).rider).toBeUndefined();
+    expect(((await make2([leg('unassigned', ['s1'])]).withRiders([order]))[0] as { rider?: unknown }).rider).toBeUndefined();
+  });
+
+  it('keeps the order-status fallback for orders whose customer legs are all legacy (sellerIds null) or not planned yet', async () => {
+    expect(((await make2([leg('assigned', null)]).withRiders([order]))[0] as { rider?: unknown }).rider).toMatchObject({ name: 'Rita Rider' });
+    expect(((await make2([]).withRiders([order]))[0] as { rider?: unknown }).rider).toMatchObject({ name: 'Rita Rider' });
+  });
+});

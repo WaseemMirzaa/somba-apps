@@ -19,7 +19,7 @@ export const HUB_BOUND_KINDS: readonly DeliveryKind[] = ['pickup', 'transfer', '
  * The legs of an order's own journey that END at the customer ("customer legs"). Every place that asks "is this the delivery
  * to the customer?" uses this list, so a new kind of customer leg is added here and nowhere else.
  */
-export const CUSTOMER_KINDS = ['delivery'] as const;
+export const CUSTOMER_KINDS = ['delivery', 'express'] as const;
 export type CustomerKind = (typeof CUSTOMER_KINDS)[number];
 export const isCustomerKind = (kind: string | null | undefined): kind is CustomerKind => CUSTOMER_KINDS.includes((kind ?? 'delivery') as CustomerKind);
 
@@ -27,7 +27,8 @@ export const isCustomerKind = (kind: string | null | undefined): kind is Custome
 export const CODE_KINDS: readonly DeliveryKind[] = [...CUSTOMER_KINDS, 'replacement_delivery'];
 
 /** Legs that leave a warehouse (staff can scan the parcel out to the rider). */
-export const OUTBOUND_KINDS: readonly DeliveryKind[] = ['transfer', 'return_transfer', ...CUSTOMER_KINDS, 'return_to_seller', 'replacement_delivery'];
+// `express` is not here: it leaves a seller, not a warehouse, so there is nothing for staff to scan out.
+export const OUTBOUND_KINDS: readonly DeliveryKind[] = ['transfer', 'return_transfer', 'delivery', 'return_to_seller', 'replacement_delivery'];
 
 /** Legs where a transfer rider may come from either end. */
 export const TRANSFER_KINDS: readonly DeliveryKind[] = ['transfer', 'return_transfer'];
@@ -75,6 +76,9 @@ export function managingHub(kind: DeliveryKind, from: string | null | undefined,
     case 'pickup':
     case 'return_pickup':
       return to ?? null;
+    // An express leg has no warehouse at either end: the order records which warehouse manages it (`hubId`).
+    case 'express':
+      return from ?? to ?? null;
     default:
       return from ?? to ?? null;
   }
@@ -114,6 +118,8 @@ export function canScanOutAt(t: LegTask, hubId: string): boolean {
 /** Customer-facing order status a leg's rider update implies, or null when the order does not change. */
 export function orderStatusFor(kind: DeliveryKind, status: DeliveryStatus): 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | null {
   if (kind === 'pickup') return status === 'assigned' || status === 'picked_up' ? 'processing' : null;
+  // Express: the rider is on the way to the seller (processing), then carries the parcel to the customer like a delivery leg.
+  if (kind === 'express' && status === 'assigned') return 'processing';
   if (isCustomerKind(kind)) {
     if (status === 'picked_up') return 'shipped';
     if (status === 'in_transit') return 'out_for_delivery';
@@ -130,5 +136,11 @@ export function movesForward(from: string, to: string): boolean {
 
 /** Human label of a leg (used in notices; the French mapping lives in notifications/localize.ts). */
 export function kindLabel(kind: DeliveryKind): string {
-  return kind.replace(/_/g, ' ');
+  return kind === 'express' ? 'express delivery' : kind.replace(/_/g, ' ');
+}
+
+/** "a pickup" / "an express delivery": the label with its indefinite article. */
+export function kindWithArticle(kind: DeliveryKind): string {
+  const label = kindLabel(kind);
+  return `${/^[aeiou]/i.test(label) ? 'an' : 'a'} ${label}`;
 }
