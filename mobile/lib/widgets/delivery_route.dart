@@ -67,6 +67,10 @@ class DeliveryRouteLines extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
+    // Express goes straight from the store to the customer: no warehouse, no transfer. Say so, with the fee.
+    if (quote.isExpress) {
+      return _line('checkout-express', s.checkoutExpress(quote.feeUsd == 0 ? s.free : money(quote.feeUsd)));
+    }
     final chains = quote.routeChains;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if ((quote.destinationHubName ?? '').isNotEmpty) _line('checkout-hub', s.checkoutFromHub(quote.destinationHubName)),

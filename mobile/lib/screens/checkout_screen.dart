@@ -448,10 +448,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(dayLabel(estimateFor(_lines.map((c) => c.product.shipDays), null, deliveryTotalDaysMax, quote?.estimateExtraDays ?? 0), lang) ?? '—',
+                  Text(dayLabel(checkoutEstimateDay(quote?.serverEstimateDay, _lines.map((c) => c.product.shipDays), extraDays: quote?.estimateExtraDays ?? 0), lang) ?? '—',
                       key: const ValueKey('delivery-estimate'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                   const SizedBox(height: 2),
-                  Text(s.deliveryEstimateHint, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                  Text(quote?.isExpress == true ? s.deliveryEstimateHintExpress : s.deliveryEstimateHint, key: const ValueKey('delivery-estimate-hint'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                 ]),
               ),
             ]),

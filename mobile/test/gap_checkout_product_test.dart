@@ -33,9 +33,12 @@ AddressDto _address({String? commune, String id = 'a1', String city = 'Kinshasa'
     isDefault: true,
     geo: pinned ? (lat: -4.31, lng: 15.31, placeId: null, formatted: null) : null);
 
-/// Gombe (a1) costs 3, Limete (a2) 5.
-Map<String, dynamic> _quoteFor(Map<String, dynamic>? body) =>
-    gapQuoteJson(fee: body?['addressId'] == 'a2' ? 5 : 3, hub: body?['addressId'] == 'a2' ? 'Limete Hub' : 'Kinshasa Hub');
+/// Gombe (a1) costs 3, Limete (a2) 5. The server also says the day the order will be stamped with (`estimatedDeliveryDate`):
+/// the slowest line's days from today here, which is what checkout must show.
+Map<String, dynamic> _quoteFor(Map<String, dynamic>? body) => {
+      ...gapQuoteJson(fee: body?['addressId'] == 'a2' ? 5 : 3, hub: body?['addressId'] == 'a2' ? 'Limete Hub' : 'Kinshasa Hub'),
+      'estimatedDeliveryDate': localDayPlus(ShopState.instance.cart.map((c) => c.product.shipDays).fold(1, (a, b) => a > b ? a : b)),
+    };
 
 void main() {
   setUpAll(() async {

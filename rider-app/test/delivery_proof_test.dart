@@ -435,9 +435,10 @@ void main() {
       expect(sent[calls.indexOf('delivery:updateStatus')], {'taskId': 'd', 'status': 'delivered'});
     });
 
-    testWidgets('a replacement delivery takes proof too; a return to the seller does not', (t) async {
+    testWidgets('a replacement delivery and an express run take proof too; a return to the seller does not', (t) async {
       expect(leg('replacement_delivery').takesProof, isTrue);
-      for (final k in LegKind.all.where((k) => k != 'delivery' && k != 'replacement_delivery')) {
+      expect(leg('express').takesProof, isTrue, reason: 'seller -> customer: the handover at the door');
+      for (final k in LegKind.all.where((k) => k != 'delivery' && k != 'express' && k != 'replacement_delivery')) {
         expect(leg(k).takesProof, isFalse, reason: k);
       }
       await show(t, [leg('return_to_seller', id: 's', status: 'in_transit')]);

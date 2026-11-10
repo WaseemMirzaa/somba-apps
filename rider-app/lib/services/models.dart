@@ -287,7 +287,14 @@ abstract final class LegKind {
   static const returnToSeller = 'return_to_seller';
   static const replacementDelivery = 'replacement_delivery';
 
-  static const all = [pickup, transfer, delivery, returnPickup, returnTransfer, returnToSeller, replacementDelivery];
+  /// Seller -> customer, straight, with no warehouse (same commune, one store). Like a delivery it meets the customer,
+  /// asks the code, collects the cash and takes the proof photo, but the rider collects at the store, not at a warehouse.
+  static const express = 'express';
+
+  static const all = [pickup, transfer, delivery, express, returnPickup, returnTransfer, returnToSeller, replacementDelivery];
+
+  /// The legs that hand an order's parcels to the customer (the server's `CUSTOMER_KINDS`).
+  static const customerKinds = {delivery, express};
 
   /// Legs that end at a warehouse: finished by the warehouse staff scanning the parcel in, never by the rider.
   static const hubBound = {pickup, transfer, returnPickup, returnTransfer};
@@ -414,6 +421,14 @@ class DeliveryTaskDto {
   /// Whether the payload carried the order snapshot (a `task:updated` push does not).
   final bool hasOrder;
 
+  /// This customer leg carries only part of the order (`order.partial`): the other parcels follow on another leg, so
+  /// [items] lists only this leg's lines.
+  final bool partial;
+
+  /// The payload said whether the leg is partial (`order.partial`, or the leg's `completesOrder`): a push without either
+  /// keeps what the list knew.
+  final bool partialKnown;
+
   DeliveryTaskDto({
     required this.id,
     required this.orderId,
@@ -456,6 +471,8 @@ class DeliveryTaskDto {
     bool? needsCode,
     this.orderFlow = true,
     this.hasOrder = true,
+    this.partial = false,
+    this.partialKnown = false,
   }) : _needsCode = needsCode;
 
   /// This leg is one hop of a route of several: "hop 1/2".
@@ -479,10 +496,16 @@ class DeliveryTaskDto {
   bool get endsAtHub => LegKind.hubBound.contains(kind);
 
   /// The rider meets the customer on this leg.
-  bool get meetsCustomer => kind == LegKind.delivery || kind == LegKind.replacementDelivery || kind == LegKind.returnPickup;
+  bool get meetsCustomer => LegKind.customerKinds.contains(kind) || kind == LegKind.replacementDelivery || kind == LegKind.returnPickup;
 
-  /// The customer's 4-digit delivery code is asked on this leg (the customer delivery of an order).
-  bool get needsCode => _needsCode ?? kind == LegKind.delivery;
+  /// The customer's 4-digit delivery code is asked on this leg (the customer delivery of an order, standard or express).
+  bool get needsCode => _needsCode ?? LegKind.customerKinds.contains(kind);
+
+  /// An order's own leg to the customer (`delivery` or `express`), as opposed to a return or a replacement.
+  bool get isCustomerLeg => LegKind.customerKinds.contains(kind);
+
+  /// The express run: seller -> customer.
+  bool get isExpress => kind == LegKind.express;
 
   /// The warehouse this leg ends at (hub-bound legs) or starts from, by name.
   String? get toHubName => toHub?.name ?? (to?.isHub == true ? to!.name : null);
@@ -611,6 +634,8 @@ class DeliveryTaskDto {
       needsCode: j['needsCode'] is bool ? j['needsCode'] as bool : null,
       orderFlow: j['orderFlow'] is bool ? j['orderFlow'] as bool : true,
       hasOrder: hasOrder,
+      partial: o['partial'] == true || j['completesOrder'] == false,
+      partialKnown: o['partial'] is bool || j['completesOrder'] is bool,
     );
   }
 
@@ -659,6 +684,9 @@ class DeliveryTaskDto {
       needsCode: _needsCode,
       orderFlow: orderFlow,
       hasOrder: old.hasOrder,
+      // A push says whether the leg completes the order; without it what the list knew stands.
+      partial: partialKnown ? partial : old.partial,
+      partialKnown: partialKnown || old.partialKnown,
     );
   }
 }

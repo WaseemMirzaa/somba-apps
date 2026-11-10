@@ -448,6 +448,7 @@ void main() {
           ...gapQuoteJson(fee: 9, transfer: 5, hub: 'Entrepôt Kikwit'),
           'transitHours': 28,
           'extraDays': 2,
+          'estimatedDeliveryDate': '2026-12-24',
           'origins': [
             _origin('s1', [_hop('Limete', 'Kinshasa', transit: 4, cost: 3), _hop('Kinshasa', 'Kikwit', transit: 24, cost: null)]),
             _origin('s2', [_hop('Limete', 'Kinshasa', transit: 4, cost: 3), _hop('Kinshasa', 'Kikwit', transit: 24, cost: null)]),
@@ -460,7 +461,7 @@ void main() {
         expect(find.byKey(const ValueKey('checkout-hop-0-2')), findsNothing);
         expect(shown(t, 'checkout-transit'), s.checkoutTransit(28));
         expect(shown(t, 'checkout-transfer'), s.checkoutTransferFee(money(5)));
-        expect(shown(t, 'delivery-estimate'), dayLabel(estimateFor([productByUuid('p1')!.shipDays], null, deliveryTotalDaysMax, 2), lang));
+        expect(shown(t, 'delivery-estimate'), dayLabel('2026-12-24', lang), reason: 'the server\'s own day, not the days added up on the phone');
       });
 
       testWidgets('one direct hop on a lane: a single hop row with its transit time, no route chain', (t) async {
@@ -488,11 +489,11 @@ void main() {
       });
 
       testWidgets('delivery between cities with no lane: the allowance in days; with a lane the transit line says it', (t) async {
-        await openCheckout(t, {...gapQuoteJson(fee: 6, transfer: 2), 'interCity': true, 'interCityDays': 3, 'extraDays': 3});
+        await openCheckout(t, {...gapQuoteJson(fee: 6, transfer: 2), 'interCity': true, 'interCityDays': 3, 'extraDays': 3, 'estimatedDeliveryDate': '2026-12-30'});
         expect(shown(t, 'checkout-intercity'), s.checkoutInterCity(3));
         expect(shown(t, 'checkout-intercity'), lang == 'en' ? 'Delivery between cities adds about 3 days.' : 'La livraison entre villes ajoute environ 3 jours.');
         expect(find.byKey(const ValueKey('checkout-transit')), findsNothing);
-        expect(shown(t, 'delivery-estimate'), dayLabel(estimateFor([productByUuid('p1')!.shipDays], null, deliveryTotalDaysMax, 3), lang));
+        expect(shown(t, 'delivery-estimate'), dayLabel('2026-12-30', lang));
       });
 
       testWidgets('delivery between cities on a lane: the transit time, not the allowance', (t) async {

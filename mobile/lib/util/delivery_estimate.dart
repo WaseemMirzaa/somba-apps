@@ -36,3 +36,8 @@ String? dayLabel(String? ymd, String lang) {
   const frM = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
   return '${(lang == 'fr' ? fr : en)[d.weekday - 1]} ${d.day} ${(lang == 'fr' ? frM : enM)[d.month - 1]}';
 }
+
+/// The day checkout shows as the estimate: the server's own `estimatedDeliveryDate` from the quote when it sent one (it is
+/// the date `orders:create` stamps), else the slowest line's days plus the lanes' transit, as before.
+String checkoutEstimateDay(String? serverDay, Iterable<Object?> days, {int extraDays = 0, DateTime? now}) =>
+    serverDay ?? estimateFor(days, now, deliveryTotalDaysMax, extraDays);

@@ -395,11 +395,21 @@ class RiderStore extends ChangeNotifier {
     _socket.on('rider:document:updated', (d) => ComplianceStore.instance.applyDocumentPush(d));
     // The rider's own account changed (here, or on another phone or the web portal).
     _socket.on('me:updated', _applyAccount);
-    _socket.on('notification:new', (d) {
-      notifications.insert(0, NotificationDto.fromJson(_map(d)));
-      notifyListeners();
-    });
+    _socket.on('notification:new', applyNotificationPush);
   }
+
+  /// A `notification:new` push. "Task updated" means parcels were merged into one of this rider's tasks, so its items
+  /// and its cash changed: the `task:updated` push carries the new cash, and one re-read brings the order's lines.
+  void applyNotificationPush(dynamic d) {
+    if (d is! Map) return;
+    final n = NotificationDto.fromJson(_map(d));
+    notifications.insert(0, n);
+    notifyListeners();
+    if (isTaskUpdatedNotice(n.title)) _pushRefresh();
+  }
+
+  /// The notice the server sends the rider when parcels were merged into a task they already have.
+  static bool isTaskUpdatedNotice(String title) => title.trim() == 'Task updated';
 
   /// A `settings:updated` push: the public settings the rider screens follow (COD on or off, the delivery code).
   void applySettingsPush(dynamic d) {

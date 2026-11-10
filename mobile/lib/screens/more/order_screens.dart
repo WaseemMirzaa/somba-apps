@@ -11,6 +11,7 @@ import '../../util/format.dart';
 import '../../util/delivery_estimate.dart';
 import '../../util/geo_distance.dart';
 import '../../util/journey.dart';
+import '../../widgets/delivery_legs.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/product_image.dart';
 import '../payment_pending_screen.dart';
@@ -98,6 +99,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       const SizedBox(height: 2),
                       if (o.createdAt != null)
                         Text(s.orderPlacedWhen(s.when(o.createdAt!)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+                      if (o.isExpress)
+                        Text(s.orderExpressNote, key: const ValueKey('order-express-note'), style: const TextStyle(color: AppColors.primary, fontSize: 12.5, fontWeight: FontWeight.w700)),
                     ]),
                   ),
                   if (o.awaitsOnlinePayment && payment != null && payment.isPending)
@@ -114,7 +117,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                 ]),
               ),
-              DeliveryCodeCard(orderId: o.id, status: o.status),
+              DeliveryCodeCard.forOrder(o),
+              PartialDeliveryBanner(order: o),
+              if (showsDeliveryLegs(o)) ...[
+                const SizedBox(height: 14),
+                DeliveryLegsPanel(order: o),
+              ],
               const SizedBox(height: 14),
               Panel(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: _itemsSection(s, o)),
@@ -282,7 +290,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           Text(s.soldBy(seller), key: const ValueKey('order-sold-by'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
         ],
         const SizedBox(height: 12),
-        ...o.items.map((i) => _line(s, i)),
+        ...o.items.map((i) => _line(s, i, split: o.partiallyDelivered)),
       ];
     }
     return [
@@ -290,12 +298,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       const SizedBox(height: 12),
       for (var n = 0; n < packages.length; n++) ...[
         if (n > 0) const Divider(height: 20),
-        _packageBlock(s, packages[n], n + 1, packages.length),
+        _packageBlock(s, packages[n], n + 1, packages.length, split: o.partiallyDelivered),
       ],
     ];
   }
 
-  Widget _packageBlock(Strings s, OrderPackage pkg, int n, int total) {
+  Widget _packageBlock(Strings s, OrderPackage pkg, int n, int total, {bool split = false}) {
     final seller = pkg.sellerName ?? '';
     final c = packageStatusColor(pkg.status);
     return Column(
@@ -323,7 +331,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ]),
         const SizedBox(height: 10),
-        ...pkg.items.map((i) => _line(s, i)),
+        ...pkg.items.map((i) => _line(s, i, split: split)),
         // What this store's live lines add up to (cancelled lines are refunded, so they do not count).
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Flexible(child: Text(s.storeSubtotal, style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600))),
@@ -334,7 +342,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  Widget _line(Strings s, OrderItemDto i) {
+  Widget _line(Strings s, OrderItemDto i, {bool split = false}) {
     final p = productByUuid(i.productId);
     final cancelled = i.isCancelled;
     final strike = cancelled ? TextDecoration.lineThrough : null;
@@ -368,6 +376,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 key: ValueKey('order-line-variant-${i.productId}'),
                 style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           Text(s.orderQty(i.qty), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          // A split order: say which lines reached the customer and which are still on their way.
+          if (split && !cancelled)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(i.isDelivered ? s.lineDelivered : s.lineComing,
+                  key: ValueKey('order-line-${i.isDelivered ? 'delivered' : 'coming'}-${i.productId}'),
+                  style: TextStyle(color: i.isDelivered ? AppColors.success : AppColors.amber, fontSize: 12, fontWeight: FontWeight.w700)),
+            ),
           if (cancelled) ...[
             const SizedBox(height: 4),
             Text(
@@ -484,7 +500,12 @@ class OrderTrackingScreen extends StatelessWidget {
                 ),
               ]),
             ),
-            DeliveryCodeCard(orderId: o.id, status: o.status),
+            DeliveryCodeCard.forOrder(o),
+            PartialDeliveryBanner(order: o),
+            if (showsDeliveryLegs(o)) ...[
+              const SizedBox(height: 14),
+              DeliveryLegsPanel(order: o),
+            ],
             if (o.rider != null && o.rider!.dialNumber.isNotEmpty) ...[
               const SizedBox(height: 14),
               Panel(
@@ -624,7 +645,28 @@ Future<void> openInMaps(BuildContext context, double lat, double lng) async {
 class DeliveryCodeCard extends StatefulWidget {
   final String orderId;
   final String status;
-  const DeliveryCodeCard({super.key, required this.orderId, required this.status});
+
+  /// Changes whenever a customer leg opens, moves or closes: the code belongs to the open leg and is new for each
+  /// leg, so the card asks the server again (the order's status may not change between two legs).
+  final String legsKey;
+
+  /// A customer leg is open: the server gives the code then, whatever the order's status.
+  final bool openLeg;
+
+  const DeliveryCodeCard({super.key, required this.orderId, required this.status, this.legsKey = '', this.openLeg = false});
+
+  /// The card of [o], refreshed per leg.
+  factory DeliveryCodeCard.forOrder(OrderDto o) => DeliveryCodeCard(
+        key: ValueKey('code-${o.id}'),
+        orderId: o.id,
+        status: o.status,
+        legsKey: legsKeyOf(o),
+        openLeg: o.customerLegs.any((l) => l.isOpen),
+      );
+
+  /// A signature of the order's customer legs (kind, status, what each carries).
+  static String legsKeyOf(OrderDto o) =>
+      [for (final l in o.customerLegs) '${l.kind}:${l.status}:${l.items.map((i) => '${i.orderItemId}x${i.qty}').join(',')}'].join('|');
 
   @override
   State<DeliveryCodeCard> createState() => _DeliveryCodeCardState();
@@ -632,6 +674,7 @@ class DeliveryCodeCard extends StatefulWidget {
 
 class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
   String? _code;
+  int _seq = 0; // a late answer for an earlier leg never replaces the code of the current one
 
   static const _statuses = {'processing', 'shipped', 'out_for_delivery'};
 
@@ -644,11 +687,12 @@ class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
   @override
   void didUpdateWidget(covariant DeliveryCodeCard old) {
     super.didUpdateWidget(old);
-    if (old.status != widget.status || old.orderId != widget.orderId) _load();
+    if (old.status != widget.status || old.orderId != widget.orderId || old.legsKey != widget.legsKey || old.openLeg != widget.openLeg) _load();
   }
 
   Future<void> _load() async {
-    if (!_statuses.contains(widget.status)) {
+    final seq = ++_seq;
+    if (!_statuses.contains(widget.status) && !widget.openLeg) {
       if (_code != null) setState(() => _code = null);
       return;
     }
@@ -656,9 +700,9 @@ class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
       final r = await RealtimeStore.instance.call('orders:deliveryCode', {'orderId': widget.orderId});
       final m = r is Map ? r : const {};
       final code = m['required'] == true && m['code'] != null ? '${m['code']}' : null;
-      if (mounted) setState(() => _code = code);
+      if (mounted && seq == _seq) setState(() => _code = code);
     } catch (_) {
-      if (mounted) setState(() => _code = null);
+      if (mounted && seq == _seq) setState(() => _code = null);
     }
   }
 

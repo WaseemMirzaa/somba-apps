@@ -69,6 +69,9 @@ class Product {
   final Map<String, String>? sellerVacationNotice;
   final int sellerHandlingDays;
   final int? totalDeliveryDays;
+
+  /// The seller's preparation time in days (null on older servers).
+  final int? prepDays;
   final int stamp;
 
   const Product({
@@ -108,6 +111,7 @@ class Product {
     this.sellerVacationNotice,
     this.sellerHandlingDays = 0,
     this.totalDeliveryDays,
+    this.prepDays,
     this.stamp = 0,
   });
 
