@@ -145,6 +145,14 @@ async function run() {
     deliveryTransferUsd: '1.5',
     allowInterCityDelivery: 'true', // a parcel may travel between two served cities
     interCityTransferDays: '3', // days added to the estimate of such an order
+    localDeliveryDays: '1', // platform days from the hub to the customer: delivery time = seller preparation + this (+ transfers)
+    splitDeliveryAfterHours: '24', // a multi-seller order delivers what arrived once the oldest parcel waited this long (0 = never split)
+    expressDeliveryEnabled: 'false', // same-commune seller -> customer rider; stays off until the rider app that knows it ships
+    expressDeliveryDays: '0',
+    expressBaseUsd: '2',
+    expressPerKmUsd: '0.5',
+    expressMaxUsd: '15',
+    expressMaxKm: '0', // 0 = no distance limit
     requirePinnedAddress: 'true', // checkout needs a map pin on the delivery address
     requireSellerPickupPin: 'true', // a seller pins their pickup location before listing products
     commissionPct: '12',

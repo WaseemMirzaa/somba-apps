@@ -47,6 +47,16 @@ describe('OrdersService.create: variants and delivery estimate', () => {
     expect(calls.last?.estimatedDeliveryDate).toBe(localDay(new Date(), 5));
     expect(calls.last).not.toHaveProperty('deliverySlot');
   });
+
+  it('counts preparation + the platform\'s transit: prep 0 is 1 day (not the old fallback of 3), and the order is standard delivery', async () => {
+    const { svc, calls } = make({ product: { prepDays: 0, deliveryDays: 99 } });
+    await svc.create({ id: 'c1', name: 'C' }, line('Size: 41')).catch(() => undefined);
+    expect(calls.last?.estimatedDeliveryDate).toBe(localDay(new Date(), 1));
+    expect(calls.last?.deliveryMode).toBe('standard');
+    const slow = make({ product: { prepDays: 6 } });
+    await slow.svc.create({ id: 'c1', name: 'C' }, line('Size: 41')).catch(() => undefined);
+    expect(slow.calls.last?.estimatedDeliveryDate).toBe(localDay(new Date(), 7));
+  });
 });
 
 describe('customer view of an order', () => {

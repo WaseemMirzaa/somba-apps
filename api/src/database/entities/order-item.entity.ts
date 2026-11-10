@@ -83,6 +83,14 @@ export class OrderItem {
   @Column({ type: 'datetime', nullable: true })
   receivedAt: Date | null;
 
+  /** When this line reached the customer (a split order delivers its parts at different times). Null = not delivered yet. */
+  @Column({ type: 'datetime', nullable: true })
+  deliveredAt: Date | null;
+
+  /** The customer leg that carried this line (null until delivered). */
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  deliveryTaskId: string | null;
+
   /** Why the seller cancelled this line (shown to the customer and ops). */
   @Column({ type: 'varchar', length: 200, nullable: true })
   cancelReason: string | null;

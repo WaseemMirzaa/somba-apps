@@ -34,8 +34,10 @@ import { availableFor } from '../products/variant-stock';
 import { cityOf, sellerTracking } from './seller-tracking';
 import type { HubName, SellerTracking } from './seller-tracking';
 import { TranslationService } from '../translation/translation.service';
-import { assertStoreOpen, storeForListing, totalDeliveryDays } from '../sellers/storefront';
-import { DELIVERY_DAYS, estimatedDeliveryDate } from '../common/delivery/estimate';
+import { MAX_HANDLING_DAYS, assertStoreOpen, storeForListing } from '../sellers/storefront';
+import { prepDaysOf, handlingDaysOf } from '../common/delivery/estimate';
+import { DEFAULT_LINE_PREP, estimateOrder } from '../logistics/order-estimate';
+import type { EstimateLine } from '../logistics/order-estimate';
 import { linesBySeller, sellerUserId } from './order-sellers';
 import { paymentMethodLabel } from '../common/payment-method';
 import { LogisticsService } from '../logistics/logistics.service';
@@ -349,8 +351,8 @@ export class OrdersService {
     const campaignSales = new Map<string, number>();
     // The discount each campaign gave on this order (counts against its budget).
     const campaignSpend = new Map<string, number>();
-    // Each line's seller-set delivery time; the order's estimate is the slowest one.
-    const lineDays: unknown[] = [];
+    // Each line's preparation (and its store's handling): the estimate is the slowest SELLER's prep + handling + route.
+    const estimateLines: EstimateLine[] = [];
     for (const line of input.items) {
       const rawQty = Number(line.qty ?? 1);
       if (!Number.isInteger(rawQty) || rawQty < 1 || rawQty > MAX_QTY) {
@@ -412,7 +414,7 @@ export class OrdersService {
           campaignSpend.set(campaignId, (campaignSpend.get(campaignId) ?? 0) + (listPrice - price) * qty);
         }
         stockToReserve.push({ productId: product.id, qty, name: product.name, variant });
-        lineDays.push(totalDeliveryDays(product.deliveryDays, store));
+        estimateLines.push({ sellerId: product.sellerId ?? null, prepDays: prepDaysOf(product.prepDays, product.deliveryDays), handlingDays: handlingDaysOf(store?.handlingDays, MAX_HANDLING_DAYS) });
       } else if (allowClientPriced && line.name != null && line.priceUsd != null) {
         const p = Number(line.priceUsd);
         if (!Number.isFinite(p) || p <= 0 || p > 100_000) {
@@ -423,7 +425,7 @@ export class OrdersService {
         price = Number(p.toFixed(2));
         productId = `ext:${name}`;
         variant = String(line.variant ?? '').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Default';
-        lineDays.push(DELIVERY_DAYS.fallback);
+        estimateLines.push({ sellerId: null, prepDays: DEFAULT_LINE_PREP, handlingDays: 0 });
       } else {
         throw new BadRequestException(
           'Unknown product. Refresh the catalogue and try again.',
@@ -452,6 +454,7 @@ export class OrdersService {
     // the app sent: the server charges exactly what `delivery:quote` shows.
     const route = await this.routeFor(input.shippingAddress, items);
     const deliveryFee = route.feeUsd;
+    const estimate = estimateOrder(route, estimateLines);
 
     let discount = 0;
     let promoCode: string | null = null;
@@ -526,7 +529,8 @@ export class OrdersService {
       originHubIds: route.originHubIds,
       originBySeller: route.originBySeller,
       routeBySeller: route.routeBySeller,
-      estimatedDeliveryDate: estimatedDeliveryDate(lineDays, new Date(), route.extraDays),
+      estimatedDeliveryDate: estimate.date,
+      deliveryMode: estimate.deliveryMode,
       shippingAddress: input.shippingAddress ?? null,
       clientRequestId,
       items,

@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { In } from 'typeorm';
 import type { DataSource, Repository } from 'typeorm';
 import { Product, Seller } from '../database/entities';
-import { DELIVERY_DAYS, deliveryDaysOf } from '../common/delivery/estimate';
+import { LOCAL_DAYS, handlingDaysOf, legacyDeliveryDays, prepDaysOf, totalDays } from '../common/delivery/estimate';
 
 /** The longest handling time a store may promise (days). */
 export const MAX_HANDLING_DAYS = 14;
@@ -49,13 +49,21 @@ export function storeForListing(repo: Repository<Seller>, sellerId: string): Pro
 }
 
 /**
- * Delivery time of a listing as shoppers should see it: the seller's transit time plus the store's handling time, and
- * THE TOTAL never exceeds the platform maximum of 30 days (DELIVERY_DAYS.max): the order's estimated date is built from
- * the same number, so a product page and the order it becomes always agree.
+ * Delivery time of a listing as shoppers should see it: the seller's preparation time plus the store's handling time plus
+ * the platform's local transit (`localDeliveryDays`, default 1), at least 1 and THE TOTAL never above the platform maximum of
+ * 30 days: the order's estimated date is built from the same numbers, so a product page and the order it becomes agree.
  */
-export function totalDeliveryDays(deliveryDays: unknown, store: Pick<Seller, 'handlingDays'> | null | undefined): number {
-  const handling = Math.max(0, Math.min(MAX_HANDLING_DAYS, Math.floor(Number(store?.handlingDays) || 0)));
-  return Math.min(DELIVERY_DAYS.max, deliveryDaysOf(deliveryDays) + handling);
+export function totalDeliveryDays(prepDays: unknown, store: Pick<Seller, 'handlingDays'> | null | undefined, local: number = LOCAL_DAYS.fallback): number {
+  return totalDays(prepDaysOf(prepDays), handlingDaysOf(store?.handlingDays, MAX_HANDLING_DAYS), local);
+}
+
+/**
+ * The LEGACY `deliveryDays` of a listing (preparation + local transit, at least 1, NO handling): what the web wizard and older
+ * apps read and send back, so a save round-trips exactly. `totalDeliveryDays` is this plus the store's handling time
+ * (unless the 1..30 clamp bites).
+ */
+export function legacyDays(prepDays: unknown, local: number = LOCAL_DAYS.fallback): number {
+  return legacyDeliveryDays(prepDaysOf(prepDays), local);
 }
 
 /** Validate a handling time: whole days 0..14. */

@@ -10,6 +10,7 @@ import { parseShipping } from '../geo/address-input';
 import { areaKeys } from '../geo/area-model';
 import { LanesService } from './lanes.service';
 import { PlannedHop, hubsOnRoute } from './lane-route';
+import { localDaysOf } from '../common/delivery/estimate';
 
 /** A warehouse with its count of active riders (the router only sends orders where somebody can deliver). */
 export type RoutedHub = Hub & { activeRiders: number };
@@ -40,6 +41,10 @@ export interface RouteOrigin {
    */
   hops: { fromHubId: string; fromHubName: string; toHubId: string; toHubName: string; transitHours: number; costUsd: number; laneCost: boolean }[];
   transitHours: number;
+  /** This seller's parcels travel between two cities. */
+  interCity: boolean;
+  /** Days this seller's parcels add to the estimate: the lane transit rounded up to days, else the inter-city allowance when it crosses cities, else 0. */
+  extraDays: number;
 }
 
 export interface Route {
@@ -85,6 +90,8 @@ export interface Route {
   /** Parcels travel between two cities: `interCityDays` are added to the delivery estimate. */
   interCity: boolean;
   interCityDays: number;
+  /** The platform's local transit days (`localDeliveryDays`, default 1): hub -> customer. */
+  localDeliveryDays: number;
 }
 
 export interface RouteInput {
@@ -102,6 +109,7 @@ export interface RouteInput {
 
 export const INTER_CITY_SETTINGS = ['allowInterCityDelivery', 'interCityTransferDays'] as const;
 export const DEFAULT_INTER_CITY_DAYS = 3;
+export const DEFAULT_SPLIT_AFTER_HOURS = 24;
 
 const NO_SELLER = '_none';
 
@@ -144,10 +152,16 @@ export class RoutingService {
   }
 
   /** The inter-city switch and the days it adds. */
-  async interCityConfig(): Promise<{ allowed: boolean; days: number }> {
+  async interCityConfig(): Promise<{ allowed: boolean; days: number; localDays: number }> {
     const all = await this.settings.all();
     const days = Number(all.interCityTransferDays);
-    return { allowed: all.allowInterCityDelivery !== 'false', days: Number.isFinite(days) && days >= 0 ? days : DEFAULT_INTER_CITY_DAYS };
+    return { allowed: all.allowInterCityDelivery !== 'false', days: Number.isFinite(days) && days >= 0 ? days : DEFAULT_INTER_CITY_DAYS, localDays: localDaysOf(all.localDeliveryDays) };
+  }
+
+  /** Hours a multi-seller order waits for its last parcel before the arrived ones are delivered (`splitDeliveryAfterHours`, default 24; 0 = never split). */
+  async splitAfterHours(): Promise<number> {
+    const n = Number((await this.settings.all()).splitDeliveryAfterHours);
+    return Number.isFinite(n) && n >= 0 && n <= 720 ? Math.round(n) : DEFAULT_SPLIT_AFTER_HOURS;
   }
 
   /** The store row behind a seller id (a store id, or the owner's user id on demo data). */
@@ -275,6 +289,7 @@ export class RoutingService {
     const origins: RouteOrigin[] = [];
     const destCity = await this.geo.cityKeyOf(area.id);
     let interCity = false;
+    const sellerInterCity = new Set<string>();
     for (const k of keys) {
       const seller = k === NO_SELLER ? null : (rows.get(k) ?? null);
       let hub: RoutedHub = destination;
@@ -291,7 +306,10 @@ export class RoutingService {
           fallback = found.fallback;
           covering = found.fallback ? found.coveringHub : null;
           const originCity = await this.geo.cityKeyOf(sa.area.id);
-          if (originCity && destCity && originCity !== destCity) interCity = true;
+          if (originCity && destCity && originCity !== destCity) {
+            interCity = true;
+            sellerInterCity.add(k);
+          }
         }
       }
       originBySeller[k] = hub.id;
@@ -307,6 +325,8 @@ export class RoutingService {
         coveringHubName: covering?.name ?? null,
         hops: [],
         transitHours: 0,
+        interCity: sellerInterCity.has(k),
+        extraDays: 0,
       });
     }
     const originHubIds = origins.map((o) => o.hubId);
@@ -327,6 +347,8 @@ export class RoutingService {
       routeBySeller[k] = hubsOnRoute(plan.hops, o.hubId);
       o.hops = plan.hops.map((h) => ({ fromHubId: h.fromHubId, fromHubName: nameOf.get(h.fromHubId) ?? h.fromHubId, toHubId: h.toHubId, toHubName: nameOf.get(h.toHubId) ?? h.toHubId, transitHours: h.transitHours, costUsd: h.costUsd ?? cfg.transferUsd, laneCost: typeof h.costUsd === 'number' }));
       o.transitHours = plan.totalHours;
+      const transit = Math.ceil(plan.totalHours / 24);
+      o.extraDays = transit > 0 ? transit : o.interCity ? ic.days : 0;
       transitHours = Math.max(transitHours, plan.totalHours);
       if (!plan.connected && !unconnected.some((u) => u.fromHubId === o.hubId && u.toHubId === destination.id)) {
         unconnected.push({ fromHubId: o.hubId, toHubId: destination.id, fromHubName: nameOf.get(o.hubId) ?? o.hubId, toHubName: destination.name });
@@ -370,6 +392,7 @@ export class RoutingService {
       feeOverrideUsd: dest.covering.feeOverrideUsd ?? null,
       interCity,
       interCityDays: interCity ? ic.days : 0,
+      localDeliveryDays: ic.localDays,
     };
   }
 }

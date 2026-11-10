@@ -91,7 +91,7 @@ async function run() {
       price: 10,
       category: 'Grocery',
       stock: 50,
-      deliveryDays: 2,
+      prepDays: 1,
       sku: 'REAL-1',
     },
     { partial: false, allowStatus: false },

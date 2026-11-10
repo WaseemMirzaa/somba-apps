@@ -127,6 +127,10 @@ export class Seller {
   @Column({ type: 'int', default: 0 })
   handlingDays: number;
 
+  /** The store offers express delivery (a rider goes from the seller straight to a customer in the same commune). Needs a pinned pickup location. */
+  @Column({ type: 'boolean', default: false })
+  expressDelivery: boolean;
+
   /** Returns / shipping policy text as the seller wrote it, in `sourceLang` (the other language is a translation row). */
   @Column({ type: 'text', nullable: true })
   returnsPolicy: string | null;

@@ -45,6 +45,16 @@ replace: seller --pickup--> ORIGIN hub --transfer--> DESTINATION hub --replaceme
 | `deliveryTransferUsd` | added when any parcel travels origin hub -> destination hub | 0–100 | 1.5 |
 | `requirePinnedAddress` | `'true'` = `orders:create` refuses an address with no map pin ("Pin your delivery address on the map.") | true/false | false (prod bootstrap: true) |
 | `requireSellerPickupPin` | `'true'` = a seller cannot list a new product until the store has a pickup pin | true/false | false (prod bootstrap: true) |
+| `localDeliveryDays` | the platform's transit days from the hub to the customer; **delivery time = the seller's preparation + this (+ lane / inter-city days)** | whole 0–30. `Local delivery days must be a whole number between 0 and 30.` | 1 |
+| `splitDeliveryAfterHours` | the oldest parcel waiting at the destination hub leaves after this many hours (split delivery, next PR); 0 = never split | whole 0–720. `Split delivery hours must be a whole number between 0 and 720.` | 24 |
+| `expressDeliveryEnabled` | master switch for express delivery (seller -> customer in the same commune, next PR); keep `false` until the rider app that knows the `express` leg ships | true/false. `Express delivery flag must be one of: true, false.` | false |
+| `expressDeliveryDays` | the platform's days for an express delivery | whole 0–30 | 0 |
+| `expressBaseUsd` / `expressPerKmUsd` / `expressMaxUsd` | express fee = `min(max, base + perKm × km(seller pin -> customer pin))`, no transfer fee, no area override | 0–100 / 0–50 / 0–500 | 2 / 0.5 / 15 |
+| `expressMaxKm` | express distance guard; 0 = no limit | 0–100 | 0 |
+
+All of the above are public and writable with `settings:set` (admin). A key that was never stored reads as its default (`localDeliveryDays` 1,
+`splitDeliveryAfterHours` 24, express off); the dev seed and `bootstrap:prod` store them. The three `express*Usd`, `expressDeliveryDays`, `expressMaxKm` and
+`splitDeliveryAfterHours` are only *stored and served* in this release: split and express delivery land in the next one.
 
 Fee = `min(max, base + perKm × km) + transfer fees`, rounded to cents (km from the delivering warehouse to the pin; 0 with no pin). A flat per-area `feeOverrideUsd` replaces `base + perKm × km`; the transfer fee is charged per hop (a lane may set its own price; with no lanes it is the single `deliveryTransferUsd`). See areas.md "Fee and estimate".
 `deliveryZones` is still in the public view for old clients; ignore it.
@@ -54,7 +64,14 @@ Fee = `min(max, base + perKm × km) + transfer fees`, rounded to cents (km from 
 `delivery:quote { addressId?, geo?: {lat, lng}, city?, lines?: [{productId, qty}] }`  (any connected client, guests included)
 
 - `addressId` = one of the caller's saved addresses (its `geo` pin and `city` are used); or send `geo` (+ `city`).
-- `lines` are the cart lines (only their sellers matter, for the origin hubs).
+- `lines` are the cart lines (their sellers give the origin hubs; their products give the preparation time of each seller).
+
+Besides the fee and route fields (areas.md), the reply carries the **delivery estimate** (see "Delivery time" below):
+`deliveryMode: 'standard' | 'express'` (always `'standard'` for now) and `express: boolean`, `prepDays`, `routeDays`, `estimateDays`
+(the deciding, i.e. slowest, seller's; `null` when `lines` resolves to no product), `estimatedDeliveryDate` (YYYY-MM-DD, Kinshasa: **the date
+`orders:create` stamps**, `null` without lines), `splitAfterHours` (the setting, default 24), and per origin `origins[].prepDays`, `routeDays`,
+`estimatedDeliveryDate`. `extraDays` keeps its old meaning (lane transit or the inter-city allowance only; 0 on express), so older app
+builds that add it to a product's `totalDeliveryDays` still agree with standard orders.
 
 Ack data:
 
@@ -329,7 +346,7 @@ journey redraws. Customers still get no `task:updated` and no `delivery:list` (n
 the `sellerId` of the order lines; the raw order that admins / staff get carries it, and so does `hubs.bySeller` above). Orders placed before this
 existed have `originBySeller: null`; the customer view reads them back from the pickup legs.
 
-**Delivery estimate.** `totalDeliveryDays = min(30, deliveryDays + handlingDays)`: the TOTAL is clamped to the platform maximum of 30 days
+**Delivery estimate** (superseded: see "Delivery time: preparation + transit" below). The TOTAL is clamped to the platform maximum of 30 days
 (`DELIVERY_DAYS.max`), exactly like the order's `estimatedDeliveryDate`.
 
 **Migration** `1792990000001-IntegrationFixes`: `warehouse_exceptions.hubId` (+ index; existing incidents are matched through their parcel, then the
@@ -383,3 +400,29 @@ the system or staff (order cancelled, seller cancelled, returned to seller, miss
 
 Migration `1793200000004-WarehouseOps` (`hub_ops_settings`, `aged_alerts`; QueryRunner API, MySQL + SQLite). Notifications added (French in `localize.ts`):
 `Aged parcel`, `Parcel escalated`, `Parcel returned to seller`.
+
+## 15. Delivery time: preparation + transit (migration `1793450000001-DeliveryPrepSplitExpress`)
+
+**Delivery time = the seller's preparation time + the platform's transit time for the route.**
+
+- `products.prepDays` (0–30, default 2) is the seller's preparation time. The store's `handlingDays` (0–14) is added on top. The platform adds
+  `localDeliveryDays` (hub -> customer, default 1) plus the days a seller's parcels spend on lanes (`ceil(transitHours / 24)`) or, with no lane
+  transit, the inter-city allowance when that seller crosses cities. Express (next release) uses `expressDeliveryDays` instead of the local + lane days.
+- **Per seller**, then the slowest wins: `estimateDays = min(30, max over sellers of (prep_s + handling_s + route_s))` with
+  `prep_s` = that seller's slowest product, `route_s = localDeliveryDays + extra_s`. A slow-preparing local seller and a quick far one are not
+  added together. The quote's `prepDays` of the deciding seller is its product preparation **plus** its handling (the days until the parcel is handed over).
+- `orders:create` stamps `estimatedDeliveryDate = today (Kinshasa) + estimateDays`: the same date `delivery:quote` returned, which clients should show.
+  It also stores `orders.deliveryMode` (`'standard'`; `'express'` in the next release).
+- **Product payloads** (every listing the API serves): `prepDays`, `sellerHandlingDays` (unchanged), `totalDeliveryDays = min(30, max(1, prep + handling + local))`,
+  and the **legacy** `deliveryDays = min(30, max(1, prep + local))` (no handling) which the web wizard and older apps read and send back, so a save
+  round-trips exactly. Both are clamped to at least 1 even with `localDeliveryDays = 0`. `sellerExpressDelivery: boolean` is served too (stores
+  with `sellers.expressDelivery` on; the toggle itself is next release).
+- **Writes** (`products:create` / `products:update`, CSV import): `prepDays` (0–30) wins. A legacy `deliveryDays` (1–30, same error as before) is
+  converted to `prep = clamp(deliveryDays - localDeliveryDays, 0, 30)` and ignored when `prepDays` is also sent. `products.deliveryDays` is still
+  written (`prep + local`, at least 1). Error: `Preparation time (days) must be a whole number between 0 and 30.`
+- **CSV import** gets a `prepDays` column (aliases: `prep`, `preparation`, `delaipreparation`, `prepjours`, `joursdepreparation` …; the template uses `prepDays`).
+  The old `deliveryDays` / `delai` columns still work and are converted.
+- Migration: `products.prepDays` int default 2, backfilled `CASE WHEN deliveryDays > 1 THEN deliveryDays - 1 ELSE 0 END` (1 -> 0, 4 -> 3, 30 -> 29; the
+  platform's default transit is 1 day). It also adds the columns the next release uses: `sellers.expressDelivery` (bool, false), `orders.deliveryMode`
+  (varchar 16, `'standard'`), `order_items.deliveredAt` / `deliveryTaskId` (null), `delivery_tasks.sellerIds` (simple-json text, null = a legacy
+  leg that carries everything) and the index `IDX_delivery_tasks_kind_status`. Nothing reads or writes them yet except `prepDays` and `deliveryMode`.

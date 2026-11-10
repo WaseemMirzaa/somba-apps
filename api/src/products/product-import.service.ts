@@ -38,13 +38,14 @@ const COLUMNS: Record<string, string> = {
   weightkg: 'weightKg', weight: 'weightKg', poids: 'weightKg', poidskg: 'weightKg',
   image: 'image', photo: 'image', imageurl: 'image',
   images: 'images', photos: 'images', imageurls: 'images',
+  prepdays: 'prepDays', prep: 'prepDays', preptime: 'prepDays', preparationdays: 'prepDays', preparation: 'prepDays', delaipreparation: 'prepDays', delaidepreparation: 'prepDays', prepjours: 'prepDays', joursdepreparation: 'prepDays',
   deliverydays: 'deliveryDays', delai: 'deliveryDays', delailivraison: 'deliveryDays', delaijours: 'deliveryDays',
   variants: 'variants', options: 'variants', variantes: 'variants',
   sourcelang: 'sourceLang', langue: 'sourceLang',
 };
 
 /** Column headers of the template file, in this order. */
-export const TEMPLATE_HEADER = ['name', 'nameFr', 'description', 'descriptionFr', 'price', 'originalPrice', 'category', 'stock', 'sku', 'brand', 'weightKg', 'images', 'deliveryDays', 'variants'];
+export const TEMPLATE_HEADER = ['name', 'nameFr', 'description', 'descriptionFr', 'price', 'originalPrice', 'category', 'stock', 'sku', 'brand', 'weightKg', 'images', 'prepDays', 'variants'];
 const TEMPLATE_ROWS = [
   ['Cotton T-shirt', 'T-shirt en coton', 'Soft everyday T-shirt.', 'T-shirt doux pour tous les jours.', '12.50', '15', 'Fashion', '40', 'TSH-001', 'Somba', '0.2', 'https://example.com/tshirt-1.jpg|https://example.com/tshirt-2.jpg', '3', 'Size=S|M|L;Colour=Black|White'],
   ['Phone case', '', '', '', '6', '', 'Electronics', '100', 'CASE-9', '', '', '', '', ''],
@@ -216,7 +217,7 @@ export class ProductImportService {
    * Every problem of one row, not just the first: `cleanListing` stops at the first bad value, so the row is also
    * checked field by field (each bad value says why) and for the title it cannot do without.
    */
-  private static rowErrors(input: ListingInput, first: string | null): string[] {
+  private static rowErrors(input: ListingInput, first: string | null, localDays?: number): string[] {
     const out: string[] = [];
     const add = (m: string) => {
       if (!out.includes(m)) out.push(m);
@@ -232,7 +233,7 @@ export class ProductImportService {
     for (const [key, value] of Object.entries(input)) {
       if (key === 'price') continue;
       try {
-        cleanListing({ [key]: value } as ListingInput, { partial: true, allowStatus: false });
+        cleanListing({ [key]: value } as ListingInput, { partial: true, allowStatus: false, localDays });
       } catch (e) {
         add((e as Error).message);
       }
@@ -264,6 +265,8 @@ export class ProductImportService {
 
     const plan = (await this.sellersSvc.plans()).find((p) => p.id === activePlanId(seller));
     let room = plan?.maxProducts ? plan.maxProducts - (await this.products.countForSeller([seller.id, ...(seller.userId ? [seller.userId] : [])])) : Infinity;
+    // A legacy `deliveryDays` column is converted to a preparation time with the platform's current transit days.
+    const localDays = await this.products.localDays();
     const seenSku = new Set<string>();
     const errors: ImportRowReport[] = [];
     const ok: ImportRowReport[] = [];
@@ -274,11 +277,11 @@ export class ProductImportService {
       const problems: string[] = [];
       const listing = ProductImportService.listingOf(row, problems);
       try {
-        clean = cleanListing(listing, { partial: false, allowStatus: false });
+        clean = cleanListing(listing, { partial: false, allowStatus: false, localDays });
         if (!clean.text.name && !clean.text.nameFr) report.errors.push('Enter a product title in English or French.');
       } catch (e) {
         // Say everything that is wrong with the row, not only the first thing the validator tripped on.
-        report.errors.push(...ProductImportService.rowErrors(listing, (e as Error).message));
+        report.errors.push(...ProductImportService.rowErrors(listing, (e as Error).message, localDays));
       }
       for (const p of problems) if (!report.errors.includes(p)) report.errors.push(p);
       // The category and the SKU are checked even when another field is wrong, so one pass shows every problem.

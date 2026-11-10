@@ -45,6 +45,7 @@ export const DELIVERY_KINDS: readonly DeliveryKind[] = [
 @Index('IDX_delivery_tasks_toHubId', ['toHubId'])
 @Index('IDX_delivery_tasks_fromHubId', ['fromHubId'])
 @Index('IDX_delivery_tasks_parentTaskId', ['parentTaskId'])
+@Index('IDX_delivery_tasks_kind_status', ['kind', 'status'])
 @Entity('delivery_tasks')
 export class DeliveryTask {
   @PrimaryGeneratedColumn('uuid')
@@ -182,6 +183,10 @@ export class DeliveryTask {
    */
   @Column({ type: 'int', default: 0 })
   codeFailures: number;
+
+  /** The sellers whose parcels this customer leg carries. Null = a legacy leg that carries everything. */
+  @Column({ type: 'simple-json', nullable: true })
+  sellerIds: (string | null)[] | null;
 
   /** The code step is locked until this time (null = not locked by time; at 15 failures only a supervisor unlocks it). */
   @Column({ type: 'datetime', nullable: true })

@@ -12,6 +12,10 @@ import { notServedFields } from '../geo/geo.service';
 import { HubsService } from './hubs.service';
 import { Actor, LogisticsService } from './logistics.service';
 import { RoutingService } from './routing.service';
+import { estimateOrder } from './order-estimate';
+import type { EstimateLine } from './order-estimate';
+import { handlingDaysOf } from '../common/delivery/estimate';
+import { MAX_HANDLING_DAYS } from '../sellers/storefront';
 import { DESK_ADMINS_ONLY, isDeskAdmin, tierAllows } from './tiers';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
@@ -85,11 +89,17 @@ export class LogisticsGateway {
       }
       const lines = Array.isArray(body?.lines) ? body.lines.slice(0, 100) : [];
       const sellerIds: (string | null)[] = [];
+      const estimateLines: EstimateLine[] = [];
       for (const l of lines) {
-        const p = l?.productId ? await this.products.getRaw(String(l.productId)) : null;
-        if (p) sellerIds.push(p.sellerId ?? null);
+        const p = l?.productId ? await this.products.get(String(l.productId)) : null;
+        if (!p) continue;
+        sellerIds.push(p.sellerId ?? null);
+        estimateLines.push({ sellerId: p.sellerId ?? null, prepDays: p.prepDays, handlingDays: handlingDaysOf(p.sellerHandlingDays, MAX_HANDLING_DAYS) });
       }
       const r = await this.routing.route({ geo, city, commune, areaId, components: Array.isArray(body?.components) ? body.components : null, sellerIds });
+      // The same numbers `orders:create` stamps: seller preparation + handling + the platform's route days, slowest seller wins.
+      const est = estimateOrder(r, estimateLines);
+      const perOrigin = new Map(est.sellers.map((s) => [s.sellerId, s]));
       return ok({
         feeUsd: r.feeUsd,
         deliveryUsd: r.deliveryUsd,
@@ -103,7 +113,7 @@ export class LogisticsGateway {
         destinationArea: r.destinationArea,
         destinationAreaChain: r.destinationAreaChain,
         originHubIds: r.originHubIds,
-        origins: r.origins.map((o) => ({ sellerId: o.sellerId, hubId: o.hubId, hubName: o.hubName, areaName: o.areaName, areaNameEn: o.areaNameEn, fallback: o.fallback, hops: o.hops.map((h) => ({ fromHubId: h.fromHubId, fromHubName: h.fromHubName, toHubId: h.toHubId, toHubName: h.toHubName, transitHours: h.transitHours, costUsd: h.costUsd, laneCost: h.laneCost })), transitHours: o.transitHours, coveringHubId: o.coveringHubId, coveringHubName: o.coveringHubName })),
+        origins: r.origins.map((o) => ({ sellerId: o.sellerId, hubId: o.hubId, hubName: o.hubName, areaName: o.areaName, areaNameEn: o.areaNameEn, fallback: o.fallback, hops: o.hops.map((h) => ({ fromHubId: h.fromHubId, fromHubName: h.fromHubName, toHubId: h.toHubId, toHubName: h.toHubName, transitHours: h.transitHours, costUsd: h.costUsd, laneCost: h.laneCost })), transitHours: o.transitHours, coveringHubId: o.coveringHubId, coveringHubName: o.coveringHubName, prepDays: perOrigin.get(o.sellerId)?.prepDays ?? null, routeDays: perOrigin.get(o.sellerId)?.routeDays ?? null, estimatedDeliveryDate: perOrigin.get(o.sellerId)?.estimatedDeliveryDate ?? null })),
         transfer: r.transfer,
         pinned: r.pinned,
         fallback: r.fallback,
@@ -113,7 +123,15 @@ export class LogisticsGateway {
         interCity: r.interCity,
         interCityDays: r.interCityDays,
         transitHours: r.transitHours,
+        // `extraDays` keeps its legacy meaning (lanes / inter-city only) so older apps that add it to the product's total still agree.
         extraDays: r.extraDays,
+        deliveryMode: est.deliveryMode,
+        express: est.deliveryMode === 'express',
+        prepDays: est.prepDays,
+        routeDays: est.routeDays,
+        estimateDays: est.estimateDays,
+        estimatedDeliveryDate: est.estimatedDeliveryDate,
+        splitAfterHours: await this.routing.splitAfterHours(),
       });
     } catch (e) {
       // A refusal for an area nobody serves also carries { areaId, areaName, areaNameEn, servedCities } for the client to render.

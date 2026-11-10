@@ -12,7 +12,7 @@ import { translationMode } from '../translation/translation-mode';
 import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
-export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays'] as const;
+export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'] as const;
 /**
  * How shoppers reach Somba from Help (support phone, e-mail and a WhatsApp number). Blank = not offered. Public like
  * the rest of the shopper settings; written by admins only (see `WRITABLE`).
@@ -21,7 +21,7 @@ export const CONTACT_SETTINGS = ['supportPhone', 'supportEmail', 'supportWhatsap
 const isContactKey = (k: string) => (CONTACT_SETTINGS as readonly string[]).includes(k);
 // `deliveryZones` stays readable for old clients but is never written or used: zones are gone (nearest-warehouse routing).
 /** The only keys that can be written, each with its own validation. */
-const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', ...FRAUD_SETTING_KEYS] as const;
+const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm', ...FRAUD_SETTING_KEYS] as const;
 
 /**
  * Key/value platform config: FX rate, COD cap, delivery fee numbers,
@@ -119,6 +119,22 @@ export class SettingsService {
         return String(num(value, 'Transfer fee', { min: 0, max: 100 }));
       case 'interCityTransferDays':
         return String(num(value, 'Inter-city transfer days', { min: 0, max: 30, int: true }));
+      case 'localDeliveryDays':
+        return String(num(value, 'Local delivery days', { min: 0, max: 30, int: true }));
+      case 'splitDeliveryAfterHours':
+        return String(num(value, 'Split delivery hours', { min: 0, max: 720, int: true }));
+      case 'expressDeliveryEnabled':
+        return oneOf(String(value), ['true', 'false'] as const, 'Express delivery flag');
+      case 'expressDeliveryDays':
+        return String(num(value, 'Express delivery days', { min: 0, max: 30, int: true }));
+      case 'expressBaseUsd':
+        return String(num(value, 'Express base fee', { min: 0, max: 100 }));
+      case 'expressPerKmUsd':
+        return String(num(value, 'Express fee per km', { min: 0, max: 50 }));
+      case 'expressMaxUsd':
+        return String(num(value, 'Maximum express fee', { min: 0, max: 500 }));
+      case 'expressMaxKm':
+        return String(num(value, 'Express maximum distance', { min: 0, max: 100 }));
       case 'requirePinnedAddress':
       case 'requireSellerPickupPin':
         return oneOf(String(value), ['true', 'false'] as const, 'Pinned address flag');

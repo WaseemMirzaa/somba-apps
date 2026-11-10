@@ -493,6 +493,7 @@ erDiagram
         float rating  "default 0"
         int reviewsCount  "default 0"
         int deliveryDays  "default 3"
+        int prepDays  "default 2"
         varchar status  "default live"
         varchar sellerId FK "nullable"
         varchar sellerName  "nullable"
@@ -974,7 +975,8 @@ _Source: `api/src/database/entities/product.entity.ts`_
 | `stock` | int |  | 0 |  |  |
 | `rating` | float |  | 0 |  |  |
 | `reviewsCount` | int |  | 0 |  | Number of customer reviews (denormalised for cards/listings). |
-| `deliveryDays` | int |  | 3 |  | Estimated delivery time in days. |
+| `deliveryDays` | int |  | 3 |  | LEGACY delivery time in days = `prepDays` + the platform's local transit (no handling); still written for old clients. |
+| `prepDays` | int |  | 2 |  | The seller's preparation time (0–30 days). Delivery time = preparation + the platform's transit (contracts/logistics.md §15). |
 | `status` | varchar(20) |  | live | yes | Values: draft, pending, approved, rejected, live, removed |
 | `sellerId` | varchar | yes |  |  |  |
 | `createdAt` | datetime |  |  |  | Set on insert |

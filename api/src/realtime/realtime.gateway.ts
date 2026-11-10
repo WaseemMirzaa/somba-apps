@@ -16,6 +16,7 @@ import { asLocale } from '../common/locale';
 import { activePlanId } from '../content/plans';
 import { clampDays } from '../ops/analytics.util';
 import { cleanListing, materialTextChange } from '../products/products.service';
+import { localDaysOf } from '../common/delivery/estimate';
 import type { ListingInput } from '../products/products.service';
 import { TranslationService } from '../translation/translation.service';
 import { accountBlockedFields } from '../auth/account-deletion.service';
@@ -535,7 +536,7 @@ export class RealtimeGateway
           return fail(`Your ${plan.name} plan allows ${plan.maxProducts} listings. Upgrade your plan to add more.`);
         }
       }
-      const clean = cleanListing(body as ListingInput, { partial: false, allowStatus: false });
+      const clean = cleanListing(body as ListingInput, { partial: false, allowStatus: false, localDays: localDaysOf(await this.settings.get('localDeliveryDays')) });
       const product = await this.products.create(clean, {
         // New listings from sellers wait for a moderator unless moderation is switched off.
         status: user.role === 'seller' && (await this.settings.get('productModeration')) !== 'false' ? 'pending' : 'live',
@@ -582,6 +583,7 @@ export class RealtimeGateway
         partial: true,
         allowStatus: moderator,
         currentPrice: existing.basePrice,
+        localDays: localDaysOf(await this.settings.get('localDeliveryDays')),
       });
       // A seller may pause a live listing or resume a paused one; everything else
       // (approving, rejecting, un-removing) is a moderator's decision.
