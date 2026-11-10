@@ -71,6 +71,7 @@ const EXPECTED: Record<string, string> = {
 
 async function preflight(
   ds: DataSource,
+  withCod: boolean,
 ): Promise<{ warnings: string[]; mainHub: Hub }> {
   const settings = new Map(
     (await ds.getRepository(Setting).find()).map((s) => [s.key, s.value]),
@@ -107,6 +108,8 @@ async function preflight(
     );
   const warnings: string[] = [];
   for (const [k, v] of Object.entries(EXPECTED)) {
+    // With --with-cod the seed switches cash on delivery on itself and says so; every other difference is only reported.
+    if (k === 'codEnabled' && withCod) continue;
     if (settings.get(k) !== v)
       warnings.push(
         `Setting ${k} is "${settings.get(k) ?? 'not set'}" (the demo is written for "${v}"). It was NOT changed; some scenarios will behave differently.`,
@@ -135,8 +138,11 @@ async function main(app: INestApplicationContext) {
   if (supplied !== undefined && supplied.length < 12)
     throw new Error('DEMO_PASSWORD must be at least 12 characters.');
 
-  const { warnings, mainHub } = await preflight(ds);
+  const withCod =
+    process.env.DEMO_WITH_COD === '1' || process.argv.includes('--with-cod');
+  const { warnings, mainHub } = await preflight(ds, withCod);
   for (const w of warnings) log(`! ${w}`);
+  const codOn = await settleCod(ds, withCod);
 
   const images = new DemoImages();
   const copied = images.install();
@@ -170,6 +176,7 @@ async function main(app: INestApplicationContext) {
     stores: new Map(),
     products: new Map(),
     created: counts,
+    codOn,
     area: async (code: string) => {
       const a = await app.get(GeoService).getByCode(code);
       if (!a) throw new Error(`Area ${code} is missing from the geography.`);
@@ -396,6 +403,42 @@ async function main(app: INestApplicationContext) {
   );
 }
 
+/**
+ * Cash on delivery is off on a production server, so the cash-on-delivery orders need an explicit opt-in. This is the ONLY
+ * setting the demo ever changes, and only when asked (`seed-demo.sh --with-cod`, or DEMO_WITH_COD=1). The removal leaves it as
+ * it is (it cannot know whether someone else relies on it) and tells how to switch it off. Returns whether COD is on.
+ */
+async function settleCod(ds: DataSource, withCod: boolean): Promise<boolean> {
+  const repo = ds.getRepository(Setting);
+  const row = await repo.findOne({ where: { key: 'codEnabled' } });
+  if (withCod && row?.value !== 'true') {
+    if (row) await repo.update({ key: 'codEnabled' }, { value: 'true' });
+    else await repo.save(repo.create({ key: 'codEnabled', value: 'true' }));
+    log('');
+    log(
+      '!!! CASH ON DELIVERY WAS SWITCHED ON (setting codEnabled = true), because you asked for --with-cod.',
+    );
+    log(
+      '!!! Real customers can now choose cash on delivery too. The demo removal does NOT switch it back off:',
+    );
+    log(
+      '!!! turn it off in Admin > Settings > Checkout and delivery > Cash on delivery when you are done testing.',
+    );
+    log('');
+    return true;
+  }
+  if (row?.value === 'true') {
+    log(
+      '• cash on delivery is on: the cash-on-delivery orders are made (the seed did not change that setting).',
+    );
+    return true;
+  }
+  log(
+    '• cash on delivery is off, so the cash-on-delivery orders are skipped. To get them: bash /opt/somba/deploy/seed-demo.sh --with-cod (this switches the setting on; see deploy/DEMO-SEED.md).',
+  );
+  return false;
+}
+
 function roleLabelOf(a: DemoAccount): string {
   const map: Record<string, string> = {
     customer: 'customer',
@@ -550,6 +593,15 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
       account: '+243 900 000 301',
     });
   }
+  // Handling time of the other two active stores (A and G are set above), for the delivery estimate.
+  for (const [key, days] of [
+    ['B', 2],
+    ['C', 1],
+  ] as const) {
+    const c = await ctxOf(key);
+    if (!c.seller.handlingDays)
+      await storefront.update(c, { handlingDays: days } as never);
+  }
   const G = await ctxOf('G');
   const wantBack = new Date(Date.now() + 45 * 86_400_000)
     .toISOString()
@@ -642,6 +694,9 @@ async function seedProducts(ctx: DemoCtx): Promise<void> {
           { id: existing.id },
           { images: urls, image: urls[0] ?? null },
         );
+      // A demo listing keeps the preparation time the demo gives it (an earlier demo run may have set another).
+      if (existing.prepDays !== p.prepDays)
+        await repo.update({ id: existing.id }, { prepDays: p.prepDays });
       ctx.products.set(p.sku, existing);
       continue;
     }

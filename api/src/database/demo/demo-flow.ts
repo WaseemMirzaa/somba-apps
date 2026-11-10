@@ -255,6 +255,17 @@ export class Driver {
     }
   }
 
+  /** The rider reports the open customer leg as not delivered (the customer did not answer); the real service re-opens it as the next attempt. */
+  async failDelivery(orderId: string, reason: string): Promise<void> {
+    await this.drive(orderId, 'out', (t) => t.kind === 'delivery');
+    const t = (await this.open(orderId)).find(
+      (x) => x.kind === 'delivery' && x.status === 'in_transit',
+    );
+    if (!t) return;
+    const { rider } = this.who(t.hubId, 'supervisor');
+    await this.delivery.updateStatus(t.id, 'failed', rider.id, reason);
+  }
+
   /** The 4-digit code the customer sees for an order that is out for delivery. */
   async code(orderId: string): Promise<string | null> {
     return this.delivery.codeForOrder(orderId);
@@ -338,7 +349,7 @@ export async function backdateOrder(
   if (lineIds.length)
     await q(
       ds,
-      `UPDATE order_items SET ${shift(['readyAt', 'receivedAt'])} WHERE id IN (${lineIds.map(() => '?').join(',')})`,
+      `UPDATE order_items SET ${shift(['readyAt', 'receivedAt', 'deliveredAt'])} WHERE id IN (${lineIds.map(() => '?').join(',')})`,
       lineIds,
     );
   if (taskIds.length)
@@ -568,4 +579,92 @@ export async function placeCases(
       );
     }
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────
+// Exact moments. The services stamp "now"; a scenario that must look days old sets the moments it needs, row by row.
+// ─────────────────────────────────────────────────────────────────────────────────
+
+export interface Moments {
+  createdAt?: Date;
+  readyAt?: Date;
+  receivedAt?: Date;
+  pickedUpAt?: Date;
+  deliveredAt?: Date;
+}
+
+/** Set the moments of one delivery leg. A cash record on the leg follows its delivery time. */
+export async function stampTask(
+  ds: DataSource,
+  taskId: string,
+  m: Moments,
+): Promise<void> {
+  const set: string[] = [];
+  const params: unknown[] = [];
+  for (const [col, v] of Object.entries(m)) {
+    if (!v) continue;
+    set.push(`${col} = ?`);
+    params.push(v);
+  }
+  if (m.deliveredAt) {
+    set.push('codCollectedAt = IF(codCollectedAt IS NULL, NULL, ?)');
+    params.push(m.deliveredAt);
+  }
+  const last = m.deliveredAt ?? m.pickedUpAt ?? m.receivedAt ?? m.createdAt;
+  if (last) {
+    set.push('updatedAt = ?');
+    params.push(last);
+  }
+  if (!set.length) return;
+  await q(ds, `UPDATE delivery_tasks SET ${set.join(', ')} WHERE id = ?`, [
+    ...params,
+    taskId,
+  ]);
+}
+
+/** Set the moments of one seller's lines of an order (ready, at the warehouse, with the customer). */
+export async function stampLines(
+  ds: DataSource,
+  orderId: string,
+  sellerId: string,
+  m: Pick<Moments, 'readyAt' | 'receivedAt' | 'deliveredAt'>,
+): Promise<void> {
+  const set: string[] = [];
+  const params: unknown[] = [];
+  for (const [col, v] of Object.entries(m)) {
+    if (!v) continue;
+    set.push(`${col} = IF(${col} IS NULL, NULL, ?)`);
+    params.push(v);
+  }
+  if (!set.length) return;
+  await q(
+    ds,
+    `UPDATE order_items SET ${set.join(', ')} WHERE orderId = ? AND sellerId = ?`,
+    [...params, orderId, sellerId],
+  );
+}
+
+/**
+ * The notices and audit lines an order and its legs wrote in the last hour (that is, by the steps a scenario just ran) are
+ * dated `when`, so a delivery that "happened three days ago" is not announced as new.
+ */
+export async function settleClock(
+  ds: DataSource,
+  orderId: string,
+  when: Date,
+): Promise<void> {
+  const tasks: { id: string }[] = await q(
+    ds,
+    'SELECT id FROM delivery_tasks WHERE orderId = ?',
+    [orderId],
+  );
+  const ids = [orderId, ...tasks.map((t) => t.id)];
+  const ph = ids.map(() => '?').join(',');
+  const since = new Date(Date.now() - 3_600_000);
+  for (const table of ['notifications', 'audit_logs'])
+    await q(
+      ds,
+      `UPDATE ${table} SET createdAt = ? WHERE entityId IN (${ph}) AND createdAt >= ?`,
+      [when, ...ids, since],
+    );
 }

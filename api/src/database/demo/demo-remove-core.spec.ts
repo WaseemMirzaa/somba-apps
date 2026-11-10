@@ -16,6 +16,9 @@ import {
   Hub,
   DeliveryTask,
   Category,
+  Payment,
+  RefreshToken,
+  Setting,
 } from '../entities';
 import { removeDemo, planRemoval } from './demo-remove-core';
 import { DEMO_HUB_NAME } from './demo-common';
@@ -297,6 +300,104 @@ describe('demo removal', () => {
     );
     const plan = await planRemoval(ds);
     expect(plan.blockers.join(' ')).toMatch(/demo warehouse/);
+  });
+
+  describe('split and cash-on-delivery orders', () => {
+    /** A demo customer's two-seller cash order, delivered on two legs (each leg with its sellers and its cash), and the setting that allows it. */
+    async function splitCodWorld() {
+      const w = await world();
+      const order = await ds.getRepository(Order).findOneOrFail({
+        where: { id: w.dOrder.id },
+      });
+      const at = new Date();
+      await ds
+        .getRepository(OrderItem)
+        .update({ orderId: order.id }, { deliveredAt: at });
+      for (const [i, sellerIds] of [
+        [1, ['s-a']],
+        [2, ['s-b']],
+      ] as const)
+        await ds.getRepository(DeliveryTask).save(
+          ds.getRepository(DeliveryTask).create({
+            orderId: order.id,
+            orderReference: order.reference,
+            kind: 'delivery',
+            status: 'delivered',
+            sellerIds: [...sellerIds],
+            codAmountUsd: 2.5 * i,
+            codCollectedUsd: 2.5 * i,
+            codCollectedAt: at,
+            deliveredAt: at,
+          }),
+        );
+      await ds.getRepository(Payment).save(
+        ds.getRepository(Payment).create({
+          reference: 'PAY-COD-1',
+          orderId: order.id,
+          orderReference: order.reference,
+          userId: order.customerId,
+          method: 'cod',
+          amountUsd: 7.5,
+          status: 'succeeded',
+        }),
+      );
+      await ds
+        .getRepository(Setting)
+        .save(
+          ds
+            .getRepository(Setting)
+            .create({ key: 'codEnabled', value: 'true' }),
+        );
+      // A sign-in of a demo account (a tester used the demo) leaves a session behind.
+      await ds.getRepository(RefreshToken).save(
+        ds.getRepository(RefreshToken).create({
+          id: 'rt-demo-1',
+          userId: w.dCust.id,
+          familyId: 'f1',
+          expiresAt: new Date(Date.now() + 86_400_000),
+        } as never),
+      );
+      return w;
+    }
+
+    it('removes the legs, the lines and the cash payment, and leaves the cash setting on, saying so', async () => {
+      await splitCodWorld();
+      const plan = await planRemoval(ds);
+      expect(plan.counts.find(([t]) => t === 'delivery_tasks')?.[1]).toBe(2);
+      expect(plan.counts.find(([t]) => t === 'payments')?.[1]).toBe(1);
+      expect(plan.notes.join(' ')).toMatch(/Cash on delivery is ON/);
+      expect(plan.notes.join(' ')).toMatch(/Admin > Settings/);
+      const res = await removeDemo(ds, {
+        yes: true,
+        uploadDir: dirs.up,
+        privateDir: dirs.priv,
+      });
+      expect(res.blockers).toEqual([]);
+      expect(await ds.getRepository(DeliveryTask).count()).toBe(0);
+      expect(await ds.getRepository(Payment).count()).toBe(0);
+      expect(await ds.getRepository(RefreshToken).count()).toBe(0);
+      expect(await ds.getRepository(Order).count()).toBe(1); // the real one
+      const setting = await ds
+        .getRepository(Setting)
+        .findOneOrFail({ where: { key: 'codEnabled' } });
+      expect(setting.value).toBe('true'); // settings are never touched
+      // Nothing left to remove: a second run finds no demo data and prints no cash note.
+      expect((await planRemoval(ds)).notes).toEqual([]);
+    });
+
+    it('does not mention cash on delivery when the demo has no cash order', async () => {
+      await world();
+      await ds
+        .getRepository(Setting)
+        .save(
+          ds
+            .getRepository(Setting)
+            .create({ key: 'codEnabled', value: 'true' }),
+        );
+      expect((await planRemoval(ds)).notes.join(' ')).not.toMatch(
+        /Cash on delivery/,
+      );
+    });
   });
 
   it('says there is nothing to do on a database without demo data', async () => {

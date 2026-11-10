@@ -84,6 +84,10 @@ unset DEMO_PASSWORD
 (Without `DEMO_PASSWORD` the script generates two random ones: customers and store owners share one, staff share another.)
 An account that already exists keeps its password unless you run `reset` (section 5).
 
+Cash on delivery is off, so the two cash-on-delivery demo orders are skipped. `bash /opt/somba/deploy/seed-demo.sh --with-cod` (or
+`DEMO_WITH_COD=1`) switches `codEnabled` on and makes them; it is the only setting the seed ever changes, and the removal leaves it on
+(turn it off as in section 7).
+
 **While the demo is installed, real visitors can see it** (stores, products, notices to real admins), and
 `admin.super@demo.sombateka.test` can do everything. Remove it before real customers arrive (section 5).
 

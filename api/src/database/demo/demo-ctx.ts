@@ -14,5 +14,7 @@ export interface DemoCtx {
   stores: Map<string, Seller>;
   products: Map<string, Product>;
   created: { created: number; existing: number };
+  /** `codEnabled` is on in the settings (the demo never switches it itself; `--with-cod` does, before the orders). Cash-on-delivery orders are made only then. */
+  codOn: boolean;
   area: (code: string) => Promise<GeoArea>;
 }
