@@ -30,7 +30,7 @@ git clone https://github.com/WaseemMirzaa/somba-apps.git && cd somba-apps
 DOMAIN=api.example.com ADMIN_EMAIL=admin@example.com bash deploy/droplet-deploy.sh
 ```
 
-`deploy/droplet-deploy.sh` is idempotent: it installs Docker/nginx/certbot, writes
+`deploy/droplet-deploy.sh` is idempotent: it installs Node 22, nginx, MySQL 8, pm2 and ufw (and certbot when `SSL=1`; it does **not** install Docker), writes
 secrets to `/etc/somba/secrets.env` (**back it up** — losing `DATA_ENCRYPTION_KEY`
 makes encrypted data unreadable), builds the stack, applies migrations, runs
 `bootstrap:prod`, configures nginx (WebSocket upgrade, `/uploads/`, 6 MB body limit,
@@ -403,19 +403,28 @@ via `--dart-define` (see `mobile/README.md`).
 
 ## 12. Updating after a code change
 
+On a server set up with `deploy/droplet-deploy.sh` (the code lives in `/opt/somba`, run by pm2 as user `somba`), you update by
+running the same script again **as root**. It is idempotent: it pulls the branch into `/opt/somba`, rebuilds the API and web,
+reloads pm2, lets the API apply pending migrations on boot, runs `bootstrap:prod` (adds what is missing, never deletes), and keeps
+your secrets, data and uploads.
+
 ```bash
-cd ~/somba-apps
-git pull
-cd api  && npm ci && npm run build && cd ..
-cd web  && npm ci && npm run build && cd ..
-pm2 restart all          # the API applies any new migrations on boot
+curl -fsSL https://raw.githubusercontent.com/waseemmirzaa/somba-apps/main/deploy/droplet-deploy.sh -o deploy.sh
+DOMAIN=your.domain ADMIN_EMAIL=you@example.com bash deploy.sh      # an IP: DOMAIN=<ip> ... SSL=0
 ```
 
-**Back up the database first** (`mysqldump somba > backup.sql`). Never run
-`npm run seed` on production — it wipes all data.
+The full operator page (check, seed demo data, credentials, API/web/app keys, COD and mobile money, test APKs, troubleshooting) is
+[`deploy/LIVE-RUNBOOK.md`](../deploy/LIVE-RUNBOOK.md).
 
-When you change an entity, generate a migration and commit it (see
-`api/src/database/migrations/`): `npm run migration:generate -- src/database/migrations/<Name>`.
+Backups: the script installs a nightly dump (`/var/backups/somba`, 14 days); take one by hand with `somba-backup` before a risky
+change. Never run `npm run seed` on production: it wipes all data. (Demo data on a server goes through `deploy/seed-demo.sh`, which only
+adds and can be removed: see `deploy/DEMO-SEED.md`.)
+
+When you change an entity, generate a migration and commit it (see `api/src/database/migrations/`):
+`npm run migration:generate -- src/database/migrations/<Name>`.
+
+If you built the server by hand with steps 1 to 11 above instead (code in `~/somba-apps`), the manual update is:
+`git pull`, then `npm ci && npm run build` in `api/` and in `web/`, then `pm2 restart all` (back up with `mysqldump somba > backup.sql` first).
 
 ---
 

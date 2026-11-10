@@ -6,6 +6,7 @@
 # Run ON the droplet, as root:
 #
 #   bash /opt/somba/deploy/set-secret.sh STRIPE_SECRET_KEY          # hidden prompt
+#   bash /opt/somba/deploy/set-secret.sh --web NEXT_PUBLIC_GOOGLE_MAPS_API_KEY   # a web (browser) key, see below
 #   age -d -i somba-payments.key keys.age \
 #     | ssh root@<droplet> 'bash /opt/somba/deploy/set-secret.sh --stdin'   # KEY=VALUE lines
 #
@@ -17,7 +18,13 @@
 # and reloads the API as user `somba`. It prints only `NAME set (…last4)`.
 # All values are checked before anything is written: one bad line writes nothing.
 #
-# Test hooks (not for production use): SOMBA_EXTRA_ENV, SOMBA_API_ENV, SOMBA_NO_RELOAD=1,
+# --web NAME (or --web --stdin): for the NEXT_PUBLIC_* keys the web portal needs in the browser
+# (NEXT_PUBLIC_FIREBASE_*, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID). They go ONLY into
+#     /etc/somba/web.env         (root, 600)  which droplet-deploy.sh copies into web/.env.local at build time
+# The API is not touched or reloaded. NEXT_PUBLIC_* values are baked into the web bundle, so a web REBUILD is
+# needed afterwards: re-run deploy/droplet-deploy.sh with the same DOMAIN / ADMIN_EMAIL / SSL as before.
+#
+# Test hooks (not for production use): SOMBA_EXTRA_ENV, SOMBA_API_ENV, SOMBA_WEB_ENV, SOMBA_NO_RELOAD=1,
 # SOMBA_TEST_MODE=1 (allows a non-root user, for trying the script on a laptop).
 # =============================================================================
 set -euo pipefail
@@ -26,20 +33,27 @@ umask 077
 
 EXTRA="${SOMBA_EXTRA_ENV:-/etc/somba/api.extra.env}"
 API_ENV="${SOMBA_API_ENV:-/opt/somba/api/.env}"
+WEB_ENV="${SOMBA_WEB_ENV:-/etc/somba/web.env}"
 APP_USER=somba
 PM2_APP=somba-api
 
-ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES TRANSLATE_PROVIDER GOOGLE_TRANSLATE_API_KEY TRANSLATE_DAILY_CHAR_LIMIT FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS MAIL_FROM"
+ALLOWED="STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET STRIPE_PENDING_TTL_MIN MM_PROVIDER PAWAPAY_API_TOKEN PAWAPAY_BASE_URL PAWAPAY_CURRENCY PAWAPAY_FX_RATE PAWAPAY_VERIFY_SIGNATURES TRANSLATE_PROVIDER GOOGLE_TRANSLATE_API_KEY TRANSLATE_DAILY_CHAR_LIMIT FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASS MAIL_FROM MM_WEBHOOK_SECRET MM_PENDING_TTL_MIN PAYOUT_CLEARANCE_HOURS REDIS_URL"
+# Browser keys for --web (same names droplet-deploy.sh copies from /etc/somba/web.env into the web build).
+WEB_ALLOWED_RE='^NEXT_PUBLIC_(FIREBASE_[A-Z0-9_]+|GOOGLE_MAPS_API_KEY|GOOGLE_MAPS_MAP_ID)$'
 # Names whose value is a credential: the confirmation shows its last 4 characters.
-SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN GOOGLE_TRANSLATE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_AUTH_TOKEN SMTP_PASS "
+SECRET_NAMES=" STRIPE_SECRET_KEY STRIPE_PUBLISHABLE_KEY STRIPE_WEBHOOK_SECRET PAWAPAY_API_TOKEN GOOGLE_TRANSLATE_API_KEY FIREBASE_SERVICE_ACCOUNT_JSON TWILIO_AUTH_TOKEN SMTP_PASS MM_WEBHOOK_SECRET REDIS_URL "
 
 die() { printf 'set-secret: %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat >&2 <<EOF
-Usage:  set-secret.sh NAME          ask for the value (hidden input)
-        set-secret.sh --stdin       read NAME=VALUE lines from standard input
+Usage:  set-secret.sh NAME              ask for the value (hidden input)
+        set-secret.sh --stdin           read NAME=VALUE lines from standard input
+        set-secret.sh --web NAME        a NEXT_PUBLIC_* browser key -> /etc/somba/web.env (then rebuild the web)
+        set-secret.sh --web --stdin     the same, NAME=VALUE lines from standard input
 Names:  ${ALLOWED}
+Web names: NEXT_PUBLIC_FIREBASE_* (API_KEY, AUTH_DOMAIN, PROJECT_ID, SENDER_ID, APP_ID, VAPID_KEY),
+        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
 EOF
   exit 2
 }
@@ -55,13 +69,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
-is_allowed() { [[ " $ALLOWED " == *" $1 "* ]]; }
+WEB=0
+is_allowed() {
+  if [[ "$WEB" == 1 ]]; then [[ "$1" =~ $WEB_ALLOWED_RE ]]; else [[ " $ALLOWED " == *" $1 "* ]]; fi
+}
+not_allowed_msg() {
+  if [[ "$WEB" == 1 ]]; then echo "$1 is not a web key this script manages (allowed: NEXT_PUBLIC_FIREBASE_*, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY, NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID)."
+  elif [[ "$1" == NEXT_PUBLIC_* ]]; then echo "$1 is a web key: use  set-secret.sh --web $1"
+  else echo "$1 is not a setting this script manages."; fi
+}
 
 # Echo nothing; return 0 when the value has the right shape for the name. Never prints the value.
 # Patterns for the e-mail settings. Values are written unquoted into an env file, so a password may not contain
 # spaces, quotes, backslash, $, backtick or # (a # would start a comment).
 SMTP_HOST_RE='^([A-Za-z0-9-]+\.)+[A-Za-z]{2,}$'
 SMTP_PASS_RE='^[^[:space:]"'"'"'\\`$#]{8,255}$'
+REDIS_URL_RE='^rediss?://[^[:space:]"'"'"'\\`$#]{1,255}$'
 MAIL_ADDR_RE='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
 MAIL_FROM_RE="^(${MAIL_ADDR_RE}|[A-Za-z0-9][A-Za-z0-9 &.'-]{0,59} <${MAIL_ADDR_RE}>)$"
 
@@ -78,7 +101,8 @@ valid_value() {
     PAWAPAY_CURRENCY) [[ "$value" =~ ^(USD|CDF)$ ]] ;;
     PAWAPAY_FX_RATE) [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] ;;
     PAWAPAY_VERIFY_SIGNATURES) [[ "$value" =~ ^(true|false)$ ]] ;;
-    TRANSLATE_PROVIDER) [[ "$value" =~ ^(google|fake|off)$ ]] ;;
+    # `fake` is refused: the API will not boot in production with it (api/src/config/assert-production.ts).
+    TRANSLATE_PROVIDER) [[ "$value" =~ ^(google|off)$ ]] ;;
     GOOGLE_TRANSLATE_API_KEY) [[ "$value" =~ ^AIza[0-9A-Za-z_-]{30,}$ ]] ;;
     TRANSLATE_DAILY_CHAR_LIMIT) [[ "$value" =~ ^[1-9][0-9]{0,8}$ ]] ;;
     FIREBASE_SERVICE_ACCOUNT_JSON) [[ "$value" =~ ^(\{.+\}|[A-Za-z0-9+/=]{100,})$ ]] ;;
@@ -91,12 +115,26 @@ valid_value() {
     SMTP_USER) [[ "$value" =~ ^[A-Za-z0-9._@+-]{1,254}$ ]] ;;
     SMTP_PASS) [[ "$value" =~ $SMTP_PASS_RE ]] ;;
     MAIL_FROM) [[ "$value" =~ $MAIL_FROM_RE ]] ;;
+    MM_WEBHOOK_SECRET) [[ "$value" =~ ^[A-Za-z0-9._~+/=-]{16,}$ ]] ;;
+    MM_PENDING_TTL_MIN) [[ "$value" =~ ^[1-9][0-9]{0,4}$ ]] ;;
+    PAYOUT_CLEARANCE_HOURS) [[ "$value" =~ ^(0|[1-9][0-9]{0,2})$ && "$value" -le 720 ]] ;;
+    REDIS_URL) [[ "$value" =~ $REDIS_URL_RE ]] ;;
+    # Browser keys (--web). They are public once the site is built, but the same charset rules keep the env file safe.
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) [[ "$value" =~ ^AIza[0-9A-Za-z_-]{30,}$ ]] ;;
+    NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID) [[ "$value" =~ ^[A-Za-z0-9_-]{1,64}$ ]] ;;
+    NEXT_PUBLIC_FIREBASE_*) [[ "$value" =~ ^[A-Za-z0-9._:-]{1,255}$ ]] ;;
     *) return 1 ;;
   esac
 }
 
 why_invalid() {
   case "$1" in
+    TRANSLATE_PROVIDER)
+      if [[ "$(printf '%s' "${2:-}" | tr '[:upper:]' '[:lower:]')" == fake ]]; then
+        echo "must not be fake: the API refuses to start in production with TRANSLATE_PROVIDER=fake (it would show \"[fr] text\" to customers). Use google (with GOOGLE_TRANSLATE_API_KEY) or off"
+      else
+        echo "must be one of: google, off"
+      fi ;;
     STRIPE_SECRET_KEY) echo "must look like sk_test_… / sk_live_… / rk_test_… / rk_live_… (letters and digits only)" ;;
     STRIPE_PUBLISHABLE_KEY) echo "must look like pk_test_… or pk_live_…" ;;
     STRIPE_WEBHOOK_SECRET) echo "must look like whsec_…" ;;
@@ -107,7 +145,6 @@ why_invalid() {
     PAWAPAY_CURRENCY) echo "must be USD or CDF" ;;
     PAWAPAY_FX_RATE) echo "must be a number (CDF per USD)" ;;
     PAWAPAY_VERIFY_SIGNATURES) echo "must be true or false" ;;
-    TRANSLATE_PROVIDER) echo "must be one of: google, fake, off" ;;
     GOOGLE_TRANSLATE_API_KEY) echo "must look like AIza… (a Google API key, restricted to Cloud Translation)" ;;
     TRANSLATE_DAILY_CHAR_LIMIT) echo "must be a whole number of characters, 1 to 999999999" ;;
     FIREBASE_SERVICE_ACCOUNT_JSON) echo "must be the service-account JSON, or its base64 on one line" ;;
@@ -119,6 +156,13 @@ why_invalid() {
     SMTP_USER) echo "must be the SMTP user name (for SendGrid: the word apikey), letters, digits and . _ @ + - only" ;;
     SMTP_PASS) echo "must be 8 to 255 characters with no spaces, quotes, backslash, \$, backtick or # (for SendGrid: the API key that starts with SG.)" ;;
     MAIL_FROM) echo "must be an address like no-reply@yourdomain.com, or a name and address like Somba&Teka <no-reply@yourdomain.com>" ;;
+    MM_WEBHOOK_SECRET) echo "must be the shared secret of the aggregator webhook (16+ characters: letters, digits and . _ ~ + / = -)" ;;
+    MM_PENDING_TTL_MIN) echo "must be a whole number of minutes, 1 to 99999 (default 15; 1440 with MM_PROVIDER=manual)" ;;
+    PAYOUT_CLEARANCE_HOURS) echo "must be a whole number of hours, 0 to 720 (the admin Settings value 'Clearance hours' overrides it)" ;;
+    REDIS_URL) echo "must look like redis://host:6379 or rediss://user:password@host:6380 (no spaces, quotes, backslash, \$, backtick or #)" ;;
+    NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) echo "must look like AIza… (the browser Maps key, restricted to your site's address)" ;;
+    NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID) echo "must be the Maps map ID: letters, digits, _ and - only" ;;
+    NEXT_PUBLIC_FIREBASE_*) echo "must be the Firebase web value: letters, digits and . _ : - only (no spaces or quotes)" ;;
   esac
 }
 
@@ -189,6 +233,11 @@ if [[ $EUID -ne 0 && "${SOMBA_TEST_MODE:-}" != "1" ]]; then die "run as root (su
 if [[ $# -lt 1 ]]; then usage; fi
 
 value=""
+if [[ "$1" == "--web" ]]; then
+  WEB=1
+  shift
+  [[ $# -ge 1 ]] || usage
+fi
 case "$1" in
   --stdin)
     [[ $# -eq 1 ]] || usage
@@ -203,8 +252,8 @@ case "$1" in
       value="${line#*=}"
       # Tolerate one pair of quotes around the value (KEY="value").
       if [[ "$value" =~ ^\"(.*)\"$ || "$value" =~ ^\'(.*)\'$ ]]; then value="${BASH_REMATCH[1]}"; fi
-      is_allowed "$name" || die "line $lineno: $name is not a setting this script manages."
-      valid_value "$name" "$value" || die "line $lineno: $name $(why_invalid "$name")."
+      is_allowed "$name" || die "line $lineno: $(not_allowed_msg "$name")"
+      valid_value "$name" "$value" || die "line $lineno: $name $(why_invalid "$name" "$value")."
       remember "$name" "$value"
     done
     ;;
@@ -213,11 +262,11 @@ case "$1" in
   *)
     [[ $# -eq 1 ]] || usage
     name="$1"
-    is_allowed "$name" || die "$name is not a setting this script manages."
+    is_allowed "$name" || die "$(not_allowed_msg "$name")"
     [[ -t 0 ]] || die "no terminal for the hidden prompt: pipe NAME=VALUE lines with --stdin instead."
     IFS= read -rs -p "$name: " value
     printf '\n'
-    valid_value "$name" "$value" || die "$name $(why_invalid "$name")."
+    valid_value "$name" "$value" || die "$name $(why_invalid "$name" "$value")."
     remember "$name" "$value"
     ;;
 esac
@@ -226,12 +275,22 @@ value=""
 [[ ${#NAMES[@]} -gt 0 ]] || die "nothing to set."
 
 # ── 1. Write both env files (atomic), only after every value passed ──────────
-[[ -e "$EXTRA" ]] || die "$EXTRA does not exist: run deploy/droplet-deploy.sh first."
-apply_to "$EXTRA"
 wrote_api=0
-if [[ -e "$API_ENV" ]]; then
-  apply_to "$API_ENV"
-  wrote_api=1
+if [[ "$WEB" == 1 ]]; then
+  # The web file may not exist yet (the deploy only reads it when it is there): create it root-only.
+  if [[ ! -e "$WEB_ENV" ]]; then
+    mkdir -p "$(dirname "$WEB_ENV")"
+    : >"$WEB_ENV"
+    chmod 600 "$WEB_ENV"
+  fi
+  apply_to "$WEB_ENV"
+else
+  [[ -e "$EXTRA" ]] || die "$EXTRA does not exist: run deploy/droplet-deploy.sh first."
+  apply_to "$EXTRA"
+  if [[ -e "$API_ENV" ]]; then
+    apply_to "$API_ENV"
+    wrote_api=1
+  fi
 fi
 
 for i in "${!NAMES[@]}"; do
@@ -242,7 +301,7 @@ for i in "${!NAMES[@]}"; do
     printf '%s set\n' "${NAMES[$i]}"
   fi
 done
-if [[ $wrote_api -eq 0 ]]; then
+if [[ "$WEB" == 0 && $wrote_api -eq 0 ]]; then
   printf 'note: %s does not exist yet; the next deploy copies %s into it.\n' "$API_ENV" "$EXTRA"
 fi
 
@@ -288,7 +347,9 @@ if value_of SMTP_HOST >/dev/null || value_of SMTP_USER >/dev/null || value_of SM
 fi
 
 # ── 3. Reload the API so it picks the values up ──────────────────────────────
-if [[ "${SOMBA_NO_RELOAD:-}" == "1" ]]; then
+if [[ "$WEB" == 1 ]]; then
+  echo "Saved in $WEB_ENV. The web must be REBUILT to use it: re-run deploy/droplet-deploy.sh with the same DOMAIN, ADMIN_EMAIL and SSL as before."
+elif [[ "${SOMBA_NO_RELOAD:-}" == "1" ]]; then
   echo "reload skipped (SOMBA_NO_RELOAD=1)."
 elif sudo -u "$APP_USER" -H pm2 reload "$PM2_APP" --update-env >/dev/null 2>&1; then
   echo "API reloaded."
