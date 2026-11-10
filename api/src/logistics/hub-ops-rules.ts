@@ -133,10 +133,33 @@ export function isWorkingNow(ops: Pick<HubOps, 'workStart' | 'workEnd' | 'workDa
   return ops.workDays.includes(weekday) && minutes >= minutesOf(ops.workStart) && minutes < minutesOf(ops.workEnd);
 }
 
+/**
+ * The first moment at or after `at` when the warehouse is open (`at` itself while it is open): today at opening time when it has not
+ * opened yet, else the opening time of the next working day. Used to count an express order's days from when a rider can start.
+ */
+export function nextWorkingMoment(ops: Pick<HubOps, 'workStart' | 'workEnd' | 'workDays' | 'timezone'>, at: Date = new Date()): Date {
+  if (isWorkingNow(ops, at)) return at;
+  const { weekday, minutes } = localClock(at, ops.timezone);
+  const start = minutesOf(ops.workStart);
+  for (let d = 0; d <= 7; d++) {
+    const day = ((weekday - 1 + d) % 7) + 1;
+    if (!ops.workDays.includes(day)) continue;
+    if (d === 0 && minutes >= start) continue; // already closed for today
+    return new Date(at.getTime() + d * 86_400_000 + (start - minutes) * 60_000);
+  }
+  return at;
+}
+
 // ── aged parcels ─────────────────────────────────────────────────────────────
 
 /** Hours an open leg has waited. */
 export const ageHours = (createdAt: Date, now: Date = new Date()): number => Math.max(0, (now.getTime() - createdAt.getTime()) / 3_600_000);
+
+/**
+ * When a leg's age starts. An express leg is created with the order but cannot be collected until the seller packs it, so its
+ * alerts count from `readyAt` (else from creation); every other leg counts from creation.
+ */
+export const ageStart = (t: { kind: DeliveryKind; createdAt: Date; readyAt?: Date | null }): Date => (t.kind === 'express' && t.readyAt ? t.readyAt : t.createdAt);
 
 /** The alert levels (1..3) a leg of this age has reached. */
 export function dueLevels(age: number, levels: readonly number[]): number[] {
@@ -152,7 +175,9 @@ export const LAST_LEVEL = 3;
  * What a "return to seller" may be made from: the customer-bound leg, while the parcel is still at the warehouse (no rider
  * has collected it yet). Anything else is on the road, belongs to another leg, or is already a way back.
  */
-export const RETURNABLE_KINDS: readonly DeliveryKind[] = [...CUSTOMER_KINDS, 'replacement_delivery'];
+// `express` is not returnable: its parcel is still with the seller (or in the rider's hands), never waiting at a warehouse.
+export const RETURNABLE_KINDS: readonly DeliveryKind[] = ['delivery', 'replacement_delivery'];
+export const EXPRESS_NOT_RETURNABLE = 'An express parcel is still with the seller. Cancel the order instead.';
 export const RETURNABLE_STATUSES = ['unassigned', 'assigned'] as const;
 export function canReturnToSeller(t: { kind: DeliveryKind; status: string; runId?: string | null }): boolean {
   return RETURNABLE_KINDS.includes(t.kind) && (RETURNABLE_STATUSES as readonly string[]).includes(t.status) && !t.runId;

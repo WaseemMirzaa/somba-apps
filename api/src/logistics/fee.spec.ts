@@ -1,4 +1,4 @@
-import { FEE_DEFAULTS, deliveryFee, feeConfigFrom } from './fee';
+import { EXPRESS_FEE_DEFAULTS, FEE_DEFAULTS, deliveryFee, expressFee, expressFeeConfigFrom, feeConfigFrom } from './fee';
 
 describe('delivery fee', () => {
   const cfg = FEE_DEFAULTS; // 2 + 0.5/km, max 15, transfer 1.5
@@ -43,5 +43,38 @@ describe('delivery fee', () => {
     expect(feeConfigFrom({ deliveryBaseUsd: '3', deliveryPerKmUsd: '1', deliveryMaxUsd: '10', deliveryTransferUsd: '2' })).toEqual({ baseUsd: 3, perKmUsd: 1, maxUsd: 10, transferUsd: 2 });
     expect(feeConfigFrom({ deliveryBaseUsd: 'abc', deliveryPerKmUsd: '-1', deliveryMaxUsd: null })).toEqual(FEE_DEFAULTS);
     expect(feeConfigFrom({ deliveryBaseUsd: '0' }).baseUsd).toBe(0);
+  });
+
+  describe('express fee', () => {
+    const x = EXPRESS_FEE_DEFAULTS; // 2 + 0.5/km, max 15
+
+    it('is min(max, base + perKm x km) from the seller pin to the customer pin, rounded to cents', () => {
+      expect(expressFee(x, 0).feeUsd).toBe(2);
+      expect(expressFee(x, 4).feeUsd).toBe(4);
+      expect(expressFee(x, 3.333).feeUsd).toBe(3.67);
+      expect(expressFee(x, 100).feeUsd).toBe(15);
+      expect(expressFee(x, 26).feeUsd).toBe(15);
+      expect(expressFee(x, 4)).toEqual({ feeUsd: 4, deliveryUsd: 4, transferUsd: 0, distanceKm: 4 });
+    });
+
+    it('has no transfer fee and no area flat fee: it uses its own settings only', () => {
+      expect(expressFee({ baseUsd: 1, perKmUsd: 0.2, maxUsd: 3 }, 10)).toMatchObject({ feeUsd: 3, transferUsd: 0 });
+      // the standard fee of the same distance differs: an override or a transfer fee never reaches express
+      expect(deliveryFee(FEE_DEFAULTS, 4, true, 30).feeUsd).toBe(31.5);
+      expect(expressFee(x, 4).feeUsd).toBe(4);
+    });
+
+    it('treats a missing or negative distance as no distance', () => {
+      expect(expressFee(x, NaN).feeUsd).toBe(2);
+      expect(expressFee(x, -5).feeUsd).toBe(2);
+    });
+
+    it('reads the numbers from the express settings and falls back to the defaults for missing or broken ones', () => {
+      expect(expressFeeConfigFrom({})).toEqual(EXPRESS_FEE_DEFAULTS);
+      expect(expressFeeConfigFrom({ expressBaseUsd: '3', expressPerKmUsd: '1', expressMaxUsd: '10' })).toEqual({ baseUsd: 3, perKmUsd: 1, maxUsd: 10 });
+      expect(expressFeeConfigFrom({ expressBaseUsd: 'abc', expressPerKmUsd: '-1', expressMaxUsd: null })).toEqual(EXPRESS_FEE_DEFAULTS);
+      // the standard keys are not the express keys
+      expect(expressFeeConfigFrom({ deliveryBaseUsd: '9' })).toEqual(EXPRESS_FEE_DEFAULTS);
+    });
   });
 });

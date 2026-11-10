@@ -243,4 +243,103 @@ describe('split order: a customer leg that fails', () => {
     await fail(leg.id);
     expect((await order(placed.id)).status).toBe('cancelled');
   });
+
+  describe('express order: a delivery that fails (C4)', () => {
+    /** One seller, express: the route is recorded the way `orders:create` does (mode express, origin = destination = the warehouse). */
+    async function placeExpress(opts: { cod?: boolean } = {}) {
+      const n = ++seq;
+      const o = await ds.getRepository(Order).save(
+        ds.getRepository(Order).create({
+          reference: `SOM-X${n}`,
+          customerId: customer.id,
+          customerName: 'Marie Dubois',
+          status: 'confirmed',
+          paymentMethod: opts.cod ? 'cod' : 'stripe_card',
+          subtotalUsd: 10,
+          deliveryFeeUsd: 2,
+          totalUsd: 12,
+          deliveryMode: 'express',
+          destinationHubId: gombe.id,
+          originHubIds: [gombe.id],
+          originBySeller: { [sellerA.id]: gombe.id },
+          routeBySeller: { [sellerA.id]: [gombe.id] },
+          shippingAddress: JSON.stringify({ line1: '1 Rue', city: 'Kinshasa', commune: 'Gombe', geo: { lat: -4.3086, lng: 15.3171 } }),
+          items: [Object.assign(new OrderItem(), { productId: `p-${sellerA.id}`, productName: 'Thing', variant: 'Default', qty: 1, priceUsd: 10, sellerId: sellerA.id, sellerName: sellerA.name, fulfilment: 'ready' })],
+        }),
+      );
+      await ds.getRepository(Payment).save(
+        ds.getRepository(Payment).create({ reference: `PAY-X${n}`, orderId: o.id, orderReference: o.reference, userId: customer.id, method: opts.cod ? 'cod' : 'stripe_card', amountUsd: 12, status: opts.cod ? 'pending' : 'succeeded' }),
+      );
+      await logistics.planOrder(await order(o.id));
+      await logistics.markSellerReady(o.id, [sellerA.id]);
+      const leg = (await tasks(o.id)).find((t) => t.kind === 'express')!;
+      await logistics.assign(leg.id, rider.id, admin);
+      return { id: o.id, leg };
+    }
+    const kindsOf = async (id: string) => (await tasks(id)).map((t) => `${t.kind}:${t.status}`).sort();
+
+    it('before the rider collected the parcel: the same express leg opens again, the order goes back to confirmed and may be cancelled', async () => {
+      const { id, leg } = await placeExpress();
+      expect((await order(id)).status).toBe('processing');
+      await fail(leg.id, 'Seller closed');
+      expect((await order(id)).status).toBe('confirmed');
+      expect(await kindsOf(id)).toEqual(['express:failed', 'express:unassigned']);
+      const next = (await tasks(id)).find((t) => t.kind === 'express' && t.status === 'unassigned')!;
+      expect(next).toMatchObject({ attempts: 2, readyAt: expect.any(Date) });
+      expect(told.find((t) => t.title === 'Delivery attempt failed')?.body).toBe(`${(await order(id)).reference}: Seller closed. We will try again (attempt 2 of 3). You can also cancel the order.`);
+    });
+
+    it('at the attempt limit, before collection: the parcel is still with the seller, so the order is cancelled as for any delivery', async () => {
+      const { id, leg } = await placeExpress();
+      await ds.getRepository(DeliveryTask).update({ id: leg.id }, { attempts: 3 });
+      await fail(leg.id, 'Seller closed');
+      expect((await order(id)).status).toBe('cancelled');
+    });
+
+    it('after collection: the parcel comes back to the warehouse with the same rider, the order keeps its status, and the customer is not told they can cancel', async () => {
+      const { id, leg } = await placeExpress();
+      await delivery.updateStatus(leg.id, 'picked_up', rider.id);
+      await delivery.updateStatus(leg.id, 'in_transit', rider.id);
+      expect((await order(id)).status).toBe('out_for_delivery');
+      await fail(leg.id, 'Customer not reachable');
+      const o = await order(id);
+      expect(o.status).toBe('out_for_delivery'); // never reset to confirmed around goods on the road
+      expect(await kindsOf(id)).toEqual(['express:failed', 'pickup:picked_up']);
+      const back = (await tasks(id)).find((t) => t.kind === 'pickup')!;
+      expect(back).toMatchObject({ riderId: rider.id, toHubId: gombe.id, parentTaskId: leg.id });
+      const msg = told.find((t) => t.title === 'Delivery attempt failed')!;
+      expect(msg.body).toContain('We will try again (attempt 2 of 3).');
+      expect(msg.body).not.toContain('cancel the order');
+      // the warehouse scans it in: a normal delivery, the second attempt
+      await logistics.onScanIn(back.id, gombe.id);
+      expect(await kindsOf(id)).toEqual(['delivery:unassigned', 'express:failed', 'pickup:delivered']);
+      expect((await tasks(id)).find((t) => t.kind === 'delivery')).toMatchObject({ attempts: 2, hubId: gombe.id, sellerIds: [sellerA.id] });
+    });
+
+    it('after collection, even at the attempt limit: never cancelled around goods in the rider\'s hands', async () => {
+      const { id, leg } = await placeExpress();
+      await delivery.updateStatus(leg.id, 'picked_up', rider.id);
+      await ds.getRepository(DeliveryTask).update({ id: leg.id }, { attempts: 3 });
+      await fail(leg.id, 'Customer not reachable');
+      expect((await order(id)).status).toBe('shipped');
+      expect(await kindsOf(id)).toEqual(['express:failed', 'pickup:picked_up']);
+      expect(told.find((t) => t.title === 'Delivery attempt failed')?.body).toContain('(attempt 3 of 3)');
+    });
+
+    it('the delivery that follows is retried as usual and gives up at the limit', async () => {
+      const { id, leg } = await placeExpress();
+      await delivery.updateStatus(leg.id, 'picked_up', rider.id);
+      await fail(leg.id, 'Customer not reachable');
+      const back = (await tasks(id)).find((t) => t.kind === 'pickup')!;
+      await logistics.onScanIn(back.id, gombe.id);
+      let d = (await tasks(id)).find((t) => t.kind === 'delivery')!;
+      await logistics.assign(d.id, rider.id, admin);
+      await fail(d.id); // attempt 2 fails: attempt 3 is planned
+      d = (await tasks(id)).find((t) => t.kind === 'delivery' && t.status === 'unassigned')!;
+      expect(d.attempts).toBe(3);
+      await logistics.assign(d.id, rider.id, admin);
+      await fail(d.id); // attempt 3 fails: the order is cancelled
+      expect((await order(id)).status).toBe('cancelled');
+    });
+  });
 });

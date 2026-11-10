@@ -133,6 +133,7 @@ const LEGS_FR: Record<string, string> = {
   pickup: 'enlèvement',
   transfer: 'transfert',
   delivery: 'livraison',
+  'express delivery': 'livraison express',
   'return pickup': 'retour client',
   'return transfer': 'transfert retour',
   'return to seller': 'retour au vendeur',
@@ -255,6 +256,7 @@ const TITLES: Record<string, string> = {
   'New task assigned to you': 'Nouvelle tâche qui vous est assignée',
   'Pickup scheduled': 'Enlèvement programmé',
   'Package at the warehouse': 'Colis à l’entrepôt',
+  'Package collected': 'Colis récupéré',
   'Address without a map pin': 'Adresse sans repère sur la carte',
   'No warehouse with riders': 'Aucun entrepôt avec des livreurs',
   'Warehouse without riders': 'Entrepôt sans livreurs',
@@ -395,6 +397,7 @@ const BODIES: Rule[] = [
   [/^(\S+) could not be delivered and is going back to the seller\. Our team will contact you about your order\.$/, (m) => `${m[1]} n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.`],
   [/^(\S+): a rider will collect your package\.$/, (m) => `${m[1]} : un livreur viendra récupérer votre colis.`],
   [/^(\S+): your package reached the warehouse\.$/, (m) => `${m[1]} : votre colis est arrivé à l’entrepôt.`],
+  [/^(\S+): the rider collected your package and is taking it to the customer\.$/, (m) => `${m[1]} : le livreur a récupéré votre colis et l’emmène chez le client.`],
   [
     /^(\S+): the delivery address has no map pin, so it was routed to (.+)\.$/,
     (m) => `${m[1]} : l’adresse de livraison n’a pas de repère sur la carte, la commande a été dirigée vers ${m[2]}.`,

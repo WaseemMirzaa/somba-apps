@@ -452,6 +452,8 @@ export class SellersService {
       if (blank(patch.pickupLat) && blank(patch.pickupLng)) {
         seller.pickupLat = null;
         seller.pickupLng = null;
+        // Express needs the pin (it prices the distance from it): a store that unpins its pickup location stops offering it.
+        seller.expressDelivery = false;
       } else {
         const pin = cleanPoint(patch.pickupLat, patch.pickupLng);
         if (!pin) throw new BadRequestException('Enter a valid pickup location: latitude -90 to 90 and longitude -180 to 180.');

@@ -695,4 +695,61 @@ describe('warehouse operations', () => {
       });
     });
   });
+
+  // ── express legs ────────────────────────────────────────────────────────────
+  describe('express legs (seller -> customer)', () => {
+    const express = (over: Partial<DeliveryTask> & { age?: number } = {}) => mkTask({ kind: 'express', fromHubId: null, ...over });
+
+    it('are alerted by the time since the seller marked them ready, not since the order was placed (prep days are not an alarm)', async () => {
+      await mkUser('warehouse_staff', hub.id, { warehouseTier: 'supervisor' });
+      // placed 80 h ago, but the seller only packed it 10 h ago: nothing is late
+      const young = await express({ age: 80 });
+      await ds.getRepository(DeliveryTask).update({ id: young.id }, { readyAt: hoursAgo(10) });
+      expect(await aged.sweep(NOW)).toEqual({ checked: 0, alerted: 0, skipped: 0 });
+      expect(await alertsOf(young.id)).toHaveLength(0);
+      // ready 30 h ago: level 1
+      await ds.getRepository(DeliveryTask).update({ id: young.id }, { readyAt: hoursAgo(30) });
+      expect(await aged.sweep(NOW)).toMatchObject({ checked: 1, alerted: 1 });
+      expect((await alertsOf(young.id)).map((a) => a.level)).toEqual([1]);
+      // one that was never marked ready counts from creation, like any leg
+      const never = await express({ age: 50 });
+      expect(await aged.sweep(NOW)).toMatchObject({ alerted: 1 });
+      expect((await alertsOf(never.id)).map((a) => a.level)).toEqual([1, 2]);
+      expect((await aged.summary(null, NOW)).byTask[young.id]?.level).toBe(1);
+    });
+
+    describe('auto-assignment', () => {
+      let rider: User;
+      beforeEach(async () => {
+        rider = await mkUser('rider', hub.id, { name: 'Ann' });
+        await settings.update(admin(), hub.id, { autoAssign: true });
+      });
+
+      it('waits for the seller: an express leg that is not ready is never given to a rider, by the sweep or directly', async () => {
+        const t = await express();
+        expect(await logistics.autoAssign(t, NOW)).toBeNull();
+        expect(await logistics.autoAssignWaiting(NOW)).toBe(0);
+        expect((await ds.getRepository(DeliveryTask).findOneByOrFail({ id: t.id })).status).toBe('unassigned');
+      });
+
+      it('is given to the least busy rider once it is ready, directly or by the sweep', async () => {
+        const t = await express();
+        await ds.getRepository(DeliveryTask).update({ id: t.id }, { readyAt: NOW });
+        const ready = await ds.getRepository(DeliveryTask).findOneByOrFail({ id: t.id });
+        expect((await logistics.autoAssign(ready, NOW))?.riderId).toBe(rider.id);
+        const t2 = await express();
+        await ds.getRepository(DeliveryTask).update({ id: t2.id }, { readyAt: NOW });
+        expect(await logistics.autoAssignWaiting(NOW)).toBe(1);
+        expect((await ds.getRepository(DeliveryTask).findOneByOrFail({ id: t2.id })).status).toBe('assigned');
+      });
+    });
+
+    it('can never be returned to the seller, whatever its status: it is still with the seller (or in the rider\'s hands)', async () => {
+      for (const status of ['unassigned', 'assigned', 'picked_up', 'in_transit'] as const) {
+        const t = await express({ status });
+        await expect(logistics.returnToSeller(t.id, admin())).rejects.toThrow('An express parcel is still with the seller. Cancel the order instead.');
+      }
+      expect(await ds.getRepository(DeliveryTask).count({ where: { kind: 'return_to_seller' } })).toBe(0);
+    });
+  });
 });

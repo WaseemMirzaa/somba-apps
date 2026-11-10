@@ -1515,4 +1515,240 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       void pL;
     });
   });
+
+  describe('express delivery: one leg from the seller straight to the customer', () => {
+    const expressLegs = async (orderId: string) => (await tasksOf(orderId)).filter((t) => t.kind === 'express');
+    const mkPayment = (order: Order, amountUsd: number) =>
+      ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: `PAY-${order.reference}`, orderId: order.id, orderReference: order.reference, userId: 'cust1', method: 'cod', amountUsd, status: 'pending' }));
+    const lines = (orderId: string) => ds.getRepository(OrderItem).find({ where: { orderId } });
+    const titlesToStaff = () => (notif.toUsers.mock.calls as unknown as [string[], { title: string }][]).map((c) => c[1].title);
+
+    /** An order the way `orders:create` records it: the route (with `deliveryMode: 'express'`) is stored first, then planned. */
+    const placeExpress = async (opts: Parameters<typeof mkOrder>[1] = {}) => {
+      setting.expressDeliveryEnabled = 'true';
+      await ds.getRepository(Seller).update({ id: sellerG.id }, { expressDelivery: true });
+      const order = await mkOrder([sellerG], opts);
+      const route = await routing.route({ shippingAddress: order.shippingAddress, sellerIds: [sellerG.id] });
+      expect(route.deliveryMode).toBe('express');
+      await ds.getRepository(Order).update({ id: order.id }, { destinationHubId: route.destinationHubId, originHubIds: route.originHubIds, originBySeller: route.originBySeller, routeBySeller: route.routeBySeller, deliveryMode: route.deliveryMode });
+      const planned = await logistics.planOrder((await ds.getRepository(Order).findOne({ where: { id: order.id } }))!);
+      return { order: (await ds.getRepository(Order).findOne({ where: { id: order.id } }))!, route, planned };
+    };
+    const codeOf = (taskId: string) => logistics.proofCodeOf(taskId);
+    const walk = async (leg: DeliveryTask, cash?: number) => {
+      await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
+      await delivery.updateStatus(leg.id, 'in_transit', riderG.id);
+      return delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, (await codeOf(leg.id)) ?? undefined, cash);
+    };
+
+    it('an order recorded as express gets ONE express leg (no pickup, no transfer, no delivery): managed by the warehouse, carrying everything, with a code and the whole cash', async () => {
+      setting.requireDeliveryCode = 'true';
+      const placed = await placeExpress({ cod: true });
+      await mkPayment(placed.order, 42);
+      const { order, planned } = await logistics.planOrder(placed.order).then(async (p) => ({ order: placed.order, planned: p }));
+      expect(planned).toHaveLength(1);
+      expect(await kinds(order.id)).toEqual(['express:unassigned']);
+      const leg = (await expressLegs(order.id))[0];
+      expect(leg).toMatchObject({ hubId: gombe.id, sellerId: sellerG.id, sellerIds: [sellerG.id], fromHubId: null, toHubId: null, attempts: 1, readyAt: null });
+      expect(await codeOf(leg.id)).toMatch(/^\d{4}$/);
+      expect(JSON.parse(leg.itemsJson as string)).toHaveLength(1);
+      // C14: the route is origin = destination = the managing warehouse, so after-sale runs through it
+      expect(order).toMatchObject({ deliveryMode: 'express', destinationHubId: gombe.id, originHubIds: [gombe.id], originBySeller: { [sellerG.id]: gombe.id }, routeBySeller: { [sellerG.id]: [gombe.id] } });
+      const v = await logistics.view(leg);
+      expect(v).toMatchObject({ kind: 'express', hubId: gombe.id, fromHub: null, toHub: null, needsCode: true, orderFlow: true, completesOrder: true, sellerIds: [sellerG.id], from: { type: 'seller', name: 'Gombe Seller' }, to: { type: 'customer' } });
+    });
+
+    it('planning twice (a payment webhook after the create) does not add a second leg or a pickup', async () => {
+      const { order } = await placeExpress();
+      await logistics.planOrder(order);
+      await logistics.planOrder(order);
+      expect(await kinds(order.id)).toEqual(['express:unassigned']);
+    });
+
+    it('planning never decides again: an order recorded as standard stays standard even when it would qualify now', async () => {
+      setting.expressDeliveryEnabled = 'true';
+      await ds.getRepository(Seller).update({ id: sellerG.id }, { expressDelivery: true });
+      const { order } = await place([sellerG]); // `place` records no mode: the column default is 'standard'
+      expect(order.deliveryMode).toBe('standard');
+      expect(await kinds(order.id)).toEqual(['pickup:unassigned']);
+    });
+
+    it('an express order recorded while its warehouse existed but that is gone becomes a standard order', async () => {
+      setting.expressDeliveryEnabled = 'true';
+      await ds.getRepository(Seller).update({ id: sellerG.id }, { expressDelivery: true });
+      const order = await mkOrder([sellerG]);
+      await ds.getRepository(Order).update({ id: order.id }, { deliveryMode: 'express', destinationHubId: 'gone-hub' });
+      await logistics.planOrder((await ds.getRepository(Order).findOne({ where: { id: order.id } }))!);
+      expect((await ds.getRepository(Order).findOne({ where: { id: order.id } }))!.deliveryMode).toBe('standard');
+      expect(await kinds(order.id)).toEqual(['pickup:unassigned']);
+    });
+
+    it('is not offered to a rider before the seller marks it ready; marking it ready tells the warehouse, and the order walks processing -> shipped -> out_for_delivery -> delivered', async () => {
+      const { order } = await placeExpress();
+      const [leg] = await expressLegs(order.id);
+      // created: nobody is asked to assign it yet
+      expect(titlesToStaff().includes('Task to assign')).toBe(false);
+      const ready = await logistics.markSellerReady(order.id, [sellerG.id]);
+      expect(ready?.id).toBe(leg.id);
+      expect((await ds.getRepository(DeliveryTask).findOneByOrFail({ id: leg.id })).readyAt).not.toBeNull();
+      expect(titlesToStaff().includes('Parcel ready for pickup')).toBe(true);
+      await logistics.assign(leg.id, riderG.id, admin);
+      expect(await orderStatus(order.id)).toBe('processing');
+      expect(notif.toUser).toHaveBeenCalledWith(sellerG.id, expect.objectContaining({ title: 'Pickup scheduled' }));
+      expect((await ds.getRepository(Order).findOne({ where: { id: order.id } }))!.riderId).toBe(riderG.id);
+      await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
+      expect(await orderStatus(order.id)).toBe('shipped');
+      await delivery.updateStatus(leg.id, 'in_transit', riderG.id);
+      expect(await orderStatus(order.id)).toBe('out_for_delivery');
+      await delivery.updateStatus(leg.id, 'delivered', riderG.id);
+      expect(await orderStatus(order.id)).toBe('delivered');
+    });
+
+    it('C5: when the rider collects it the lines become received (the seller can no longer cancel) and the seller is told "Package collected"', async () => {
+      const { order } = await placeExpress();
+      const [leg] = await expressLegs(order.id);
+      await logistics.markSellerReady(order.id, [sellerG.id]);
+      await ds.getRepository(OrderItem).update({ orderId: order.id }, { fulfilment: 'ready' });
+      await logistics.assign(leg.id, riderG.id, admin);
+      expect((await lines(order.id)).map((l) => l.fulfilment)).toEqual(['ready']);
+      await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
+      expect((await lines(order.id)).map((l) => l.fulfilment)).toEqual(['received']);
+      expect(notif.toUser).toHaveBeenCalledWith(sellerG.id, expect.objectContaining({ title: 'Package collected', body: `${order.reference}: the rider collected your package and is taking it to the customer.` }));
+      // the seller's own screens follow the leg (task push), and see no customer
+      const sent = emitter.toUser.mock.calls.filter((c) => c[0] === sellerG.id && c[1] === 'task:updated');
+      expect(sent.length).toBeGreaterThan(0);
+      expect(sent[sent.length - 1][2]).toMatchObject({ kind: 'express', address: null, to: null });
+    });
+
+    it('delivering needs the code and the full cash; it stamps the lines, collects the payment once and finishes the order', async () => {
+      setting.requireDeliveryCode = 'true';
+      const { order } = await placeExpress({ cod: true });
+      await mkPayment(order, 42);
+      const [leg] = await expressLegs(order.id);
+      expect((await logistics.proofCodeOf(leg.id))?.length).toBe(4);
+      // COD is the whole payment, whatever the line prices say
+      await logistics.recomputeCod(order.id);
+      const fresh = await ds.getRepository(DeliveryTask).findOneByOrFail({ id: leg.id });
+      expect(fresh.codAmountUsd).toBe(42);
+      await logistics.assign(leg.id, riderG.id, admin);
+      await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
+      await delivery.updateStatus(leg.id, 'in_transit', riderG.id);
+      await expect(delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, '0000', 42)).rejects.toThrow(/Wrong delivery code/);
+      const code = (await codeOf(leg.id)) as string;
+      await expect(delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code)).rejects.toThrow(/Confirm the cash you collected/);
+      await expect(delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code, 40)).rejects.toThrow(/not the amount to collect/);
+      await delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code, 42);
+      expect(await orderStatus(order.id)).toBe('delivered');
+      expect(payments.markCollected).toHaveBeenCalledTimes(1);
+      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: 42, byId: riderG.id, source: 'rider', taskId: leg.id }));
+      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: leg.id })).toMatchObject({ codCollectedUsd: 42, codCollectedById: riderG.id });
+      expect((await lines(order.id)).every((l) => !!l.deliveredAt && l.deliveryTaskId === leg.id)).toBe(true);
+      // a repeated "delivered" records the cash once
+      await delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code, 42);
+      expect((await ds.getRepository(DeliveryTask).find({ where: { orderId: order.id } })).length).toBe(1);
+      // the customer's code is the express leg's, and it is not asked of a prepaid order's cash
+      expect(await delivery.codeForOrder(order.id)).toBeNull(); // nothing open any more
+    });
+
+    it('a prepaid express order takes no cash', async () => {
+      const { order } = await placeExpress();
+      const [leg] = await expressLegs(order.id);
+      expect(leg.codAmountUsd).toBe(0);
+      await logistics.assign(leg.id, riderG.id, admin);
+      await walk(leg);
+      expect(await orderStatus(order.id)).toBe('delivered');
+    });
+
+    it('the customer\'s code and the cash flows address the open express leg', async () => {
+      const { order } = await placeExpress();
+      const [leg] = await expressLegs(order.id);
+      expect(await delivery.codeForOrder(order.id)).toBe(await codeOf(leg.id));
+      for (let i = 0; i < 5; i++) await ds.getRepository(DeliveryTask).update({ id: leg.id }, { codeFailures: i + 1 });
+      await ds.getRepository(DeliveryTask).update({ id: leg.id }, { codeFailures: 5, codeLockedUntil: new Date(Date.now() + 60_000) });
+      expect((await delivery.resetCodeLock(leg.id, admin)).codeFailures).toBe(0);
+    });
+
+    it('the rider\'s status error uses the leg\'s name and the right article: "An express delivery that is picked up cannot become assigned."', async () => {
+      const { order } = await placeExpress();
+      const [leg] = await expressLegs(order.id);
+      await logistics.assign(leg.id, riderG.id, admin);
+      await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
+      await expect(delivery.updateStatus(leg.id, 'assigned', riderG.id)).rejects.toThrow('An express delivery that is picked up cannot become assigned.');
+      await expect(delivery.updateStatus(leg.id, 'picked_up', riderG.id)).rejects.toThrow('An express delivery that is picked up cannot become picked up.');
+    });
+
+    it('is refused "return to seller" with the dedicated message', async () => {
+      const { order } = await placeExpress();
+      const [leg] = await expressLegs(order.id);
+      await expect(logistics.returnToSeller(leg.id, admin)).rejects.toThrow('An express parcel is still with the seller. Cancel the order instead.');
+    });
+
+    it('C4: a failure BEFORE collection opens the same express leg again (next attempt, same code, still ready)', async () => {
+      const { order } = await placeExpress();
+      const [leg] = await expressLegs(order.id);
+      await logistics.markSellerReady(order.id, [sellerG.id]);
+      await logistics.assign(leg.id, riderG.id, admin);
+      const code = await codeOf(leg.id);
+      const failed = await delivery.updateStatus(leg.id, 'failed', riderG.id, 'Seller closed');
+      const next = await logistics.reopen(failed);
+      expect(next).toMatchObject({ kind: 'express', status: 'unassigned', attempts: 2, hubId: gombe.id, sellerIds: [sellerG.id], pickedUpAt: null });
+      expect(next.readyAt).not.toBeNull();
+      expect(await codeOf(next.id)).toBe(code);
+      expect(await kinds(order.id)).toEqual(['express:failed', 'express:unassigned']);
+    });
+
+    it('C4: a failure AFTER collection brings the parcel back with the SAME rider (a pickup to the warehouse); scanning it in plans a normal delivery, counted as the next attempt', async () => {
+      const { order } = await placeExpress({ cod: true });
+      await mkPayment(order, 42);
+      const [leg] = await expressLegs(order.id);
+      await logistics.markSellerReady(order.id, [sellerG.id]);
+      await logistics.assign(leg.id, riderG.id, admin);
+      await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
+      await delivery.updateStatus(leg.id, 'in_transit', riderG.id);
+      const failed = await delivery.updateStatus(leg.id, 'failed', riderG.id, 'Customer not reachable');
+      const back = await logistics.reopen(failed);
+      expect(back).toMatchObject({ kind: 'pickup', status: 'picked_up', riderId: riderG.id, toHubId: gombe.id, hubId: gombe.id, parentTaskId: leg.id, sellerId: sellerG.id });
+      expect(back.pickedUpAt).not.toBeNull();
+      expect(await kinds(order.id)).toEqual(['express:failed', 'pickup:picked_up']);
+      // the rider's task list shows the pickup; nobody is sent to the seller
+      const riders = new RiderService(ds.getRepository(DeliveryTask), ds.getRepository(Order), ds.getRepository(User), ds.getRepository(Hub), logistics);
+      expect((await riders.queue(riderG.id)).filter((t) => t.status === 'picked_up').map((t) => t.kind)).toEqual(['pickup']);
+      // staff scan it in at the warehouse: the chain plans a normal delivery
+      const { next } = await logistics.onScanIn(back.id, gombe.id, staff(gombe, 'operator'));
+      expect(next).toHaveLength(1);
+      expect(next[0]).toMatchObject({ kind: 'delivery', status: 'unassigned', hubId: gombe.id, fromHubId: gombe.id, sellerIds: [sellerG.id], attempts: 2, codAmountUsd: 42 });
+      expect(await kinds(order.id)).toEqual(['delivery:unassigned', 'express:failed', 'pickup:delivered']);
+      // it is delivered like any delivery and finishes the order
+      await logistics.assign(next[0].id, riderG.id, admin);
+      await walk(next[0], 42);
+      expect(await orderStatus(order.id)).toBe('delivered');
+      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: 42 }));
+    });
+
+    it('the seller\'s tracking shows the express leg (and the customer\'s tracking too), without a warehouse', async () => {
+      const { order } = await placeExpress();
+      const tracking = (await sellerTracking(ds.manager, [order.id], [sellerG.id])).get(order.id)!;
+      expect(tracking.legs.map((l) => l.kind)).toEqual(['express']);
+      expect(tracking.currentLeg).toBe('express');
+    });
+
+    it('part-cancel while it waits: what the leg carries and collects follows the live lines', async () => {
+      setting.expressDeliveryEnabled = 'true';
+      await ds.getRepository(Seller).update({ id: sellerG.id }, { expressDelivery: true });
+      const order = await mkOrder([sellerG], { cod: true });
+      await ds.getRepository(OrderItem).save(Object.assign(new OrderItem(), { orderId: order.id, productId: 'p-extra', productName: 'Extra', variant: 'Default', qty: 1, priceUsd: 10, sellerId: sellerG.id, sellerName: sellerG.name, fulfilment: 'open' }));
+      const route = await routing.route({ shippingAddress: order.shippingAddress, sellerIds: [sellerG.id] });
+      await ds.getRepository(Order).update({ id: order.id }, { destinationHubId: route.destinationHubId, originHubIds: route.originHubIds, originBySeller: route.originBySeller, routeBySeller: route.routeBySeller, deliveryMode: 'express' });
+      await mkPayment(order, 42);
+      await logistics.planOrder((await ds.getRepository(Order).findOne({ where: { id: order.id } }))!);
+      const [leg] = await expressLegs(order.id);
+      expect(JSON.parse(leg.itemsJson as string)).toHaveLength(2);
+      await ds.getRepository(OrderItem).update({ orderId: order.id, productId: 'p-extra' }, { fulfilment: 'cancelled' });
+      await ds.getRepository(Payment).update({ orderId: order.id }, { amountUsd: 31 });
+      await logistics.recomputeCod(order.id);
+      const after = await ds.getRepository(DeliveryTask).findOneByOrFail({ id: leg.id });
+      expect(after.codAmountUsd).toBe(31);
+      expect(JSON.parse(after.itemsJson as string)).toHaveLength(1);
+    });
+  });
 });
