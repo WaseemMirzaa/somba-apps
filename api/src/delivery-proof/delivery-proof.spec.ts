@@ -267,7 +267,7 @@ describe('proof of delivery with the delivery code flow (DeliveryService, unchan
   const emitter = { toRoles: () => undefined, toHub: () => undefined, toUser: () => undefined };
   const build = (code: string | null, requireCode = true) => {
     const settings = { get: async (k: string) => (k === 'requireDeliveryCode' ? String(requireCode) : null) };
-    const logistics = { proofCodeOf: async () => code, afterRiderStatus: async () => undefined, emitTask: async () => undefined };
+    const logistics = { proofCodeOf: async () => code, afterRiderStatus: async () => undefined, emitTask: async () => undefined, completesOrder: async () => true };
     const payments = { markCollected: async () => undefined };
     return new DeliveryService(ds.getRepository(DeliveryTask), ds.getRepository(Order), emitter as never, payments as never, settings as never, logistics as never);
   };

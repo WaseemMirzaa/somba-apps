@@ -1,6 +1,10 @@
 import {
+  CODE_KINDS,
+  CUSTOMER_KINDS,
+  OUTBOUND_KINDS,
   canScanInAt,
   canScanOutAt,
+  isCustomerKind,
   isHubBound,
   isOrderFlow,
   managingHub,
@@ -157,5 +161,25 @@ describe('warehouse tiers', () => {
     expect(tierAllows('warehouse_staff', null, 'assign')).toBe(false);
     expect(tierAllows('rider', 'manager', 'scan')).toBe(false);
     expect(tierAllows('customer', null, 'scan')).toBe(false);
+  });
+});
+
+describe('CUSTOMER_KINDS: the legs that end at the customer', () => {
+  it('is the one list every "is this the delivery to the customer?" test reads', () => {
+    expect([...CUSTOMER_KINDS]).toEqual(['delivery']);
+    expect(isCustomerKind('delivery')).toBe(true);
+    expect(isCustomerKind(null)).toBe(true); // a task that predates legs is a delivery
+    expect(isCustomerKind(undefined)).toBe(true);
+    for (const k of ['pickup', 'transfer', 'return_pickup', 'return_transfer', 'return_to_seller', 'replacement_delivery']) expect(isCustomerKind(k)).toBe(false);
+  });
+
+  it('feeds the rules built on it', () => {
+    for (const k of CUSTOMER_KINDS) {
+      expect(CODE_KINDS).toContain(k);
+      expect(OUTBOUND_KINDS).toContain(k);
+      expect(isOrderFlow({ kind: k, disputeId: null, replacementId: null, exchangeId: null })).toBe(true);
+      expect(orderStatusFor(k, 'in_transit')).toBe('out_for_delivery');
+      expect(orderStatusFor(k, 'delivered')).toBe('delivered');
+    }
   });
 });

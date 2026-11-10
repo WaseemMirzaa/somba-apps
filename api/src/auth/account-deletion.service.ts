@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 import { DataSource, EntityManager, In, IsNull, Not } from 'typeorm';
 import {
   CartLine,
@@ -147,7 +148,7 @@ export class AccountDeletionService {
     const ids = orders.map((o) => o.id);
     if (ids.length) {
       // The legs that end at (or start from) the customer's door carry the full address and the phone inside it.
-      const tasks = await m.find(DeliveryTask, { where: { orderId: In(ids), kind: In(['delivery', 'replacement_delivery', 'return_pickup']) } });
+      const tasks = await m.find(DeliveryTask, { where: { orderId: In(ids), kind: In([...CUSTOMER_KINDS, 'replacement_delivery', 'return_pickup']) } });
       for (const t of tasks) {
         await m.update(DeliveryTask, { id: t.id }, {
           address: placeOnly(t.address),

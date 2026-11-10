@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AuditLog, DeliveryStatus, DeliveryTask, Order, User } from '../database/entities';
 import { AUDIT_ROLES } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -9,7 +9,7 @@ import { SettingsService } from '../content/settings.service';
 import { cents, HALF_CENT, usd } from '../warehouse/cash.service';
 import { pageOf } from '../common/paging';
 import { tasksOfHub } from '../logistics/hub-scope';
-import { isHubBound, isOrderFlow, kindLabel, riderNext } from '../logistics/leg-rules';
+import { CUSTOMER_KINDS, isCustomerKind, isHubBound, isOrderFlow, kindLabel, riderNext } from '../logistics/leg-rules';
 import { Actor, LogisticsService } from '../logistics/logistics.service';
 import { RunsService } from '../logistics/runs.service';
 import { DESK_ROLES, tierAllows } from '../logistics/tiers';
@@ -39,7 +39,10 @@ export class DeliveryService {
     private readonly settings: SettingsService,
     private readonly logistics: LogisticsService,
     private readonly runs?: RunsService,
-  ) {}
+  ) {
+    // An order that completes without a rider's last handover (its last waiting parcel was cancelled) still gets its cash settled.
+    this.logistics.registerCompletionHandler?.((orderId) => this.settleOrder(orderId));
+  }
 
   /** Open tasks nobody has been given yet, for a warehouse (staff). */
   listUnassigned(paging?: unknown, hubId?: string | null): Promise<DeliveryTask[]> {
@@ -95,11 +98,11 @@ export class DeliveryService {
     }
     // Proof of delivery: the customer's code must be entered to complete the handover.
     // Every wrong code is counted on the task in the database and locks the step after 5 (see delivery-code-lock.ts).
-    if (status === 'delivered' && kind === 'delivery' && (await this.settings.get('requireDeliveryCode')) === 'true') {
+    if (status === 'delivered' && isCustomerKind(kind) && (await this.settings.get('requireDeliveryCode')) === 'true') {
       await this.checkDeliveryCode(task, code, riderId);
     }
     // C-cod: the cash the rider says they took must be exactly what is due, before anything is written.
-    const cashDue = status === 'delivered' && kind === 'delivery' && isOrderFlow(task) ? DeliveryService.checkCash(task, cashUsd) : 0;
+    const cashDue = status === 'delivered' && isCustomerKind(kind) && isOrderFlow(task) ? DeliveryService.checkCash(task, cashUsd) : 0;
     // A parcel in a run that has not left is handed to the driver with the whole run (dispatch), not picked up on its own.
     if (task.runId && status === 'picked_up' && (await this.runs?.isPlanned(task.runId))) {
       throw new BadRequestException('This parcel is part of a transfer run. Manage it from the run.');
@@ -132,15 +135,13 @@ export class DeliveryService {
     }
     const saved = (await this.tasks.findOne({ where: { id: taskId } }))!;
 
-    // Collect COD when the customer's parcel is delivered.
-    if (status === 'delivered' && kind === 'delivery' && isOrderFlow(saved)) {
+    // Cash on delivery: every leg that took cash records it (on the task, and in the audit); the PAYMENT is collected once, when the
+    // delivery finishes the order. A partial leg leaves it pending for the legs still to come.
+    if (status === 'delivered' && isCustomerKind(kind) && isOrderFlow(saved)) {
       const rider = cashDue > 0 ? await this.tasks.manager.getRepository(User).findOne({ where: { id: riderId }, select: ['id', 'name'] }).catch(() => null) : null;
       const byName = rider?.name ?? 'Rider';
-      await this.payments.markCollected(
-        task.orderId,
-        cashDue > 0 ? { amountUsd: cashDue, byId: riderId, byName, byRole: 'rider', at: now, taskId: saved.id, source: 'rider' } : undefined,
-      );
       if (cashDue > 0) await this.auditCash('rider', byName, 'cod.collected', saved, `${saved.orderReference}: ${usd(cashDue)} collected at the door`);
+      if (await this.logistics.completesOrder(saved)) await this.collectPayment(saved, riderId, byName);
     }
 
     // A failed attempt is not a dead end: the leg is re-opened for another attempt (or the order is cancelled and
@@ -235,7 +236,7 @@ export class DeliveryService {
     const mayUnlock = actor.role === 'admin' || actor.role === 'admin_operations' || (actor.role === 'warehouse_staff' && tierAllows(actor.role, actor.tier, 'oversee'));
     if (!mayUnlock) throw new BadRequestException(CODE_MESSAGES.notAllowedToUnlock);
     if (actor.hubId && !this.logistics.touches(task, actor.hubId)) throw new BadRequestException('This task belongs to another warehouse.');
-    if ((task.kind ?? 'delivery') !== 'delivery') throw new BadRequestException(CODE_MESSAGES.notLocked);
+    if (!isCustomerKind(task.kind ?? 'delivery')) throw new BadRequestException(CODE_MESSAGES.notLocked);
     const was = task.codeFailures ?? 0;
     if (was === 0 && !isCodeLocked(task, Date.now())) throw new BadRequestException(CODE_MESSAGES.notLocked);
     await this.tasks.update({ id: task.id }, { codeFailures: 0, codeLockedUntil: null });
@@ -279,11 +280,31 @@ export class DeliveryService {
     if (given !== null && task.codCollectedUsd !== null && Math.abs(cents(given) - cents(task.codCollectedUsd)) > HALF_CENT) {
       throw new BadRequestException(`This delivery is already complete with ${usd(task.codCollectedUsd)} collected.`);
     }
-    if (task.codCollectedAt && task.codCollectedUsd !== null && (task.kind ?? 'delivery') === 'delivery') {
+    // Only a delivery that finished the order settles the payment (a partial leg's retry finishes nothing).
+    if (isCustomerKind(task.kind ?? 'delivery') && isOrderFlow(task) && (await this.logistics.completesOrder(task))) {
       const rider = await this.tasks.manager.getRepository(User).findOne({ where: { id: task.codCollectedById ?? task.riderId ?? '' }, select: ['id', 'name'] }).catch(() => null);
-      await this.payments.markCollected(task.orderId, { amountUsd: task.codCollectedUsd, byId: task.codCollectedById ?? '', byName: rider?.name ?? 'Rider', byRole: 'rider', at: task.codCollectedAt, taskId: task.id, source: 'rider' });
+      await this.collectPayment(task, task.codCollectedById ?? task.riderId ?? '', rider?.name ?? 'Rider');
     }
     return task;
+  }
+
+  /**
+   * The order is complete: mark its cash-on-delivery payment collected, with a receipt for the TOTAL the delivery legs took (the
+   * cash of the earlier legs plus this one's). A prepaid payment is not pending, so this changes nothing there.
+   */
+  private async collectPayment(task: DeliveryTask, byId: string, byName: string): Promise<void> {
+    const legs = await this.tasks.find({ where: { orderId: task.orderId, kind: In([...CUSTOMER_KINDS]), status: 'delivered' } });
+    const total = Math.round(legs.reduce((t, x) => t + (x.codCollectedUsd ?? 0), 0) * 100) / 100;
+    const at = task.codCollectedAt ?? task.deliveredAt ?? new Date();
+    await this.payments.markCollected(task.orderId, total > 0 ? { amountUsd: total, byId, byName, byRole: 'rider', at, taskId: task.id, source: 'rider' } : undefined);
+  }
+
+  /** The order finished without a final handover (the waiting parcels were cancelled after the others were delivered): settle the cash the legs took. */
+  private async settleOrder(orderId: string): Promise<void> {
+    const last = (await this.tasks.find({ where: { orderId, kind: In([...CUSTOMER_KINDS]), status: 'delivered' }, order: { deliveredAt: 'DESC' }, take: 1 }))[0];
+    if (!last) return;
+    const rider = await this.tasks.manager.getRepository(User).findOne({ where: { id: last.codCollectedById ?? last.riderId ?? '' }, select: ['id', 'name'] }).catch(() => null);
+    await this.collectPayment(last, last.codCollectedById ?? last.riderId ?? '', rider?.name ?? 'Rider');
   }
 
   /** One audit line (fire-and-forget like the desk's other audit lines: the delivery must not fail because of it). */
@@ -314,7 +335,7 @@ export class DeliveryService {
 
     const payload = { taskId, orderId: task.orderId, kind: task.kind, lat, lng };
     // Only the customer waiting for their own parcel watches the rider on a map.
-    if (task.kind === 'delivery' || task.kind === 'replacement_delivery') {
+    if (isCustomerKind(task.kind) || task.kind === 'replacement_delivery') {
       const order = await this.orders.findOne({ where: { id: task.orderId } });
       if (order) this.emitter.toUser(order.customerId, 'delivery:location', payload);
     }
@@ -327,10 +348,13 @@ export class DeliveryService {
     return this.logistics.proofCodeOf(taskId);
   }
 
-  /** The code for the customer's CURRENT delivery of an order (only the owner may ask). */
+  /**
+   * The code for the customer's OPEN delivery of an order (only the owner may ask): a split order has one customer leg open at a time,
+   * and each has its own code, so this is the code of the leg that is waiting for, or on its way to, the customer now.
+   */
   async codeForOrder(orderId: string): Promise<string | null> {
-    const task = await this.tasks.findOne({ where: { orderId, kind: 'delivery' }, order: { createdAt: 'DESC' } });
-    if (!task || task.status === 'delivered' || task.status === 'failed') return null;
+    const task = await this.tasks.findOne({ where: { orderId, kind: In([...CUSTOMER_KINDS]), status: In(['unassigned', 'assigned', 'picked_up', 'in_transit']) }, order: { createdAt: 'DESC' } });
+    if (!task) return null;
     return this.getProofCode(task.id);
   }
 }

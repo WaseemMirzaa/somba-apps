@@ -169,6 +169,7 @@ const REASONS: Record<string, string> = {
   'Customer unreachable': 'Client injoignable',
   'Wrong address': 'Adresse incorrecte',
   'Customer refused': 'Le client a refusé',
+  'Could not be delivered': 'N’a pas pu être livré',
   'Payment issue': 'Problème de paiement',
   Other: 'Autre',
   Refunded: 'Remboursé',
@@ -228,6 +229,10 @@ const TITLES: Record<string, string> = {
   'Parcel at our warehouse': 'Colis à notre entrepôt',
   'Delivery update': 'Suivi de la livraison',
   'Delivery attempt failed': 'Échec de la livraison',
+  'Part of your order is on its way': 'Une partie de votre commande est en route',
+  'Part of your order was delivered': 'Une partie de votre commande a été livrée',
+  'Items could not be delivered': 'Articles non livrables',
+  'Task updated': 'Tâche mise à jour',
   Payment: 'Paiement',
   'Payment received': 'Paiement reçu',
   'Payment failed': 'Paiement échoué',
@@ -381,6 +386,7 @@ const BODIES: Rule[] = [
   [/^Your store is open again and takes new orders\.$/, () => 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.'],
   [/^Your store badge is now (\w+) \(was (\w+)\)\.$/, (m) => `Le badge de votre boutique est maintenant ${pick(BADGES, m[1])} (avant : ${pick(BADGES, m[2])}).`],
   // The journey: tasks for the warehouse desk and the riders, notices for sellers, routing alerts for admins
+  [/^(\S+): ([a-z ]+) now carries more parcels\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » mise à jour, d’autres colis s’y ajoutent.`],
   [/^(\S+): ([a-z ]+) needs a rider\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » à confier à un livreur.`],
   [/^(\S+): ([a-z ]+) is now in your tasks\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ajoutée à vos tâches.`],
   [/^(\S+): ([a-z ]+) has been open for (\d+) hours and needs a decision\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ouverte depuis ${m[3]} heures, une décision est nécessaire.`],
@@ -504,6 +510,16 @@ const BODIES: Rule[] = [
     },
   ],
   [/^(.+) is handling (\S+)\.$/, (m) => `${m[1]} s’occupe de ${m[2]}.`],
+  [/^(\S+): part of your order is on its way\. The rest will follow\.$/, (m) => `${m[1]} : une partie de votre commande est en route. Le reste suivra.`],
+  [/^(\S+): part of your order was delivered\. The rest will follow\.$/, (m) => `${m[1]} : une partie de votre commande a été livrée. Le reste suivra.`],
+  [
+    /^(\S+): (.+) could not be delivered \((.+)\)\.( \$([\d.]+) was refunded to your wallet\.)?$/,
+    (m) => `${m[1]} : ${m[2]} n’a pas pu être livré (${translateReason(m[3])}).${m[5] !== undefined ? ` ${moneyFr(m[5])} ont été remboursés sur votre portefeuille.` : ''}`,
+  ],
+  [
+    /^(\S+): (.+)\. We will try again \(attempt (\d+) of (\d+)\)\.$/,
+    (m) => `${m[1]} : ${translateReason(m[2])}. Nous allons réessayer (tentative ${m[3]} sur ${m[4]}).`,
+  ],
   [
     /^(\S+): (.+)\. We will try again \(attempt (\d+) of (\d+)\)\. You can also cancel the order\.$/,
     (m) => `${m[1]} : ${translateReason(m[2])}. Nous allons réessayer (tentative ${m[3]} sur ${m[4]}). Vous pouvez aussi annuler la commande.`,

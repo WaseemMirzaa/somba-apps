@@ -603,6 +603,32 @@ describe('stock out on dispatch', () => {
   });
 });
 
+describe('stock out on dispatch: a split order\'s partial customer leg', () => {
+  const leaving = (over: Partial<DeliveryTask> = {}) => parcel({ kind: 'delivery', status: 'picked_up', fromHubId: hub.id, toHubId: null, ...over });
+
+  it('takes only the products the leg carries; the parcel still waiting stays on the shelves', async () => {
+    const shop = await w.store('Cables', 'u-c');
+    const cable = await w.product(shop, { name: 'Cable', stock: 5 });
+    const a = await bin('A-01');
+    const t = await parcel({ itemsJson: JSON.stringify([{ productId: phone.id, name: 'Phone case', qty: 2 }, { productId: cable.id, name: 'Cable', qty: 3 }]) });
+    await svc.receiveParcel(operator(), { taskId: t.id, binId: a.id });
+    // the leg carries the cable seller's parcel only (`sellerIds` set): the phone cases are still waiting for the rest of the order
+    const partial = await leaving({ sellerIds: ['u-c'], itemsJson: JSON.stringify([{ productId: cable.id, name: 'Cable', qty: 3 }]) });
+    const out = await svc.dispatched(partial);
+    expect(out.map((l) => [l.productId, l.qty])).toEqual([[cable.id, 3]]);
+    expect(await inBin(a, cable)).toBe(0);
+    expect(await inBin(a, phone)).toBe(2);
+  });
+
+  it('a leg with no sellerIds (the whole order) still takes everything the order put away here', async () => {
+    const a = await bin('A-01');
+    const t = await parcel();
+    await svc.receiveParcel(operator(), { taskId: t.id, binId: a.id });
+    await svc.dispatched(await leaving({ sellerIds: null }));
+    expect(await inBin(a)).toBe(0);
+  });
+});
+
 describe('reading', () => {
   it('on hand by SKU and bin, with search by name or SKU label, and totals', async () => {
     const shop = await w.store('Cables', 'u-c');

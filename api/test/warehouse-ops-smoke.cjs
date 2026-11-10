@@ -21,6 +21,8 @@ const ok = (cond, name, extra = '') => {
   if (cond) { pass++; console.log(`  ✅ ${name}`); }
   else { fails.push(name); console.log(`  ❌ ${name} ${extra}`); }
 };
+/** The job's split step (multi-seller orders) also heals every waiting order of the seeded database; these checks are about the aged-parcel and auto-assignment steps only. */
+const ONLY = ['aged', 'assign'];
 const section = (t) => console.log(`\n— ${t}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const rest = async (path, body, token) => {
@@ -165,7 +167,7 @@ const allDay = { workStart: '00:00', workEnd: '23:59', workDays: [1, 2, 3, 4, 5,
   const stuck = await toDelivery(admin, rider, o2.id, { assign: false }); // a delivery leg waiting at the warehouse
   ok(stuck.status === 'unassigned', 'a delivery leg is waiting at the warehouse');
   ok(!(await req(manager.sock, 'warehouseOps:runNow')).ok, 'a manager cannot run the job by hand');
-  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(1.5) });
+  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(1.5), only: ONLY });
   ok(a.ok && a.data.aged.alerted >= 1, 'level 1 (1 h in this test) alerts', JSON.stringify(a));
   a = await req(manager.sock, 'aged:summary', { asOf: hoursFromNow(1.5) });
   ok(a.ok && a.data.levels.join() === '1,2,3' && a.data.byTask[stuck.id]?.level === 1 && a.data.byTask[stuck.id]?.alertedAt, 'the aged board shows level 1 and when it was alerted', JSON.stringify(a.data?.byTask?.[stuck.id]));
@@ -173,18 +175,18 @@ const allDay = { workStart: '00:00', workEnd: '23:59', workDays: [1, 2, 3, 4, 5,
   ok(mine.some((n) => n.title === 'Aged parcel' && n.entityId === stuck.id), 'the warehouse is told in-app (no supervisor here, so the manager)');
   ok(mine.some((n) => n.title === 'Aged parcel' && n.entityId === stuck.id && /Colis|colis|tâche|ouverte/.test(`${n.titleFr ?? ''}${n.bodyFr ?? ''}`)), 'with its French text');
   const before = mine.filter((n) => n.entityId === stuck.id).length;
-  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(1.5) });
+  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(1.5), only: ONLY });
   ok(a.ok && a.data.aged.alerted === 0, 'running the job again alerts nobody twice', JSON.stringify(a));
   ok((await notices(manager)).filter((n) => n.entityId === stuck.id).length === before, 'and sends no second notice');
-  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(2.5) });
+  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(2.5), only: ONLY });
   ok(a.ok && a.data.aged.alerted >= 1, 'level 2 alerts as the parcel ages');
-  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(3.5) });
+  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(3.5), only: ONLY });
   ok(a.ok && a.data.aged.alerted >= 1, 'level 3, the last, escalates');
   a = await req(manager.sock, 'aged:summary', { asOf: hoursFromNow(3.5) });
   ok(a.ok && a.data.byTask[stuck.id]?.level === 3 && a.data.counts[2] >= 1, 'the board shows level 3');
   ok((await notices(manager)).some((n) => n.title === 'Parcel escalated' && n.entityId === stuck.id), 'the manager is told of the escalation');
   ok((await notices(admin)).some((n) => n.title === 'Parcel escalated' && n.entityId === stuck.id), 'and the admins');
-  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(200) });
+  a = await req(admin.sock, 'warehouseOps:runNow', { asOf: hoursFromNow(200), only: ONLY });
   ok(a.ok && a.data.aged.alerted === 0, 'nothing more after the last level');
   ok(!(await req(operator.sock, 'aged:summary')).ok, 'an operator cannot read the aged board');
 
@@ -261,7 +263,7 @@ const allDay = { workStart: '00:00', workEnd: '23:59', workDays: [1, 2, 3, 4, 5,
   const midnightMonday = dow === 1 && new Date().getUTCHours() === 0 && new Date().getUTCMinutes() < 1;
   ok(midnightMonday || pickup7?.status === 'unassigned', 'outside working hours nothing is assigned automatically');
   await req(manager.sock, 'hubSettings:update', allDay);
-  a = await req(admin.sock, 'warehouseOps:runNow');
+  a = await req(admin.sock, 'warehouseOps:runNow', { only: ONLY });
   ok(a.ok && a.data.autoAssigned >= 1, 'the job gives out the tasks that waited once the warehouse is open', JSON.stringify(a));
   const pickup7b = (await tasksOf(admin, o7.id)).find((t) => t.kind === 'pickup');
   ok(pickup7b?.status === 'assigned', 'the waiting task is now with a rider');

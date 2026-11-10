@@ -31,6 +31,8 @@ replace: seller --pickup--> ORIGIN hub --transfer--> DESTINATION hub --replaceme
   old builds. `deliveryZones` stays readable in settings but is not writable and not used.
 - Riders and warehouse staff **always** belong to one hub (`users.hubId`). A rider sees only the tasks assigned to them;
   there is no self-accept and no open pool.
+- **One open customer leg per order, and a multi-seller order can be split** (§16): the customer leg waits for every seller's parcel; once the oldest
+  waiting parcel has waited longer than `splitDeliveryAfterHours` the arrived parcels go alone and the rest follows on a later leg.
 - A leg that **ends at a hub** (`pickup`, `transfer`, `return_pickup`, `return_transfer`) is finished by hub staff
   scanning it in: "delivered" = scanned in. A leg that ends at a customer or a seller (`delivery`,
   `replacement_delivery`, `return_to_seller`) is finished by the rider with `delivery:updateStatus`.
@@ -46,15 +48,14 @@ replace: seller --pickup--> ORIGIN hub --transfer--> DESTINATION hub --replaceme
 | `requirePinnedAddress` | `'true'` = `orders:create` refuses an address with no map pin ("Pin your delivery address on the map.") | true/false | false (prod bootstrap: true) |
 | `requireSellerPickupPin` | `'true'` = a seller cannot list a new product until the store has a pickup pin | true/false | false (prod bootstrap: true) |
 | `localDeliveryDays` | the platform's transit days from the hub to the customer; **delivery time = the seller's preparation + this (+ lane / inter-city days)** | whole 0–30. `Local delivery days must be a whole number between 0 and 30.` | 1 |
-| `splitDeliveryAfterHours` | the oldest parcel waiting at the destination hub leaves after this many hours (split delivery, next PR); 0 = never split | whole 0–720. `Split delivery hours must be a whole number between 0 and 720.` | 24 |
+| `splitDeliveryAfterHours` | the oldest parcel waiting at the destination hub leaves after this many hours: what arrived is delivered and the rest follows (split delivery, §16); 0 = never split | whole 0–720. `Split delivery hours must be a whole number between 0 and 720.` | 24 |
 | `expressDeliveryEnabled` | master switch for express delivery (seller -> customer in the same commune, next PR); keep `false` until the rider app that knows the `express` leg ships | true/false. `Express delivery flag must be one of: true, false.` | false |
 | `expressDeliveryDays` | the platform's days for an express delivery | whole 0–30 | 0 |
 | `expressBaseUsd` / `expressPerKmUsd` / `expressMaxUsd` | express fee = `min(max, base + perKm × km(seller pin -> customer pin))`, no transfer fee, no area override | 0–100 / 0–50 / 0–500 | 2 / 0.5 / 15 |
 | `expressMaxKm` | express distance guard; 0 = no limit | 0–100 | 0 |
 
 All of the above are public and writable with `settings:set` (admin). A key that was never stored reads as its default (`localDeliveryDays` 1,
-`splitDeliveryAfterHours` 24, express off); the dev seed and `bootstrap:prod` store them. The three `express*Usd`, `expressDeliveryDays`, `expressMaxKm` and
-`splitDeliveryAfterHours` are only *stored and served* in this release: split and express delivery land in the next one.
+`splitDeliveryAfterHours` 24, express off); the dev seed and `bootstrap:prod` store them. `splitDeliveryAfterHours` is used by the warehouse job (§16). The `express*` settings are only *stored and served* in this release: express delivery lands in the next one.
 
 Fee = `min(max, base + perKm × km) + transfer fees`, rounded to cents (km from the delivering warehouse to the pin; 0 with no pin). A flat per-area `feeOverrideUsd` replaces `base + perKm × km`; the transfer fee is charged per hop (a lane may set its own price; with no lanes it is the single `deliveryTransferUsd`). See areas.md "Fee and estimate".
 `deliveryZones` is still in the public view for old clients; ignore it.
@@ -143,7 +144,7 @@ Table `delivery_tasks`, new columns: `kind`, `fromHubId`, `toHubId`, `sellerId`,
 |---|---|---|---|---|
 | `pickup` | seller → origin hub (`toHubId`) | origin | origin | **scan-in** at origin |
 | `transfer` | origin (`fromHubId`) → destination (`toHubId`) | origin | origin **or** destination | **scan-in** at destination |
-| `delivery` | destination hub (`fromHubId`) → customer | destination | destination | rider (`delivered`, needs the customer's 4-digit code when `requireDeliveryCode`) |
+| `delivery` | destination hub (`fromHubId`) → customer; carries the parcels of `sellerIds` (§16) | destination | destination | rider (`delivered`, needs the customer's 4-digit code when `requireDeliveryCode`) |
 | `return_pickup` | customer → destination hub | destination | destination | **scan-in** at destination |
 | `return_transfer` | destination → origin | destination | either | **scan-in** at origin |
 | `return_to_seller` | hub → seller | that hub | that hub | rider (`delivered`) |
@@ -157,12 +158,15 @@ Status per leg: `unassigned → assigned → picked_up → in_transit → delive
   (3) a `pickup`/`delivery` of an order cancels + refunds the order; `transfer` and return/replacement legs raise a
   "Task needs attention" notice to admins and hub staff instead. After a failed `pickup` or `delivery` attempt the order
   goes back to `confirmed` (the customer may still cancel; they are told "Delivery attempt failed") and the re-opened leg
-  moves it forward again.
+  moves it forward again. **Split orders** (§16): when part of the order was already delivered, or the failed leg carries only some sellers, the
+  order status is not touched and the leg is planned again (same code, next attempt); at the limit only that leg's lines are cancelled.
 - Staff "scan out" (`logistics:scanOut`): `assigned → picked_up` on legs that leave their hub.
 - Task fields in every payload (`TaskView`): `id, orderId, orderReference, kind, status, riderId, riderName, hubId,
   fromHubId, toHubId, sellerId, sellerName, parentTaskId, disputeId, replacementId, exchangeId, attempts, codAmountUsd,
   address, pickupAddress, lat, lng, failureReason, readyAt, receivedAt, pickedUpAt, deliveredAt, createdAt, updatedAt,
-  from, to, fromHub, toHub, items, collectOld, needsCode, orderFlow`.
+  from, to, fromHub, toHub, items, collectOld, needsCode, orderFlow, hop, hops, sellerIds, completesOrder`.
+  `sellerIds` (customer legs only; `null` = a legacy leg that carries everything, and always `null` in a seller's view) lists the sellers whose parcels the leg
+  carries; `completesOrder` is true when delivering the leg finishes the order (§16).
   `from` / `to` / `fromHub` / `toHub` are endpoints `{type: 'seller'|'hub'|'customer', id, name, address, lat, lng, city?, phone?}` ready to draw on a map.
   `items` = what the leg carries (`[{name, qty, ...}]`). `orderFlow` = the leg belongs to the order's own journey.
   **The handover code is never in a payload** (only the customer sees it: `orders:deliveryCode`).
@@ -175,11 +179,14 @@ Status per leg: `unassigned → assigned → picked_up → in_transit → delive
 - **every** pickup scanned in (all parcels at their origin hubs) → `shipped` (customer notice "Parcel at our warehouse")
 - delivery picked up → `shipped` (no change); delivery in transit → `out_for_delivery`; delivery delivered → `delivered`
 - `order.riderId` is set when the **delivery** leg is assigned (the customer sees that rider's name/phone while
-  `shipped`/`out_for_delivery`); pickup and transfer riders are never shown to the customer.
+  `shipped`/`out_for_delivery`, **and while any customer leg is `picked_up` / `in_transit`**, whatever the order status); pickup and transfer riders
+  are never shown to the customer.
+- **Only a customer leg that finishes the order moves the order status** (`completesOrder`). A partial leg leaves it alone and tells the customer
+  about its part instead ("Part of your order is on its way" / "Part of your order was delivered").
 - Seller "ready" (`orders:sellerReady`) marks the seller's lines `ready` and the seller's pickup task `readyAt`; it no longer
   waits for the other sellers. `orders:sellerCancel` that removes all of a seller's lines voids their legs; the
   delivery leg starts once the remaining parcels are at the destination.
-- Seller line `fulfilment`: `open → ready → received` (received = their pickup scanned in at the hub).
+- Seller line `fulfilment`: `open → ready → received` (received = their pickup scanned in at the hub). `received` stays `received` when the line reaches the customer: `order_items.deliveredAt` (+ `deliveryTaskId`) say so, and a seller's `packageStatus` reads `delivered` once all their live lines have `deliveredAt`.
 
 ## 7. Warehouse desk (staff, new gateway `logistics.gateway.ts`)
 
@@ -195,7 +202,7 @@ The caller's hub and tier are read from the database on every call. Staff withou
 | `logistics:dispatchTransfer` (alias `logistics:scanOut`) | any staff of the task's **from-hub**, admins | `{taskId}` | `TaskView` — hands an assigned parcel to its rider (`picked_up`) |
 | `logistics:custody` | staff / admins (`hubId`) | `{hubId?}` | `{ hubId, inbound: TaskView[], onHand: (TaskView & {since, waitingFor})[], outbound: TaskView[], counts }` |
 
-`onHand.waitingFor` ∈ `other_parcels` (waiting for the order's other parcels), `next_leg`, or `<kind>:<status>` of the next leg.
+`onHand.waitingFor` ∈ `other_parcels` (waiting for the order's other parcels), `next_leg`, or `<kind>:<status>` of the next leg. Custody is **per seller**: a parcel is on hand until a customer leg *that carries that seller* is taken out by a rider, so a split order's waiting parcel stays listed after the partial leg left. `onHand.splitAt` (date or null) is when a parcel waiting for the others will be sent on without them (the oldest waiting parcel of the order + `splitDeliveryAfterHours`; null when splitting is off or the parcel is not waiting).
 Old events keep working with the same rules: `delivery:assign {taskId, riderId}` = `logistics:assign`;
 `warehouse:receive {taskId}` = `logistics:scanIn` (returns the scanned task);
 `warehouse:buildBatch {taskIds, riderId}` assigns several tasks to one rider (supervisor+, all-or-nothing);
@@ -224,14 +231,14 @@ a staff member's list holds their own hub only).
 
 - `rider:tasks` → only tasks **assigned to me**, newest first: `TaskView`-like rows plus `order` (`reference,
   customerName, paymentMethod, estimatedDeliveryDate, totalUsd, shippingAddress, items`). On legs that do not meet the
-  customer (pickup, transfer, return_to_seller) `shippingAddress` is null and the name is the first name only.
+  customer (pickup, transfer, return_to_seller) `shippingAddress` is null and the name is the first name only. On a customer leg `order.items` is **the leg's lines only** and `order.partial` is true when the leg brings only part of the order (§16).
 - `delivery:accept` → `{ok:false, error:"Your warehouse assigns your tasks. You cannot accept a task yourself."}`.
 - `delivery:unassigned` for a rider → `[]`.
 - `delivery:list` (rider) = my tasks. `rider:workStats` (riders only; any other role is refused with "Riders only.") -> `{ totalTasks, completed, active, failed, completedToday, completedLast7Days, successRate, byKind: [{ kind, count }], codCollectedUsd, delivered }`. Riders are salaried: the platform pays nothing per task, so there is no money here except `codCollectedUsd` (the company's cash the rider collected). `completed` counts every finished leg (customer deliveries, seller pickups, transfers, return legs), `active` is everything not delivered or failed, `successRate` is `completed / (completed + failed)` as a whole percent (`null` when both are 0), `byKind` lists the kinds with at least one completed task in `DELIVERY_KINDS` order, counts only. `completedToday` / `completedLast7Days` use `deliveredAt` in UTC days (the last 7 days are today and the 6 before). `delivered` repeats `completed` for old clients and will be dropped one release later. `rider:earnings` is a deprecated alias with the same payload. Screens must call them tasks, not deliveries.
 
 ### Cash on delivery: the cash record and the hand-over (C-cod)
 
-- `delivery:updateStatus { taskId, status: 'delivered', cashUsd }`: on a cash-on-delivery customer delivery (`codAmountUsd > 0`) `cashUsd` is required and must equal the amount due, otherwise the call is refused with both figures ("The cash you entered ($35.00) is not the amount to collect ($40.00). ..."). On a prepaid delivery `cashUsd` must be absent or 0. The server writes `codCollectedUsd`, `codCollectedAt`, `codCollectedById` on the task in the same update that delivers it; a repeated "delivered" changes nothing. The payment turns "succeeded" (`PaymentsService.markCollected`) and the audit trail gets `payment.cod_collected` (entity payment) and `cod.collected` (entity delivery). A delivery closed by hand by an admin (`orders:updateStatus` to delivered) records the cash as taken and settled by that admin.
+- `delivery:updateStatus { taskId, status: 'delivered', cashUsd }`: on a cash-on-delivery customer delivery (`codAmountUsd > 0`) `cashUsd` is required and must equal the amount due, otherwise the call is refused with both figures ("The cash you entered ($35.00) is not the amount to collect ($40.00). ..."). On a prepaid delivery `cashUsd` must be absent or 0. The server writes `codCollectedUsd`, `codCollectedAt`, `codCollectedById` on the task in the same update that delivers it; a repeated "delivered" changes nothing. The payment turns "succeeded" (`PaymentsService.markCollected`) **when the delivery finishes the order** (a partial leg of a split order records its cash on the task and audits `cod.collected`, and leaves the payment pending, §16) and the audit trail gets `payment.cod_collected` (entity payment) and `cod.collected` (entity delivery). A delivery closed by hand by an admin (`orders:updateStatus` to delivered) records the cash as taken and settled by that admin.
 - Task views carry `codCollectedUsd`, `codCollectedAt`, `codHandedOverUsd` (null / 0 before any, and for sellers).
 - `cash:mine` (rider) -> `{ collectedUsd, handedOverUsd, heldUsd, openTasks, handovers: [{ id, amountUsd, heldBeforeUsd, heldAfterUsd, receivedByName, note, createdAt }] }` (latest 20). The rider is pushed `cash:updated` when a hand-over is recorded.
 - `cash:handover { riderId, amountUsd, note?, clientRef? }` (supervisor or manager of the rider's warehouse, or `admin` / `admin_finance` / `admin_operations`; `tierAllows(.., 'assign')`) -> `{ handover, balance }`. Partial amounts are fine, never more than the rider holds; the same `clientRef` is recorded once. Audit action `cod.handover`. `cash:history { hubId?, riderId?, limit? }` (supervisors and managers of the warehouse; `admin` / `admin_finance` / `admin_operations` all warehouses; operators and the other admin roles are refused) -> the receipts, newest first.
@@ -248,6 +255,8 @@ onScanIn(taskId, hubId, actor?): Promise<{ task, next: DeliveryTask[] }>
 createReturnPickup({ disputeId, orderId, items?: [{orderItemId? | productId?, qty?}] }): Promise<DeliveryTask>
 createReplacementDelivery({ replacementId? | exchangeId?, orderId }): Promise<DeliveryTask>   // returns the FIRST leg (a pickup)
 registerListener(fn: ({type, task}) => void | Promise<void>)
+planWaiting(now?): Promise<number>                              // the warehouse job's split step (§16); returns the customer legs it created
+withOrderLock(manager, orderId, fn)                             // common/order-lock.ts: one planning pass per order at a time
 ```
 
 - `createReturnPickup` → one `return_pickup` task (customer → destination hub) carrying `disputeId`. When staff scan it in,
@@ -265,14 +274,15 @@ registerListener(fn: ({type, task}) => void | Promise<void>)
 
 ## 9. Notifications added (all have French in `notifications/localize.ts`)
 
-`Task to assign` (hub supervisors, or all staff if none), `New task assigned to you` (rider, type `task`),
+`Task to assign` (hub supervisors, or all staff if none), `Task updated` (rider: parcels were merged into their customer leg), `New task assigned to you` (rider, type `task`),
 `Pickup scheduled` and `Package at the warehouse` (seller), `Address without a map pin` and `No warehouse with riders`
-(admins + destination hub staff), `Task needs attention` (admins + hub staff). Reused: `Rider assigned`, `Parcel at our
+(admins + destination hub staff), `Task needs attention` (admins + hub staff). Split delivery (to the customer): `Part of your order is on its way`, `Part of your order was delivered`, `Items could not be delivered`. Reused: `Rider assigned`, `Parcel at our
 warehouse`, `Delivery update`, `Parcel ready for pickup`, `Seller package ready`. Removed: `New delivery available`
 (riders are never offered tasks) and the batch notice "collect them at the warehouse".
 
 ## 10. Errors (English text → map to French by exact match)
 
+- `Part of this order was already delivered. Contact support to stop the rest.` (`orders:cancel`, `orders:adminCancel` and `orders:refund` once part of a split order reached the customer)
 - `Your warehouse assigns your tasks. You cannot accept a task yourself.`
 - `A rider must collect this parcel before it can be scanned in.` (scan-in of an unassigned / assigned leg)
 - `That parcel belongs to another warehouse.` (`exceptions:create` with a `taskId` of another warehouse) / `Exception not found.` (changing another warehouse's incident)
@@ -328,7 +338,7 @@ order's `destinationHubId` or one of its `originHubIds` / `originBySeller` value
 **Scan-in rule.** `logistics:scanIn` / `warehouse:receive` / `delivery:scanIn` need the leg to be `picked_up` or `in_transit` (a rider collected it).
 `desk.scanIn` is true only then.
 
-**`needsCode`** on a `TaskView` is true only for a `delivery` leg **and** only while the `requireDeliveryCode` setting is `'true'`.
+**`needsCode`** on a `TaskView` is true only for a customer leg (`CUSTOMER_KINDS`, today `delivery`) **and** only while the `requireDeliveryCode` setting is `'true'`.
 
 **Reassignment.** When `logistics:assign` moves a task from one rider to another, the previous rider gets `task:updated` (and `delivery:updated`)
 `{ id, orderId, orderReference, kind, status: 'unassigned', removed: true, reason: 'reassigned' }` (nothing about the new rider): drop it from the list.
@@ -336,7 +346,8 @@ order's `destinationHubId` or one of its `originHubIds` / `originBySeller` value
 **Customers read the journey.** Every order payload a customer receives (`orders:list`, the `orders:create` reply, `order:created`, `order:updated`) carries:
 ```
 tracking: null | { carrier, currentLeg, riderFirstName, lastUpdateAt, legs: [{ id, kind, status, riderFirstName, readyAt, receivedAt, pickedUpAt,
-                    deliveredAt, createdAt, updatedAt, attempts, failureReason, fromHub: HubName|null, toHub: HubName|null }] }
+                    deliveredAt, createdAt, updatedAt, attempts, failureReason, fromHub: HubName|null, toHub: HubName|null,
+                    sellerIds?, items?: [{ orderItemId, qty }], completesOrder? }] }      // the last three: customer legs only (§16)
 hubs: { destination: HubName|null, origins: HubName[], bySeller: { [sellerId]: HubName } }       // HubName = { id, name, city }
 ```
 (`rider: { name, phone }` as before, while the order is shipped / out for delivery). A leg that changes pushes `order:updated` to the customer, so the
@@ -426,3 +437,58 @@ Migration `1793200000004-WarehouseOps` (`hub_ops_settings`, `aged_alerts`; Query
   platform's default transit is 1 day). It also adds the columns the next release uses: `sellers.expressDelivery` (bool, false), `orders.deliveryMode`
   (varchar 16, `'standard'`), `order_items.deliveredAt` / `deliveryTaskId` (null), `delivery_tasks.sellerIds` (simple-json text, null = a legacy
   leg that carries everything) and the index `IDX_delivery_tasks_kind_status`. Nothing reads or writes them yet except `prepDays` and `deliveryMode`.
+
+## 16. Split delivery: one open customer leg, merged while it waits, the rest after a time limit
+
+**Owner's rule.** A multi-seller order waits at the destination warehouse for every seller's parcel. Once the **oldest waiting parcel** has been there
+longer than `splitDeliveryAfterHours` (default 24; 0 = never), the parcels that arrived are delivered and the rest follows later.
+
+**One open customer leg per order** (`CUSTOMER_KINDS` in `leg-rules.ts`, today `['delivery']`; the next release adds `'express'` there and every place that
+asks "is this the delivery to the customer?" reads that list).
+- A customer leg records `delivery_tasks.sellerIds` (`null` = a legacy leg, created before this release, that carries everything) and its cargo (`itemsJson`) is
+  **the live, not yet delivered lines of those sellers**, read from `order_items` (a multi-seller leg no longer carries the first seller's items only).
+- While the leg is `unassigned` or `assigned` (and not in a run), parcels that reach the destination are **merged** into it: `sellerIds`, cargo and cash are
+  updated, `task:updated` is pushed, and an assigned rider is told **"Task updated"**. While it is `picked_up` / `in_transit`, arrivals wait. When it is
+  delivered, or failed and planned again, the next pass plans the next leg.
+- `completesOrder` is **computed**, never stored: every live line that no *other* leg delivered belongs to one of the leg's sellers (a legacy leg always
+  completes). It changes when the rest merges in or another seller cancels. **Only a leg that completes the order moves the order status**
+  (`shipped` / `out_for_delivery` / `delivered`); a partial leg tells the customer about its part. A leg that finishes the order of a split order
+  also happens when the last waiting parcel is cancelled after the others were delivered: the order is then marked delivered and its cash settled.
+- **Planning** (`progressChain` → `planCustomerLeg`) runs inside `withOrderLock(orderId)` (`common/order-lock.ts`): an in-process queue per order (one API
+  instance, ARCHITECTURE.md) plus a transaction that takes `SELECT … FOR UPDATE` on the order row (MySQL; moved there from `disputes.service`). It reads the legs
+  and lines, decides from the current state and creates or merges the leg in that transaction; announcements, pushes and notifications run **after the
+  commit**. Two scan-ins, a scan-in and the sweeper, or a seller cancel and a scan-in therefore make exactly one leg.
+- **The sweeper** `planWaiting(now)` is step 3 of the 5-minute `WarehouseOpsJob.run` (after the aged-parcel sweep and auto-assignment). Candidates: orders
+  with a scanned-in order-flow parcel at their destination, no open customer leg and a live line still undelivered (200 per pass, oldest first). Each goes through the same locked
+  planning, so it starts a partial leg once the oldest waiting parcel is older than the limit, and it also **heals** "every parcel arrived but no leg
+  exists" (a scan-in that failed half way). It is idempotent. `warehouseOps:runNow { asOf?, only? }` (`asOf` outside production only) replies
+  `{ aged, autoAssigned, split }` (`split` = customer legs the pass created); `only` is a list from `'aged' | 'assign' | 'split'` (default all), so a test that ages every parcel can leave the split step out.
+- **Proof code.** A new leg gets a new code; a retry or a merge keeps it. `orders:deliveryCode` and `codeForOrder` return the code of the **open** customer leg
+  (the order status no longer gates it), and the customer sees the rider while a customer leg is `picked_up` / `in_transit`.
+- **Lines.** Delivering a customer leg stamps its lines `deliveredAt` + `deliveryTaskId`. `fulfilment` stays `received` (old clients test it), and a seller's
+  `packageStatus` can now be `delivered`. Returns still open only when the whole order is `delivered`, and seller payouts and the return window still
+  wait for the whole order (finance clears per order; per-part clearance would need per-line return windows).
+
+**Cash on delivery per leg.**
+- A partial leg collects **its sellers' lines' share** (value − the pro-rata promo discount, `lineShareUsd`, the same helper `sellerCancel` refunds by) **plus the delivery fee
+  only while no customer leg has delivered yet**. The leg that completes the order takes the **remainder**: payment amount − the cash earlier legs collected, so cent rounding can
+  never leave the payment apart from the cash. Shares are recomputed on create, merge, re-plan and part-cancel (the blind subtraction from every open leg is gone).
+- `delivery:updateStatus … delivered` records the cash on the task and audits `cod.collected` on every customer leg; `markCollected` (payment → `succeeded`, audit
+  `payment.cod_collected`, receipt for the **total** the legs took) runs only when the order completes, including in a repeated "delivered". `cash:mine` already sums the tasks.
+
+**Failures.**
+- Below the attempt limit the leg is re-planned (same code, `attempts + 1`, everything now at the warehouse); the order status is not touched when anything was delivered
+  or the leg does not complete the order, and the customer's message does not offer to cancel.
+- At the limit on a leg that does not complete the order (or on any leg once something was delivered) the order is **not** cancelled: `cancelLines()` (taken out of `sellerCancel`)
+  cancels only the leg's lines (reason `Could not be delivered`), refunds prepaid money to the wallet (ledger kind `cancellation`) or lowers the pending COD payment, and restocks;
+  a `return_to_seller` leg per seller (`parentTaskId` = the failed leg) carries the goods back from the warehouse; the customer gets "Items could not be delivered";
+  the parcels still waiting are planned as usual, and an order with nothing left to deliver is delivered. A whole-order leg that fails at the limit with nothing delivered cancels the order as before.
+- **Cancel and refund guards.** Once part of an order reached the customer and the rest has not (some live line with `deliveredAt`, another without), `orders:cancel`, `orders:adminCancel` and
+  `orders:refund` are refused with `Part of this order was already delivered. Contact support to stop the rest.` A fully delivered order is not "partial": it refunds as a return, as before.
+
+**Elsewhere.** `returnToSeller` (aged parcels) sends back the leg's cargo only; the stock dispatch takes only the leg's products when `sellerIds` is set; sellers see only the customer
+legs that carry their parcel (`orders:list` tracking, `legs[]`); `rider:tasks` shows the leg's lines and `order.partial`; the customer's tracking `legs[]` on a customer leg carry
+`sellerIds`, `items` and `completesOrder`.
+
+**Analytics (known).** Analytics count **legs**: a split order is counted once per customer leg in the delivered / failed / on-time figures and in the per-rider counts. Orders delivered
+are not de-duplicated in this release.

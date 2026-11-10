@@ -9,7 +9,7 @@ import { HUB_OPS_ADMINS, HubOpsSettingsService } from './hub-ops-settings.servic
 import { Actor, LogisticsService } from './logistics.service';
 import { OpsAnalyticsService } from './ops-analytics.service';
 import { DESK_ADMINS_ONLY, isDeskAdmin, tierAllows, tierOf } from './tiers';
-import { WarehouseOpsJob } from './warehouse-ops.job';
+import { JOB_STEPS, JobStep, WarehouseOpsJob } from './warehouse-ops.job';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
 
@@ -130,15 +130,22 @@ export class WarehouseOpsGateway {
   }
 
   /**
-   * Run the warehouse job now (super admin and operations admin): the aged-parcel sweep and auto-assignment of waiting legs.
+   * Run the warehouse job now (super admin and operations admin): the aged-parcel sweep, auto-assignment of waiting legs and the
+   * planning of waiting multi-seller orders. Replies `{ aged, autoAssigned, split }`. `only` limits the pass to some steps
+   * (`'aged' | 'assign' | 'split'`), so a test that ages every parcel does not also split every waiting order of its database.
    * Outside production an `asOf` time moves the job's clock, so a test can age the open parcels without waiting.
    */
   @SubscribeMessage('warehouseOps:runNow')
-  async runNow(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { asOf?: string }) {
+  async runNow(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { asOf?: string; only?: unknown }) {
     try {
       const me = await this.actor(client);
       if (!HUB_OPS_ADMINS.includes(me.role)) return fail('Not allowed.');
-      return ok(await this.job.run(this.clock(body?.asOf)));
+      let only: readonly JobStep[] = JOB_STEPS;
+      if (body?.only !== undefined && body?.only !== null) {
+        if (!Array.isArray(body.only) || body.only.some((x) => !JOB_STEPS.includes(x as JobStep))) throw new Error("only must list steps from: 'aged', 'assign', 'split'.");
+        only = body.only as JobStep[];
+      }
+      return ok(await this.job.run(this.clock(body?.asOf), only));
     } catch (e) {
       return fail((e as Error).message);
     }

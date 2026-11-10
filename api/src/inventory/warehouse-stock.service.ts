@@ -13,6 +13,7 @@ import { DESK_ADMINS_ONLY, DESK_ROLES, tierAllows } from '../logistics/tiers';
 import type { DeskAction } from '../logistics/tiers';
 import { ProductsService } from '../products/products.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
+import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 import { ROLE_GROUPS } from '../common/role-groups';
 
 /** Admin roles that read and change a warehouse's stock: the warehouse desk (group `logisticsDesk`). Warehouse staff by tier; no other admin role. */
@@ -733,14 +734,14 @@ export class WarehouseStockService implements OnModuleInit {
 
   /**
    * A parcel left this warehouse with a rider (or on a run): stock out what the ORDER had put away here and has not left
-   * yet. A delivery takes everything the order has here; a transfer or return leg takes the products it carries. It
+   * yet. A delivery takes everything the order has here (a split order's partial leg only what it carries); a transfer or return leg takes the products it carries. It
    * takes only what is on the shelves (it never goes below zero) and it can never block or fail the dispatch: a
    * warehouse that does not track stock simply has nothing to take. Once per task.
    */
   async dispatched(task: DeliveryTask): Promise<WarehouseLedger[]> {
     try {
       const hubId = task.fromHubId;
-      if (!hubId || !task.orderId || !['delivery', 'transfer', 'return_transfer', 'return_to_seller', 'replacement_delivery'].includes(task.kind)) return [];
+      if (!hubId || !task.orderId || ![...CUSTOMER_KINDS, 'transfer', 'return_transfer', 'return_to_seller', 'replacement_delivery'].includes(task.kind)) return [];
       if (await this.ledgerRepo.exist({ where: { taskId: task.id, kind: 'stock_out', reason: 'dispatch' } })) return [];
       const net = await this.ledgerRepo
         .createQueryBuilder('l')
@@ -752,7 +753,9 @@ export class WarehouseStockService implements OnModuleInit {
         .addGroupBy('l.variant')
         .getRawMany<{ productId: string; variant: string; n: string }>();
       let wanted = net.map((r) => ({ productId: r.productId, variant: r.variant, left: Number(r.n) })).filter((r) => r.left > 0);
-      if (!['delivery', 'replacement_delivery'].includes(task.kind)) {
+      // A whole-order delivery takes everything the order has here. A leg that carries only some parcels (a transfer, a return leg, or a
+      // split order's partial customer leg, which records `sellerIds`) takes only the products it carries: the parcels still waiting stay on the shelves.
+      if (!([...CUSTOMER_KINDS, 'replacement_delivery'] as string[]).includes(task.kind) || task.sellerIds) {
         const carried = new Set((await this.cargo(task)).map((l) => l.productId));
         if (carried.size) wanted = wanted.filter((r) => carried.has(r.productId));
       }

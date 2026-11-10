@@ -6,9 +6,10 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { basename, join } from 'path';
 import { Repository } from 'typeorm';
 import { DeliveryProof, DeliveryTask, User } from '../database/entities';
+import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 
 /** The customer-facing handover legs: the only ones that take a photo or a signature. */
-export const PROOF_KINDS: readonly string[] = ['delivery', 'replacement_delivery'];
+export const PROOF_KINDS: readonly string[] = [...CUSTOMER_KINDS, 'replacement_delivery'];
 /** Admin roles that may open a delivery's proof (everyone who works disputes or operations); warehouse staff see their own warehouse's. */
 export const PROOF_ADMINS: readonly string[] = ['admin', 'admin_operations', 'admin_support'];
 /** Limits per file; together they stay under the proxy's 6 MB body limit. */

@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, QueryFailedError, Repository } from 'typeorm';
+import { In, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   DeliveryTask,
   Hub,
+  ItemFulfilment,
   Order,
   OrderItem,
   OrderRequest,
@@ -23,6 +24,7 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { CodReceipt, PaymentsService } from '../payments/payments.service';
 import { recordRefund } from '../payments/refund-ledger';
+import type { RefundKind } from '../database/entities';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
 import { CouponsService } from '../content/coupons.service';
@@ -43,7 +45,8 @@ import { paymentMethodLabel } from '../common/payment-method';
 import { LogisticsService } from '../logistics/logistics.service';
 import { RoutingService } from '../logistics/routing.service';
 import type { Route } from '../logistics/routing.service';
-import { isOrderFlow } from '../logistics/leg-rules';
+import { CUSTOMER_KINDS, isCustomerKind, isOrderFlow } from '../logistics/leg-rules';
+import { PART_DELIVERED, anyDelivered, isPartiallyDelivered, lineShareUsd } from '../common/delivery/split';
 import { ORDER_HUB_SQL, hubsOfOrder, orderHubParams, pushOrderToOps } from '../logistics/hub-scope';
 import { parseAddressPin } from '../common/geo/geo';
 import { inRoleGroup } from '../common/role-groups';
@@ -782,10 +785,12 @@ export class OrdersService {
    * cancelled, else the furthest common step of their lines (open → ready →
    * received), and once the hub has it, the order's own delivery status.
    */
-  static packageStatus(order: Pick<Order, 'status' | 'paymentMethod'>, items: Pick<OrderItem, 'fulfilment'>[]): string {
+  static packageStatus(order: Pick<Order, 'status' | 'paymentMethod'>, items: (Pick<OrderItem, 'fulfilment'> & Partial<Pick<OrderItem, 'deliveredAt'>>)[]): string {
     const live = items.filter((i) => i.fulfilment !== 'cancelled');
     if (!live.length) return 'cancelled';
     if (order.status === 'cancelled' || (order.status === 'pending' && !OrdersService.fulfillable(order))) return order.status;
+    // A split order delivers each seller's parcel on its own: this seller's package is delivered once all their lines reached the customer.
+    if (live.every((i) => !!i.deliveredAt)) return 'delivered';
     if (live.every((i) => i.fulfilment === 'received')) {
       // 'shipped' means every parcel is at a warehouse: the package is still "at hub" until the delivery rider is on the road.
       return ['out_for_delivery', 'delivered', 'returned'].includes(order.status) ? order.status : 'at_hub';
@@ -807,11 +812,21 @@ export class OrdersService {
    * `rider: { name, phone }` so they can call. Never for other statuses (the field is absent, not null).
    */
   async withRiders(orders: Order[]): Promise<(Order & { rider?: RiderContact })[]> {
-    const ids = [...new Set(orders.filter((o) => RIDER_VISIBLE.includes(o.status) && o.riderId).map((o) => o.riderId as string))];
+    // A split order has a customer leg on the road while the order itself still reads "processing": the rider of that leg is shown
+    // for as long as the leg is on the road (picked up or in transit), whatever the order's status. Otherwise the status rule applies.
+    const candidates = orders.filter((o) => !['cancelled', 'returned', 'delivered'].includes(o.status));
+    const onRoad = candidates.length
+      ? await this.orders.manager.find(DeliveryTask, { where: { orderId: In(candidates.map((o) => o.id)), kind: In([...CUSTOMER_KINDS]), status: In(['picked_up', 'in_transit']) }, select: ['id', 'orderId', 'riderId'], order: { createdAt: 'DESC' } })
+      : [];
+    const legRider = new Map<string, string>();
+    for (const t of onRoad) if (t.riderId && !legRider.has(t.orderId)) legRider.set(t.orderId, t.riderId);
+    const riderOf = (o: Order): string | null => legRider.get(o.id) ?? (RIDER_VISIBLE.includes(o.status) ? o.riderId : null);
+    const ids = [...new Set(orders.map(riderOf).filter((x): x is string => !!x))];
     if (!ids.length) return orders;
     const riders = new Map((await this.orders.manager.find(User, { where: { id: In(ids) } })).map((u) => [u.id, u]));
     return orders.map((o) => {
-      const r = RIDER_VISIBLE.includes(o.status) && o.riderId ? riders.get(o.riderId) : undefined;
+      const id = riderOf(o);
+      const r = id ? riders.get(id) : undefined;
       return r ? Object.assign(Object.create(Object.getPrototypeOf(o)), o, { rider: { name: r.name, phone: r.phone ?? null } }) : o;
     });
   }
@@ -871,9 +886,9 @@ export class OrdersService {
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order || order.customerId !== customerId) throw new NotFoundException('Order not found.');
     const required = (await this.settings.get('requireDeliveryCode')) === 'true';
-    // Only once a rider is on the job; before that there is nothing to hand over.
-    const onItsWay = ['processing', 'shipped', 'out_for_delivery'].includes(order.status);
-    return { required, code: required && onItsWay ? await this.delivery.codeForOrder(orderId) : null };
+    // While a customer leg is open (a split order has one at a time, each with its own code); nothing to hand over once the order is over.
+    const over = ['cancelled', 'returned', 'delivered'].includes(order.status);
+    return { required, code: required && !over ? await this.delivery.codeForOrder(orderId) : null };
   }
 
   /** The seller confirms the parcel is packed and ready for the rider. */
@@ -954,47 +969,8 @@ export class OrdersService {
       return OrdersService.sellerView(cancelled, (cancelled.items ?? []).filter((i) => targets.some((t) => t.id === i.id)));
     }
 
-    // The promo discount is shared across lines pro rata, so a partial refund never exceeds what was paid.
-    const value = targets.reduce((t, i) => t + i.priceUsd * i.qty, 0);
-    const share = order.subtotalUsd > 0 ? value / order.subtotalUsd : 0;
-    const refund = Number((value - (order.discountUsd ?? 0) * share).toFixed(2));
-    const payment = await this.payments.forOrder(order.id);
-    const prepaid = order.paymentMethod !== 'cod' && payment?.status === 'succeeded';
-
-    const done = await this.orders.manager.transaction(async (m) => {
-      // Claim the lines atomically: two concurrent cancels refund once.
-      const claim = await m
-        .createQueryBuilder()
-        .update(OrderItem)
-        .set({ fulfilment: 'cancelled', cancelReason: reason })
-        .where("id IN (:...ids) AND fulfilment IN ('open','ready')", { ids: targets.map((i) => i.id) })
-        .execute();
-      if ((claim.affected ?? 0) !== targets.length) return false;
-      if (prepaid && payment && refund > 0) {
-        const per = targets.length ? refund / value : 0;
-        for (const i of targets) {
-          await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per).toFixed(2)) });
-        }
-        // C-refund: recorded and capped like every refund (a payment already refunded cannot be refunded again here).
-        await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: 'seller_cancel', memo: `Refund: seller cancelled part of ${order.reference}` });
-        await this.wallet.apply(order.customerId, 'refund', refund, `Refund: seller cancelled part of ${order.reference}`, m);
-      }
-      if (order.paymentMethod === 'cod' && refund > 0) {
-        // Less to collect at the door.
-        const tasks = await m.find(DeliveryTask, { where: { orderId: order.id, status: In(['unassigned', 'assigned', 'picked_up', 'in_transit']) } });
-        for (const t of tasks) {
-          await m.update(DeliveryTask, { id: t.id }, { codAmountUsd: Math.max(0, Number((t.codAmountUsd - refund).toFixed(2))) });
-        }
-        if (payment && payment.status === 'pending') {
-          await m.update(Payment, { id: payment.id }, { amountUsd: Math.max(0, Number((payment.amountUsd - refund).toFixed(2))) });
-        }
-      }
-      return true;
-    });
+    const { done, refund, prepaid } = await this.cancelLines(order, targets, reason, { from: ['open', 'ready'], kind: 'seller_cancel', memo: `Refund: seller cancelled part of ${order.reference}` });
     if (!done) throw new BadRequestException('These items were just updated. Refresh and try again.');
-    for (const i of targets) {
-      if (!i.productId.startsWith('ext:')) await this.products.restock(i.productId, i.qty, { variant: i.variant, orderId: order.id, reason: 'cancel_restock' });
-    }
 
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
     // A seller with nothing left to send has no parcel to collect; the other parcels may now be complete.
@@ -1021,6 +997,58 @@ export class OrdersService {
   }
 
   /**
+   * Cancel some lines of an order and settle them on their own (taken out of `sellerCancel`, shared with a delivery that was given up):
+   *  - claim the lines atomically, from the fulfilment states in `from`: two concurrent cancels refund once;
+   *  - prepaid: refund their value less their share of the promo discount to the customer's wallet (recorded and capped like every refund);
+   *  - cash on delivery: the payment, still pending, asks for that much less, and the open customer leg's cash is worked out again;
+   *  - restock them.
+   * Returns `done: false` when another request cancelled them first. The caller tells the people involved.
+   */
+  private async cancelLines(
+    order: Order,
+    targets: OrderItem[],
+    reason: string,
+    opts: { from: ItemFulfilment[]; kind: RefundKind; memo: string },
+  ): Promise<{ done: boolean; refund: number; prepaid: boolean }> {
+    // The promo discount is shared across lines pro rata, so a partial refund never exceeds what was paid.
+    const value = targets.reduce((t, i) => t + i.priceUsd * i.qty, 0);
+    const refund = lineShareUsd(order, value);
+    const payment = await this.payments.forOrder(order.id);
+    const prepaid = order.paymentMethod !== 'cod' && payment?.status === 'succeeded';
+
+    const done = await this.orders.manager.transaction(async (m) => {
+      // Claim the lines atomically: two concurrent cancels refund once.
+      const claim = await m
+        .createQueryBuilder()
+        .update(OrderItem)
+        .set({ fulfilment: 'cancelled', cancelReason: reason })
+        .where('id IN (:...ids) AND fulfilment IN (:...from)', { ids: targets.map((i) => i.id), from: opts.from })
+        .execute();
+      if ((claim.affected ?? 0) !== targets.length) return false;
+      if (prepaid && payment && refund > 0) {
+        const per = targets.length ? refund / value : 0;
+        for (const i of targets) {
+          await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per).toFixed(2)) });
+        }
+        // C-refund: recorded and capped like every refund (a payment already refunded cannot be refunded again here).
+        await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: opts.kind, memo: opts.memo });
+        await this.wallet.apply(order.customerId, 'refund', refund, opts.memo, m);
+      }
+      if (order.paymentMethod === 'cod' && refund > 0 && payment && payment.status === 'pending') {
+        // Less to collect at the door.
+        await m.update(Payment, { id: payment.id }, { amountUsd: Math.max(0, Number((payment.amountUsd - refund).toFixed(2))) });
+      }
+      return true;
+    });
+    if (!done) return { done, refund, prepaid };
+    if (order.paymentMethod === 'cod' && refund > 0) await this.logistics.recomputeCod(order.id);
+    for (const i of targets) {
+      if (!i.productId.startsWith('ext:')) await this.products.restock(i.productId, i.qty, { variant: i.variant, orderId: order.id, reason: 'cancel_restock' });
+    }
+    return { done, refund, prepaid };
+  }
+
+  /**
    * A delivery attempt failed. The order goes back to "confirmed" and a fresh
    * task is queued for another attempt; after DELIVERY_MAX_ATTEMPTS the order is
    * cancelled, the stock released and any prepaid money refunded.
@@ -1041,7 +1069,14 @@ export class OrdersService {
       else await this.logistics.alertExhausted(task, reason);
       return;
     }
+    // A split order: parts of it may already be with the customer, and the leg that failed may carry only part of what is left.
+    const delivered = anyDelivered(order.items);
+    const completes = await this.logistics.completesOrder(task);
     if (task.attempts >= max) {
+      if (delivered || !completes) {
+        await this.giveUpLeg(order, task, reason);
+        return;
+      }
       const claim = await this.orders
         .createQueryBuilder()
         .update(Order)
@@ -1065,8 +1100,10 @@ export class OrdersService {
       });
       return;
     }
-    // Back to "confirmed" (the customer may still cancel; the re-opened leg moves the order forward again).
-    order.status = 'confirmed';
+    // Back to "confirmed" (the customer may still cancel; the re-opened leg moves the order forward again). A leg that does not finish
+    // the order, or an order that is partly delivered, keeps its status: the order is further along than this one leg, and cannot be cancelled.
+    const keepStatus = delivered || !completes;
+    if (!keepStatus) order.status = 'confirmed';
     order.riderId = null;
     const saved = await this.orders.save(order);
     const next = await this.logistics.reopen(task);
@@ -1074,10 +1111,47 @@ export class OrdersService {
     pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Delivery attempt failed',
-      body: `${saved.reference}: ${reason}. We will try again (attempt ${next.attempts} of ${max}). You can also cancel the order.`,
+      body: `${saved.reference}: ${reason}. We will try again (attempt ${next.attempts} of ${max}).${keepStatus ? '' : ' You can also cancel the order.'}`,
       type: 'order',
       entityId: saved.id,
     });
+  }
+
+  /**
+   * The attempts ran out on a customer leg that cannot take the whole order down with it (part of the order was delivered already,
+   * or the leg carries only some sellers): ONLY its lines are cancelled (refunded, or less cash to collect, and restocked), a
+   * `return_to_seller` leg per seller brings the goods back from the warehouse, and the customer is told. If nothing is left to
+   * deliver, the order is delivered; otherwise the parcels still waiting are planned as usual.
+   */
+  private async giveUpLeg(order: Order, task: DeliveryTask, reason: string): Promise<void> {
+    const lines = await this.linesOfLeg(order, task);
+    const targets = lines.filter((i) => i.fulfilment !== 'cancelled' && !i.deliveredAt);
+    if (targets.length) {
+      const { done, refund, prepaid } = await this.cancelLines(order, targets, 'Could not be delivered', { from: ['open', 'ready', 'received'], kind: 'cancellation', memo: `Refund: part of ${order.reference} could not be delivered` });
+      if (!done) return;
+      await this.logistics.returnCargoToSellers(task, targets);
+      const names = targets.map((i) => i.productName).join(', ');
+      await this.notifications.toUser(order.customerId, {
+        title: 'Items could not be delivered',
+        body: `${order.reference}: ${names} could not be delivered (${reason}).${prepaid && refund > 0 ? ` $${refund.toFixed(2)} was refunded to your wallet.` : ''}`,
+        type: 'order',
+        entityId: order.id,
+      });
+    }
+    // Plan what waits; an order with nothing left to deliver is delivered there and its cash is settled.
+    await this.logistics.planNext(order.id);
+    const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
+    this.emitter.toUser(saved.customerId, 'order:updated', saved);
+    pushOrderToOps(this.emitter, 'order:updated', saved);
+  }
+
+  /** The lines a customer leg carries: its sellers' lines (a legacy leg carries every line). */
+  private async linesOfLeg(order: Order, task: DeliveryTask): Promise<OrderItem[]> {
+    if (!task.sellerIds) return order.items ?? [];
+    const mine = new Set(task.sellerIds.map((k) => k ?? '_none'));
+    const out: OrderItem[] = [];
+    for (const [key, lines] of await this.logistics.linesBySellerKey(order)) if (mine.has(key)) out.push(...lines);
+    return out;
   }
 
   /** A mobile-money payment reached its final state (webhook, sandbox, or timeout). */
@@ -1173,7 +1247,7 @@ export class OrdersService {
         task.deliveredAt = now;
         // C-cod: the operator who closes a COD delivery by hand takes responsibility for its cash. It is recorded as collected
         // by them and settled at once (it never shows up as cash a rider holds), and it goes in the payment's audit line.
-        const due = task.kind === 'delivery' ? Math.round(task.codAmountUsd * 100) / 100 : 0;
+        const due = isCustomerKind(task.kind) ? Math.round(task.codAmountUsd * 100) / 100 : 0;
         if (due > 0 && actor && !task.codCollectedAt) {
           task.codCollectedUsd = due;
           task.codCollectedAt = now;
@@ -1184,6 +1258,9 @@ export class OrdersService {
         await this.deliveries.save(task);
         await this.logistics.emitTask(task);
       }
+      // Every line that had not reached the customer has now (the order is delivered by hand): stamp them with the closing leg.
+      const closer = open.find((t) => isCustomerKind(t.kind));
+      await this.orders.manager.update(OrderItem, { orderId: saved.id, deliveredAt: IsNull(), fulfilment: Not('cancelled') }, { deliveredAt: now, deliveryTaskId: closer?.id ?? null });
       await this.payments.markCollected(saved.id, receipt);
     }
 
@@ -1231,6 +1308,8 @@ export class OrdersService {
     if (!order || (!operator && order.customerId !== user.id)) {
       throw new NotFoundException('Order not found.');
     }
+    // A split order whose first part already reached the customer cannot be called off: the rest is stopped by support.
+    if (isPartiallyDelivered(order.items)) throw new BadRequestException(PART_DELIVERED);
 
     // Atomic transition: of two concurrent cancels exactly one wins, so stock is
     // restored and money refunded once.

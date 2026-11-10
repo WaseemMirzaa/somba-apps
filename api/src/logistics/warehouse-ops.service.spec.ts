@@ -459,6 +459,21 @@ describe('warehouse operations', () => {
       expect(await job.run(NOW)).toMatchObject({ autoAssigned: 0 }); // idempotent
     });
 
+    it('the job reports { aged, autoAssigned, split } and `only` limits it to some steps', async () => {
+      const waiting = await mkTask({ age: 2 });
+      await on();
+      const job = new WarehouseOpsJob(aged, logistics);
+      expect(await job.run(NOW, ['aged'])).toEqual({ aged: expect.objectContaining({ checked: expect.any(Number) }), autoAssigned: 0, split: 0 });
+      expect((await ds.getRepository(DeliveryTask).findOneByOrFail({ id: waiting.id })).status).toBe('unassigned'); // the assign step did not run
+      expect(await job.run(NOW, ['assign'])).toMatchObject({ autoAssigned: 1, split: 0, aged: { checked: 0, alerted: 0, skipped: 0 } });
+      expect(await job.run(NOW)).toEqual({ aged: expect.any(Object), autoAssigned: 0, split: 0 });
+      // the gateway only accepts the three step names
+      const gw = new WarehouseOpsGateway(settings, aged, analytics, logistics, job, ds.getRepository(User));
+      const adminSock = { data: { user: { id: 'a1', role: 'admin', name: 'Admin' } } } as never;
+      expect(await gw.runNow(adminSock, { only: ['aged', 'sweep'] })).toMatchObject({ ok: false, error: expect.stringContaining("only must list steps") });
+      expect(await gw.runNow(adminSock, { only: ['split'] })).toMatchObject({ ok: true, data: { aged: { checked: 0 }, autoAssigned: 0, split: 0 } });
+    });
+
     it('a warehouse with auto-assignment off keeps its waiting legs for staff', async () => {
       await mkTask();
       expect(await logistics.autoAssignWaiting(NOW)).toBe(0);

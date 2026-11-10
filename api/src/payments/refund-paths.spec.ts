@@ -239,3 +239,19 @@ describe('finance counts every refund', () => {
     expect(f).toMatchObject({ refundsUsd: 73, refundsCount: 2 });
   });
 });
+
+describe('a split order that is partly delivered', () => {
+  it('cannot be refunded as a whole while the rest is still on its way; once everything was delivered it can (returned)', async () => {
+    const items = await ds.getRepository(OrderItem).find({ where: { orderId: order.id } });
+    await ds.getRepository(Order).update({ id: order.id }, { status: 'processing' });
+    await ds.getRepository(OrderItem).update({ id: items[0].id }, { deliveredAt: new Date(), deliveryTaskId: 't-1' });
+    await expect(payments.refund(order.id, true)).rejects.toThrow('Part of this order was already delivered. Contact support to stop the rest.');
+    expect(await ledger()).toEqual([]);
+    expect(await balance()).toBe(0);
+    // the other part reached the customer too: the order is delivered, a refund closes it as returned
+    await ds.getRepository(OrderItem).update({ id: items[1].id }, { deliveredAt: new Date(), deliveryTaskId: 't-2' });
+    await ds.getRepository(Order).update({ id: order.id }, { status: 'delivered' });
+    await expect(payments.refund(order.id, true)).resolves.toMatchObject({ status: 'refunded' });
+    expect((await ds.getRepository(Order).findOneByOrFail({ id: order.id })).status).toBe('returned');
+  });
+});

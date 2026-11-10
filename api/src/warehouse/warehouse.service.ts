@@ -27,6 +27,10 @@ import { riderFits } from '../logistics/leg-rules';
 import { DESK_ROLES, isDeskAdmin, tierAllows } from '../logistics/tiers';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
+import { CUSTOMER_KINDS } from '../logistics/leg-rules';
+
+/** The customer kinds as an SQL list (the constants are fixed words, never input). */
+const CUSTOMER_SQL = CUSTOMER_KINDS.map((k) => `'${k}'`).join(',');
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -262,7 +266,7 @@ export class WarehouseService {
       .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'codUsd')
       .addSelect('COALESCE(SUM(t.codCollectedUsd), 0)', 'collectedUsd')
       .addSelect('COALESCE(SUM(CASE WHEN t.codCollectedUsd IS NULL THEN 0 ELSE t.codHandedOverUsd END), 0)', 'handedOverUsd')
-      .where("t.status = 'delivered' AND t.kind = 'delivery'");
+      .where(`t.status = 'delivered' AND t.kind IN (${CUSTOMER_SQL})`);
     if (hubId) qb.andWhere('(t.hubId = :hubId OR t.fromHubId = :hubId OR t.toHubId = :hubId)', { hubId });
     const rows = await qb
       .groupBy('t.riderId')
