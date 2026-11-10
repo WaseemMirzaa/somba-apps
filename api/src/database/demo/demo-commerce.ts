@@ -25,7 +25,14 @@ import { PayoutsService } from '../../payouts/payouts.service';
 import { PINS } from './demo-catalog';
 import { log } from './demo-common';
 import type { DemoCtx } from './demo-ctx';
-import { Driver, backdateOrder, placeCases } from './demo-flow';
+import {
+  Driver,
+  backdateOrder,
+  placeCases,
+  stampLines,
+  stampTask,
+} from './demo-flow';
+import { orderTypeSpecs } from './demo-orders';
 import type { Stage } from './demo-flow';
 
 const H = 3_600_000;
@@ -77,6 +84,14 @@ export const ADDRESSES = {
     lat: -4.3532,
     lng: 15.3441,
   },
+  kasavubu: {
+    label: 'Home (Kasa-Vubu)',
+    line1: '5 Avenue Kasa-Vubu, quartier Ndolo',
+    commune: 'Kasa-Vubu',
+    code: 'CD-KN-KSV',
+    lat: -4.3401,
+    lng: 15.3079,
+  },
   kalamu: {
     label: 'Home',
     line1: '31 Avenue Kalemie',
@@ -109,7 +124,7 @@ const BOOK: Record<string, AddrKey[]> = {
   'customer.full': ['gombe', 'maluku'],
   'customer.fr': ['ngaliema'],
   'customer.fraud': ['gombe2'],
-  'reviewer.1': ['limete'],
+  'reviewer.1': ['limete', 'kasavubu'],
   'reviewer.2': ['kalamu'],
   'reviewer.3': ['bandalungwa'],
   'reviewer.4': ['kintambo'],
@@ -145,6 +160,12 @@ export interface OrderSpec {
   caseAgoH?: number;
   /** Extra steps (returns, reviews...) run after the order is in its state; each one checks what exists first. */
   after?: (c: Scenario) => Promise<void>;
+  /** Like `after`, but only for an order made in this run and after its clock was moved (the steps there set their own moments). */
+  afterBackdate?: (c: Scenario) => Promise<void>;
+  /** Paid in cash at the door: made only while `codEnabled` is on. */
+  cod?: boolean;
+  /** Same-commune express delivery: made only while `expressDeliveryEnabled` is on. */
+  express?: boolean;
 }
 
 /** What a scenario step gets to work with. */
@@ -254,7 +275,12 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
 
   // ── orders, oldest first so the wallet history reads in order ──────────────────
   const driver = new Driver(ctx);
-  const specs = [...orderSpecs()].sort((a, b) => b.placedAgoH - a.placedAgoH);
+  const all = [...orderSpecs(), ...orderTypeSpecs()];
+  const skipped = all.filter((s) => s.cod && !ctx.codOn);
+  const skippedExpress = all.filter((s) => s.express && !ctx.expressOn);
+  const specs = all
+    .filter((s) => (!s.cod || ctx.codOn) && (!s.express || ctx.expressOn))
+    .sort((a, b) => b.placedAgoH - a.placedAgoH);
   let made = 0;
   for (const spec of specs) {
     const user = ctx.users.get(spec.customer)!;
@@ -283,7 +309,7 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
           qty: l.qty,
           ...(l.variant !== 'Default' ? { variant: l.variant } : {}),
         })),
-        paymentMethod: 'wallet',
+        paymentMethod: spec.cod ? 'cod' : 'wallet',
         shippingAddress: shipping(spec.address, areaIds.get(spec.address)!),
         ...(spec.promo ? { promoCode: spec.promo } : {}),
       } as never);
@@ -319,9 +345,27 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
       });
       if (spec.caseAgoH !== undefined)
         await placeCases(ds, current.id, spec.caseAgoH * H);
+      if (spec.express) {
+        const mode = (
+          await ds.getRepository(Order).findOne({ where: { id: current.id } })
+        )?.deliveryMode;
+        if (mode !== 'express')
+          throw new Error(
+            `Order ${spec.key} was meant to be an express order but is "${mode}": check that store C offers express and that the customer's address is pinned in the store's commune.`,
+          );
+      }
+      if (spec.afterBackdate) await spec.afterBackdate(scenario);
     }
   }
   log(`✓ orders: ${made} created, ${specs.length - made} already there`);
+  if (skippedExpress.length)
+    log(
+      `! ${skippedExpress.length} express-delivery order(s) NOT made: express delivery is off on this server. To get them, run the seed with --with-express (seed-demo.sh --with-express, or DEMO_WITH_EXPRESS=1); that switches expressDeliveryEnabled on. Switch it on only once the rider app that knows express is installed.`,
+    );
+  if (skipped.length)
+    log(
+      `! ${skipped.length} cash-on-delivery order(s) NOT made: cash on delivery is off on this server. To get them, run the seed with --with-cod (seed-demo.sh --with-cod, or DEMO_WITH_COD=1); that switches the setting on, and the removal leaves it on.`,
+    );
   await payoutsAndFinance(ctx);
 }
 
@@ -574,19 +618,17 @@ export function orderSpecs(): OrderSpec[] {
         )
           return;
         const item = c.line('MK-SNK');
-        await c.ctx.app
-          .get(ExchangesService)
-          .create(
-            { id: c.user.id, name: c.user.name, role: 'customer' },
-            {
-              orderId: c.order.id,
-              itemId: item.id,
-              toSku: item.productId,
-              toName: item.productName,
-              toVariant: 'Size: 42',
-              reason: 'The size is too small, I need a 42.',
-            },
-          );
+        await c.ctx.app.get(ExchangesService).create(
+          { id: c.user.id, name: c.user.name, role: 'customer' },
+          {
+            orderId: c.order.id,
+            itemId: item.id,
+            toSku: item.productId,
+            toName: item.productName,
+            toVariant: 'Size: 42',
+            reason: 'The size is too small, I need a 42.',
+          },
+        );
       },
     },
     {
@@ -603,17 +645,15 @@ export function orderSpecs(): OrderSpec[] {
         let rep = await repo.findOne({ where: { orderId: c.order.id } });
         if (!rep) {
           const item = c.line('MK-LMP');
-          const view = await c.ctx.app
-            .get(ReplacementsService)
-            .create(
-              { id: c.user.id, name: c.user.name, role: 'customer' },
-              {
-                orderId: c.order.id,
-                itemId: item.id,
-                reason: 'The lantern does not charge from the solar panel.',
-                condition: 'Defective',
-              },
-            );
+          const view = await c.ctx.app.get(ReplacementsService).create(
+            { id: c.user.id, name: c.user.name, role: 'customer' },
+            {
+              orderId: c.order.id,
+              itemId: item.id,
+              reason: 'The lantern does not charge from the solar panel.',
+              condition: 'Defective',
+            },
+          );
           rep = (await repo.findOne({ where: { id: view.id } }))!;
         }
         if (rep.status === 'requested') {
@@ -710,6 +750,18 @@ export function orderSpecs(): OrderSpec[] {
       address: 'gombe',
       stage: 'placed',
       placedAgoH: 26,
+      // A's parcel reached the warehouse two hours ago: with the order's own age it would be past the split limit, and the
+      // warehouse sweeper would send it out alone within minutes (the split scenarios below show that on purpose).
+      afterBackdate: async (c) => {
+        const a = c.ctx.stores.get('A')!.id;
+        const at = new Date(Date.now() - 2 * H);
+        await stampLines(c.ctx.ds, c.order.id, a, { receivedAt: at });
+        const t = (await c.driver.tasks(c.order.id)).find(
+          (x) => x.kind === 'pickup' && x.sellerId === a,
+        );
+        if (t)
+          await stampTask(c.ctx.ds, t.id, { receivedAt: at, deliveredAt: at });
+      },
       after: async (c) => {
         // A multi-seller basket: store A's package is already at the warehouse, store B's is packed but not collected.
         const a = c.ctx.stores.get('A')!.id;
@@ -843,19 +895,17 @@ export function orderSpecs(): OrderSpec[] {
         let ex = await repo.findOne({ where: { orderId: c.order.id } });
         if (!ex) {
           const item = c.line('MK-SNK');
-          const view = await c.ctx.app
-            .get(ExchangesService)
-            .create(
-              { id: c.user.id, name: c.user.name, role: 'customer' },
-              {
-                orderId: c.order.id,
-                itemId: item.id,
-                toSku: item.productId,
-                toName: item.productName,
-                toVariant: 'Size: 41',
-                reason: 'Trop petites, je voudrais la pointure 41.',
-              },
-            );
+          const view = await c.ctx.app.get(ExchangesService).create(
+            { id: c.user.id, name: c.user.name, role: 'customer' },
+            {
+              orderId: c.order.id,
+              itemId: item.id,
+              toSku: item.productId,
+              toName: item.productName,
+              toVariant: 'Size: 41',
+              reason: 'Trop petites, je voudrais la pointure 41.',
+            },
+          );
           ex = (await repo.findOne({ where: { id: view.id } }))!;
         }
         if (ex.status === 'requested') {

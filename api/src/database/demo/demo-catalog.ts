@@ -907,7 +907,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     state: 'live',
     pictures: 1,
     weightGrams: 3500,
-    prepDays: 4,
+    prepDays: 5,
     machineFr: true,
     look: 'An African hand drum (djembe style).',
   },

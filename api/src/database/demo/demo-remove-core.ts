@@ -33,6 +33,7 @@ import {
   Payout,
   PayoutStatementLine,
   PrivateFile,
+  RefreshToken,
   Product,
   ProductQuestion,
   ProductView,
@@ -42,6 +43,7 @@ import {
   ReviewHelpful,
   ReviewReport,
   Seller,
+  Setting,
   SellerTeamMember,
   StockMovement,
   StoreFollow,
@@ -591,6 +593,11 @@ function steps(i: Ids): Step[] {
     { label: 'hubs', entity: Hub, terms: [['id', i.hubs]] },
     { label: 'addresses', entity: Address, terms: [['userId', i.users]] },
     {
+      label: 'refresh_tokens',
+      entity: RefreshToken,
+      terms: [['userId', i.users]],
+    },
+    {
       label: 'device_tokens',
       entity: DeviceToken,
       terms: [['userId', i.users]],
@@ -786,6 +793,38 @@ export async function planRemoval(
     notes.push(
       `${realOrdersOfDemoUsers.length} order line(s) of demo customers are for real products: their stock is not given back.`,
     );
+  // Cash on delivery is a platform setting the demo may have switched on (--with-cod). The removal never touches settings.
+  if (ids.payments.length) {
+    const cod = await ds
+      .getRepository(Payment)
+      .createQueryBuilder('x')
+      .where('x.id IN (:...p)', { p: ids.payments.slice(0, CHUNK) })
+      .andWhere("x.method = 'cod'")
+      .getCount();
+    const on = await ds
+      .getRepository(Setting)
+      .findOne({ where: { key: 'codEnabled' } });
+    if (cod && on?.value === 'true')
+      notes.push(
+        'Cash on delivery is ON (setting codEnabled). The removal does not change settings, so it stays on: real customers can pay cash at the door. Switch it off in Admin > Settings > Checkout and delivery > Cash on delivery (or see deploy/LIVE-RUNBOOK.md section 7) if the platform should not offer it.',
+      );
+  }
+  // Express delivery: the same, for the platform setting `--with-express` may have switched on.
+  if (ids.orders.length) {
+    const express = await ds
+      .getRepository(Order)
+      .createQueryBuilder('x')
+      .where('x.id IN (:...o)', { o: ids.orders.slice(0, CHUNK) })
+      .andWhere("x.deliveryMode = 'express'")
+      .getCount();
+    const on = await ds
+      .getRepository(Setting)
+      .findOne({ where: { key: 'expressDeliveryEnabled' } });
+    if (express && on?.value === 'true')
+      notes.push(
+        'Express delivery is ON (setting expressDeliveryEnabled). The removal does not change settings, so it stays on: real orders from stores that offer express, in their own commune, get an express rider. Switch it off in Admin > Settings > Checkout and delivery > Express delivery (or: UPDATE settings SET value=\'false\' WHERE key=\'expressDeliveryEnabled\') unless the current rider app is installed.',
+      );
+  }
   const pub = uniq([
     ...manifestNames,
     ...(await referencedUploads(ds, ids)).map((n) => n),

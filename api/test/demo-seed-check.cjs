@@ -85,7 +85,8 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
 (async () => {
   section('Every account signs in');
   const sessions = {};
-  const order = Object.keys(accounts).map((e) => e.split('@')[0]);
+  const only = process.env.ONLY ? process.env.ONLY.split(',') : null; // e.g. ONLY=seller.a,rider: sign in only these (a quick re-run)
+  const order = Object.keys(accounts).map((e) => e.split('@')[0]).filter((l) => !only || only.includes(l));
   for (const local of order) {
     const a = acct(local);
     if (local === 'customer.suspended') {
@@ -107,7 +108,9 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
   const S = sessions;
 
   section('Passwords');
-  ok(acct('customer.full').password !== acct('admin.super').password && acct('seller.a').password === acct('customer.full').password && acct('rider').password === acct('admin.super').password, 'customers and store owners share one password, staff another');
+  // With DEMO_PASSWORD the seed gives everybody one password; otherwise customers and store owners share one and staff another.
+  const single = acct('customer.full').password === acct('admin.super').password;
+  ok(single ? acct('seller.a').password === acct('rider').password : acct('seller.a').password === acct('customer.full').password && acct('rider').password === acct('admin.super').password, single ? 'one password for everybody (DEMO_PASSWORD)' : 'customers and store owners share one password, staff another');
 
   section('Customer: full');
   if (S['customer.full']) {
@@ -162,8 +165,8 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(S['customer.fr'].user.locale === 'fr', 'French customer: locale fr');
     const orders = list(await req(S['customer.fr'].sock, 'orders:list', { limit: 20 }));
     ok(orders.length >= 4 && orders.some((o) => o.status === 'delivered') && orders.some((o) => o.status === 'out_for_delivery'), 'French customer: orders');
-    const o = orders.find((x) => x.items?.[0]?.productNameFr);
-    ok(o && o.items[0].productNameFr !== o.items[0].productName, 'French names on order lines', JSON.stringify(o?.items?.[0]?.productNameFr));
+    const named = orders.flatMap((x) => x.items ?? []).filter((i) => i.productNameFr && i.productNameFr !== i.productName);
+    ok(named.length > 0, 'French names on order lines', JSON.stringify(orders[0]?.items?.[0]?.productNameFr));
   }
 
   section('Stores');
@@ -290,6 +293,157 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(!!data(await req(S['rider'].sock, 'rider:workStats', {})), 'rider: my work');
   }
   if (S['warehouse.maluku']) ok(((data(await req(S['warehouse.maluku'].sock, 'logistics:queue', { status: 'open', limit: 50 }))?.tasks) ?? []).length >= 1, 'the demo warehouse expects the transfer');
+
+
+  section('Orders to process: every store, split delivery, failed attempt, cash on delivery');
+  const settings = S['admin.super'] ? data(await req(S['admin.super'].sock, 'settings:get')) : null;
+  const sellerOrders = async (l) => (S[l] ? list(await req(S[l].sock, 'orders:sellerList', { limit: 200 })) : []);
+  const names = (o) => (o.items ?? []).map((i) => i.productName);
+  const has = (o, want) => names(o).length === want.length && want.every((n) => names(o).includes(n));
+  const legsOf = (o) => o?.tracking?.legs ?? [];
+  const STORES = {
+    'seller.a': { label: 'A (Maison Kinshasa)', toPack: 5, pack: ['Natural Honey 500 g'], part: ['Solar LED Lantern', 'Football, Size 5'], ready: ['Wooden Building Blocks, 50 pieces'] },
+    'seller.b': { label: 'B (Limete Grossiste)', toPack: 2, pack: ['Hibiscus Tea (Bissap) 250 g'], part: ['Storage Bin Set, 3 pieces', 'Exercise Notebooks, 5 pack'], ready: ['Steel Water Bottle 750 ml'] },
+    'seller.c': { label: 'C (Ndolo Électro)', toPack: 2, pack: ['Electric Kettle 1.7 L'], part: ['Rechargeable Stand Fan', 'USB Fast Charger'], ready: ['Steam Iron'] },
+  };
+  const sellerSide = {};
+  for (const [local, st] of Object.entries(STORES)) {
+    if (!S[local]) continue;
+    const orders = await sellerOrders(local);
+    sellerSide[local] = orders;
+    const toPack = orders.filter((o) => o.packageStatus === 'to_pack');
+    ok(toPack.length >= st.toPack, `store ${st.label}: ${toPack.length} orders to pack (at least ${st.toPack})`);
+    const pack = orders.find((o) => has(o, st.pack));
+    ok(pack?.packageStatus === 'to_pack' && pack.paymentMethod === 'wallet', `store ${st.label}: a paid order waiting for Package Ready (${st.pack[0]})`, JSON.stringify(pack?.packageStatus));
+    const part = orders.find((o) => has(o, st.part));
+    ok(part?.packageStatus === 'to_pack' && part.items.length === 2 && part.items.every((i) => i.fulfilment === 'open'), `store ${st.label}: a two-line order the seller can part-cancel`, JSON.stringify(part?.packageStatus));
+    const ready = orders.find((o) => has(o, st.ready));
+    ok(ready?.packageStatus === 'ready' && legsOf(ready).some((l) => l.kind === 'pickup' && l.readyAt && ['unassigned', 'assigned'].includes(l.status)), `store ${st.label}: marked ready, the pickup leg waits for a rider`, JSON.stringify(ready?.packageStatus));
+  }
+
+  // A part-cancel is only refused here on a bad reason (nothing is changed): the order must be the seller's own and open.
+  if (S['seller.b']) {
+    const o = (sellerSide['seller.b'] ?? []).find((x) => has(x, STORES['seller.b'].part));
+    const r = await req(S['seller.b'].sock, 'orders:sellerCancel', { orderId: o?.id, reason: '' });
+    ok(r?.ok === false, 'store B: a part-cancel needs a reason (refused without one, nothing changed)', JSON.stringify(r).slice(0, 100));
+  }
+
+  // Split delivery: A's parcel waited past the limit and is out alone; B's is still on the way.
+  const limit = Number(settings?.splitDeliveryAfterHours ?? 24);
+  if (limit > 0) {
+    if (S['customer.full']) {
+      const o = list(await req(S['customer.full'].sock, 'orders:list', { limit: 100 })).find((x) => has(x, ['Planner 2027, A5', 'Cotton Bath Towel']));
+      ok(!!o && o.status !== 'delivered', 'split order 1: the customer sees it, not delivered yet');
+      const code = o ? data(await req(S['customer.full'].sock, 'orders:deliveryCode', { orderId: o.id })) : null;
+      ok(code && /^\d{4}$/.test(String(code.code ?? '')), 'split order 1: the open partial leg has its own 4-digit code', JSON.stringify(code));
+      const lg = legsOf(o);
+      ok(lg.some((l) => l.kind === 'delivery' && l.status === 'in_transit'), 'split order 1: a delivery leg is out (partial)');
+      ok(lg.some((l) => l.kind === 'pickup' && l.status === 'in_transit') && lg.some((l) => l.kind === 'pickup' && l.status === 'delivered'), "split order 1: A's parcel is at the warehouse, B's is still on its way");
+      ok((o?.items ?? []).every((i) => !i.deliveredAt), 'split order 1: nothing is marked delivered yet');
+    }
+    if (S['seller.b']) {
+      const o = (sellerSide['seller.b'] ?? (await sellerOrders('seller.b'))).find((x) => has(x, ['Cotton Bath Towel']));
+      ok(!!o && o.packageStatus !== 'delivered' && legsOf(o).some((l) => l.kind === 'pickup' && l.status === 'in_transit'), "split order 1: store B sees its parcel still on the way to the warehouse");
+    }
+    if (S['rider']) {
+      const t = data(await req(S['rider'].sock, 'rider:tasks', {}));
+      const arr = Array.isArray(t) ? t : (t?.tasks ?? t?.items ?? []);
+      ok(arr.some((x) => x.kind === 'delivery' && x.status === 'in_transit' && x.order?.partial === true && (x.sellerIds ?? []).length === 1), 'split order 1: the rider has the partial delivery (order.partial, one seller)');
+    }
+    if (S['customer.fr']) {
+      const o = list(await req(S['customer.fr'].sock, 'orders:list', { limit: 100 })).find((x) => has(x, ['Football, Size 5', 'Cassava Flour 2 kg']));
+      const lg = legsOf(o).filter((l) => l.kind === 'delivery');
+      ok(o?.status === 'delivered' && lg.length === 2 && lg.every((l) => l.status === 'delivered'), 'split order 2: delivered on two legs', JSON.stringify([o?.status, lg.map((l) => l.status)]));
+      ok((o?.items ?? []).length === 2 && o.items.every((i) => !!i.deliveredAt), 'split order 2: every line has its own delivered time');
+      const times = new Set((o?.items ?? []).map((i) => String(i.deliveredAt)));
+      ok(times.size === 2, 'split order 2: the two parts were delivered at different times');
+    }
+    for (const local of ['seller.a', 'seller.b']) {
+      if (!S[local]) continue;
+      const o = (await sellerOrders(local)).find((x) => (local === 'seller.a' ? has(x, ['Football, Size 5']) : has(x, ['Cassava Flour 2 kg'])) && x.status === 'delivered');
+      ok(o?.packageStatus === 'delivered', `split order 2: store ${local === 'seller.a' ? 'A' : 'B'} sees its package delivered`, JSON.stringify(o?.packageStatus));
+    }
+  } else console.log('  (splitDeliveryAfterHours is 0 on this server: the split orders are plain two-seller orders and are not checked)');
+
+  // A failed attempt that was re-opened.
+  if (S['reviewer.4']) {
+    const o = list(await req(S['reviewer.4'].sock, 'orders:list', { limit: 50 })).find((x) => has(x, ['Ceramic Dinner Plate Set, 12 pieces']));
+    const del = legsOf(o).filter((l) => l.kind === 'delivery');
+    const failed = del.find((l) => l.status === 'failed');
+    const retry = del.find((l) => ['unassigned', 'assigned', 'picked_up', 'in_transit'].includes(l.status));
+    ok(failed && failed.attempts === 1 && /not reachable/i.test(failed.failureReason ?? ''), 'failed attempt: attempt 1 failed with its reason recorded', JSON.stringify(failed?.failureReason));
+    ok(retry && retry.attempts === 2, 'failed attempt: re-opened as attempt 2', JSON.stringify(retry?.attempts));
+    ok(o?.status === 'confirmed', 'failed attempt: the order is back to confirmed', o?.status);
+    const notes = list(await req(S['reviewer.4'].sock, 'notifications:list'));
+    ok(notes.some((n) => /attempt failed/i.test(`${n.title} ${n.body}`)), 'failed attempt: the customer has the "attempt failed" notice');
+  }
+  if (S['rider']) {
+    const t = data(await req(S['rider'].sock, 'rider:tasks', {}));
+    const arr = Array.isArray(t) ? t : (t?.tasks ?? t?.items ?? []);
+    ok(arr.some((x) => x.kind === 'delivery' && x.attempts === 2 && ['assigned', 'picked_up', 'in_transit'].includes(x.status)), 'failed attempt: the rider has the retry (attempt 2)');
+  }
+
+  // Cash on delivery: only when the server has it on.
+  if (settings?.codEnabled === 'true') {
+    if (S['seller.a']) {
+      const o = (sellerSide['seller.a'] ?? (await sellerOrders('seller.a'))).find((x) => has(x, ['Leather Handbag']) && x.paymentMethod === 'cod');
+      ok(o?.packageStatus === 'to_pack', 'cash on delivery: an order to pack (store A)', JSON.stringify(o?.packageStatus));
+    }
+    if (S['customer.full']) {
+      const o = list(await req(S['customer.full'].sock, 'orders:list', { limit: 100 })).find((x) => has(x, ['Argan Hair Oil 100 ml', 'Ground Coffee 500 g']));
+      ok(o?.paymentMethod === 'cod' && o.status === 'delivered', 'cash on delivery: a delivered order paid in cash', JSON.stringify([o?.paymentMethod, o?.status]));
+      if (S['rider']) {
+        const t = data(await req(S['rider'].sock, 'rider:tasks', {}));
+        const arr = Array.isArray(t) ? t : (t?.tasks ?? t?.items ?? []);
+        const leg = arr.find((x) => x.orderReference === o?.reference && x.kind === 'delivery');
+        ok(leg && leg.codAmountUsd > 0 && Math.abs(leg.codCollectedUsd - leg.codAmountUsd) < 0.005 && leg.codCollectedAt, 'cash on delivery: the cash is recorded on the leg (amount, time)', JSON.stringify([leg?.codAmountUsd, leg?.codCollectedUsd]));
+      }
+    }
+  } else console.log('  (cash on delivery is off on this server: the cash orders are not made and not checked. Seed with --with-cod to get them.)');
+
+  // Express (store C, Kasa-Vubu): only when the server has express on.
+  if (settings?.expressDeliveryEnabled === 'true') {
+    const nm = { pack: ['USB Fast Charger'], out: ['Rechargeable Stand Fan'], done: ['Steam Iron'] };
+    if (S['seller.c']) {
+      const c = await sellerOrders('seller.c');
+      const p = c.find((o) => o.items.length === 1 && o.items[0].productName === 'USB Fast Charger' && o.items[0].qty === 2);
+      ok(p?.packageStatus === 'to_pack', 'express: a paid order waiting for store C to press Package Ready', JSON.stringify(p?.packageStatus));
+      ok(legsOf(p).some((l) => l.kind === 'express' && l.status === 'unassigned' && !l.readyAt), 'express: its express leg is held back until the package is ready');
+    }
+    if (S['reviewer.1']) {
+      const orders = list(await req(S['reviewer.1'].sock, 'orders:list', { limit: 100 }));
+      const out = orders.find((o) => has(o, nm.out));
+      ok(out?.deliveryMode === 'express' && out.status === 'out_for_delivery' && legsOf(out).some((l) => l.kind === 'express' && l.status === 'in_transit'), 'express: an order out for delivery (express leg in transit)', JSON.stringify([out?.deliveryMode, out?.status]));
+      const code = out ? data(await req(S['reviewer.1'].sock, 'orders:deliveryCode', { orderId: out.id })) : null;
+      ok(code && /^\d{4}$/.test(String(code.code ?? '')), 'express: the customer has the 4-digit code', JSON.stringify(code));
+      const done = orders.find((o) => has(o, nm.done));
+      ok(done?.deliveryMode === 'express' && done.status === 'delivered' && (done.items ?? []).every((i) => !!i.deliveredAt), 'express: a delivered order, lines stamped delivered', JSON.stringify([done?.deliveryMode, done?.status]));
+      if (settings?.codEnabled === 'true') {
+        const x = orders.find((o) => has(o, ['Electric Kettle 1.7 L', 'USB Fast Charger']) && o.paymentMethod === 'cod');
+        ok(x?.deliveryMode === 'express', 'express: a cash-on-delivery express order to pack', JSON.stringify([x?.deliveryMode, x?.paymentMethod]));
+      }
+    }
+    if (S['rider']) {
+      const t = data(await req(S['rider'].sock, 'rider:tasks', {}));
+      const arr = Array.isArray(t) ? t : (t?.tasks ?? t?.items ?? []);
+      ok(arr.some((x) => x.kind === 'express' && x.status === 'in_transit'), 'express: the rider has the express job on the road');
+      ok(arr.some((x) => x.kind === 'express' && x.status === 'delivered'), 'express: and a delivered one');
+    }
+  } else console.log('  (express delivery is off on this server: the express orders are not made and not checked. Seed with --with-express to get them.)');
+
+  // Preparation and handling time.
+  if (S['seller.g']) {
+    const ps = list(await req(S['seller.g'].sock, 'products:list', { mine: true, limit: 50 }));
+    ok(ps.some((p) => p.prepDays === 5), 'prep time: a listing with 5 days (store G)');
+    ok(ps.every((p) => p.prepDays >= 3), 'prep time: store G (hand-made) is 3 to 5 days');
+  }
+  if (S['seller.a']) {
+    const ps = list(await req(S['seller.a'].sock, 'products:list', { mine: true, limit: 100 }));
+    ok(ps.some((p) => p.prepDays === 0) && ps.some((p) => p.prepDays >= 2), 'prep time: store A has 0 days (food) up to 2 or more (goods made to order)');
+  }
+  for (const [local, days] of [['seller.a', 1], ['seller.b', 2], ['seller.c', 1], ['seller.g', 3]]) {
+    if (S[local]) ok((await mine(local))?.handlingDays === days, `handling time: ${local} keeps ${days} day(s)`);
+  }
 
   for (const s of Object.values(S)) s.sock.close();
   console.log(`\n${pass} passed, ${fails.length} failed`);
