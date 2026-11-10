@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { RETURN_TO_SELLER_ADMINS } from '../common/staff-access';
+import { withOrderLock } from '../common/order-lock';
+import { cents2, lineShareUsd } from '../common/delivery/split';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 import {
   AuditLog,
   DeliveryKind,
@@ -30,11 +32,13 @@ import { LanesService } from './lanes.service';
 import { PlannedHop, hubsOnRoute } from './lane-route';
 import {
   COLLECTED_STATUSES,
+  CUSTOMER_KINDS,
   OPEN_STATUSES,
   OUTBOUND_KINDS,
   canScanInAt,
   canScanOutAt,
   isHubBound,
+  isCustomerKind,
   isOpen,
   isOrderFlow,
   kindLabel,
@@ -140,6 +144,10 @@ export interface TaskView {
   /** Which hop of a multi-warehouse transfer this is (1-based) and how many there are; 1 of 1 for every other leg. */
   hop: number;
   hops: number;
+  /** On a customer leg: the sellers whose parcels it carries (null = a legacy leg that carries everything; null on every other leg). */
+  sellerIds: (string | null)[] | null;
+  /** On a customer leg: does delivering it finish the order (every live line not delivered by another leg is on it)? False on every other leg. */
+  completesOrder: boolean;
 }
 
 export type LogisticsEventType = 'created' | 'assigned' | 'picked_up' | 'in_transit' | 'scanned_in' | 'delivered' | 'failed' | 'voided';
@@ -323,10 +331,18 @@ export class LogisticsService {
       return { type: 'customer', id: o?.customerId ?? null, name: o?.customerName ?? null, address: text, lat: pin?.lat ?? null, lng: pin?.lng ?? null, city, phone };
     };
 
+    // Does each customer leg finish its order? (Read once per order, from the lines it still has to deliver.)
+    const completes = new Map<string, boolean>();
+    for (const t of tasks) {
+      if (!isCustomerKind(t.kind ?? 'delivery') || !isOrderFlow({ kind: t.kind ?? 'delivery', disputeId: t.disputeId, replacementId: t.replacementId, exchangeId: t.exchangeId })) continue;
+      const o = orders.get(t.orderId);
+      completes.set(t.id, !o || (await this.completesFor(t, o)));
+    }
+
     return tasks.map((t) => {
       let from: TaskEndpoint | null = null;
       let to: TaskEndpoint | null = null;
-      switch (t.kind) {
+      switch (isCustomerKind(t.kind) ? 'customer' : t.kind) {
         case 'pickup':
           from = sellerEp(t);
           to = hubEp(t.toHubId);
@@ -336,7 +352,7 @@ export class LogisticsService {
           from = hubEp(t.fromHubId);
           to = hubEp(t.toHubId);
           break;
-        case 'delivery':
+        case 'customer':
         case 'replacement_delivery':
           from = hubEp(t.fromHubId ?? t.hubId);
           to = customerEp(t);
@@ -391,7 +407,7 @@ export class LogisticsService {
         toHub: hubEp(t.toHubId ?? null),
         items,
         collectOld: t.kind === 'replacement_delivery',
-        needsCode: codeRequired && (t.kind ?? 'delivery') === 'delivery',
+        needsCode: codeRequired && isCustomerKind(t.kind ?? 'delivery'),
         codeFailures: t.codeFailures ?? 0,
         codeLockedUntil: t.codeLockedUntil ?? null,
         codeLocked: isCodeLocked(t, Date.now()),
@@ -400,10 +416,12 @@ export class LogisticsService {
         runReference: t.runId ? (runRefs.get(t.runId) ?? null) : null,
         hop: t.hop ?? 1,
         hops: t.hops ?? 1,
+        sellerIds: isCustomerKind(t.kind ?? 'delivery') ? (t.sellerIds ?? null) : null,
+        completesOrder: completes.get(t.id) ?? false,
       };
       if (audience === 'seller') {
         // A seller sees where their parcel is, never the customer.
-        return { ...base, codeFailures: 0, codeLockedUntil: null, codeLocked: false, address: null, codAmountUsd: 0, codCollectedUsd: null, codCollectedAt: null, codHandedOverUsd: 0, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
+        return { ...base, sellerIds: null, codeFailures: 0, codeLockedUntil: null, codeLocked: false, address: null, codAmountUsd: 0, codCollectedUsd: null, codCollectedAt: null, codHandedOverUsd: 0, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
       }
       return base;
     });
@@ -443,9 +461,10 @@ export class LogisticsService {
   }
 
   // ── creating legs ────────────────────────────────────────────────────────────
-  private async make(base: Partial<DeliveryTask> & Pick<DeliveryTask, 'kind' | 'orderId' | 'orderReference'>): Promise<DeliveryTask> {
+  private async make(base: Partial<DeliveryTask> & Pick<DeliveryTask, 'kind' | 'orderId' | 'orderReference'>, m?: EntityManager): Promise<DeliveryTask> {
     const hubId = base.hubId ?? managingHub(base.kind, base.fromHubId, base.toHubId);
-    const row = this.tasks.create({
+    const repo = m ? m.getRepository(DeliveryTask) : this.tasks;
+    const row = repo.create({
       status: 'unassigned',
       attempts: 1,
       codAmountUsd: 0,
@@ -459,9 +478,9 @@ export class LogisticsService {
       ...base,
       hubId,
       // Only the customer delivery of an order is protected by the 4-digit code.
-      proofCode: base.kind === 'delivery' ? (base.proofCode ?? String(randomInt(1000, 10000))) : null,
+      proofCode: isCustomerKind(base.kind) ? (base.proofCode ?? String(randomInt(1000, 10000))) : null,
     });
-    const saved = await this.tasks.save(row);
+    const saved = await repo.save(row);
     saved.proofCode = null; // the code lives in the database only; the object we hand around must never carry it
     return saved;
   }
@@ -635,19 +654,217 @@ export class LogisticsService {
     return created;
   }
 
-  /** A pickup was voided / finished: has every parcel reached the destination? Then create the delivery leg. */
-  private async progressChain(anchor: { orderId: string; replacementId?: string | null; exchangeId?: string | null }): Promise<DeliveryTask[]> {
-    const orderFlow = !anchor.replacementId && !anchor.exchangeId;
-    const where = orderFlow
-      ? { orderId: anchor.orderId, disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() }
-      : anchor.replacementId
-        ? { replacementId: anchor.replacementId }
-        : { exchangeId: anchor.exchangeId as string };
-    const all = await this.tasks.find({ where, order: { createdAt: 'ASC' } });
+  // ── the customer leg: one open at a time, merged while it waits, split after the limit ───────
+  /** A seller's key on an order's lines and legs (`null` ids are lines no seller owns). */
+  private static keyOf(id: string | null | undefined): string {
+    return id ?? NO_SELLER;
+  }
+
+  /**
+   * Does a customer leg finish its order? True when every live line that no OTHER leg delivered belongs to one of the leg's
+   * sellers (a legacy leg, `sellerIds` null, carries everything). Computed from the lines each time: a partial leg becomes
+   * the last one when another seller cancels, or when the rest arrives and merges into it.
+   */
+  private async completesFor(task: Pick<DeliveryTask, 'id' | 'sellerIds'>, order: Order): Promise<boolean> {
+    if (!task.sellerIds) return true;
+    const mine = new Set(task.sellerIds.map((k) => LogisticsService.keyOf(k)));
+    const groups = await this.groupBySeller(order);
+    for (const [key, lines] of groups) {
+      if (lines.some((l) => !l.deliveredAt || l.deliveryTaskId === task.id) && !mine.has(key)) return false;
+    }
+    return true;
+  }
+
+  /** Public: does delivering this customer leg finish its order? (Anything that is not a customer leg of the order's own journey counts as yes.) */
+  async completesOrder(task: DeliveryTask): Promise<boolean> {
+    if (!isCustomerKind(task.kind) || !isOrderFlow(task)) return true;
+    const order = await this.orders.findOne({ where: { id: task.orderId } });
+    return order ? this.completesFor(task, order) : true;
+  }
+
+  /**
+   * The cash a customer leg collects at the door (0 for prepaid). A leg that finishes the order takes the REMAINDER (what the
+   * payment still asks, after the cash earlier legs collected), so rounding can never leave the payment a cent apart. Any other
+   * leg takes its sellers' lines (the same pro-rata discount a seller's part-cancel refunds by) plus the delivery fee when no
+   * customer leg has delivered yet. A payment that is not pending any more asks for nothing.
+   */
+  private async codShare(m: EntityManager, order: Order, leg: Pick<DeliveryTask, 'id' | 'sellerIds'>, legs: DeliveryTask[], cargo: OrderItem[], completes: boolean): Promise<number> {
+    if (order.paymentMethod !== 'cod') return 0;
+    const pay = await m.findOne(Payment, { where: { orderId: order.id } });
+    if (pay && pay.status !== 'pending') return 0;
+    const total = pay ? pay.amountUsd : order.totalUsd;
+    const delivered = legs.filter((t) => isCustomerKind(t.kind) && t.status === 'delivered' && t.id !== leg.id);
+    const collected = cents2(delivered.reduce((t, x) => t + (x.codCollectedUsd ?? 0), 0));
+    const left = Math.max(0, cents2(total - collected));
+    if (completes) return left;
+    const value = cargo.reduce((t, i) => t + i.priceUsd * i.qty, 0);
+    const fee = delivered.length ? 0 : (order.deliveryFeeUsd ?? 0);
+    return Math.min(left, cents2(lineShareUsd(order, value) + fee));
+  }
+
+  /** The live lines of these sellers that have not reached the customer. */
+  private static undelivered(groups: Map<string, OrderItem[]>, keys: Iterable<string>): OrderItem[] {
+    const out: OrderItem[] = [];
+    for (const k of keys) for (const l of groups.get(k) ?? []) if (!l.deliveredAt) out.push(l);
+    return out;
+  }
+
+  /**
+   * ONE pass of customer-leg planning for an order, run inside {@link withOrderLock}: read the order's legs and lines, decide, then
+   * create, merge into, or leave the open customer leg. It only decides from the current state, so running it twice (a scan-in and
+   * the sweeper at the same moment, a retry after a crash) changes nothing the second time.
+   *
+   *  - There is at most ONE open customer leg per order. While it is unassigned or assigned, parcels that arrive are merged into it
+   *    (its sellers, cargo and cash change). While it is on the road they wait; when it ends, the next pass plans the next leg.
+   *  - With none open: once every parcel with goods left is at the destination, the leg is planned for all of them; before that,
+   *    only when the oldest waiting parcel has waited `splitAfterHours` (0 = never) and then only for the parcels that arrived.
+   *  - `retryOf`: a failed leg is planned again at once (with everything at the warehouse), keeping its proof code.
+   */
+  private async planCustomerLeg(m: EntityManager, orderId: string, opts: { now: Date; splitHours: number; retryOf?: DeliveryTask | null }): Promise<{ created: DeliveryTask | null; merged: DeliveryTask | null; shipped: boolean; finished: boolean; cod: DeliveryTask | null }> {
+    const none = { created: null, merged: null, shipped: false, finished: false, cod: null };
+    const order = await m.findOne(Order, { where: { id: orderId } });
+    if (!order || ['cancelled', 'returned', 'delivered'].includes(order.status)) return none;
+    const all = await m.find(DeliveryTask, { where: { orderId, disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() }, order: { createdAt: 'ASC' } });
     // The latest attempt of each seller's pickup; one that was voided (seller cancelled) no longer counts.
     const latest = new Map<string, DeliveryTask>();
     for (const t of all.filter((x) => x.kind === 'pickup')) {
-      const k = t.sellerId ?? NO_SELLER;
+      const k = LogisticsService.keyOf(t.sellerId);
+      const cur = latest.get(k);
+      if (!cur || t.attempts >= cur.attempts) latest.set(k, t);
+    }
+    const pickups = new Map([...latest].filter(([, p]) => !(p.status === 'failed' && !p.parentTaskId && /cancel/i.test(p.failureReason ?? ''))));
+    if (!pickups.size) return none;
+    const firstTransfer = all.find((t) => t.kind === 'transfer');
+    const dest = order.destinationHubId ?? firstTransfer?.finalHubId ?? firstTransfer?.toHubId ?? [...pickups.values()][0].toHubId;
+    if (!dest) return none;
+    const shipped = [...pickups.values()].every((p) => p.status === 'delivered');
+
+    // A parcel is at the destination when its pickup was scanned in there, or the last hop of its transfer chain was: that scan is the arrival.
+    const kids = (id: string) => all.filter((t) => t.parentTaskId === id && t.kind === 'transfer');
+    const arrival = (p: DeliveryTask): DeliveryTask | null => {
+      if (p.toHubId === dest) return p.status === 'delivered' ? p : null;
+      const stack = [p];
+      while (stack.length) {
+        const cur = stack.pop() as DeliveryTask;
+        for (const k of kids(cur.id)) {
+          if (k.toHubId === dest && k.status === 'delivered') return k;
+          stack.push(k);
+        }
+      }
+      return null;
+    };
+
+    const customer = all.filter((t) => isCustomerKind(t.kind));
+    // Goods a "return to seller" sent back are not waiting for the customer any more.
+    const sentBack = new Set<string>();
+    for (const t of customer) {
+      if (t.status !== 'failed' || t.failureReason !== RETURN_TO_SELLER_REASON) continue;
+      for (const k of t.sellerIds ?? [...pickups.keys()]) sentBack.add(LogisticsService.keyOf(k));
+    }
+    const groups = await this.groupBySeller(order);
+    const pending = [...groups.keys()].filter((k) => pickups.has(k) && !sentBack.has(k) && groups.get(k)!.some((l) => !l.deliveredAt));
+    const arrived = pending.filter((k) => arrival(pickups.get(k) as DeliveryTask));
+    const open = customer.find((t) => isOpen(t.status)) ?? null;
+    const everyLineSettled = [...groups.values()].every((ls) => ls.every((l) => !!l.deliveredAt)) && [...groups.values()].some((ls) => ls.length);
+    const finished = !open && !pending.length && everyLineSettled;
+
+    if (open) {
+      let merged: DeliveryTask | null = null;
+      if (open.sellerIds && ['unassigned', 'assigned'].includes(open.status) && !open.runId) {
+        const have = new Set(open.sellerIds.map((k) => LogisticsService.keyOf(k)));
+        const add = arrived.filter((k) => !have.has(k));
+        if (add.length) {
+          const keys = [...have, ...add];
+          const cargo = LogisticsService.undelivered(groups, keys);
+          const frNames = await frenchLineNames(m, cargo.map((i) => i.id));
+          await m.update(DeliveryTask, { id: open.id }, { sellerIds: keys.map((k) => (k === NO_SELLER ? null : k)), itemsJson: JSON.stringify(cargo.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr))) });
+          merged = (await m.findOne(DeliveryTask, { where: { id: open.id } }))!;
+        }
+      }
+      const cod = await this.recomputeOpenCod(m, order, groups, merged ?? open, all);
+      return { ...none, shipped, merged, cod };
+    }
+    if (!arrived.length) return { ...none, shipped, finished };
+
+    const complete = arrived.length === pending.length;
+    if (!complete && !opts.retryOf) {
+      // Not everything is here: wait, unless the oldest waiting parcel has waited past the limit.
+      const oldest = Math.min(...arrived.map((k) => (arrival(pickups.get(k) as DeliveryTask)?.receivedAt ?? opts.now).getTime()));
+      if (!(opts.splitHours > 0) || oldest > opts.now.getTime() - opts.splitHours * 3_600_000) return { ...none, shipped };
+    }
+    const cargo = LogisticsService.undelivered(groups, arrived);
+    const frNames = await frenchLineNames(m, cargo.map((i) => i.id));
+    const leg: Pick<DeliveryTask, 'id' | 'sellerIds'> = { id: '', sellerIds: arrived.map((k) => (k === NO_SELLER ? null : k)) };
+    const created = await this.make(
+      {
+        kind: 'delivery',
+        orderId: order.id,
+        orderReference: order.reference,
+        fromHubId: dest,
+        hubId: dest,
+        address: order.shippingAddress,
+        sellerIds: leg.sellerIds,
+        codAmountUsd: await this.codShare(m, order, leg, all, cargo, complete),
+        itemsJson: JSON.stringify(cargo.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr))),
+        pickupAddress: await this.hubAddressText(dest),
+        // A retry keeps the proof code and counts as the next attempt; a new leg gets a new code (the first leg's rider has heard the old one).
+        ...(opts.retryOf ? { attempts: opts.retryOf.attempts + 1, proofCode: (await this.proofCodeOf(opts.retryOf.id)) ?? undefined, readyAt: opts.retryOf.readyAt, receivedAt: opts.retryOf.receivedAt } : {}),
+      },
+      m,
+    );
+    return { ...none, created, shipped };
+  }
+
+  /** Re-work the open customer leg's cash from the current lines and payment (shares are recomputed on create, merge, re-plan and part-cancel). Returns the leg when its figure changed. */
+  private async recomputeOpenCod(m: EntityManager, order: Order, groups: Map<string, OrderItem[]>, leg: DeliveryTask, all: DeliveryTask[]): Promise<DeliveryTask | null> {
+    if (!isOpen(leg.status)) return null;
+    const keys = leg.sellerIds ? leg.sellerIds.map((k) => LogisticsService.keyOf(k)) : [...groups.keys()];
+    const cargo = LogisticsService.undelivered(groups, keys);
+    const completes = await this.completesFor(leg, order);
+    const due = await this.codShare(m, order, leg, all, cargo, completes);
+    if (Math.abs(due - leg.codAmountUsd) < 0.005) return null;
+    await m.update(DeliveryTask, { id: leg.id }, { codAmountUsd: due });
+    return (await m.findOne(DeliveryTask, { where: { id: leg.id } })) ?? null;
+  }
+
+  /** Recompute what the open customer leg of an order collects (after a part-cancel lowered the payment, say) and tell the rider. */
+  async recomputeCod(orderId: string): Promise<void> {
+    const changed = await withOrderLock(this.tasks.manager, orderId, async (m) => {
+      const order = await m.findOne(Order, { where: { id: orderId } });
+      if (!order) return null;
+      const all = await m.find(DeliveryTask, { where: { orderId, disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() }, order: { createdAt: 'ASC' } });
+      const open = all.find((t) => isCustomerKind(t.kind) && isOpen(t.status));
+      return open ? this.recomputeOpenCod(m, order, await this.groupBySeller(order), open, all) : null;
+    });
+    if (changed) await this.emitTask(changed);
+  }
+
+  /**
+   * A pickup was voided / finished, or a leg ended: plan what comes next for the customer. For an order's own journey this takes the
+   * order's turn ({@link withOrderLock}) and creates / merges the open customer leg ({@link planCustomerLeg}); what has to be announced
+   * is announced after the commit. A replacement or an exchange has its own single delivery leg once its parcel is at the destination.
+   */
+  private async progressChain(anchor: { orderId: string; replacementId?: string | null; exchangeId?: string | null }, opts: { now?: Date; retryOf?: DeliveryTask | null } = {}): Promise<DeliveryTask[]> {
+    if (anchor.replacementId || anchor.exchangeId) return this.progressSide(anchor);
+    const splitHours = await this.routing.splitAfterHours();
+    const out = await withOrderLock(this.tasks.manager, anchor.orderId, (m) => this.planCustomerLeg(m, anchor.orderId, { now: opts.now ?? new Date(), splitHours, retryOf: opts.retryOf }));
+    // "Every parcel is at a warehouse" moves the order to shipped when the parcels arrive; planning a failed leg again must not push an order
+    // that went back to `confirmed` forward (the re-opened leg does that when its rider picks it up).
+    if (out.shipped && !opts.retryOf) await this.advanceOrder(anchor.orderId, 'shipped', { notice: 'warehouse' });
+    if (out.merged) await this.afterMerge(out.merged);
+    else if (out.cod) await this.emitTask(out.cod);
+    if (out.created) await this.announce(out.created);
+    if (out.finished) await this.finishOrder(anchor.orderId);
+    return out.created ? [out.created] : [];
+  }
+
+  /** The replacement / exchange side: its one `replacement_delivery` leg is created once the replacement parcel is at the destination. */
+  private async progressSide(anchor: { orderId: string; replacementId?: string | null; exchangeId?: string | null }): Promise<DeliveryTask[]> {
+    const where = anchor.replacementId ? { replacementId: anchor.replacementId } : { exchangeId: anchor.exchangeId as string };
+    const all = await this.tasks.find({ where, order: { createdAt: 'ASC' } });
+    const latest = new Map<string, DeliveryTask>();
+    for (const t of all.filter((x) => x.kind === 'pickup')) {
+      const k = LogisticsService.keyOf(t.sellerId);
       const cur = latest.get(k);
       if (!cur || t.attempts >= cur.attempts) latest.set(k, t);
     }
@@ -655,14 +872,9 @@ export class LogisticsService {
     if (!pickups.length) return [];
     const order = await this.orders.findOne({ where: { id: anchor.orderId } });
     if (!order) return [];
-    if (orderFlow && ['cancelled', 'returned', 'delivered'].includes(order.status)) return [];
     const firstTransfer = all.find((t) => t.kind === 'transfer');
-    const dest = (orderFlow ? order.destinationHubId : null) ?? firstTransfer?.finalHubId ?? firstTransfer?.toHubId ?? pickups[0].toHubId;
+    const dest = firstTransfer?.finalHubId ?? firstTransfer?.toHubId ?? pickups[0].toHubId;
     if (!dest) return [];
-
-    if (orderFlow && pickups.every((p) => p.status === 'delivered')) await this.advanceOrder(order.id, 'shipped', { notice: 'warehouse' });
-
-    // A parcel is at the destination when its pickup was scanned in there, or the last hop of its transfer chain was.
     const kids = (id: string) => all.filter((t) => t.parentTaskId === id && t.kind === 'transfer');
     const reachedDest = (p: DeliveryTask): boolean => {
       if (p.toHubId === dest) return p.status === 'delivered';
@@ -677,16 +889,14 @@ export class LogisticsService {
       return false;
     };
     if (!pickups.every(reachedDest)) return [];
-    const finalKind: DeliveryKind = orderFlow ? 'delivery' : 'replacement_delivery';
-    if (all.some((t) => t.kind === finalKind)) return [];
+    if (all.some((t) => t.kind === 'replacement_delivery')) return [];
     const last = await this.make({
-      kind: finalKind,
+      kind: 'replacement_delivery',
       orderId: order.id,
       orderReference: order.reference,
       fromHubId: dest,
       hubId: dest,
       address: order.shippingAddress,
-      codAmountUsd: orderFlow ? await this.codFor(order) : 0,
       replacementId: anchor.replacementId ?? null,
       exchangeId: anchor.exchangeId ?? null,
       itemsJson: pickups[0].itemsJson,
@@ -694,6 +904,77 @@ export class LogisticsService {
     });
     await this.announce(last);
     return [last];
+  }
+
+  /** Plan the order's next customer leg now (a leg ended or was given up): the same locked planning a scan-in runs. Returns the legs it created. */
+  planNext(orderId: string): Promise<DeliveryTask[]> {
+    return this.progressChain({ orderId });
+  }
+
+  /** The order's live lines by seller key (`_none` for lines no seller owns). */
+  linesBySellerKey(order: Order): Promise<Map<string, OrderItem[]>> {
+    return this.groupBySeller(order);
+  }
+
+  /** Parcels were merged into a leg that is still at the warehouse: the feeds update and its rider is told ("Task updated"). */
+  private async afterMerge(task: DeliveryTask): Promise<void> {
+    await this.emitTask(task);
+    if (task.riderId) {
+      await this.notifications
+        .toUser(task.riderId, { title: 'Task updated', body: `${task.orderReference}: ${kindLabel(task.kind)} now carries more parcels.`, type: 'task', entityId: task.id, extra: { orderId: task.orderId, view: 'active', kind: task.kind } })
+        .catch(() => undefined);
+    }
+  }
+
+  /**
+   * Every line of the order has now reached the customer or was cancelled (a seller or a failed attempt took the last waiting parcel
+   * out): the order is delivered and its cash is settled. Idempotent.
+   */
+  private async finishOrder(orderId: string): Promise<void> {
+    await this.advanceOrder(orderId, 'delivered', { notice: 'update' });
+    try {
+      await this.completion?.(orderId);
+    } catch (e) {
+      this.logger.warn(`settling ${orderId} failed: ${(e as Error).message}`);
+    }
+  }
+
+  private completion: ((orderId: string) => Promise<void>) | null = null;
+  /** DeliveryService settles the cash when an order completes without a rider finishing it (the last waiting parcel was cancelled). */
+  registerCompletionHandler(fn: (orderId: string) => Promise<void>): void {
+    this.completion = fn;
+  }
+
+  /**
+   * The sweeper's step: for every order whose parcels are at the destination warehouse with no customer leg open, run the same
+   * locked planning as a scan-in. It starts a partial leg once the oldest waiting parcel is older than `splitDeliveryAfterHours`,
+   * and also plans an order whose parcels all arrived but whose leg was never created (a scan-in that failed half way). Idempotent.
+   * Returns how many customer legs it created.
+   */
+  async planWaiting(now: Date = new Date()): Promise<number> {
+    const rows = await this.tasks
+      .createQueryBuilder('t')
+      .innerJoin(Order, 'o', 'o.id = t.orderId')
+      .select('t.orderId', 'orderId')
+      .addSelect('MIN(t.receivedAt)', 'since')
+      .where("t.status = 'delivered' AND t.kind IN ('pickup','transfer') AND t.disputeId IS NULL AND t.replacementId IS NULL AND t.exchangeId IS NULL")
+      .andWhere('t.toHubId = o.destinationHubId')
+      .andWhere("o.status NOT IN ('cancelled','returned','delivered')")
+      .andWhere(`NOT EXISTS (SELECT 1 FROM delivery_tasks c WHERE c.orderId = t.orderId AND c.kind IN (${CUSTOMER_KINDS.map((k) => `'${k}'`).join(',')}) AND c.status IN ('unassigned','assigned','picked_up','in_transit'))`)
+      .andWhere("EXISTS (SELECT 1 FROM order_items i WHERE i.orderId = t.orderId AND i.fulfilment <> 'cancelled' AND i.deliveredAt IS NULL)")
+      .groupBy('t.orderId')
+      .orderBy('since', 'ASC')
+      .limit(200)
+      .getRawMany<{ orderId: string }>();
+    let created = 0;
+    for (const r of rows) {
+      try {
+        created += (await this.progressChain({ orderId: r.orderId }, { now })).length;
+      } catch (e) {
+        this.logger.warn(`planning ${r.orderId} failed: ${(e as Error).message}`);
+      }
+    }
+    return created;
   }
 
   /**
@@ -864,7 +1145,7 @@ export class LogisticsService {
   async createReturnPickup(input: { disputeId: string; orderId: string; items?: ReturnItemInput[] }): Promise<DeliveryTask> {
     const order = await this.orders.findOne({ where: { id: input.orderId } });
     if (!order) throw new NotFoundException('Order not found.');
-    const dest = order.destinationHubId ?? (await this.tasks.findOne({ where: { orderId: order.id, kind: 'delivery' }, order: { createdAt: 'DESC' } }))?.hubId ?? null;
+    const dest = order.destinationHubId ?? (await this.tasks.findOne({ where: { orderId: order.id, kind: In([...CUSTOMER_KINDS]) }, order: { createdAt: 'DESC' } }))?.hubId ?? null;
     if (!dest) throw new BadRequestException('This order has no destination warehouse.');
     const existing = await this.tasks.findOne({ where: { disputeId: input.disputeId, kind: 'return_pickup', status: Not('failed') } });
     if (existing) return existing;
@@ -949,7 +1230,7 @@ export class LogisticsService {
     const existing = await this.tasks.findOne({ where: { ...key, kind: 'pickup' }, order: { createdAt: 'ASC' } });
     if (existing) return existing;
 
-    const dest = order.destinationHubId ?? (await this.tasks.findOne({ where: { orderId: order.id, kind: 'delivery' }, order: { createdAt: 'DESC' } }))?.hubId ?? null;
+    const dest = order.destinationHubId ?? (await this.tasks.findOne({ where: { orderId: order.id, kind: In([...CUSTOMER_KINDS]) }, order: { createdAt: 'DESC' } }))?.hubId ?? null;
     if (!dest) throw new BadRequestException('This order has no destination warehouse.');
     const hubs = await this.routing.hubsWithRiders();
     const destination = hubs.find((h) => h.id === dest);
@@ -1104,7 +1385,7 @@ export class LogisticsService {
     if (task.runId) throw new BadRequestException('This parcel is part of a transfer run. Manage it from the run.');
     if (!canReturnToSeller(task)) {
       throw new BadRequestException(
-        task.kind === 'delivery' || task.kind === 'replacement_delivery' ? 'A rider already has this parcel, or it is closed. Only a parcel still at the warehouse can be returned.' : 'Only the delivery to the customer can be returned to the seller.',
+        isCustomerKind(task.kind) || task.kind === 'replacement_delivery' ? 'A rider already has this parcel, or it is closed. Only a parcel still at the warehouse can be returned.' : 'Only the delivery to the customer can be returned to the seller.',
       );
     }
     if (!task.hubId) throw new BadRequestException('This parcel is not tied to a warehouse.');
@@ -1112,10 +1393,14 @@ export class LogisticsService {
     if (!order) throw new NotFoundException('Order not found.');
     // Who gets what, worked out BEFORE anything is closed so a problem leaves the parcel untouched.
     const groups = new Map<string, CargoLine[]>();
-    const lines: CargoLine[] =
-      task.kind === 'replacement_delivery'
-        ? LogisticsService.cargoOf(task)
-        : (order.items ?? []).filter((i) => i.fulfilment !== 'cancelled').map((i) => ({ ...LogisticsService.cargoLine(i, i.productNameFr), sellerId: i.sellerId ?? null }));
+    // What goes back is what THIS leg carries: a split order's other parcels (still at their sellers, or already delivered) stay where they are.
+    let lines: CargoLine[];
+    if (task.kind === 'replacement_delivery') lines = LogisticsService.cargoOf(task);
+    else {
+      const byKey = await this.groupBySeller(order);
+      const keys = task.sellerIds ? task.sellerIds.map((k) => LogisticsService.keyOf(k)) : [...byKey.keys()];
+      lines = LogisticsService.undelivered(byKey, keys).map((i) => ({ ...LogisticsService.cargoLine(i, i.productNameFr), sellerId: i.sellerId ?? null }));
+    }
     for (const l of lines) {
       let key = l.sellerId ?? null;
       if (!key && typeof l.productId === 'string' && !l.productId.startsWith('ext:')) key = (await this.products.findOne({ where: { id: l.productId }, select: ['id', 'sellerId'] }))?.sellerId ?? null;
@@ -1160,7 +1445,7 @@ export class LogisticsService {
     await this.notifications
       .toAdmins({ title: 'Parcel returned to seller', body: `${closed.orderReference}: the customer parcel is going back to the seller. Review the order.`, type: 'task', entityId: closed.id }, 'logisticsDesk')
       .catch(() => undefined);
-    if (closed.kind === 'delivery') {
+    if (isCustomerKind(closed.kind)) {
       await this.notifications
         .toUser(order.customerId, { title: 'Order update', body: `${order.reference} could not be delivered and is going back to the seller. Our team will contact you about your order.`, type: 'order', entityId: order.id })
         .catch(() => undefined);
@@ -1168,10 +1453,48 @@ export class LogisticsService {
     return { closed, legs };
   }
 
+  /**
+   * A customer leg that nobody could deliver was given up (its lines were cancelled and refunded): the goods are at the warehouse, so
+   * a `return_to_seller` leg per seller carries them back, for the warehouse to give a rider. The failed leg stays as it is.
+   */
+  async returnCargoToSellers(failed: DeliveryTask, lines: OrderItem[]): Promise<DeliveryTask[]> {
+    if (!failed.hubId || !lines.length) return [];
+    const order = await this.orders.findOne({ where: { id: failed.orderId } });
+    if (!order) return [];
+    const bySeller = new Map<string, OrderItem[]>();
+    for (const i of lines) {
+      let key = i.sellerId ?? null;
+      if (!key && !i.productId.startsWith('ext:')) key = (await this.products.findOne({ where: { id: i.productId }, select: ['id', 'sellerId'] }))?.sellerId ?? null;
+      bySeller.set(LogisticsService.keyOf(key), [...(bySeller.get(LogisticsService.keyOf(key)) ?? []), i]);
+    }
+    const hubAddress = await this.hubAddressText(failed.hubId);
+    const frNames = await frenchLineNames(this.items.manager, lines.map((i) => i.id));
+    const legs: DeliveryTask[] = [];
+    for (const [key, part] of bySeller) {
+      const seller = key === NO_SELLER ? null : await this.sellerRow(key);
+      legs.push(
+        await this.make({
+          kind: 'return_to_seller',
+          orderId: order.id,
+          orderReference: order.reference,
+          sellerId: key === NO_SELLER ? null : key,
+          parentTaskId: failed.id,
+          fromHubId: failed.hubId,
+          hubId: failed.hubId,
+          pickupAddress: hubAddress,
+          address: seller?.pickupAddress ?? null,
+          itemsJson: JSON.stringify(part.map((i) => ({ ...LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr), sellerId: key === NO_SELLER ? null : key }))),
+        }),
+      );
+    }
+    for (const leg of legs) await this.announce(leg);
+    return legs;
+  }
+
   private async afterAssigned(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>): Promise<void> {
     const orderFlow = isOrderFlow(task);
     if (orderFlow && task.kind === 'pickup') await this.advanceOrder(task.orderId, 'processing');
-    if (orderFlow && task.kind === 'delivery') {
+    if (orderFlow && isCustomerKind(task.kind)) {
       const order = await this.orders.findOne({ where: { id: task.orderId } });
       if (order && !['cancelled', 'returned', 'delivered'].includes(order.status)) {
         await this.orders.update({ id: order.id }, { riderId: rider.id });
@@ -1224,15 +1547,50 @@ export class LogisticsService {
    * feeds update and listeners hear about it. Failures go through {@link reopen} instead.
    */
   async afterRiderStatus(task: DeliveryTask, status: DeliveryStatus): Promise<void> {
+    let next = false;
     if (isOrderFlow(task)) {
-      if (task.kind === 'delivery') {
-        if (status === 'picked_up') await this.advanceOrder(task.orderId, 'shipped', { notice: 'update' });
-        if (status === 'in_transit') await this.advanceOrder(task.orderId, 'out_for_delivery', { notice: 'update' });
-        if (status === 'delivered') await this.advanceOrder(task.orderId, 'delivered', { notice: 'update' });
+      if (isCustomerKind(task.kind)) {
+        // Only the leg that finishes the order moves the order's status; a partial leg tells the customer about its part instead.
+        const completes = await this.completesOrder(task);
+        if (status === 'delivered') await this.stampDelivered(task);
+        if (completes) {
+          if (status === 'picked_up') await this.advanceOrder(task.orderId, 'shipped', { notice: 'update' });
+          if (status === 'in_transit') await this.advanceOrder(task.orderId, 'out_for_delivery', { notice: 'update' });
+          if (status === 'delivered') await this.advanceOrder(task.orderId, 'delivered', { notice: 'update' });
+        } else if (status === 'picked_up' || status === 'delivered') {
+          await this.tellPartial(task, status);
+        }
+        next = status === 'delivered' && !completes;
       }
     }
     await this.emitTask(task);
     if (status === 'picked_up' || status === 'in_transit' || status === 'delivered') await this.fire(status, task);
+    // The leg ended: the parcels that waited for it are planned now (a leg that failed is planned again by `reopen`).
+    if (next) await this.progressChain({ orderId: task.orderId }).catch((e) => this.logger.warn(`next leg of ${task.orderReference} failed: ${(e as Error).message}`));
+  }
+
+  /** The lines a delivered customer leg carried reached the customer: stamp them (`deliveredAt`, `deliveryTaskId`). Their fulfilment stays `received`. */
+  private async stampDelivered(task: DeliveryTask): Promise<void> {
+    const order = await this.orders.findOne({ where: { id: task.orderId } });
+    if (!order) return;
+    const groups = await this.groupBySeller(order);
+    const keys = task.sellerIds ? task.sellerIds.map((k) => LogisticsService.keyOf(k)) : [...groups.keys()];
+    const ids = LogisticsService.undelivered(groups, keys).map((i) => i.id);
+    if (ids.length) await this.items.update({ id: In(ids) }, { deliveredAt: task.deliveredAt ?? new Date(), deliveryTaskId: task.id });
+  }
+
+  /** A partial leg is on its way / delivered: the customer is told which part (the order itself keeps its status). */
+  private async tellPartial(task: DeliveryTask, status: 'picked_up' | 'delivered'): Promise<void> {
+    const order = await this.orders.findOne({ where: { id: task.orderId } });
+    if (!order) return;
+    await this.notifications
+      .toUser(order.customerId, {
+        title: status === 'picked_up' ? 'Part of your order is on its way' : 'Part of your order was delivered',
+        body: status === 'picked_up' ? `${order.reference}: part of your order is on its way. The rest will follow.` : `${order.reference}: part of your order was delivered. The rest will follow.`,
+        type: 'delivery',
+        entityId: order.id,
+      })
+      .catch(() => undefined);
   }
 
   /**
@@ -1263,6 +1621,11 @@ export class LogisticsService {
   // ── failures, voiding, readiness ─────────────────────────────────────────────
   /** A task failed: open a fresh copy for another attempt (same legs, same warehouses). */
   async reopen(failed: DeliveryTask): Promise<DeliveryTask> {
+    // A customer leg is planned again with everything that is at the warehouse now (the same code, the next attempt).
+    if (isCustomerKind(failed.kind) && isOrderFlow(failed)) {
+      const [planned] = await this.progressChain({ orderId: failed.orderId }, { retryOf: failed });
+      if (planned) return planned;
+    }
     const next = await this.make({
       kind: failed.kind,
       orderId: failed.orderId,
@@ -1285,7 +1648,8 @@ export class LogisticsService {
       hop: failed.hop,
       hops: failed.hops,
       attempts: failed.attempts + 1,
-      proofCode: failed.kind === 'delivery' ? ((await this.proofCodeOf(failed.id)) ?? undefined) : undefined,
+      proofCode: isCustomerKind(failed.kind) ? ((await this.proofCodeOf(failed.id)) ?? undefined) : undefined,
+      sellerIds: failed.sellerIds,
     });
     await this.announce(next);
     return next;
@@ -1417,7 +1781,7 @@ export class LogisticsService {
    */
   async custody(hubId: string): Promise<{
     inbound: TaskView[];
-    onHand: (TaskView & { since: Date | null; waitingFor: string })[];
+    onHand: (TaskView & { since: Date | null; waitingFor: string; splitAt: Date | null })[];
     outbound: TaskView[];
     counts: { inbound: number; onHand: number; outbound: number };
   }> {
@@ -1434,8 +1798,16 @@ export class LogisticsService {
       const children = related.filter((x) => x.parentTaskId === t.id);
       let successors = children;
       if (!children.length && (t.kind === 'pickup' || t.kind === 'transfer')) {
-        const finalKind: DeliveryKind = t.replacementId || t.exchangeId ? 'replacement_delivery' : 'delivery';
-        successors = related.filter((x) => x.kind === finalKind && x.orderId === t.orderId && (x.replacementId ?? null) === (t.replacementId ?? null) && (x.exchangeId ?? null) === (t.exchangeId ?? null));
+        const side = !!(t.replacementId || t.exchangeId);
+        // On a split order a customer leg only carries the sellers it lists: another seller's parcel is not on it.
+        successors = related.filter(
+          (x) =>
+            (side ? x.kind === 'replacement_delivery' : isCustomerKind(x.kind)) &&
+            x.orderId === t.orderId &&
+            (x.replacementId ?? null) === (t.replacementId ?? null) &&
+            (x.exchangeId ?? null) === (t.exchangeId ?? null) &&
+            (side || !x.sellerIds || x.sellerIds.some((k) => LogisticsService.keyOf(k) === LogisticsService.keyOf(t.sellerId))),
+        );
       }
       const left = successors.some((s) => ['picked_up', 'in_transit', 'delivered'].includes(s.status));
       if (left) continue;
@@ -1447,7 +1819,19 @@ export class LogisticsService {
       this.viewMany(outboundTasks),
       this.viewMany(onHandTasks.map((x) => x.task)),
     ]);
-    const onHand = onHandViews.map((v, i) => ({ ...v, since: onHandTasks[i].task.receivedAt, waitingFor: onHandTasks[i].waitingFor }));
+    // When a parcel waiting for the others is due to go on without them (the oldest of the order's waiting parcels + the split limit).
+    const splitHours = await this.routing.splitAfterHours();
+    const oldestOf = new Map<string, number>();
+    for (const x of onHandTasks) {
+      if (x.waitingFor !== 'other_parcels') continue;
+      const at = (x.task.receivedAt ?? x.task.updatedAt).getTime();
+      oldestOf.set(x.task.orderId, Math.min(at, oldestOf.get(x.task.orderId) ?? at));
+    }
+    const onHand = onHandViews.map((v, i) => {
+      const oldest = oldestOf.get(onHandTasks[i].task.orderId);
+      const splitAt = splitHours > 0 && onHandTasks[i].waitingFor === 'other_parcels' && oldest !== undefined ? new Date(oldest + splitHours * 3_600_000) : null;
+      return { ...v, since: onHandTasks[i].task.receivedAt, waitingFor: onHandTasks[i].waitingFor, splitAt };
+    });
     return { inbound, onHand, outbound, counts: { inbound: inbound.length, onHand: onHand.length, outbound: outbound.length } };
   }
 

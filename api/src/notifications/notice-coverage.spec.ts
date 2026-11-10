@@ -176,12 +176,22 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['SOM-1001 was cancelled by Somba&Teka. Do not pack it.', 'SOM-1001 a été annulée par Somba&Teka. Ne la préparez pas.'],
     ['SOM-1001 was cancelled (Fraud check). Do not pack it.', 'SOM-1001 a été annulée (Fraud check). Ne la préparez pas.'],
   ],
-  '{}: {}. We will try again (attempt {} of {}). You can also cancel the order.': [
+  '{}: {}. We will try again (attempt {} of {}).{}': [
     [
       'SOM-1001: Customer not reachable. We will try again (attempt 2 of 3). You can also cancel the order.',
       'SOM-1001 : Client injoignable. Nous allons réessayer (tentative 2 sur 3). Vous pouvez aussi annuler la commande.',
     ],
+    // part of the order was delivered already: the order cannot be cancelled
+    ['SOM-1001: Customer not reachable. We will try again (attempt 2 of 3).', 'SOM-1001 : Client injoignable. Nous allons réessayer (tentative 2 sur 3).'],
   ],
+  // A split order: one part at a time
+  '{}: part of your order is on its way. The rest will follow.': [['SOM-1001: part of your order is on its way. The rest will follow.', 'SOM-1001 : une partie de votre commande est en route. Le reste suivra.']],
+  '{}: part of your order was delivered. The rest will follow.': [['SOM-1001: part of your order was delivered. The rest will follow.', 'SOM-1001 : une partie de votre commande a été livrée. Le reste suivra.']],
+  '{}: {} could not be delivered ({}).{}': [
+    ['SOM-1001: Lamp could not be delivered (Customer not reachable). $12.50 was refunded to your wallet.', 'SOM-1001 : Lamp n’a pas pu être livré (Client injoignable). 12,50\u00A0$ ont été remboursés sur votre portefeuille.'],
+    ['SOM-1001: Lamp could not be delivered (Customer not reachable).', 'SOM-1001 : Lamp n’a pas pu être livré (Client injoignable).'],
+  ],
+  '{}: {} now carries more parcels.': [['SOM-1001: delivery now carries more parcels.', 'SOM-1001 : tâche « livraison » mise à jour, d’autres colis s’y ajoutent.']],
   '{} could not be delivered after {} attempts ({}).{}': [
     [
       'SOM-1001 could not be delivered after 3 attempts (Wrong address). $12.50 was refunded to your wallet.',

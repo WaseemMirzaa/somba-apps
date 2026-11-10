@@ -15,11 +15,19 @@ import type { DeliveryKind, DeliveryStatus } from '../database/entities';
 /** Legs that end at a warehouse: only a scan-in completes them. */
 export const HUB_BOUND_KINDS: readonly DeliveryKind[] = ['pickup', 'transfer', 'return_pickup', 'return_transfer'];
 
+/**
+ * The legs of an order's own journey that END at the customer ("customer legs"). Every place that asks "is this the delivery
+ * to the customer?" uses this list, so a new kind of customer leg is added here and nowhere else.
+ */
+export const CUSTOMER_KINDS = ['delivery'] as const;
+export type CustomerKind = (typeof CUSTOMER_KINDS)[number];
+export const isCustomerKind = (kind: string | null | undefined): kind is CustomerKind => CUSTOMER_KINDS.includes((kind ?? 'delivery') as CustomerKind);
+
 /** Legs where a customer hands over / receives the parcel and the 4-digit code applies. */
-export const CODE_KINDS: readonly DeliveryKind[] = ['delivery', 'replacement_delivery'];
+export const CODE_KINDS: readonly DeliveryKind[] = [...CUSTOMER_KINDS, 'replacement_delivery'];
 
 /** Legs that leave a warehouse (staff can scan the parcel out to the rider). */
-export const OUTBOUND_KINDS: readonly DeliveryKind[] = ['transfer', 'return_transfer', 'delivery', 'return_to_seller', 'replacement_delivery'];
+export const OUTBOUND_KINDS: readonly DeliveryKind[] = ['transfer', 'return_transfer', ...CUSTOMER_KINDS, 'return_to_seller', 'replacement_delivery'];
 
 /** Legs where a transfer rider may come from either end. */
 export const TRANSFER_KINDS: readonly DeliveryKind[] = ['transfer', 'return_transfer'];
@@ -58,7 +66,7 @@ export function riderNext(kind: DeliveryKind, status: DeliveryStatus): DeliveryS
 
 /** Does this task belong to the order's own journey (not to a return / replacement / exchange)? */
 export function isOrderFlow(t: Pick<LegTask, 'kind' | 'disputeId' | 'replacementId' | 'exchangeId'>): boolean {
-  return !t.disputeId && !t.replacementId && !t.exchangeId && (t.kind === 'pickup' || t.kind === 'transfer' || t.kind === 'delivery');
+  return !t.disputeId && !t.replacementId && !t.exchangeId && (t.kind === 'pickup' || t.kind === 'transfer' || isCustomerKind(t.kind));
 }
 
 /** The warehouse that manages a leg: its staff assign the rider. */
@@ -106,7 +114,7 @@ export function canScanOutAt(t: LegTask, hubId: string): boolean {
 /** Customer-facing order status a leg's rider update implies, or null when the order does not change. */
 export function orderStatusFor(kind: DeliveryKind, status: DeliveryStatus): 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | null {
   if (kind === 'pickup') return status === 'assigned' || status === 'picked_up' ? 'processing' : null;
-  if (kind === 'delivery') {
+  if (isCustomerKind(kind)) {
     if (status === 'picked_up') return 'shipped';
     if (status === 'in_transit') return 'out_for_delivery';
     if (status === 'delivered') return 'delivered';

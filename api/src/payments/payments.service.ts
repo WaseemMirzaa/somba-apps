@@ -46,6 +46,7 @@ import {
   type StripeRefund,
   type StripeWebhookEvent,
 } from './stripe.provider';
+import { PART_DELIVERED, isPartiallyDelivered } from '../common/delivery/split';
 import { NOTHING_LEFT_TO_REFUND, recordParkedPayment, recordRefund, refundableUsd, revertRefund } from './refund-ledger';
 
 /** Why a refund is made, when it is not the plain order refund of finance (`orders:refund`). */
@@ -1106,6 +1107,9 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   async refund(orderId: string, toWallet: boolean, source: RefundSource = {}): Promise<RefundResult> {
     const payment = await this.payments.findOne({ where: { orderId } });
     if (!payment) throw new NotFoundException('No payment for this order.');
+    // Part of a split order was delivered and the rest is still on its way: a whole-order refund would restock goods the customer holds.
+    const delivering = await this.orders.findOne({ where: { id: orderId } });
+    if (delivering && isPartiallyDelivered(delivering.items)) throw new BadRequestException(PART_DELIVERED);
     if (payment.status === 'refunded') {
       throw new BadRequestException('Already refunded.');
     }

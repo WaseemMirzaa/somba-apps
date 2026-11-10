@@ -26,6 +26,7 @@ import type {
 } from '../database/entities';
 import { cleanAttachments, firstName, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
 import { pageOf } from '../common/paging';
+import { lockOrder } from '../common/order-lock';
 import { RETURNS_DESK_ADMINS } from '../common/staff-access';
 import { SettingsService } from '../content/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -37,6 +38,7 @@ import { linesBySeller, sellerUserId } from '../orders/order-sellers';
 import { sellerKeys } from '../flows/after-sale';
 import { resolutionFr } from '../notifications/localize';
 import { pushOrderToOps } from '../logistics/hub-scope';
+import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { ReplacementsService } from '../flows/replacements.service';
 import { PartialRefundService } from './partial-refund.service';
@@ -154,7 +156,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   private async deliveredAt(order: Order): Promise<Date> {
     // Only the leg that brought the goods to the customer counts: a pickup, a return leg or a replacement that was
     // delivered later must not push the end of the return window further out.
-    const rows = await this.tasks.find({ where: { orderId: order.id, status: 'delivered', kind: 'delivery' }, select: ['id', 'deliveredAt', 'updatedAt'] });
+    const rows = await this.tasks.find({ where: { orderId: order.id, status: 'delivered', kind: In([...CUSTOMER_KINDS]) }, select: ['id', 'deliveredAt', 'updatedAt'] });
     const times = rows.map((t) => (t.deliveredAt ?? t.updatedAt)?.getTime?.() ?? 0).filter(Boolean);
     return times.length ? new Date(Math.max(...times)) : order.updatedAt;
   }
@@ -357,7 +359,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     for (const group of groups) {
       const dispute = await this.disputes.manager.transaction(async (m) => {
         // Two requests for the same order at the same moment queue up on the order row, and the second one re-checks.
-        await this.lockOrder(m, order.id);
+        await lockOrder(m, order.id);
         await this.assertRoom(m, order.id, customer.id, type, group.lines);
         const d = await m.save(
           m.create(Dispute, {
@@ -415,11 +417,6 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     }
     const [first, ...rest] = views;
     return rest.length ? { ...first, siblings: rest.map((v) => v.id) } : first;
-  }
-
-  private async lockOrder(m: EntityManager, orderId: string): Promise<void> {
-    if (m.connection.options.type !== 'mysql') return; // SQLite already serialises writers
-    await m.createQueryBuilder().select('o.id').from(Order, 'o').where('o.id = :orderId', { orderId }).setLock('pessimistic_write').getRawOne();
   }
 
   /**

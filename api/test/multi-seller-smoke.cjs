@@ -197,6 +197,28 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
     ok(false, 'COD order placed', a.error);
   }
 
+  section('Cash on delivery per leg: a split leg takes its own share, and another seller\'s cancel does not touch it');
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }, { productId: prodB.id, qty: 1 }], paymentMethod: 'cod', shippingAddress: ADDRESS });
+  if (a.ok) {
+    const split = a.data;
+    const fee = Math.round((split.totalUsd - 50) * 100) / 100;
+    const sA = split.items.find((i) => i.productId === prodA.id).sellerId;
+    const pk = await until(async () => { const t = (await tasksOf(admin, split.id)).filter((x) => x.kind === 'pickup'); return t.length === 2 ? t : null; });
+    const pkA = pk?.find((t) => t.sellerId === sA);
+    await collect(pkA.id);
+    await req(warehouse.sock, 'warehouse:receive', { taskId: pkA.id });
+    const ran = await req(admin.sock, 'warehouseOps:runNow', { asOf: new Date(Date.now() + 25 * 3_600_000).toISOString(), only: ['split'] });
+    ok(ran.ok && ran.data.split >= 1, 'once the first parcel has waited past the limit the job plans a partial leg', ran.error ?? JSON.stringify(ran.data));
+    const partial = (await tasksOf(admin, split.id)).find((t) => t.kind === 'delivery');
+    ok(partial && Math.abs(partial.codAmountUsd - (30 + fee)) < 0.011, "the partial leg collects A's $30 plus the delivery fee, not the whole order", `${split.totalUsd} → ${partial?.codAmountUsd}`);
+    a = await req(shopB.sock, 'orders:sellerCancel', { orderId: split.id, reason: 'Damaged in storage' });
+    ok(a.ok, 'seller B cancels their (not yet collected) part', a.error ?? '');
+    const after = (await tasksOf(admin, split.id)).find((t) => t.id === partial.id);
+    ok(after && Math.abs(after.codAmountUsd - (30 + fee)) < 0.011, "B's cancel does not take $20 off A's leg: it now finishes the order and takes the remainder of the lowered payment", `${partial?.codAmountUsd} → ${after?.codAmountUsd}`);
+  } else {
+    ok(false, 'COD split order placed', a.error);
+  }
+
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: String(moderation ?? 'false') });
   await req(admin.sock, 'settings:set', { key: 'codEnabled', value: String(cod ?? 'false') });
   await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: String(verified ?? 'false') });

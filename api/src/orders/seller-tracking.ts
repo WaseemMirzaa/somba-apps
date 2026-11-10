@@ -1,6 +1,7 @@
 import { In } from 'typeorm';
 import type { EntityManager } from 'typeorm';
-import { DeliveryTask, TransferRun, User } from '../database/entities';
+import { DeliveryTask, OrderItem, TransferRun, User } from '../database/entities';
+import { isCustomerKind } from '../logistics/leg-rules';
 
 /** One leg of an order's journey as the SELLER may see it: who (first name), where it stands, when. No phone, no address, no code. */
 export interface TrackingLeg {
@@ -29,6 +30,12 @@ export interface TrackingLeg {
   toHub?: HubName | null;
   fromHubName?: string | null;
   toHubName?: string | null;
+  /** Only in the CUSTOMER's view, on a customer leg: the sellers whose parcels it carries (null = a legacy leg that carries everything). */
+  sellerIds?: (string | null)[] | null;
+  /** Only in the CUSTOMER's view, on a customer leg: what it carries. */
+  items?: { orderItemId: string; qty: number }[];
+  /** Only in the CUSTOMER's view, on a customer leg: does delivering it finish the order? */
+  completesOrder?: boolean;
 }
 
 /** A warehouse as a customer reads it. */
@@ -76,7 +83,7 @@ export async function sellerTracking(m: EntityManager, orderIds: string[], selle
   if (!ids.length) return out;
   const tasks = await m.find(DeliveryTask, {
     where: { orderId: In(ids) },
-    select: ['id', 'orderId', 'kind', 'status', 'riderId', 'sellerId', 'readyAt', 'receivedAt', 'pickedUpAt', 'deliveredAt', 'createdAt', 'updatedAt', 'attempts', 'failureReason', 'fromHubId', 'toHubId', 'hop', 'hops', 'runId'],
+    select: ['id', 'orderId', 'kind', 'status', 'riderId', 'sellerId', 'readyAt', 'receivedAt', 'pickedUpAt', 'deliveredAt', 'createdAt', 'updatedAt', 'attempts', 'failureReason', 'fromHubId', 'toHubId', 'hop', 'hops', 'runId', 'sellerIds', 'itemsJson'],
     order: { createdAt: 'ASC' },
   });
   const riderIds = [...new Set(tasks.map((t) => t.riderId).filter((x): x is string => !!x))];
@@ -88,10 +95,30 @@ export async function sellerTracking(m: EntityManager, orderIds: string[], selle
   const mine = sellerKeys ? new Set(sellerKeys) : null;
   const byOrder = new Map<string, DeliveryTask[]>();
   for (const t of tasks) {
-    // Another seller's pickup is none of this seller's business.
+    // Another seller's pickup is none of this seller's business, and a customer leg that carries only other sellers' parcels is not theirs either.
     if (mine && t.sellerId && !mine.has(t.sellerId)) continue;
+    if (mine && isCustomerKind(t.kind) && t.sellerIds && !t.sellerIds.some((k) => !!k && mine.has(k))) continue;
     (byOrder.get(t.orderId) ?? byOrder.set(t.orderId, []).get(t.orderId)!).push(t);
   }
+  // The customer's view says which part of the order each customer leg carries, and whether it is the last one.
+  const lines = new Map<string, OrderItem[]>();
+  if (opts.hubs) {
+    const wanted = [...byOrder].filter(([, list]) => list.some((t) => isCustomerKind(t.kind))).map(([id]) => id);
+    if (wanted.length) for (const i of await m.find(OrderItem, { where: { orderId: In(wanted) }, select: ['id', 'orderId', 'sellerId', 'fulfilment', 'deliveredAt', 'deliveryTaskId'] })) lines.set(i.orderId, [...(lines.get(i.orderId) ?? []), i]);
+  }
+  const completes = (t: DeliveryTask): boolean => {
+    if (!t.sellerIds) return true;
+    const mineKeys = new Set(t.sellerIds);
+    return (lines.get(t.orderId) ?? []).every((l) => l.fulfilment === 'cancelled' || (!!l.deliveredAt && l.deliveryTaskId !== t.id) || mineKeys.has(l.sellerId ?? null));
+  };
+  const cargoOf = (t: DeliveryTask): { orderItemId: string; qty: number }[] => {
+    try {
+      const v = t.itemsJson ? (JSON.parse(t.itemsJson) as { orderItemId?: string; qty?: number }[]) : [];
+      return v.filter((x) => typeof x?.orderItemId === 'string').map((x) => ({ orderItemId: x.orderItemId as string, qty: Number(x.qty) || 1 }));
+    } catch {
+      return [];
+    }
+  };
   for (const [orderId, list] of byOrder) {
     const legs: TrackingLeg[] = list.map((t) => ({
       id: t.id,
@@ -110,6 +137,9 @@ export async function sellerTracking(m: EntityManager, orderIds: string[], selle
       hops: t.hops ?? 1,
       runId: t.runId ?? null,
       runReference: t.runId ? (runRefs.get(t.runId) ?? null) : null,
+      ...(opts.hubs && isCustomerKind((t as { kind?: string }).kind)
+        ? { sellerIds: t.sellerIds ?? null, items: cargoOf(t), completesOrder: completes(t) }
+        : {}),
       ...(opts.hubs
         ? {
             fromHub: (t.fromHubId && opts.hubs.get(t.fromHubId)) || null,

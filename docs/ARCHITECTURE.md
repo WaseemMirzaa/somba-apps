@@ -1460,7 +1460,7 @@ stateDiagram-v2
 |---|---|
 | Customer can cancel only from `pending` or `confirmed`; one cancel wins (atomic) | `OrdersService.cancel` |
 | Ops (`orders:updateStatus`) may move an order to any status except `cancelled`; a `delivered` order can only become `returned`; `cancelled`/`returned` are final; an order with a pending mobile-money payment cannot be fulfilled ⚠ (otherwise free-form) | `OrdersService.updateStatus` |
-| Delivery milestones drive the order status: assigned→processing, picked_up→shipped, in_transit→out_for_delivery, delivered→delivered; a cancelled/returned order is never resurrected | `DeliveryService.updateStatus` |
+| Delivery milestones drive the order status: assigned→processing, picked_up→shipped, in_transit→out_for_delivery, delivered→delivered; a cancelled/returned order is never resurrected. On a **split** multi-seller order only the customer leg that *completes the order* moves the status; a partial leg leaves it alone (logistics contract §16) | `LogisticsService.afterRiderStatus` |
 | A **failed** delivery does not change the order status ⚠ (no re-attempt / return-to-sender flow) | — |
 
 ### 5.2 Payment (`payments.status`)
@@ -1625,6 +1625,7 @@ Status: lifecycle, webhook, idempotency, expiry and late-success handling are im
 ### F7. Cancellation and refunds ✅
 
 * **Customer cancel** (`orders:cancel`): atomic claim from `pending`/`confirmed` → if money was received, payment `refunded` + wallet credit (one transaction); pending mobile money is abandoned (late approval goes to wallet) → stock restocked → delivery task `failed` → pushes to customer, ops and the assigned rider.
+* **Part-delivered orders** (split delivery, logistics contract §16): once some lines reached the customer and others have not, `orders:cancel`, `orders:adminCancel` and `orders:refund` are refused with "Part of this order was already delivered. Contact support to stop the rest." A delivery that is given up at the attempt limit cancels only its own lines (`cancelLines`: refund or lower the COD payment, restock, return-to-seller legs).
 * **Admin refund** (`orders:refund`, admin/finance): only a `succeeded` payment, and only what is LEFT on it (amount paid − already refunded, returns and seller cancellations included; refused with "That is more than what is left…" / "Nothing is left to refund on this order." / "Already refunded."); to wallet (instant) or back to the paying phone through pawaPay; recorded in the refund ledger like every refund; order → `returned`.
 * **Dispute refund**: see F12.
 
@@ -1658,7 +1659,7 @@ Missing for a professional operation: **seller fulfilment step** (seller accepts
 
 ### F9. Cash on delivery ✅ (disabled)
 
-Off by default (`codEnabled=false`). When enabled by an admin: payment `pending` from creation, fulfilment opens immediately, the order is flagged to fraud review when total > `codCapUsd`, the rider confirms cash on `delivered`, `warehouse:reconcile` sums cash per rider.
+Off by default (`codEnabled=false`). When enabled by an admin: payment `pending` from creation, fulfilment opens immediately, the order is flagged to fraud review when total > `codCapUsd`, the rider confirms cash on `delivered`, `warehouse:reconcile` sums cash per rider. On a split order each customer leg collects its own share (its sellers' lines less their pro-rata discount, plus the delivery fee on the first leg); the leg that completes the order takes the remainder, and the payment turns `succeeded` once, then, with a receipt for the total (logistics contract §16).
 
 ### F10. Seller onboarding and listing 🟡
 

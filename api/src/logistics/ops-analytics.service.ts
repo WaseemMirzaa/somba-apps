@@ -4,7 +4,7 @@ import { In, Repository } from 'typeorm';
 import { DeliveryTask, User } from '../database/entities';
 import { DEFAULT_HUB_OPS, isVoidedFailure } from './hub-ops-rules';
 import { HubOpsSettingsService } from './hub-ops-settings.service';
-import { isHubBound } from './leg-rules';
+import { isCustomerKind, isHubBound } from './leg-rules';
 
 const DAY_MS = 86_400_000;
 export const MAX_RANGE_DAYS = 366;
@@ -115,7 +115,7 @@ export class OpsAnalyticsService {
           k.completed++;
           k.hours.push(Math.max(0, (end - t.createdAt.getTime()) / 3_600_000));
           if (t.pickedUpAt && t.deliveredAt && !isHubBound(t.kind)) k.transit.push(Math.max(0, (t.deliveredAt.getTime() - t.pickedUpAt.getTime()) / 60_000));
-          if (t.kind === 'delivery') {
+          if (isCustomerKind(t.kind)) {
             deliveries++;
             if ((end - t.createdAt.getTime()) / 3_600_000 <= targetOf(t.hubId)) onTime++;
           }

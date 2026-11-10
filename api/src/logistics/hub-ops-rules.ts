@@ -1,5 +1,6 @@
 import type { DeliveryKind } from '../database/entities';
 import { num, oneOf, str } from '../common/validate';
+import { CUSTOMER_KINDS } from './leg-rules';
 
 /**
  * Warehouse operations rules as pure functions (no I/O): the settings and their validation, working hours, the aged-parcel
@@ -151,7 +152,7 @@ export const LAST_LEVEL = 3;
  * What a "return to seller" may be made from: the customer-bound leg, while the parcel is still at the warehouse (no rider
  * has collected it yet). Anything else is on the road, belongs to another leg, or is already a way back.
  */
-export const RETURNABLE_KINDS: readonly DeliveryKind[] = ['delivery', 'replacement_delivery'];
+export const RETURNABLE_KINDS: readonly DeliveryKind[] = [...CUSTOMER_KINDS, 'replacement_delivery'];
 export const RETURNABLE_STATUSES = ['unassigned', 'assigned'] as const;
 export function canReturnToSeller(t: { kind: DeliveryKind; status: string; runId?: string | null }): boolean {
   return RETURNABLE_KINDS.includes(t.kind) && (RETURNABLE_STATUSES as readonly string[]).includes(t.status) && !t.runId;
@@ -186,4 +187,4 @@ export function pickLeastBusy(riders: readonly Candidate[]): Candidate | null {
 }
 
 /** Legs auto-assignment handles: the ones a supervisor would assign by hand. Transfers are planned into runs instead. */
-export const AUTO_ASSIGN_KINDS: readonly DeliveryKind[] = ['pickup', 'delivery', 'return_pickup', 'return_to_seller', 'replacement_delivery'];
+export const AUTO_ASSIGN_KINDS: readonly DeliveryKind[] = ['pickup', ...CUSTOMER_KINDS, 'return_pickup', 'return_to_seller', 'replacement_delivery'];

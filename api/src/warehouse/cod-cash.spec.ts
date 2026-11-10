@@ -28,6 +28,7 @@ describe('cash on delivery: the cash record and the hand-over', () => {
   let seq = 0;
 
   const markCollected = jest.fn();
+  const completesOrder = jest.fn(async (_task?: DeliveryTask) => true);
   const mkHub = (name: string) => ds.getRepository(Hub).save(ds.getRepository(Hub).create({ name, city: 'Kinshasa', lat: -4.3, lng: 15.3 }));
   const mkUser = (role: User['role'], hubId: string | null, name: string) => {
     const n = ++seq;
@@ -58,12 +59,14 @@ describe('cash on delivery: the cash record and the hand-over', () => {
     setting = {};
     emitter = recordingEmitter();
     markCollected.mockReset();
+    completesOrder.mockReset();
+    completesOrder.mockImplementation(async () => true);
     gombe = await mkHub('Gombe');
     limete = await mkHub('Limete');
     rider = await mkUser('rider', gombe.id, 'Rider One');
     other = await mkUser('rider', limete.id, 'Rider Two');
     const settings = { get: async (k: string) => setting[k] ?? null };
-    const logistics = { proofCodeOf: async () => null, afterRiderStatus: async () => undefined, emitTask: async () => undefined };
+    const logistics = { proofCodeOf: async () => null, afterRiderStatus: async () => undefined, emitTask: async () => undefined, completesOrder };
     payments = new PaymentsService(
       ds.getRepository(Payment), ds.getRepository(Order), {} as never, {} as never, emitter as never, settings as never,
       null as never, ds.getRepository(DeliveryTask), {} as never,
@@ -88,6 +91,31 @@ describe('cash on delivery: the cash record and the hand-over', () => {
       expect(onPayment).toMatchObject({ actor: 'Rider One', role: 'rider', entity: 'payment' });
       expect(onPayment.detail).toContain('40.00 USD cash collected by Rider One');
       expect((await audits('cod.collected'))[0]).toMatchObject({ entity: 'delivery', entityId: t.id });
+    });
+
+    it('a partial delivery records its cash on the task and audits it, but leaves the payment pending; the leg that finishes the order collects it, with the total', async () => {
+      const first = await mkCodTask(14);
+      const [{ id: orderId }] = await ds.getRepository(Order).find({ where: { id: first.orderId } });
+      await ds.getRepository(Payment).update({ orderId }, { amountUsd: 23 });
+      const second = await ds.getRepository(DeliveryTask).save(
+        ds.getRepository(DeliveryTask).create({ orderId, orderReference: first.orderReference, riderId: rider.id, hubId: gombe.id, status: 'in_transit', kind: 'delivery', codAmountUsd: 9 }),
+      );
+      completesOrder.mockImplementation(async (t?: DeliveryTask) => t?.id === second.id);
+      await deliver(first, 14);
+      expect(await reload(first.id)).toMatchObject({ status: 'delivered', codCollectedUsd: 14, codCollectedById: rider.id });
+      expect(markCollected).not.toHaveBeenCalled();
+      expect((await ds.getRepository(Payment).findOneByOrFail({ orderId })).status).toBe('pending');
+      expect(await audits('cod.collected')).toHaveLength(1);
+      // the rider's cash balance already counts the partial leg
+      await deliver(second, 9);
+      expect(markCollected).toHaveBeenCalledTimes(1);
+      expect(markCollected).toHaveBeenCalledWith(orderId, expect.objectContaining({ amountUsd: 23, taskId: second.id }));
+      expect((await ds.getRepository(Payment).findOneByOrFail({ orderId })).status).toBe('succeeded');
+      expect(await audits('cod.collected')).toHaveLength(2);
+      // a repeat of the partial leg's "delivered" settles nothing
+      markCollected.mockClear();
+      await deliver(first, 14);
+      expect(markCollected).not.toHaveBeenCalled();
     });
 
     it('accepts the amount as the app sends it (a string), to the cent', async () => {

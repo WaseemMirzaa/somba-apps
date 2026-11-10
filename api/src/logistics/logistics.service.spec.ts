@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { DeliveryTask, ENTITIES, Hub, Order, OrderItem, Product, Seller, TransferRun, User, WarehouseException } from '../database/entities';
+import { DeliveryTask, ENTITIES, Hub, Order, OrderItem, Payment, Product, Seller, TransferRun, User, WarehouseException } from '../database/entities';
 import { DeliveryService } from '../delivery/delivery.service';
 import { LogisticsService } from './logistics.service';
 import type { Actor } from './logistics.service';
@@ -408,6 +408,9 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       const last = await scan(transfer.id, gombe.id);
       expect(last.next.map((t) => t.kind)).toEqual(['delivery']);
       expect((await kinds(order.id)).filter((k) => k.startsWith('delivery'))).toHaveLength(1);
+      // the one leg records both sellers and carries both sellers' lines (not just the first pickup's)
+      expect(last.next[0].sellerIds?.slice().sort()).toEqual([sellerG.id, sellerL.id].sort());
+      expect(JSON.parse(last.next[0].itemsJson as string).map((l: { productId: string }) => l.productId).sort()).toEqual([`p-${sellerG.id}`, `p-${sellerL.id}`].sort());
     });
 
     it('a seller who cancels everything frees the delivery once the other parcels are in', async () => {
@@ -1209,6 +1212,307 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
         expect(() => guard.assertNotSuspended({ role, active: false } as User)).toThrow('This account has been suspended. Contact support.');
         expect(() => guard.assertNotSuspended({ role, active: true } as User)).not.toThrow();
       }
+    });
+  });
+
+  describe('split delivery: one open customer leg, merge, then the rest after the time limit', () => {
+    const hours = (h: number) => new Date(Date.now() + h * 3_600_000);
+    const customerLegs = async (orderId: string) => (await tasksOf(orderId)).filter((t) => t.kind === 'delivery');
+    const openLeg = async (orderId: string) => (await customerLegs(orderId)).find((t) => ['unassigned', 'assigned', 'picked_up', 'in_transit'].includes(t.status));
+    const lines = (orderId: string) => ds.getRepository(OrderItem).find({ where: { orderId }, order: { productId: 'ASC' } });
+    const codeOf = (taskId: string) => logistics.proofCodeOf(taskId);
+
+    /** A two-seller order whose Gombe parcel (seller G) is at the destination and whose Limete parcel (seller L) is still on its way. */
+    const gArrived = async (opts: Parameters<typeof mkOrder>[1] = {}) => {
+      const placed = await place([sellerG, sellerL], opts);
+      const pickups = await tasksOf(placed.order.id);
+      const pG = pickups.find((t) => t.sellerId === sellerG.id)!;
+      const pL = pickups.find((t) => t.sellerId === sellerL.id)!;
+      await assignAndScan(pG.id);
+      return { ...placed, pG, pL };
+    };
+    /** Seller L's parcel travels Limete -> Gombe: pickup scanned in at Limete, transfer scanned in at Gombe. */
+    const lArrives = async (pL: DeliveryTask) => {
+      const first = await assignAndScan(pL.id);
+      const transfer = first.next[0];
+      await logistics.assign(transfer.id, riderL.id, admin);
+      return scan(transfer.id, gombe.id);
+    };
+    const handOver = async (leg: DeliveryTask, rider: User, cash?: number) => {
+      if (leg.status === 'unassigned') await logistics.assign(leg.id, rider.id, admin);
+      await delivery.updateStatus(leg.id, 'picked_up', rider.id);
+      await delivery.updateStatus(leg.id, 'in_transit', rider.id);
+      return delivery.updateStatus(leg.id, 'delivered', rider.id, undefined, (await codeOf(leg.id)) ?? undefined, cash);
+    };
+    const mkPayment = (order: Order, amountUsd: number) =>
+      ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: `PAY-${order.reference}`, orderId: order.id, orderReference: order.reference, userId: 'cust1', method: 'cod', amountUsd, status: 'pending' }));
+    /** $10 + $10 lines, a $5 delivery fee, so the order asks $25 (less any discount). */
+    const priced = async (order: Order, discountUsd = 0) => {
+      await ds.getRepository(Order).update({ id: order.id }, { subtotalUsd: 20, deliveryFeeUsd: 5, discountUsd, totalUsd: 25 - discountUsd });
+      return mkPayment(order, 25 - discountUsd);
+    };
+
+    it('waits for the other parcel until the oldest one has waited past the limit, then delivers what arrived; running the sweeper twice makes one leg', async () => {
+      const { order } = await gArrived();
+      expect(await logistics.planWaiting(new Date())).toBe(0); // too young
+      expect(await customerLegs(order.id)).toHaveLength(0);
+      expect(await logistics.planWaiting(hours(25))).toBe(1); // older than 24 h
+      expect(await logistics.planWaiting(hours(25))).toBe(0); // idempotent
+      const legs = await customerLegs(order.id);
+      expect(legs).toHaveLength(1);
+      expect(legs[0].sellerIds).toEqual([sellerG.id]);
+      expect(JSON.parse(legs[0].itemsJson as string)).toMatchObject([{ productId: `p-${sellerG.id}` }]); // only G's line, not the first pickup's by accident
+      const view = await logistics.view(legs[0]);
+      expect(view).toMatchObject({ sellerIds: [sellerG.id], completesOrder: false });
+    });
+
+    it('does nothing when splitting is off (0 hours), however long the parcel waits', async () => {
+      setting.splitDeliveryAfterHours = '0';
+      const { order } = await gArrived();
+      expect(await logistics.planWaiting(hours(24 * 30))).toBe(0);
+      expect(await customerLegs(order.id)).toHaveLength(0);
+    });
+
+    it('the limit comes from splitDeliveryAfterHours', async () => {
+      setting.splitDeliveryAfterHours = '48';
+      const { order } = await gArrived();
+      expect(await logistics.planWaiting(hours(25))).toBe(0);
+      expect(await logistics.planWaiting(hours(49))).toBe(1);
+      expect(await customerLegs(order.id)).toHaveLength(1);
+    });
+
+    it('the rest arrives while the partial leg is still unassigned: it is merged (cargo, sellers, cash), the code stays, and no second leg appears', async () => {
+      const { order, pL } = await gArrived({ cod: true });
+      await priced(order);
+      await logistics.planWaiting(hours(25));
+      const before = (await openLeg(order.id))!;
+      expect(before.codAmountUsd).toBe(15); // G's $10 + the $5 fee
+      const code = await codeOf(before.id);
+      const arrived = await lArrives(pL);
+      expect(arrived.next).toEqual([]); // merged, not a second leg
+      const legs = await customerLegs(order.id);
+      expect(legs).toHaveLength(1);
+      expect(legs[0].id).toBe(before.id);
+      expect(legs[0].sellerIds?.slice().sort()).toEqual([sellerG.id, sellerL.id].sort());
+      expect(JSON.parse(legs[0].itemsJson as string)).toHaveLength(2);
+      expect(legs[0].codAmountUsd).toBe(25); // now the leg that finishes the order: the whole payment
+      expect(await codeOf(legs[0].id)).toBe(code);
+      expect((await logistics.view(legs[0])).completesOrder).toBe(true);
+    });
+
+    it('tells the rider of an assigned leg "Task updated" when parcels are merged into it', async () => {
+      const { pL } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const leg = (await ds.getRepository(DeliveryTask).findOneByOrFail({ kind: 'delivery' }));
+      await logistics.assign(leg.id, riderG.id, admin);
+      notif.toUser.mockClear();
+      await lArrives(pL);
+      expect(notif.toUser).toHaveBeenCalledWith(riderG.id, expect.objectContaining({ title: 'Task updated', entityId: leg.id }));
+    });
+
+    it('while the partial leg is on the road new parcels wait; the next leg is planned when it is delivered, with a new code, and only that one finishes the order', async () => {
+      const { order, pL } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const first = (await openLeg(order.id))!;
+      await logistics.assign(first.id, riderG.id, admin);
+      await delivery.updateStatus(first.id, 'picked_up', riderG.id);
+      const arrived = await lArrives(pL);
+      expect(arrived.next).toEqual([]); // waits: one open leg per order
+      const statusOnTheRoad = await orderStatus(order.id);
+      expect(statusOnTheRoad).toBe('shipped'); // every parcel is at a warehouse; the partial leg moves nothing further
+      expect(await customerLegs(order.id)).toHaveLength(1);
+      expect(await logistics.planWaiting(hours(100))).toBe(0);
+      // the partial leg does not move the order (nor does it say "out for delivery")
+      await delivery.updateStatus(first.id, 'in_transit', riderG.id);
+      expect(await orderStatus(order.id)).toBe(statusOnTheRoad);
+      expect((await logistics.view(first)).completesOrder).toBe(false);
+      await delivery.updateStatus(first.id, 'delivered', riderG.id);
+      expect(await orderStatus(order.id)).toBe(statusOnTheRoad); // still not delivered: the rest is coming
+      // the lines of the first leg are stamped; fulfilment stays `received`
+      const afterFirst = await lines(order.id);
+      const g = afterFirst.find((i) => i.sellerId === sellerG.id)!;
+      const l = afterFirst.find((i) => i.sellerId === sellerL.id)!;
+      expect(g).toMatchObject({ fulfilment: 'received', deliveryTaskId: first.id });
+      expect(g.deliveredAt).toBeInstanceOf(Date);
+      expect(l.deliveredAt).toBeNull();
+      // the next leg was planned by the end of the first
+      const second = (await openLeg(order.id))!;
+      expect(second.id).not.toBe(first.id);
+      expect(second.sellerIds).toEqual([sellerL.id]);
+      expect(JSON.parse(second.itemsJson as string)).toMatchObject([{ productId: `p-${sellerL.id}` }]);
+      expect(await codeOf(second.id)).not.toBe(await codeOf(first.id));
+      expect((await logistics.view(second)).completesOrder).toBe(true);
+      await handOver(second, riderG);
+      expect(await orderStatus(order.id)).toBe('delivered');
+      expect((await lines(order.id)).every((i) => !!i.deliveredAt)).toBe(true);
+    });
+
+    it('tells the customer about each part, and the last part completes the order', async () => {
+      const { order, pL } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const first = (await openLeg(order.id))!;
+      notif.toUser.mockClear();
+      await handOver(first, riderG);
+      const titles = () => notif.toUser.mock.calls.map((c) => (c as unknown as [string, { title: string }])[1].title);
+      expect(titles()).toEqual(expect.arrayContaining(['Part of your order is on its way', 'Part of your order was delivered']));
+      expect(titles()).not.toContain('Delivery update');
+      await lArrives(pL);
+      notif.toUser.mockClear();
+      await handOver((await openLeg(order.id))!, riderG);
+      expect(titles()).toContain('Delivery update'); // "is now delivered": the order itself
+      expect(titles()).not.toContain('Part of your order was delivered');
+    });
+
+    it('cash on delivery: the partial leg collects its share + the fee, the last leg the remainder, and the payment is collected once, with the total', async () => {
+      const { order, pL } = await gArrived({ cod: true });
+      await priced(order, 2); // $2 promo: the payment asks $23
+      await logistics.planWaiting(hours(25));
+      const first = (await openLeg(order.id))!;
+      expect(first.codAmountUsd).toBe(14); // $10 - its share of the discount ($1) + the $5 fee
+      await handOver(first, riderG, 14);
+      expect(payments.markCollected).not.toHaveBeenCalled(); // partial: the payment stays pending
+      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: first.id })).toMatchObject({ codCollectedUsd: 14, codCollectedById: riderG.id });
+      await lArrives(pL);
+      const second = (await openLeg(order.id))!;
+      expect(second.codAmountUsd).toBe(9); // the remainder: $23 - $14, no second fee
+      await expect(delivery.updateStatus(second.id, 'picked_up', riderG.id)).rejects.toThrow(); // not assigned to this rider yet
+      await handOver(second, riderG, 9);
+      expect(payments.markCollected).toHaveBeenCalledTimes(1);
+      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: 23, byId: riderG.id, taskId: second.id }));
+      const collected = (await customerLegs(order.id)).reduce((t, x) => t + (x.codCollectedUsd ?? 0), 0);
+      expect(collected).toBe(23);
+      // repeating the last "delivered" settles nothing twice
+      await delivery.updateStatus(second.id, 'delivered', riderG.id, undefined, undefined, 9);
+      expect(payments.markCollected).toHaveBeenCalledTimes(2); // asked again (a retry finishes a payment that missed it), the payment service ignores a settled one
+    });
+
+    it('a part-cancel works the open leg\'s cash out again (the blind subtraction is gone)', async () => {
+      const { order, pL } = await gArrived({ cod: true });
+      const payment = await priced(order);
+      await logistics.planWaiting(hours(25));
+      const leg = (await openLeg(order.id))!;
+      expect(leg.codAmountUsd).toBe(15);
+      // L's line is cancelled by its seller: $10 off the payment; the leg now finishes the order and takes the remainder
+      await ds.getRepository(OrderItem).update({ orderId: order.id, sellerId: sellerL.id }, { fulfilment: 'cancelled' });
+      await ds.getRepository(Payment).update({ id: payment.id }, { amountUsd: 15 });
+      await logistics.onSellerCancelled(order.id, [sellerL.id]);
+      expect((await openLeg(order.id))!.codAmountUsd).toBe(15);
+      void pL;
+    });
+
+    it('a failed leg is planned again with the same code and the next attempt, and with everything now at the warehouse', async () => {
+      const { order, pL } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const first = (await openLeg(order.id))!;
+      await logistics.assign(first.id, riderG.id, admin);
+      await delivery.updateStatus(first.id, 'picked_up', riderG.id);
+      await lArrives(pL); // waits: the leg is on the road
+      await ds.getRepository(DeliveryTask).update({ id: first.id }, { status: 'failed', failureReason: 'Customer not reachable' });
+      const failed = await ds.getRepository(DeliveryTask).findOneByOrFail({ id: first.id });
+      const next = await logistics.reopen(failed);
+      expect(next).toMatchObject({ kind: 'delivery', status: 'unassigned', attempts: 2 });
+      expect(next.sellerIds?.slice().sort()).toEqual([sellerG.id, sellerL.id].sort());
+      expect(await codeOf(next.id)).toBe(await codeOf(first.id));
+      expect(await customerLegs(order.id)).toHaveLength(2);
+    });
+
+    it('two things planning the same order at once (a scan-in and the sweeper) make exactly one leg', async () => {
+      const { order, pL } = await gArrived();
+      const first = await assignAndScan(pL.id);
+      const transfer = first.next[0];
+      await logistics.assign(transfer.id, riderL.id, admin);
+      await ds.getRepository(DeliveryTask).update({ id: transfer.id }, { status: 'picked_up' });
+      await Promise.all([logistics.onScanIn(transfer.id, gombe.id), logistics.planWaiting(hours(25)), logistics.planWaiting(hours(25))]);
+      const legs = await customerLegs(order.id);
+      expect(legs).toHaveLength(1);
+      expect((await logistics.view(legs[0])).completesOrder).toBe(true);
+    });
+
+    it('heals an order whose parcels all arrived but whose leg was never created', async () => {
+      const { order } = await place([sellerG]);
+      const [pickup] = await tasksOf(order.id);
+      await logistics.assign(pickup.id, riderG.id, admin);
+      // the scan-in worked but the planning step that follows it failed: simulate by scanning, then deleting the leg it made
+      await scan(pickup.id, gombe.id);
+      await ds.getRepository(DeliveryTask).delete({ orderId: order.id, kind: 'delivery' });
+      expect(await customerLegs(order.id)).toHaveLength(0);
+      expect(await logistics.planWaiting(new Date())).toBe(1);
+      expect(await logistics.planWaiting(new Date())).toBe(0);
+      expect(await customerLegs(order.id)).toHaveLength(1);
+      expect((await customerLegs(order.id))[0].sellerIds).toEqual([sellerG.id]);
+    });
+
+    it('custody is per seller: a parcel that left with a partial leg is gone, the one still waiting stays on hand, with the time it will be sent on', async () => {
+      const { order, pL } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const first = (await openLeg(order.id))!;
+      await logistics.assign(first.id, riderG.id, admin);
+      await logistics.scanOut(first.id, gombe.id);
+      await lArrives(pL);
+      const c = await logistics.custody(gombe.id);
+      const mine = c.onHand.filter((x) => x.orderId === order.id);
+      expect(mine.map((x) => x.sellerId)).toEqual([sellerL.id]);
+      expect(mine[0].splitAt).toBeInstanceOf(Date);
+      expect(c.outbound.map((x) => x.id)).toContain(first.id);
+      setting.splitDeliveryAfterHours = '0';
+      expect((await logistics.custody(gombe.id)).onHand.find((x) => x.orderId === order.id)?.splitAt).toBeNull();
+    });
+
+    it('"return to seller" sends back what the leg carries, not the order\'s other parcels', async () => {
+      const { order } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const leg = (await openLeg(order.id))!;
+      const { legs } = await logistics.returnToSeller(leg.id, staff(gombe, 'supervisor'));
+      expect(legs.map((x) => x.sellerId)).toEqual([sellerG.id]);
+      expect(JSON.parse(legs[0].itemsJson as string)).toHaveLength(1);
+      // the goods went back: the sweeper does not plan them again
+      expect(await logistics.planWaiting(hours(100))).toBe(0);
+      expect(await customerLegs(order.id)).toHaveLength(1);
+    });
+
+    it('a seller sees only the customer legs that carry their parcel; the customer sees which part each carries', async () => {
+      const { order, pL } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const asG = (await sellerTracking(ds.manager, [order.id], [sellerG.id])).get(order.id)!;
+      const asL = (await sellerTracking(ds.manager, [order.id], [sellerL.id])).get(order.id)!;
+      expect(asG.legs.some((x) => x.kind === 'delivery')).toBe(true);
+      expect(asL.legs.some((x) => x.kind === 'delivery')).toBe(false);
+      const customer = (await sellerTracking(ds.manager, [order.id], undefined, { hubs: new Map() })).get(order.id)!;
+      const leg = customer.legs.find((x) => x.kind === 'delivery')!;
+      expect(leg).toMatchObject({ sellerIds: [sellerG.id], completesOrder: false });
+      expect(leg.items).toHaveLength(1);
+      void pL;
+    });
+
+    it('the rider sees only the leg\'s lines, and that the order is partial', async () => {
+      const { order } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const leg = (await openLeg(order.id))!;
+      await logistics.assign(leg.id, riderG.id, admin);
+      const riders = new RiderService(ds.getRepository(DeliveryTask), ds.getRepository(Order), ds.getRepository(User), ds.getRepository(Hub), logistics);
+      const row = (await riders.queue(riderG.id)).find((t) => t.id === leg.id)!;
+      expect(row.order?.items.map((i) => i.sellerId)).toEqual([sellerG.id]);
+      expect(row.order?.partial).toBe(true);
+    });
+
+    it('a customer leg that finishes the order is not partial for the rider', async () => {
+      const { order } = await place([sellerG]);
+      const [pickup] = await tasksOf(order.id);
+      const { next } = await assignAndScan(pickup.id);
+      await logistics.assign(next[0].id, riderG.id, admin);
+      const riders = new RiderService(ds.getRepository(DeliveryTask), ds.getRepository(Order), ds.getRepository(User), ds.getRepository(Hub), logistics);
+      expect((await riders.queue(riderG.id)).find((t) => t.id === next[0].id)?.order?.partial).toBe(false);
+    });
+
+    it('seller cancels their whole part while the other parcel waits: the order is delivered with what is left, and the settled leg finishes it', async () => {
+      const { order, pL } = await gArrived();
+      await logistics.planWaiting(hours(25));
+      const first = (await openLeg(order.id))!;
+      await handOver(first, riderG);
+      await ds.getRepository(OrderItem).update({ orderId: order.id, sellerId: sellerL.id }, { fulfilment: 'cancelled' });
+      await logistics.onSellerCancelled(order.id, [sellerL.id]);
+      expect(await orderStatus(order.id)).toBe('delivered');
+      void pL;
     });
   });
 });

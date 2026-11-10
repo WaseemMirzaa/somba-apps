@@ -52,7 +52,8 @@
     "smoke:aftersale": "node test/after-sale-smoke.cjs",
     "smoke:sellerplatform": "node test/seller-platform-smoke.cjs",
     "smoke:staff2fa": "node test/staff-2fa-fraud-smoke.cjs",
-    "smoke:warehouseops": "node test/warehouse-ops-smoke.cjs"
+    "smoke:warehouseops": "node test/warehouse-ops-smoke.cjs",
+    "smoke:split": "node test/delivery-split-smoke.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

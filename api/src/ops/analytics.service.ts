@@ -37,6 +37,10 @@ import {
   startOfUtcDay,
   toDate,
 } from './analytics.util';
+import { CUSTOMER_KINDS, isCustomerKind } from '../logistics/leg-rules';
+
+/** The customer kinds as an SQL list (the constants are fixed words, never input). */
+const CUSTOMER_SQL = CUSTOMER_KINDS.map((k) => `'${k}'`).join(',');
 import { SQL_KEPT_FRACTION } from '../payouts/line-refund';
 
 /** Orders that no longer count as sales. */
@@ -468,25 +472,25 @@ export class AnalyticsService {
       scope(this.deliveries.createQueryBuilder('t'))
         .select(AnalyticsService.day(delivered), 'day')
         .addSelect('COUNT(*)', 'delivered')
-        .andWhere(`t.status = 'delivered' AND t.kind = 'delivery' AND ${delivered} > :from`, { from: week.from })
+        .andWhere(`t.status = 'delivered' AND t.kind IN (${CUSTOMER_SQL}) AND ${delivered} > :from`, { from: week.from })
         .groupBy('day')
         .getRawMany<{ day: string; delivered: string }>(),
       scope(this.deliveries.createQueryBuilder('t'))
         .select(AnalyticsService.day('t.pickedUpAt'), 'day')
         .addSelect('COUNT(*)', 'pickedUp')
-        .andWhere("t.kind = 'delivery' AND t.pickedUpAt IS NOT NULL AND t.pickedUpAt > :from", { from: week.from })
+        .andWhere(`t.kind IN (${CUSTOMER_SQL}) AND t.pickedUpAt IS NOT NULL AND t.pickedUpAt > :from`, { from: week.from })
         .groupBy('day')
         .getRawMany<{ day: string; pickedUp: string }>(),
       // Only parcels with both stamps (recorded since this feature shipped) count towards the average.
       scope(this.deliveries.createQueryBuilder('t'))
         .select(`AVG(${this.hoursBetween('t.deliveredAt', 't.pickedUpAt')}) * 60`, 'minutes')
         .addSelect('COUNT(*)', 'samples')
-        .andWhere("t.kind = 'delivery' AND t.status = 'delivered' AND t.pickedUpAt IS NOT NULL AND t.deliveredAt IS NOT NULL AND t.deliveredAt > :d30", { d30 })
+        .andWhere(`t.kind IN (${CUSTOMER_SQL}) AND t.status = 'delivered' AND t.pickedUpAt IS NOT NULL AND t.deliveredAt IS NOT NULL AND t.deliveredAt > :d30`, { d30 })
         .getRawOne<{ minutes: string | null; samples: string }>(),
       scope(this.deliveries.createQueryBuilder('t'))
         .select("COALESCE(SUM(CASE WHEN t.status = 'delivered' THEN 1 ELSE 0 END), 0)", 'delivered')
         .addSelect("COALESCE(SUM(CASE WHEN t.status = 'failed' THEN 1 ELSE 0 END), 0)", 'failed')
-        .andWhere("t.kind = 'delivery' AND t.createdAt > :d30", { d30 })
+        .andWhere(`t.kind IN (${CUSTOMER_SQL}) AND t.createdAt > :d30`, { d30 })
         .getRawOne<{ delivered: string; failed: string }>(),
       scope(this.deliveries.createQueryBuilder('t'))
         .select("COALESCE(t.hubId, 'unknown')", 'hubId')
@@ -520,7 +524,7 @@ export class AnalyticsService {
           `AVG(CASE WHEN t.status = 'delivered' AND t.pickedUpAt IS NOT NULL AND t.deliveredAt IS NOT NULL THEN ${this.hoursBetween('t.deliveredAt', 't.pickedUpAt')} * 60 END)`,
           'minutes',
         )
-        .andWhere("t.kind = 'delivery' AND t.createdAt > :d30", { d30 })
+        .andWhere(`t.kind IN (${CUSTOMER_SQL}) AND t.createdAt > :d30`, { d30 })
         .groupBy('o.destinationAreaId')
         .getRawMany<{ areaId: string | null; orders: string; delivered: string; failed: string; minutes: string | null }>(),
     ]);
@@ -538,7 +542,7 @@ export class AnalyticsService {
         cod += n(r.cod);
         byKind[r.kind ?? 'delivery'] = (byKind[r.kind ?? 'delivery'] ?? 0) + n(r.n);
       }
-      if (r.status === 'delivered' && (r.kind ?? 'delivery') === 'delivery') deliveredParcels += n(r.n);
+      if (r.status === 'delivered' && isCustomerKind(r.kind)) deliveredParcels += n(r.n);
     }
     const done = n(window30?.delivered);
     const failed = n(window30?.failed);

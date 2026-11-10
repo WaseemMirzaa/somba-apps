@@ -3,11 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThanOrEqual, Repository } from 'typeorm';
 import { DELIVERY_KINDS, DeliveryTask, Hub, Order, User } from '../database/entities';
 import { LogisticsService } from '../logistics/logistics.service';
+import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 import { CoverageService } from '../geo/coverage.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Legs where the rider meets the customer. */
-const CUSTOMER_LEGS: readonly string[] = ['delivery', 'return_pickup', 'replacement_delivery'];
+const CUSTOMER_LEGS: readonly string[] = [...CUSTOMER_KINDS, 'return_pickup', 'replacement_delivery'];
 
 @Injectable()
 export class RiderService {
@@ -92,6 +93,17 @@ export class RiderService {
     };
   }
 
+  /** The order lines a customer leg carries, from its cargo (null for a legacy leg that carries the whole order). */
+  private static cargoIds(t: DeliveryTask): Set<string> | null {
+    if (!t.sellerIds) return null;
+    try {
+      const v = t.itemsJson ? (JSON.parse(t.itemsJson) as { orderItemId?: string }[]) : [];
+      return new Set(v.map((x) => x?.orderItemId).filter((x): x is string => typeof x === 'string'));
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * The rider's task list: ONLY the tasks the warehouse assigned to them (riders never pick from an open pool),
    * each with its leg (`kind`, `from`, `to`) and a snapshot of the order, so the rider app renders in one live call.
@@ -104,6 +116,11 @@ export class RiderService {
     const byId = new Map(orders.map((o) => [o.id, o]));
     return rows.map((t, i) => {
       const o = byId.get(t.orderId) ?? null;
+      // A customer leg of a split order carries only some of the order's lines: the rider sees those (and that the order is partial).
+      const cargo = RiderService.cargoIds(t);
+      const live = (o?.items ?? []).filter((x) => x.fulfilment !== 'cancelled');
+      const isCustomerLeg = (CUSTOMER_KINDS as readonly string[]).includes(t.kind);
+      const items = !o ? [] : isCustomerLeg ? (cargo ? (o.items ?? []).filter((x) => cargo.has(x.id)) : (o.items ?? [])) : CUSTOMER_LEGS.includes(t.kind) || !t.sellerId ? (o.items ?? []) : (o.items ?? []).filter((x) => !x.sellerId || x.sellerId === t.sellerId);
       return {
         ...(views[i] ?? {}),
         id: t.id,
@@ -130,7 +147,9 @@ export class RiderService {
               estimatedDeliveryDate: o.estimatedDeliveryDate ?? null,
               totalUsd: o.totalUsd,
               shippingAddress: CUSTOMER_LEGS.includes(t.kind) ? o.shippingAddress : null,
-              items: CUSTOMER_LEGS.includes(t.kind) || !t.sellerId ? (o.items ?? []) : (o.items ?? []).filter((i) => !i.sellerId || i.sellerId === t.sellerId),
+              items,
+              /** True when this leg brings only part of the order (the rest was delivered before, or comes in another leg). */
+              partial: isCustomerLeg && !!cargo && cargo.size < live.length,
             }
           : null,
       };
