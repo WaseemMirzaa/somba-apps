@@ -17,6 +17,12 @@ on:
       - 'rider-app/**'
       - '.github/workflows/rider-app-apk.yml'
   workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Server the APK talks to (base URL, no /api/v1). Empty = repo variable LIVE_API_URL, else http://107.170.116.169'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -93,11 +99,60 @@ jobs:
             echo "REQUIRE_RELEASE_SIGNING=true"
           } >> "$GITHUB_ENV"
 
+      # Live server + optional keys (docs: mobile/README.md "Install the test APK"). The server URL is the workflow input
+      # `api_url`, else the repo variable LIVE_API_URL, else the default below. It is a bare base (scheme + host [+ port]):
+      # the app adds /api/v1/... itself, and Socket.IO follows the same host (SOCKET_URL is only set if you ask for it).
+      # Maps and Firebase defines are written only when the matching repo secret is set; empty means the feature stays off.
+      - name: Resolve live server and build defines
+        env:
+          INPUT_API_URL: ${{ inputs.api_url }}
+          VAR_API_URL: ${{ vars.LIVE_API_URL }}
+          VAR_SOCKET_URL: ${{ vars.LIVE_SOCKET_URL }}
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_SENDER_ID: ${{ secrets.FIREBASE_SENDER_ID }}
+          FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+        run: |
+          set -euo pipefail
+          url="${INPUT_API_URL:-${VAR_API_URL:-}}"
+          url="${url:-http://107.170.116.169}"
+          url="${url%/}"; url="${url%/api/v1}"; url="${url%/}"
+          case "$url" in http://*|https://*) ;; *) echo "::error::API URL '$url' must start with http:// or https://"; exit 1 ;; esac
+          socket="${VAR_SOCKET_URL:-}"
+          for v in GOOGLE_MAPS_API_KEY FIREBASE_API_KEY FIREBASE_PROJECT_ID FIREBASE_SENDER_ID FIREBASE_ANDROID_APP_ID; do
+            [ -n "${!v}" ] && echo "::add-mask::${!v}"
+          done
+          defines="$RUNNER_TEMP/dart-defines.json"
+          jq -n --arg api "$url" --arg socket "$socket" \
+            --arg maps "$GOOGLE_MAPS_API_KEY" --arg fk "$FIREBASE_API_KEY" --arg fp "$FIREBASE_PROJECT_ID" \
+            --arg fs "$FIREBASE_SENDER_ID" --arg fa "$FIREBASE_ANDROID_APP_ID" \
+            '{API_URL: $api}
+             + (if $socket != "" then {SOCKET_URL: $socket} else {} end)
+             + (if $maps != "" then {GOOGLE_MAPS_API_KEY: $maps} else {} end)
+             + (if $fk != "" then {FIREBASE_API_KEY: $fk} else {} end)
+             + (if $fp != "" then {FIREBASE_PROJECT_ID: $fp} else {} end)
+             + (if $fs != "" then {FIREBASE_SENDER_ID: $fs} else {} end)
+             + (if $fa != "" then {FIREBASE_ANDROID_APP_ID: $fa} else {} end)' > "$defines"
+          {
+            echo "DART_DEFINES_FILE=$defines"
+            echo "LIVE_SERVER_URL=$url"
+            # The Android Maps SDK key is a manifest placeholder filled by Gradle from this property (build.gradle.kts).
+            [ -n "$GOOGLE_MAPS_API_KEY" ] && echo "ORG_GRADLE_PROJECT_GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY"
+            true
+          } >> "$GITHUB_ENV"
+          {
+            echo "### Rider APK"
+            echo "Talks to: $url"
+            echo "Maps key: $([ -n "$GOOGLE_MAPS_API_KEY" ] && echo set || echo 'not set (map off)')"
+            echo "Firebase: $([ -n "$FIREBASE_API_KEY" ] && echo set || echo 'not set (push off)')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build release APK (universal)
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define-from-file="$DART_DEFINES_FILE"
 
       - name: Build release APKs (split per ABI)
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --dart-define-from-file="$DART_DEFINES_FILE"
 
       - name: Rename universal APK
         run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/somba-rider.apk
@@ -120,6 +175,7 @@ jobs:
             Automated release of the Somba&Teka rider Android app.
 
             - Built with Flutter ${{ env.FLUTTER_VERSION }}
+            - **Server: `${{ env.LIVE_SERVER_URL }}`** (the app talks to this server)
             - Commit: ${{ github.sha }}
 
             Download `somba-rider.apk` (universal) below and install on any Android device.
