@@ -70,3 +70,11 @@ test("the server saying an earlier request with this key is still running keeps 
   const e = Object.assign(new Error("Your order is still being processed."), { raw: "x", code: "order_processing" });
   assert.equal(m.outcomeUnknown(e), true);
 });
+
+test("a timeout worded in French by socket-client is still 'no answer' (timedOut flag), a refusal never is", () => {
+  const slowFr = Object.assign(new Error("Le serveur met trop de temps à répondre. Réessayez."), { timedOut: true });
+  assert.equal(m.isNoAnswer(slowFr), true);
+  assert.equal(m.outcomeUnknown(slowFr), true);
+  assert.equal(m.isNoAnswer(refusal("Le serveur met trop de temps à répondre.")), false);
+  assert.equal(m.outcomeUnknown(Object.assign(new Error("Connexion perdue."), { raw: "Socket not connected." })), true);
+});

@@ -14,7 +14,7 @@ import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-s
 import { useSellerAccess, useSellerData } from "@/lib/seller";
 import { useLiveQuery } from "@/lib/seller-api";
 import { localDateTime } from "@/lib/dates";
-import { movementReasonLabel, movementReasonVariant, variantLabels, type StockMovements, type StockOverview } from "@/lib/seller-stock";
+import { movementReasonLabel, movementReasonVariant, stockVariantText, variantLabels, type StockMovements, type StockOverview } from "@/lib/seller-stock";
 import { useLocale } from "@/context/locale-context";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -61,6 +61,7 @@ export default function SellerInventoryDetailPage() {
   }
 
   const labels = variantLabels(item);
+  const product = sellerProductList.find((p) => p.id === item.productId);
   const mv = movements.data;
   const pages = mv ? Math.max(1, Math.ceil(mv.total / PAGE)) : 1;
 
@@ -120,7 +121,7 @@ export default function SellerInventoryDetailPage() {
                 { key: "units", label: fr ? "Unités" : "Units" },
               ]}
               data={[
-                ...labels.map((l) => ({ option: l, units: item.variantStock?.[l] ?? 0 })),
+                ...labels.map((l) => ({ option: stockVariantText(l, product, fr), units: item.variantStock?.[l] ?? 0 })),
                 { option: fr ? "Réserve commune (hors option)" : "Shared pool (not tied to an option)", units: item.pool },
               ]}
             />
@@ -142,7 +143,7 @@ export default function SellerInventoryDetailPage() {
               columns={[
                 { key: "createdAt", label: "Date", render: (r) => localDateTime(String(r.createdAt)) },
                 { key: "reason", label: fr ? "Motif" : "Reason", render: (r) => <Badge variant={movementReasonVariant(String(r.reason))}>{movementReasonLabel(String(r.reason), fr)}</Badge> },
-                { key: "variant", label: fr ? "Option" : "Option", render: (r) => String(r.variant ?? "—") },
+                { key: "variant", label: fr ? "Option" : "Option", render: (r) => (r.variant ? stockVariantText(String(r.variant), product, fr) : "—") },
                 { key: "delta", label: fr ? "Quantité" : "Quantity", render: (r) => <span className={Number(r.delta) < 0 ? "font-semibold text-red-700" : "font-semibold text-emerald-700"}>{Number(r.delta) > 0 ? `+${r.delta}` : String(r.delta)}</span> },
                 { key: "stockAfter", label: fr ? "Stock après" : "Stock after" },
                 {

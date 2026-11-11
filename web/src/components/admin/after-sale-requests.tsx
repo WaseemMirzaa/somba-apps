@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
+import { localizeVariant } from "@/lib/i18n-fields";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -119,8 +120,8 @@ const CFG = {
 
 const itemOf = (r: Row, kind: AfterSaleKind, fr: boolean) =>
   kind === "replacement"
-    ? `${fr && r.productNameFr ? r.productNameFr : r.productName}${r.variant ? ` · ${r.variant}` : ""}`
-    : `${fr && r.fromNameFr ? r.fromNameFr : r.fromName}${r.fromVariant ? ` (${r.fromVariant})` : ""} → ${fr && r.toNameFr ? r.toNameFr : r.toName}${r.toVariant ? ` (${r.toVariant})` : ""}`;
+    ? `${fr && r.productNameFr ? r.productNameFr : r.productName}${r.variant ? ` · ${localizeVariant(r.variant, fr)}` : ""}`
+    : `${fr && r.fromNameFr ? r.fromNameFr : r.fromName}${r.fromVariant ? ` (${localizeVariant(r.fromVariant, fr)})` : ""} → ${fr && r.toNameFr ? r.toNameFr : r.toName}${r.toVariant ? ` (${localizeVariant(r.toVariant, fr)})` : ""}`;
 
 export function AfterSaleList({ kind }: { kind: AfterSaleKind }) {
   const c = CFG[kind];

@@ -13,6 +13,7 @@ import { TranslationsPanel } from "@/components/seller/translations-panel";
 import { EngageReviews } from "@/components/seller/engage-reviews";
 import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
 import { useSellerAccess, useSellerData } from "@/lib/seller";
+import { stockVariantText } from "@/lib/seller-stock";
 import { assetUrl } from "@/lib/seller-api";
 import { weightLabel } from "@/lib/seller-products";
 import {
@@ -181,7 +182,7 @@ export default function SellerProductDetailPage() {
                 <ul className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)]">
                   {Object.entries(product.variantStock).map(([label, n]) => (
                     <li key={label} className="flex items-center justify-between gap-3 px-3 py-1.5">
-                      <span className="min-w-0 truncate">{label}</span>
+                      <span className="min-w-0 truncate">{stockVariantText(label, product, fr)}</span>
                       <span className={n <= 0 ? "font-semibold text-red-600" : n <= product.lowStockThreshold ? "font-semibold text-amber-700" : "font-medium"}>{n}</span>
                     </li>
                   ))}

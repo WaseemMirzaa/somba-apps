@@ -217,7 +217,7 @@ export default function AdminCategoriesPage() {
                   <div className="relative flex h-24 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50">
                     {form.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.image} alt="preview" className="h-full w-full object-cover" />
+                      <img src={form.image} alt={fr ? "Aperçu" : "Preview"} className="h-full w-full object-cover" />
                     ) : (
                       <ImageIcon className="h-6 w-6 text-slate-300" />
                     )}

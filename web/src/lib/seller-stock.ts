@@ -3,6 +3,8 @@
  * Labels are EN/FR; nothing here is invented — every reason is a value the API writes to the ledger.
  */
 import type { BadgeVariant } from "@/lib/seller-labels";
+import { localizeVariant, localizeVariantText } from "@/lib/i18n-fields";
+import type { VariantGroup, VariantLabels } from "@/lib/variants";
 
 export interface StockItem {
   productId: string;
@@ -92,4 +94,22 @@ export function removableUnits(item: Pick<StockItem, "stock" | "variantStock" | 
   if (variant && item.variantStock && variant in item.variantStock) return item.variantStock[variant];
   if (variant) return item.pool; // an option with no entry draws on the shared pool
   return item.variantStock ? item.pool : item.stock;
+}
+
+/**
+ * A stock line's option text ("Colour: Black") in the viewer's language, from the product's own option labels. The
+ * canonical text stays the key of every request.
+ */
+export function stockVariantText(
+  label: string,
+  product: { variantGroups?: VariantGroup[]; variantLabelSet?: VariantLabels | null } | null | undefined,
+  fr: boolean,
+): string {
+  if (!fr) return label;
+  if (product?.variantGroups?.length && product.variantLabelSet) {
+    const own = localizeVariantText(label, product.variantGroups, product.variantLabelSet, fr);
+    if (own !== label) return own;
+  }
+  // No stored labels for this product: the well-known words (Size, Colour, Black...) still read in French.
+  return localizeVariant(label, fr);
 }

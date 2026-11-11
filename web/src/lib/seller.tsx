@@ -398,7 +398,7 @@ export async function uploadImage(file: File): Promise<string> {
   };
   if (!res.ok || !json.url) {
     const msg = httpErrorText(json, currentLocale());
-    throw new Error(msg ?? `Upload failed (${res.status}).`);
+    throw new Error(msg ?? (currentLocale() === "fr" ? `Échec du téléversement (${res.status}).` : `Upload failed (${res.status}).`));
   }
   return json.url;
 }

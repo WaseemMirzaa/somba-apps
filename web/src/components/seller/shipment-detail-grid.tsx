@@ -1,5 +1,6 @@
 "use client";
 
+import { failureReasonText } from "@/lib/rider-actions";
 import Link from "next/link";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
@@ -145,7 +146,7 @@ export function ShipmentDetailGrid({ shipment, locale, showOrderLink = true, var
                         {leg.attempts}
                         {leg.failureReason && (
                           <p className="mt-0.5 text-xs text-red-700">
-                            {fr ? "Dernier échec" : "Last failure"}: {leg.failureReason}
+                            {fr ? "Dernier échec" : "Last failure"}: {failureReasonText(leg.failureReason, fr)}
                           </p>
                         )}
                       </td>

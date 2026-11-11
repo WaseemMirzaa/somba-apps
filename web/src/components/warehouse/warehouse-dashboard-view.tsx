@@ -1,5 +1,6 @@
 "use client";
 
+import { failureReasonText } from "@/lib/rider-actions";
 import Link from "next/link";
 import {
   Send,
@@ -89,7 +90,7 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
     ...failed.slice(0, 4).map((p) => ({
       id: `f-${p.id}`,
       title: fr ? `Trajet échoué ${p.orderReference}` : `Failed leg ${p.orderReference}`,
-      detail: p.failureReason ?? (fr ? "Aucun motif indiqué" : "No reason given"),
+      detail: (p.failureReason ? failureReasonText(p.failureReason, fr) : null) ?? (fr ? "Aucun motif indiqué" : "No reason given"),
       href: `/tasks/${p.id}`,
       priority: "danger" as const,
     })),

@@ -12,6 +12,7 @@ import { PasswordChangeGate } from "@/components/layout/password-change-gate";
 import { PortalGuard } from "@/components/layout/portal-guard";
 import { useOpsTickets } from "@/lib/ops-support";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { usePortalTitle } from "@/components/layout/portal-title";
 
 const nav = [
   { href: "/rider", icon: Home, label: "dashboard" },
@@ -35,6 +36,8 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
   const { t, locale, setLocale } = useLocale();
   const { logout } = useAuth();
   const router = useRouter();
+  const current = nav.filter((n) => pathname === n.href || (n.href !== "/rider" && pathname.startsWith(`${n.href}/`))).sort((a, b) => b.href.length - a.href.length)[0];
+  usePortalTitle(current && current.href !== "/rider" ? t(current.label as Parameters<typeof t>[0]) : null, t("riderApp"));
 
   return (
     <PortalGuard>

@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeVariant } from "@/lib/i18n-fields";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AlertCircle } from "lucide-react";
@@ -96,7 +97,7 @@ export default function WarehouseReplacementDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Produit" : "Product", value: fr && rep.productNameFr ? rep.productNameFr : rep.productName },
             { label: "SKU", value: rep.sku },
-            ...(rep.variant ? [{ label: fr ? "Option" : "Option", value: rep.variant }] : []),
+            ...(rep.variant ? [{ label: fr ? "Option" : "Option", value: localizeVariant(rep.variant, fr) }] : []),
             { label: fr ? "Quantité" : "Quantity", value: rep.qty ?? 1 },
             { label: fr ? "Expédition" : "Dispatch", value: rep.dispatchStatus ? pick(DISPATCH_STATUS[rep.dispatchStatus], fr, rep.dispatchStatus) : "—" },
             { label: fr ? "Livré le" : "Delivered", value: rep.deliveredAt ? shortDate(rep.deliveredAt, locale) : "—" },

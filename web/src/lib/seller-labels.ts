@@ -137,6 +137,9 @@ const PAYOUT_METHOD: Record<string, { en: string; fr: string }> = {
 export const payoutMethodLabel = (m: string, fr: boolean) =>
   PAYOUT_METHOD[m] ? (fr ? PAYOUT_METHOD[m].fr : PAYOUT_METHOD[m].en) : m;
 
+/** A transaction's detail line: a payout line carries the bare method key (`mobile_money`), shown as its label. */
+export const transactionDetail = (text: string, fr: boolean) => (PAYOUT_METHOD[text] ? payoutMethodLabel(text, fr) : text);
+
 // ─── Transactions (derived payment status) ───────────────────────────────────
 const TXN: Labels = {
   paid: { en: "Paid", fr: "Payé", variant: "success" },
@@ -260,3 +263,28 @@ export function errMessage(e: unknown, fallback = "Something went wrong."): stri
 // ─── Payment methods on orders (orders.paymentMethod) ────────────────────────
 // One shared map for every portal: see lib/payment-methods.ts.
 export { paymentMethodLabel } from "@/lib/payment-methods";
+
+// ─── Store badge (sellers.badge) ─────────────────────────────────────────────
+const BADGE: Record<string, { en: string; fr: string }> = {
+  bronze: { en: "Bronze", fr: "Bronze" },
+  silver: { en: "Silver", fr: "Argent" },
+  gold: { en: "Gold", fr: "Or" },
+  somba_assured: { en: "KOMORIKO Assured", fr: "KOMORIKO Garanti" },
+};
+export const sellerBadgeLabel = (badge: string | null | undefined, fr: boolean) => {
+  const hit = badge ? BADGE[badge] : undefined;
+  if (hit) return fr ? hit.fr : hit.en;
+  return badge ? badge.replace(/_/g, " ") : BADGE.bronze[fr ? "fr" : "en"];
+};
+
+// ─── Store status (sellers.status) ───────────────────────────────────────────
+const STORE_STATUS: Record<string, { en: string; fr: string }> = {
+  pending: { en: "Pending", fr: "En attente" },
+  approved: { en: "Approved", fr: "Approuvé" },
+  rejected: { en: "Rejected", fr: "Rejeté" },
+  suspended: { en: "Suspended", fr: "Suspendu" },
+};
+export const storeStatusLabel = (status: string, fr: boolean) => {
+  const hit = STORE_STATUS[status];
+  return hit ? (fr ? hit.fr : hit.en) : status.replace(/_/g, " ");
+};

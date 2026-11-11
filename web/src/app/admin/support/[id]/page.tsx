@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import { auditRoleLabel } from "@/lib/admin-i18n";
 import { supportCategoryLabel } from "@/lib/i18n-fields";
 import { localDay, localDateTime } from "@/lib/dates";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -260,7 +261,7 @@ export default function AdminSupportDetailPage() {
                 >
                   <option value="">{fr ? "Choisir un agent…" : "Choose an agent…"}</option>
                   {adminAccounts.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} · {u.role.replace("admin_", "")}</option>
+                    <option key={u.id} value={u.id}>{u.name} · {auditRoleLabel(u.role, fr)}</option>
                   ))}
                 </select>
               )}

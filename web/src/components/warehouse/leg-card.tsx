@@ -1,5 +1,6 @@
 "use client";
 
+import { failureReasonText } from "@/lib/rider-actions";
 import Link from "next/link";
 import { ArrowRight, Bike, Clock, MapPin, Navigation, Package, Store, Warehouse, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +146,7 @@ export function LegCard({ task, onChanged }: { task: DeskTask; onChanged?: (res?
           {task.failureReason && (
             <p className="rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-700">
               {fr ? "Motif d'échec : " : "Failure reason: "}
-              {task.failureReason}
+              {failureReasonText(task.failureReason, fr)}
             </p>
           )}
         </div>

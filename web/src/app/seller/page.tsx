@@ -105,7 +105,7 @@ export default function SellerDashboard() {
       <PageHeader
         title={sellerStore.name}
         subtitle={
-          (fr ? `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge}` : `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge}`) +
+          `${t("welcome")}, ${sellerStore.owner} · ${sellerStore.badge}` +
           (Number(sellerStore.rating) > 0 ? ` · ⭐ ${Number(sellerStore.rating).toFixed(1)}` : "")
         }
         actions={
