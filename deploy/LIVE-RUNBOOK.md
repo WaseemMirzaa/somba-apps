@@ -94,7 +94,7 @@ Express delivery is off too, so the express demo orders of store C are skipped. 
 The two flags can be given together.
 
 **While the demo is installed, real visitors can see it** (stores, products, notices to real admins), and
-`admin.super@demo.sombateka.test` can do everything. Remove it before real customers arrive (section 5).
+`admin.super@demo.komoriko.test` can do everything. Remove it before real customers arrive (section 5).
 
 ## 4. Credentials
 
@@ -102,7 +102,7 @@ The two flags can be given together.
 |---|---|
 | Your real admin login | the `ADMIN_EMAIL` you passed. Password: `ADMIN_PASSWORD` in `/etc/somba/secrets.env`; read it with `grep '^ADMIN_PASSWORD=' /etc/somba/secrets.env` (root). It was also printed once by the first deploy. If you changed it in the app, the file is stale |
 | Demo accounts, passwords, two-factor keys | `cat /etc/somba/demo-credentials.txt` (root, mode 600, never in git or on screen by itself) |
-| Two-factor code of a **demo** account (admins and store owners A, B, D, E, F, G, H) | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.sombateka.test` (root; replace the e-mail; the code lasts about 30 seconds). Or add that account's `totp_key` as a setup key in an authenticator app. Each `recovery_codes` entry works once instead of a code |
+| Two-factor code of a **demo** account (admins and store owners A, B, D, E, F, G, H) | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.komoriko.test` (root; replace the e-mail; the code lasts about 30 seconds). Or add that account's `totp_key` as a setup key in an authenticator app. Each `recovery_codes` entry works once instead of a code |
 | Two-factor code of your **real** admin | not available from any script: use the authenticator app you enrolled (the script only reads demo accounts) |
 | List, rename or remove admin accounts | `cd /opt/somba/api && sudo -u somba npm run manage:admin:prod -- list` (root). See `docs/DEPLOYMENT.md` step 6 for `update-email` and `remove` |
 
@@ -119,7 +119,7 @@ bash /opt/somba/deploy/seed-demo.sh remove --yes         # removes it (and /etc/
 ```
 
 To refresh the dates (the "delivered 2 days ago" order ages), run `remove --yes`, then seed again. Removal finds the demo only through
-accounts ending in `@demo.sombateka.test`; it refuses, and deletes nothing, while a real order still contains a demo product or
+accounts ending in `@demo.komoriko.test`; it refuses, and deletes nothing, while a real order still contains a demo product or
 uses the demo warehouse or a demo rider.
 
 ## 6. Keys: what each one turns on and where it goes
@@ -204,10 +204,10 @@ existing ones sit in the same page under **Checkout and delivery** (`deliveryBas
 
 ## 9. Install the test APKs
 
-1. On GitHub: **Releases** > the latest `customer-apk-v...` (customer) or the rider release > download `somba-customer.apk`
+1. On GitHub: **Releases** > the latest `customer-apk-v...` (customer) or the rider release > download `komoriko-customer.apk`
    (universal) or the rider APK.
 2. On the Android phone open the file and allow "install unknown apps" for the browser or file manager when asked.
-3. Sign in with a demo customer from `/etc/somba/demo-credentials.txt` (for example `customer.full@demo.sombateka.test`).
+3. Sign in with a demo customer from `/etc/somba/demo-credentials.txt` (for example `customer.full@demo.komoriko.test`).
 4. Remove a debug-signed build before installing a release-signed one (different signatures do not update over each other).
 
 More: `mobile/README.md` (CI/CD section), `docs/ANDROID-RELEASE-SIGNING.md`. iPhones need TestFlight with the owner's Apple account

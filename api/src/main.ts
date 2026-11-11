@@ -49,7 +49,7 @@ async function bootstrap() {
   await app.listen(port);
   // eslint-disable-next-line no-console
   console.log(
-    `Somba&Teka API on http://localhost:${port} · db=${config.get('db.type')} · realtime=socket.io`,
+    `KOMORIKO API on http://localhost:${port} · db=${config.get('db.type')} · realtime=socket.io`,
   );
 }
 void bootstrap();

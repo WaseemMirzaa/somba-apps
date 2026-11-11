@@ -42,7 +42,7 @@ export const RETURN_STAGE_LABEL: Record<string, { en: string; fr: string }> = {
   seller_replied: { en: "Seller replied", fr: "Le vendeur a répondu" },
   seller_rejected: { en: "Seller said no", fr: "Refusé par le vendeur" },
   seller_timeout: { en: "Seller did not answer", fr: "Le vendeur n'a pas répondu" },
-  escalated: { en: "With Somba support", fr: "Chez le support Somba" },
+  escalated: { en: "With KOMORIKO support", fr: "Chez le support KOMORIKO" },
   approved: { en: "Approved (no pickup yet)", fr: "Approuvé (pas encore de collecte)" },
   pickup: { en: "Pickup in progress", fr: "Collecte en cours" },
   received: { en: "Goods at the warehouse", fr: "Articles à l'entrepôt" },

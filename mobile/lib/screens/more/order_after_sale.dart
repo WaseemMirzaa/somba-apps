@@ -50,7 +50,7 @@ Future<void> buyAgain(BuildContext context, OrderDto order, Locale locale) async
 /// Plain-text receipt (shared through the phone's share sheet: WhatsApp, e-mail, Files…).
 String receiptText(Strings s, OrderDto o) {
   final b = StringBuffer()
-    ..writeln('Somba&Teka — ${s.receiptTitle}')
+    ..writeln('KOMORIKO — ${s.receiptTitle}')
     ..writeln('${s.receiptOrder}: ${o.reference}')
     ..writeln('${s.receiptDate}: ${o.createdAt != null ? formatDateTime(o.createdAt!) : '—'}')
     ..writeln('${s.receiptCustomer}: ${o.customerName}');

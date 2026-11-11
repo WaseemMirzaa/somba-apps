@@ -7,7 +7,7 @@
 export type PaymentMethodId = "wallet" | "airtel_money" | "orange_money" | "vodacom_mpesa" | "stripe_card" | "cod";
 
 export const PAYMENT_METHODS: Record<PaymentMethodId, { en: string; fr: string }> = {
-  wallet: { en: "Somba wallet", fr: "Portefeuille Somba" },
+  wallet: { en: "KOMORIKO wallet", fr: "Portefeuille KOMORIKO" },
   airtel_money: { en: "Airtel Money", fr: "Airtel Money" },
   orange_money: { en: "Orange Money", fr: "Orange Money" },
   vodacom_mpesa: { en: "Vodacom M-Pesa", fr: "Vodacom M-Pesa" },
@@ -28,7 +28,7 @@ export function paymentMethodId(method: string | null | undefined): PaymentMetho
   return ALIASES[raw.toLowerCase()] ?? null;
 }
 
-/** "Portefeuille Somba" / "Somba wallet" for `wallet`. A method we do not know is shown readable, as it came. */
+/** "Portefeuille KOMORIKO" / "KOMORIKO wallet" for `wallet`. A method we do not know is shown readable, as it came. */
 export function paymentMethodLabel(method: string | null | undefined, fr: boolean): string {
   const id = paymentMethodId(method);
   if (id) return fr ? PAYMENT_METHODS[id].fr : PAYMENT_METHODS[id].en;

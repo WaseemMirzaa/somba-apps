@@ -103,7 +103,7 @@ export function ShipmentDetailGrid({ shipment, locale, showOrderLink = true, var
               { label: fr ? "Ville de destination" : "Destination City", value: shipment.customer.city },
               {
                 label: fr ? "Livraison" : "Delivery",
-                value: fr ? "Gérée par la logistique Somba&Teka" : "Handled by Somba&Teka logistics",
+                value: fr ? "Gérée par la logistique KOMORIKO" : "Handled by KOMORIKO logistics",
                 full: true,
               },
             ]}

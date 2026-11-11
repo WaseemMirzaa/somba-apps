@@ -1,6 +1,6 @@
 name: Customer App · Build APK
 
-# Builds and releases the Somba customer Flutter app (mobile/) as an Android APK
+# Builds and releases the KOMORIKO customer Flutter app (mobile/) as an Android APK
 # using Flutter 3.47.7.
 
 on:
@@ -155,12 +155,12 @@ jobs:
         run: flutter build apk --release --split-per-abi --dart-define-from-file="$DART_DEFINES_FILE"
 
       - name: Rename universal APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/somba-customer.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/komoriko-customer.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: somba-customer-apk
+          name: komoriko-customer-apk
           path: mobile/build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 90
@@ -170,15 +170,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: customer-apk-v${{ github.run_number }}
-          name: Somba Customer App — APK build ${{ github.run_number }}
+          name: KOMORIKO Customer App — APK build ${{ github.run_number }}
           body: |
-            Automated release of the Somba customer Android app.
+            Automated release of the KOMORIKO customer Android app.
 
             - Built with Flutter ${{ env.FLUTTER_VERSION }}
             - **Server: `${{ env.LIVE_SERVER_URL }}`** (the app talks to this server)
             - Commit: ${{ github.sha }}
 
-            Download `somba-customer.apk` (universal) below and install on any Android device.
+            Download `komoriko-customer.apk` (universal) below and install on any Android device.
           files: mobile/build/app/outputs/flutter-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

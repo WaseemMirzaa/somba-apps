@@ -17,7 +17,7 @@ wait 1.4
 say "Delivered, Scanned in, Failed: the rider keeps the full trail||Livrée, Réceptionnée, Échouée : le livreur garde tout l'historique" 3.4
 tap "icon:person_rounded#last" 1.4
 tap key:support-entry 1.8
-say "Support: tickets to the Somba&Teka team, from the rider app||Support : des tickets à l'équipe Somba&Teka, depuis l'app livreur" 3.2
+say "Support: tickets to the KOMORIKO team, from the rider app||Support : des tickets à l'équipe KOMORIKO, depuis l'app livreur" 3.2
 tap key:support-new 1.8
 tap keyp:cat-#1 0.8
 type key:ticket-subject "Gate closed at the warehouse||Portail fermé à l'entrepôt" 30
@@ -30,7 +30,7 @@ tap key:ticket-submit 1.4
 if key:ticket-submit tap key:ticket-submit 1.4
 wait 1.2
 say "The ticket is sent||Le ticket est envoyé" 2.4
-cap "Somba support answers from the admin console||Le support Somba répond depuis la console d'administration" 3
+cap "KOMORIKO support answers from the admin console||Le support KOMORIKO répond depuis la console d'administration" 3
 act supportReply "text=Thanks Jean, we told the warehouse to leave the gate open.||text=Merci Jean, nous avons demandé à l'entrepôt de laisser le portail ouvert."
 wait 3.4
 say "The ticket opens as a thread: the reply appears live||Le ticket s'ouvre en fil : la réponse apparaît en direct" 3.4

@@ -34,12 +34,12 @@ const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 export const smsText = {
   verify: (code: string, locale?: string | null) =>
     locale === 'fr'
-      ? `Votre code de vérification Somba&Teka est ${code}. Il expire dans 10 minutes.`
-      : `Your Somba&Teka verification code is ${code}. It expires in 10 minutes.`,
+      ? `Votre code de vérification KOMORIKO est ${code}. Il expire dans 10 minutes.`
+      : `Your KOMORIKO verification code is ${code}. It expires in 10 minutes.`,
   signIn: (code: string, locale?: string | null) =>
     locale === 'fr'
-      ? `Votre code de connexion Somba&Teka est ${code}. Il expire dans 10 minutes. Ne le partagez jamais.`
-      : `Your Somba&Teka sign-in code is ${code}. It expires in 10 minutes. Never share it.`,
+      ? `Votre code de connexion KOMORIKO est ${code}. Il expire dans 10 minutes. Ne le partagez jamais.`
+      : `Your KOMORIKO sign-in code is ${code}. It expires in 10 minutes. Never share it.`,
 };
 
 /** What the API returns; `devToken` is only ever present outside production. */
@@ -117,7 +117,7 @@ export class VerificationService {
     const link = `${this.webUrl}/shop/verify-email?token=${secret}`;
     const d = await this.messaging.deliverEmail(
       user.email,
-      'Verify your Somba&Teka email',
+      'Verify your KOMORIKO email',
       `Hello ${user.name},\n\nConfirm your email address:\n${link}\n\nThis link expires in 24 hours. If you didn't create an account, ignore this message.`,
     );
     return { ...outcome(d, user.email), ...(this.expose ? { devToken: secret } : {}) };
@@ -223,7 +223,7 @@ export class VerificationService {
     const link = `${this.webUrl}/shop/reset?token=${secret}`;
     await this.messaging.sendEmail(
       user.email,
-      'Reset your Somba&Teka password',
+      'Reset your KOMORIKO password',
       `Hello ${user.name},\n\nReset your password:\n${link}\n\nThis link expires in 1 hour and works once. If you didn't ask for this, ignore this message — your password is unchanged.`,
     );
     return { sent: true, ...unconfigured, ...(this.expose ? { devToken: secret } : {}) };

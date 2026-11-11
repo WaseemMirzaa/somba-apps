@@ -54,8 +54,8 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['Approve the airtel money request on your phone to confirm SOM-1001.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer SOM-1001.'],
   ],
   '{} is handling {}.': [['Amadou is handling SOM-1001.', 'Amadou s’occupe de SOM-1001.']],
-  '{} reached the Somba&Teka warehouse and will be on its way soon.': [
-    ['SOM-1001 reached the Somba&Teka warehouse and will be on its way soon.', 'SOM-1001 est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'],
+  '{} reached the KOMORIKO warehouse and will be on its way soon.': [
+    ['SOM-1001 reached the KOMORIKO warehouse and will be on its way soon.', 'SOM-1001 est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'],
   ],
   // The three-leg journey: warehouse desk, riders, sellers, routing alerts
   // RD-01: the delivery code lockout
@@ -166,15 +166,15 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   '{} was cancelled: {}.': [['SOM-1001 was cancelled: payment was not completed.', 'SOM-1001 a été annulée : le paiement n’a pas abouti.']],
   '{} was cancelled{}.{}': [
     [
-      'SOM-1001 was cancelled by Somba&Teka support: Fraud check. $12.50 was refunded to your wallet.',
-      'SOM-1001 a été annulée par l’assistance Somba&Teka : Fraud check. 12,50\u00A0$ ont été remboursés sur votre portefeuille.',
+      'SOM-1001 was cancelled by KOMORIKO support: Fraud check. $12.50 was refunded to your wallet.',
+      'SOM-1001 a été annulée par l’assistance KOMORIKO : Fraud check. 12,50\u00A0$ ont été remboursés sur votre portefeuille.',
     ],
     ['SOM-1001 was cancelled.', 'SOM-1001 a été annulée.'],
     ['SOM-1001 was cancelled. $12.50 was refunded to your wallet.', 'SOM-1001 a été annulée. 12,50\u00A0$ ont été remboursés sur votre portefeuille.'],
   ],
   '{} was cancelled{}. Do not pack it.': [
     ['SOM-1001 was cancelled by the customer. Do not pack it.', 'SOM-1001 a été annulée par le client. Ne la préparez pas.'],
-    ['SOM-1001 was cancelled by Somba&Teka. Do not pack it.', 'SOM-1001 a été annulée par Somba&Teka. Ne la préparez pas.'],
+    ['SOM-1001 was cancelled by KOMORIKO. Do not pack it.', 'SOM-1001 a été annulée par KOMORIKO. Ne la préparez pas.'],
     ['SOM-1001 was cancelled (Fraud check). Do not pack it.', 'SOM-1001 a été annulée (Fraud check). Ne la préparez pas.'],
   ],
   '{}: {}. We will try again (attempt {} of {}).{}': [
@@ -336,7 +336,7 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   'Your store is open again and takes new orders.': [['Your store is open again and takes new orders.', 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.']],
   'Your store badge is now {} (was {}).': [
     ['Your store badge is now gold (was silver).', 'Le badge de votre boutique est maintenant or (avant : argent).'],
-    ['Your store badge is now somba_assured (was bronze).', 'Le badge de votre boutique est maintenant Somba Assuré (avant : bronze).'],
+    ['Your store badge is now somba_assured (was bronze).', 'Le badge de votre boutique est maintenant KOMORIKO Assuré (avant : bronze).'],
   ],
 
   // Stock, flash sales, campaign budget, invoices, bulk import (localize-commerce.ts)

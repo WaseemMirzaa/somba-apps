@@ -2,7 +2,7 @@ export type Locale = "en" | "fr";
 
 export const translations = {
   en: {
-    brand: "Somba&Teka",
+    brand: "KOMORIKO",
     tagline: "Shop smarter. Deliver faster.",
     heroTitle: "Your marketplace, reimagined",
     heroSubtitle:
@@ -153,7 +153,7 @@ export const translations = {
     // @@SHOP-KEYS-EN
   },
   fr: {
-    brand: "Somba&Teka",
+    brand: "KOMORIKO",
     tagline: "Achetez malin. Livrez vite.",
     heroTitle: "Votre marketplace, réinventée",
     heroSubtitle:

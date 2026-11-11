@@ -82,7 +82,7 @@ describe('TOTP (RFC 6238)', () => {
     const url = new URL(otpauthUrl('ABCDEFGH', 'amina@example.com'));
     expect(url.protocol).toBe('otpauth:');
     expect(url.host).toBe('totp');
-    expect(decodeURIComponent(url.pathname)).toBe('/Somba&Teka:amina@example.com');
+    expect(decodeURIComponent(url.pathname)).toBe('/KOMORIKO:amina@example.com');
     expect(url.searchParams.get('secret')).toBe('ABCDEFGH');
     expect(url.searchParams.get('digits')).toBe('6');
     expect(url.searchParams.get('period')).toBe('30');

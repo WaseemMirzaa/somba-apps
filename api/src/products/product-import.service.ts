@@ -47,7 +47,7 @@ const COLUMNS: Record<string, string> = {
 /** Column headers of the template file, in this order. */
 export const TEMPLATE_HEADER = ['name', 'nameFr', 'description', 'descriptionFr', 'price', 'originalPrice', 'category', 'stock', 'sku', 'brand', 'weightKg', 'images', 'prepDays', 'variants'];
 const TEMPLATE_ROWS = [
-  ['Cotton T-shirt', 'T-shirt en coton', 'Soft everyday T-shirt.', 'T-shirt doux pour tous les jours.', '12.50', '15', 'Fashion', '40', 'TSH-001', 'Somba', '0.2', 'https://example.com/tshirt-1.jpg|https://example.com/tshirt-2.jpg', '3', 'Size=S|M|L;Colour=Black|White'],
+  ['Cotton T-shirt', 'T-shirt en coton', 'Soft everyday T-shirt.', 'T-shirt doux pour tous les jours.', '12.50', '15', 'Fashion', '40', 'TSH-001', 'KOMORIKO', '0.2', 'https://example.com/tshirt-1.jpg|https://example.com/tshirt-2.jpg', '3', 'Size=S|M|L;Colour=Black|White'],
   ['Phone case', '', '', '', '6', '', 'Electronics', '100', 'CASE-9', '', '', '', '', ''],
 ];
 

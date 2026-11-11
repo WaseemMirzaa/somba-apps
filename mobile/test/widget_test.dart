@@ -1,4 +1,4 @@
-// UI smoke tests for the Somba customer app (no server needed).
+// UI smoke tests for the KOMORIKO customer app (no server needed).
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,7 +21,7 @@ void main() {
     await tester.pump();
 
     // Splash shows the brand while booting.
-    expect(find.text('Somba&Teka'), findsOneWidget);
+    expect(find.text('KOMORIKO'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 3));
     await tester.pump();

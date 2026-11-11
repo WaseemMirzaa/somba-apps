@@ -39,7 +39,7 @@ describe('rating and badge rules', () => {
     it('a new store with nothing is bronze', () => {
       expect(badgeFor({ rating: 0, ratingCount: 0, fulfilmentRate: null }, 'bronze')).toBe('bronze');
     });
-    it('Somba Assured is granted by hand and never touched', () => {
+    it('KOMORIKO Assured is granted by hand and never touched', () => {
       expect(badgeFor({ rating: 1, ratingCount: 0, fulfilmentRate: 0 }, 'somba_assured')).toBe('somba_assured');
     });
   });
@@ -157,7 +157,7 @@ describe('SellerScoringService', () => {
     expect(out).toMatchObject({ rating: 0, ratingCount: 0 });
   });
 
-  it('keeps Somba Assured and skips rejected stores in the sweep', async () => {
+  it('keeps KOMORIKO Assured and skips rejected stores in the sweep', async () => {
     const assured = await addSeller(ds, { userId: 'o1', badge: 'somba_assured' });
     const rejected = await addSeller(ds, { userId: 'o2', status: 'rejected' });
     const normal = await addSeller(ds, { userId: 'o3' });

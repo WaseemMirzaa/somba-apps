@@ -1,4 +1,4 @@
-# Somba&Teka — Customer App: Full Feature Guide (Screen by Screen, with details)
+# KOMORIKO — Customer App: Full Feature Guide (Screen by Screen, with details)
 
 A granular walkthrough of every screen in the Flutter customer app (`mobile/`):
 its purpose, every section, the exact on-screen texts/labels, the mock data it
@@ -48,7 +48,7 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
   Categories: **Electronics / Électronique**, **Fashion / Mode**,
   **Jewelery / Bijoux**.
 - **Sellers** (`lib/data/catalog_meta.dart`):
-  - *Kinshasa Tech Hub* — **Somba Assured**, 4.8★, 12,400 followers, **97%**
+  - *Kinshasa Tech Hub* — **KOMORIKO Assured**, 4.8★, 12,400 followers, **97%**
     health (Electronics products).
   - *Gombe Fashion House* — **Gold seller**, 4.6★, 8,600 followers, 92%
     (Fashion).
@@ -60,12 +60,12 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
 
 ### 1.1 Splash — `CustomerSplashScreen`
 - Full-screen Teka-red gradient; white rounded tile with the “S” monogram.
-- Title **“Somba&Teka”**, tagline **“Shop everything, delivered”**, spinner.
+- Title **“KOMORIKO”**, tagline **“Shop everything, delivered”**, spinner.
 - Auto-advances after ~1.6 s to the sign-in screen.
 
 ### 1.2 Sign in — `LoginScreen`
 - Gradient header: **“Welcome back”**, subtitle *“Sign in to continue shopping
-  on Somba”*.
+  on KOMORIKO”*.
 - Fields: **Phone or email** (hint `+243 970 000 000`), **Password** (hint
   `••••••••`, obscured).
 - **Forgot password?** (right-aligned) → Reset flow.
@@ -75,7 +75,7 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
 - Footer: *“New here? Create an account”* → Register.
 
 ### 1.3 Create account — `RegisterScreen`
-- Header **“Create account”**, *“Join Somba&Teka in under a minute”*, back arrow.
+- Header **“Create account”**, *“Join KOMORIKO in under a minute”*, back arrow.
 - Fields: **Full name** (Marie Dubois), **Phone number** (`+243 970 000 000`),
   **Email** (marie@email.com), **Password** (Create a password).
 - Consent row with a checked box: *“I agree to the Terms & Privacy Policy”*.
@@ -166,7 +166,7 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
   *“Within 30 days”*.
 - **Description** (generated blurb).
 - **Seller card**: avatar, name, ★rating · **health %**, **tier badge**
-  (Gold / Silver / Bronze / **Somba Assured**), **Follow store / Following**
+  (Gold / Silver / Bronze / **KOMORIKO Assured**), **Follow store / Following**
   (persisted) and **Visit store** (→ Store front).
 - **Specifications** table, by category:
   - Electronics: Warranty **12 months** · Condition **Brand new · sealed** · In
@@ -186,7 +186,7 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
 
 ### 3.2 Store front — `StoreScreen`
 - Gradient hero: **“TechSphere Store”** (verified), *“Official electronics
-  partner”*, **“Somba Assured · 97% health”** badge, share button.
+  partner”*, **“KOMORIKO Assured · 97% health”** badge, share button.
 - Stats: **4.8★ Rating · 128 Products · 12.4k Followers**.
 - **Follow** (snackbar *“Following TechSphere Store”*) and **Chat** (snackbar
   *“Opening chat with the store…”*).
@@ -343,14 +343,14 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
   app-wide (snackbar *“Market set to …”*).
 - **Privacy**: **Personalized recommendations** (*Use my activity to improve
   results*).
-- **Account**: **Change password** · **About Somba&Teka** (about dialog) ·
+- **Account**: **Change password** · **About KOMORIKO** (about dialog) ·
   **Delete account** (→ delete screen).
 
 ### 6.4 Notifications — `NotificationsScreen`
 - Title shows the **unread count** (e.g. “Notifications (3)”); **Mark all**.
 - Items (unread ones carry a dot; broadcasts a **“News”** tag):
   - **Out for delivery** — *“Your order SMB-2026-4821 is on the way.”* · 2m
-  - **Weekend mega sale** (News) — *“Somba&Teka: up to 50% off this weekend
+  - **Weekend mega sale** (News) — *“KOMORIKO: up to 50% off this weekend
     only!”* · 40m
   - **Flash sale live** — *“Up to 30% off electronics — ends tonight.”* · 1h
   - **Order delivered** — *“SMB-2026-4712 was delivered. Rate it?”* · 1d

@@ -562,7 +562,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
 
   // ── The thread ─────────────────────────────────────────────────────────────
 
-  /** A message from the customer, the seller or Somba staff. */
+  /** A message from the customer, the seller or KOMORIKO staff. */
   async reply(user: Viewer & { name: string }, id: string, rawText: unknown, rawAttachments?: unknown): Promise<DisputeMessageView> {
     const d = await this.loadFor(user, id);
     if (user.role === 'warehouse_staff') throw new NotFoundException('Dispute not found.');
@@ -632,7 +632,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (d.type !== 'return') throw new BadRequestException('Only returns need an accept or reject; reply to the customer instead.');
     if (d.status !== 'open' || d.stage !== 'awaiting_seller') {
       throw new BadRequestException(
-        d.stage === 'seller_timeout' || d.stage === 'escalated' ? 'The response time has passed; Somba support decides now.' : 'This request was already handled.',
+        d.stage === 'seller_timeout' || d.stage === 'escalated' ? 'The response time has passed; KOMORIKO support decides now.' : 'This request was already handled.',
       );
     }
     const reason = text(rawReason, 1000);
@@ -653,7 +653,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return view;
   }
 
-  /** Somba support approves or refuses a return the seller rejected or let lapse (or any return still undecided). */
+  /** KOMORIKO support approves or refuses a return the seller rejected or let lapse (or any return still undecided). */
   async adminDecideReturn(admin: Viewer, id: string, approve: boolean, rawReason: unknown): Promise<DisputeView> {
     if (!admin.role.startsWith('admin')) throw new BadRequestException('Admins only.');
     if (!inRoleGroup(admin.role, 'disputeDesk')) throw new BadRequestException('Not allowed.');
@@ -700,11 +700,11 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return view;
   }
 
-  /** The customer takes a rejected or lapsed return to Somba support. */
+  /** The customer takes a rejected or lapsed return to KOMORIKO support. */
   async escalate(customer: Viewer, id: string, rawNote?: unknown): Promise<DisputeView> {
     const d = await this.disputes.findOne({ where: { id: String(id ?? '') } });
     if (!d || d.customerId !== customer.id) throw new NotFoundException('Dispute not found.');
-    if (d.type !== 'return') throw new BadRequestException('Only returns can be escalated; a dispute is already with Somba support.');
+    if (d.type !== 'return') throw new BadRequestException('Only returns can be escalated; a dispute is already with KOMORIKO support.');
     // C-R4: only after the seller said no or the time ran out.
     if (d.status !== 'open' || !(d.stage === 'seller_rejected' || d.stage === 'seller_timeout')) {
       throw new BadRequestException(d.stage === 'awaiting_seller' ? 'Wait for the seller to answer, or for the response time to pass.' : STALE);

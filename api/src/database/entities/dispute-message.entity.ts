@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-/** The thread under a dispute or return: customer, seller and Somba staff. */
+/** The thread under a dispute or return: customer, seller and KOMORIKO staff. */
 @Entity('dispute_messages')
 export class DisputeMessage {
   @PrimaryGeneratedColumn('uuid')

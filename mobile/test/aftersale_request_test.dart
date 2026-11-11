@@ -40,7 +40,7 @@ void main() {
       ('awaiting_seller', 'Waiting for the seller', 'En attente du vendeur'),
       ('seller_rejected', 'The seller declined your return', 'Le vendeur a refusé votre retour'),
       ('seller_timeout', 'The seller did not answer in time', 'Le vendeur n’a pas répondu à temps'),
-      ('escalated', 'With Somba support', 'Chez le support Somba'),
+      ('escalated', 'With KOMORIKO support', 'Chez le support KOMORIKO'),
       ('approved', 'Return accepted', 'Retour accepté'),
       ('pickup', 'Pickup arranged', 'Collecte organisée'),
       ('received', 'Received at the warehouse', 'Reçu à l’entrepôt'),
@@ -60,7 +60,7 @@ void main() {
       current = disputeJson(type: 'dispute', stage: 'seller_replied', category: 'missing', messages: []);
       await open(tester);
       expect(banner(tester), 'The seller replied');
-      expect(body(tester), contains('Somba support will review'));
+      expect(body(tester), contains('KOMORIKO support will review'));
       expect(find.text('Dispute'), findsOneWidget);
     });
 
@@ -164,14 +164,14 @@ void main() {
       await open(tester);
       await asTap(tester, 'escalate');
       await asSettle(tester);
-      expect(find.text('Ask Somba support to decide?'), findsOneWidget);
+      expect(find.text('Ask KOMORIKO support to decide?'), findsOneWidget);
       expect(server.countOf('disputes:escalate'), 0, reason: 'nothing is sent before the customer confirms');
       await tester.enterText(find.byKey(const ValueKey('escalate-note')).hitTestable(), 'The shoes were new');
       await tester.tap(find.byKey(const ValueKey('escalate-confirm')));
       await asSettle(tester);
       expect(server.bodiesOf('disputes:escalate').single, {'id': 'd1', 'note': 'The shoes were new'});
-      expect(asSnack(tester), 'Sent to Somba support.');
-      expect(banner(tester), 'With Somba support');
+      expect(asSnack(tester), 'Sent to KOMORIKO support.');
+      expect(banner(tester), 'With KOMORIKO support');
       expect(find.byKey(const ValueKey('escalate')), findsNothing, reason: 'no longer allowed');
     });
 
@@ -183,7 +183,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('escalate-back')));
       await asSettle(tester);
       expect(server.countOf('disputes:escalate'), 0);
-      expect(find.text('Ask Somba support to decide?'), findsNothing);
+      expect(find.text('Ask KOMORIKO support to decide?'), findsNothing);
     });
 
     testWidgets('a refused escalation is shown in French and the screen stays usable', (tester) async {
@@ -293,7 +293,7 @@ void main() {
       await open(tester);
       expect(find.text('Jean · seller'), findsOneWidget);
       expect(find.text('You'), findsOneWidget);
-      expect(find.text('Somba support'), findsOneWidget);
+      expect(find.text('KOMORIKO support'), findsOneWidget);
       expect(find.textContaining('Mukendi'), findsNothing);
       expect(find.textContaining('Kalala'), findsNothing);
       expect(find.textContaining('Dupont'), findsNothing);
@@ -401,7 +401,7 @@ void main() {
       current = disputeJson(stage: 'escalated', messages: []);
       await open(tester, byId: true);
       expect(server.bodiesOf('disputes:get').first, {'id': 'd1'});
-      expect(banner(tester), 'With Somba support');
+      expect(banner(tester), 'With KOMORIKO support');
     });
 
     testWidgets('a request that cannot be loaded shows the error with a retry', (tester) async {

@@ -1,4 +1,4 @@
-# Somba&Teka — Configuration Record
+# KOMORIKO — Configuration Record
 
 All questionnaire answers applied to the prototype.
 
@@ -6,11 +6,11 @@ All questionnaire answers applied to the prototype.
 
 | Setting | Value |
 |---------|-------|
-| Brand | **Somba&Teka** (`web/src/lib/config.ts`) |
+| Brand | **KOMORIKO** (`web/src/lib/config.ts`) |
 | Market | France + Global |
 | Languages | EN + FR together (toggle on all portals) |
 | Currency | USD (mock) |
-| Legal entity | Somba Commerce SAS — Paris (Flipkart-style footer & `/legal/*`) |
+| Legal entity | KOMORIKO Commerce SAS — Paris (Flipkart-style footer & `/legal/*`) |
 
 ## 2. Business Model
 
@@ -29,7 +29,7 @@ All questionnaire answers applied to the prototype.
 | Stripe card | Mock at checkout |
 | COD | OTP verification, limits, address blocking |
 | Airtel Money | Checkout + wallet top-up |
-| Somba&Teka Wallet | Store credit, top-up, transaction history |
+| KOMORIKO Wallet | Store credit, top-up, transaction history |
 | Refunds | Original method OR wallet |
 
 ## 4. Auth & Roles

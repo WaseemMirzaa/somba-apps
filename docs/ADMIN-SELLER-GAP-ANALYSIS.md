@@ -25,7 +25,7 @@ Status: ✅ fixed in this pass · 🔶 partly · ⬜ open.
 | General marketplaces (Amazon, Jumia, Flipkart, eBay, Etsy) | One cart, any number of sellers, never cleared | Checkout splits into **per-seller packages / sub-orders**, each with its own status, cancel and return; Jumia/Amazon consolidate at their hub and deliver once |
 | Food / quick commerce (Uber Eats, Glovo, Swiggy, DoorDash) | **One store per cart** — adding from another store asks "Start a new cart?" | One order per store (cooked and dispatched from one place) |
 
-Somba is a general marketplace with a hub (Jumia model), so it keeps the multi-seller cart and uses per-seller packages.
+KOMORIKO is a general marketplace with a hub (Jumia model), so it keeps the multi-seller cart and uses per-seller packages.
 
 ### What was built (✅)
 - Every order line stores its **seller snapshot** (`sellerId`, `sellerName`) and its own **fulfilment** state
@@ -98,7 +98,7 @@ Somba is a general marketplace with a hub (Jumia model), so it keeps the multi-s
 
 ## 1. Admin (operator console)
 
-| Area | Feature | Jumia | Amazon | Flipkart | Somba | Priority |
+| Area | Feature | Jumia | Amazon | Flipkart | KOMORIKO | Priority |
 |---|---|---|---|---|---|---|
 | Sellers | KYC: ID, RCCM / tax no., bank, documents, review | ✓ | ✓ | ✓ | ✅ legal name, phone, ID, RCCM, tax no., documents, terms; admin review with reason; resubmit (bank still at payout time) | done |
 | Sellers | Approve / reject / suspend **with reason**, resubmit | ✓ | ✓ | ✓ | no reason | P1 |
@@ -126,7 +126,7 @@ Somba is a general marketplace with a hub (Jumia model), so it keeps the multi-s
 
 ## 2. Seller Center
 
-| Area | Feature | Jumia | Amazon | Flipkart | Somba | Priority |
+| Area | Feature | Jumia | Amazon | Flipkart | KOMORIKO | Priority |
 |---|---|---|---|---|---|---|
 | Onboarding | KYC, terms acceptance, phone/email verification, saved verified payout account, checklist | ✓ | ✓ | ✓ | name + pickup address | P1 |
 | Store | Vacation mode, handling time, policies, map-pinned pickup | ✓ | ✓ | ✓ | ✗ | P1 |

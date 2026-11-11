@@ -59,7 +59,7 @@ export default function ShopCartPage() {
   const total = Math.max(0, subtotal - discount) + delivery;
 
   const grouped = lines.reduce<Record<string, typeof lines>>((acc, item) => {
-    (acc[item.seller || "Somba&Teka"] ??= []).push(item);
+    (acc[item.seller || "KOMORIKO"] ??= []).push(item);
     return acc;
   }, {});
 
@@ -202,7 +202,7 @@ export default function ShopCartPage() {
             {promoSellerId && (promoStore ? (fr ? ` · valable uniquement sur les produits de ${promoStore}` : ` · applies to ${promoStore} products only`) : fr ? " · coupon boutique" : " · store coupon")}
           </p>
         )}
-        <p className="mt-1 text-xs text-slate-500">{fr ? "Un seul code : code Somba ou coupon d'une boutique." : "One code only: a Somba code or a store coupon."}</p>
+        <p className="mt-1 text-xs text-slate-500">{fr ? "Un seul code : code KOMORIKO ou coupon d'une boutique." : "One code only: a KOMORIKO code or a store coupon."}</p>
       </div>
 
       <div className="card-premium space-y-3 p-4">

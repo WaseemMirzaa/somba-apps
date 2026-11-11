@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Somba&Teka — one-command deploy to a DigitalOcean droplet (Ubuntu 22.04/24.04)
+# KOMORIKO — one-command deploy to a DigitalOcean droplet (Ubuntu 22.04/24.04)
 #
 # Run ON the droplet, as root, on a fresh box OR on every update (idempotent):
 #
@@ -222,7 +222,7 @@ curl -fsS -o /dev/null -w "web → HTTP %{http_code}\n" -H "Host: $DOMAIN" "http
 cat <<EOF
 
 ══════════════════════════════════════════════════════════════════════════════
- ✅  Somba&Teka is live:  $BASE_URL
+ ✅  KOMORIKO is live:  $BASE_URL
 ──────────────────────────────────────────────────────────────────────────────
  Admin login:   $ADMIN_EMAIL
 EOF

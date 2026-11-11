@@ -21,8 +21,15 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "S&T Marketplace — Shop, sell and deliver",
-  description: "S&T Marketplace: shop products from verified sellers, pay with mobile money or your wallet and follow your delivery live.",
+  applicationName: "KOMORIKO",
+  title: "KOMORIKO — Shop, sell and deliver",
+  description: "KOMORIKO: shop products from verified sellers, pay with mobile money or your wallet and follow your delivery live.",
+  openGraph: {
+    siteName: "KOMORIKO",
+    title: "KOMORIKO — Shop, sell and deliver",
+    description: "KOMORIKO: shop products from verified sellers, pay with mobile money or your wallet and follow your delivery live.",
+    type: "website",
+  },
   icons: {
     icon: "/brand/logo-stack.png",
     apple: "/brand/logo-stack.png",

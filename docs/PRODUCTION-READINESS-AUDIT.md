@@ -1,4 +1,4 @@
-# Production-Readiness Audit — Somba&Teka
+# Production-Readiness Audit — KOMORIKO
 
 _Scope: backend (NestJS API), all 17 domain modules, and frontend↔backend
 connectivity (Next.js web + Flutter apps). Assessed against real deployment

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
-/// The Somba&Teka logo (copied from the web app) rendered on a white tile.
+/// The KOMORIKO logo (copied from the web app) rendered on a white tile.
 /// Used on splash and across the auth screens.
 class BrandLogo extends StatelessWidget {
   final double size;

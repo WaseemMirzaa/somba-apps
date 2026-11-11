@@ -11,7 +11,7 @@ import { UPLOAD_DIR } from '../uploads/uploads.controller';
 
 /**
  * Takes the demo data out again (see seed-demo.ts). It finds the demo through the users whose e-mail ends in
- * @demo.sombateka.test and deletes only what belongs to them: their stores, listings, orders, payments, messages,
+ * @demo.komoriko.test and deletes only what belongs to them: their stores, listings, orders, payments, messages,
  * reviews, tickets and so on, the demo warehouse, the demo picture files. Real rows are not touched.
  *
  *   npm run seed:demo:remove:prod              shows what would go and changes nothing

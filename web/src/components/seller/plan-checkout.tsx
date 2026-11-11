@@ -18,7 +18,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 const MOBILE_METHODS = ["airtel_money", "orange_money", "vodacom_mpesa"] as const;
 type Method = "wallet" | (typeof MOBILE_METHODS)[number];
 
-const SALES_MAIL = "mailto:sales@somba.com?subject=Somba%20seller%20plan";
+const SALES_MAIL = "mailto:sales@somba.com?subject=KOMORIKO%20seller%20plan";
 
 /** Plans that can be bought online (a price above zero). */
 const buyable = (p: SellerPlanInfo) => p.priceUsd !== null && p.priceUsd > 0;
@@ -310,7 +310,7 @@ export function PlanCheckout({ preselect, signInHref = "/login" }: { preselect?:
               <input type="radio" name="method" checked={method === "wallet"} onChange={() => setMethod("wallet")} />
               <Wallet className="h-4 w-4 text-[var(--primary)]" />
               <span className="flex-1">
-                {fr ? "Portefeuille Somba" : "Somba wallet"}
+                {fr ? "Portefeuille KOMORIKO" : "KOMORIKO wallet"}
                 <span className="block text-xs text-slate-500">
                   {fr ? `Solde : ${formatCurrency(rt.walletBalance, locale)} · activation immédiate` : `Balance: ${formatCurrency(rt.walletBalance, locale)} · active immediately`}
                 </span>

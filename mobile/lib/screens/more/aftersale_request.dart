@@ -10,7 +10,7 @@ import 'aftersale_widgets.dart';
 import 'chat_entry.dart';
 
 /// One return or dispute request: where it stands, the items and the refund, the conversation with the seller
-/// and Somba support, and what the customer may do next. Follows the live pushes while it is open.
+/// and KOMORIKO support, and what the customer may do next. Follows the live pushes while it is open.
 class ReturnStatusScreen extends StatefulWidget {
   const ReturnStatusScreen({super.key, this.locale = const Locale('en'), this.returnRequest, this.requestId, this.siblings = const []})
       : assert(returnRequest != null || requestId != null, 'give the request or its id');
@@ -460,7 +460,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
       ]);
 }
 
-/// "Ask Somba support to decide?": explains, takes an optional note, pops the note (null when the customer backs out).
+/// "Ask KOMORIKO support to decide?": explains, takes an optional note, pops the note (null when the customer backs out).
 class EscalateDialog extends StatefulWidget {
   const EscalateDialog({super.key});
   @override

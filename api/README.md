@@ -1,6 +1,6 @@
-# Somba&Teka API — Real-time backend
+# KOMORIKO API — Real-time backend
 
-NestJS backend for the Somba&Teka marketplace. **WebSocket-first**: a one-shot
+NestJS backend for the KOMORIKO marketplace. **WebSocket-first**: a one-shot
 REST call exchanges credentials for a JWT, then a single authenticated
 Socket.IO connection carries every read, write, and live update — no HTTP
 polling.

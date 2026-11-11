@@ -7,7 +7,7 @@ export class AppController {
 
   @Get()
   root() {
-    return { name: 'Somba&Teka API', realtime: 'socket.io', docs: '/api/v1/health' };
+    return { name: 'KOMORIKO API', realtime: 'socket.io', docs: '/api/v1/health' };
   }
 
   @Get('api/v1/health')

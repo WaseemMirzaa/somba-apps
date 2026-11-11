@@ -106,7 +106,7 @@ describe('starting a card payment', () => {
       {
         amountCents: 2999,
         currency: 'usd',
-        description: `Somba & Teka order ${order.reference}`,
+        description: `KOMORIKO order ${order.reference}`,
         metadata: { reference: payment.reference, orderReference: order.reference, purpose: 'order', userId: customer.id },
         idempotencyKey: `pi-${payment.reference}`,
       },
@@ -167,7 +167,7 @@ describe('payments:card-sheet', () => {
   it('gives the owner the sheet data for the pending card payment, by reference or by order', async () => {
     const { order } = await place();
     const payment = await payOf(order.id);
-    const expected = { reference: payment.reference, clientSecret: expect.stringContaining('pi_1_secret_'), publishableKey: PK, amountUsd: 29.99, currency: 'usd', merchantName: 'Somba & Teka' };
+    const expected = { reference: payment.reference, clientSecret: expect.stringContaining('pi_1_secret_'), publishableKey: PK, amountUsd: 29.99, currency: 'usd', merchantName: 'KOMORIKO' };
     expect(await payments.cardSheet(customer.id, { reference: payment.reference })).toEqual(expected);
     expect(await payments.cardSheet(customer.id, { orderId: order.id })).toEqual(expected);
     expect(await payments.cardSheet(customer.id, { orderId: order.id, reference: payment.reference })).toEqual(expected);

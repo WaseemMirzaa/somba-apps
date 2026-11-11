@@ -24,19 +24,19 @@ const customer = (locale?: string) => ({
 
 describe('SMS text', () => {
   it('has the French templates', () => {
-    expect(smsText.verify('123456', 'fr')).toBe('Votre code de vérification Somba&Teka est 123456. Il expire dans 10 minutes.');
-    expect(smsText.signIn('123456', 'fr')).toBe('Votre code de connexion Somba&Teka est 123456. Il expire dans 10 minutes. Ne le partagez jamais.');
+    expect(smsText.verify('123456', 'fr')).toBe('Votre code de vérification KOMORIKO est 123456. Il expire dans 10 minutes.');
+    expect(smsText.signIn('123456', 'fr')).toBe('Votre code de connexion KOMORIKO est 123456. Il expire dans 10 minutes. Ne le partagez jamais.');
   });
 
   it('keeps the English templates unchanged', () => {
-    expect(smsText.verify('123456', 'en')).toBe('Your Somba&Teka verification code is 123456. It expires in 10 minutes.');
-    expect(smsText.signIn('123456', 'en')).toBe('Your Somba&Teka sign-in code is 123456. It expires in 10 minutes. Never share it.');
+    expect(smsText.verify('123456', 'en')).toBe('Your KOMORIKO verification code is 123456. It expires in 10 minutes.');
+    expect(smsText.signIn('123456', 'en')).toBe('Your KOMORIKO sign-in code is 123456. It expires in 10 minutes. Never share it.');
   });
 
   it('falls back to English for an unknown or missing language', () => {
     for (const locale of [undefined, null, '', 'de']) {
-      expect(smsText.verify('1', locale)).toMatch(/^Your Somba&Teka verification code/);
-      expect(smsText.signIn('1', locale)).toMatch(/^Your Somba&Teka sign-in code/);
+      expect(smsText.verify('1', locale)).toMatch(/^Your KOMORIKO verification code/);
+      expect(smsText.signIn('1', locale)).toMatch(/^Your KOMORIKO sign-in code/);
     }
   });
 
@@ -51,13 +51,13 @@ describe('VerificationService sends the SMS in the account language', () => {
   it('phone verification code, French account', async () => {
     const { svc, messaging } = make({});
     const res = await svc.sendPhoneOtp({ id: 'u1', phone: '+243812345678', locale: 'fr' } as never);
-    expect(messaging.deliverSms).toHaveBeenCalledWith('+243812345678', `Votre code de vérification Somba&Teka est ${res.devToken}. Il expire dans 10 minutes.`);
+    expect(messaging.deliverSms).toHaveBeenCalledWith('+243812345678', `Votre code de vérification KOMORIKO est ${res.devToken}. Il expire dans 10 minutes.`);
   });
 
   it('phone verification code, English account', async () => {
     const { svc, messaging } = make({});
     const res = await svc.sendPhoneOtp({ id: 'u1', phone: '+243812345678', locale: 'en' } as never);
-    expect(messaging.deliverSms).toHaveBeenCalledWith('+243812345678', `Your Somba&Teka verification code is ${res.devToken}. It expires in 10 minutes.`);
+    expect(messaging.deliverSms).toHaveBeenCalledWith('+243812345678', `Your KOMORIKO verification code is ${res.devToken}. It expires in 10 minutes.`);
   });
 
   it('sign-in code, French account', async () => {
@@ -65,7 +65,7 @@ describe('VerificationService sends the SMS in the account language', () => {
     const res = await svc.sendLoginCode('0812345678');
     expect(messaging.deliverSms).toHaveBeenCalledWith(
       '+243812345678',
-      `Votre code de connexion Somba&Teka est ${res.devToken}. Il expire dans 10 minutes. Ne le partagez jamais.`,
+      `Votre code de connexion KOMORIKO est ${res.devToken}. Il expire dans 10 minutes. Ne le partagez jamais.`,
     );
   });
 
@@ -74,7 +74,7 @@ describe('VerificationService sends the SMS in the account language', () => {
     const res = await svc.sendLoginCode('0812345678');
     expect(messaging.deliverSms).toHaveBeenCalledWith(
       '+243812345678',
-      `Your Somba&Teka sign-in code is ${res.devToken}. It expires in 10 minutes. Never share it.`,
+      `Your KOMORIKO sign-in code is ${res.devToken}. It expires in 10 minutes. Never share it.`,
     );
   });
 });

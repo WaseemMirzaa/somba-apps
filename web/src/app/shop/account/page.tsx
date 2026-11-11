@@ -166,7 +166,7 @@ function WalletCard() {
       <div className="flex items-center gap-4">
         <div className="rounded-xl bg-emerald-50 p-3"><Wallet className="h-5 w-5 text-emerald-600" /></div>
         <div className="flex-1">
-          <p className="text-sm text-slate-500">{fr ? "Portefeuille Somba" : "Somba wallet"}</p>
+          <p className="text-sm text-slate-500">{fr ? "Portefeuille KOMORIKO" : "KOMORIKO wallet"}</p>
           <p className="font-[family-name:var(--font-display)] text-2xl font-bold text-slate-900">{formatCurrency(rt.walletBalance, locale)}</p>
         </div>
         <Button size="sm" onClick={() => setOpen((v) => !v)}>{fr ? "Recharger" : "Top up"}</Button>

@@ -130,7 +130,7 @@ export class StripeSdkClient implements StripeClient {
     this.publishableKey = cfg.publishableKey;
     this.webhookSecret = cfg.webhookSecret;
     this.secrets = [cfg.secretKey, cfg.webhookSecret];
-    this.sdk = sdk ?? new Stripe(cfg.secretKey, { timeout: 15_000, maxNetworkRetries: 1, appInfo: { name: 'Somba&Teka API' } });
+    this.sdk = sdk ?? new Stripe(cfg.secretKey, { timeout: 15_000, maxNetworkRetries: 1, appInfo: { name: 'KOMORIKO API' } });
   }
 
   /**

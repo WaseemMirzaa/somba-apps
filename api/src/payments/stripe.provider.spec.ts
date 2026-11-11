@@ -128,10 +128,10 @@ describe('StripeSdkClient', () => {
   it('creates a card PaymentIntent in cents with the idempotency key, and maps the answer', async () => {
     const { sdk, calls } = fakeSdk();
     const client = new StripeSdkClient(cfg, sdk);
-    const pi = await client.createPaymentIntent({ amountCents: 1234, currency: 'usd', metadata: { reference: 'PAY-1' }, description: 'Somba & Teka order SOM-1', idempotencyKey: 'pi-PAY-1' });
+    const pi = await client.createPaymentIntent({ amountCents: 1234, currency: 'usd', metadata: { reference: 'PAY-1' }, description: 'KOMORIKO order SOM-1', idempotencyKey: 'pi-PAY-1' });
     expect(calls[0]).toEqual({
       fn: 'pi.create',
-      args: [{ amount: 1234, currency: 'usd', payment_method_types: ['card'], metadata: { reference: 'PAY-1' }, description: 'Somba & Teka order SOM-1' }, { idempotencyKey: 'pi-PAY-1' }],
+      args: [{ amount: 1234, currency: 'usd', payment_method_types: ['card'], metadata: { reference: 'PAY-1' }, description: 'KOMORIKO order SOM-1' }, { idempotencyKey: 'pi-PAY-1' }],
     });
     expect(pi).toEqual({
       id: 'pi_1', status: 'requires_payment_method', amount: 1234, amountReceived: 0, currency: 'usd', clientSecret: 'pi_1_secret_FAKE',

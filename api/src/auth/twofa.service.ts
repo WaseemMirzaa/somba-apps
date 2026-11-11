@@ -110,7 +110,7 @@ export class TwoFaService {
     user.twofaSecret = newTotpSecret();
     user.twofaLastStep = 0;
     await this.users.save(user);
-    return { secret: user.twofaSecret, otpauthUrl: otpauthUrl(user.twofaSecret, user.email), issuer: 'Somba&Teka', account: user.email };
+    return { secret: user.twofaSecret, otpauthUrl: otpauthUrl(user.twofaSecret, user.email), issuer: 'KOMORIKO', account: user.email };
   }
 
   /** Confirm the first code: 2FA is now on. Returns the recovery codes, ONCE. */

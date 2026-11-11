@@ -118,7 +118,7 @@ export class PdfDoc {
     const infoParts = [
       this.meta.title ? `/Title ${hex(toWinAnsi(this.meta.title))}` : '',
       this.meta.author ? `/Author ${hex(toWinAnsi(this.meta.author))}` : '',
-      `/Producer ${hex(toWinAnsi('Somba&Teka'))}`,
+      `/Producer ${hex(toWinAnsi('KOMORIKO'))}`,
     ].filter(Boolean);
     const infoNo = add(`<< ${infoParts.join(' ')} >>`);
 

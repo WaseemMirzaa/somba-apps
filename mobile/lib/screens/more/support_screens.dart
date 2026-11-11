@@ -311,7 +311,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
   }
 }
 
-/// One ticket message: the customer's on the right, Somba support's on the left; photos are thumbnails.
+/// One ticket message: the customer's on the right, KOMORIKO support's on the left; photos are thumbnails.
 class TicketBubble extends StatelessWidget {
   const TicketBubble({super.key, required this.message});
   final TicketMessage message;

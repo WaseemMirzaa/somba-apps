@@ -32,7 +32,7 @@ def doc(name, title, lines, size=(1200, 800), tint=(244, 247, 250)):
     stamp = stamp.rotate(25, resample=Image.BICUBIC)
     img.paste(stamp, (0, 0), stamp)
     d = ImageDraw.Draw(img)
-    d.text((60, size[1] - 80), 'Made up for testing the Somba&Teka sign-up form. Not a real document.', font=font(26), fill=(120, 30, 30))
+    d.text((60, size[1] - 80), 'Made up for testing the KOMORIKO sign-up form. Not a real document.', font=font(26), fill=(120, 30, 30))
     img.save(os.path.join(HERE, name), 'JPEG', quality=85)
 
 

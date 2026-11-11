@@ -58,8 +58,8 @@ export function AftersaleCaseList({ type }: { type: CaseType }) {
               ? "Retours demandés sur vos commandes : acceptez ou refusez dans les délais, suivez la collecte, l'inspection et le remboursement."
               : "Returns requested on your orders: accept or reject in time, then follow the pickup, inspection and refund."
             : fr
-              ? "Problèmes signalés par vos clients (article manquant, endommagé, non reçu…) : répondez avec un message et des photos, le support Somba tranche."
-              : "Problems your customers report (missing, damaged, not received…): reply with a message and photos, Somba support decides."
+              ? "Problèmes signalés par vos clients (article manquant, endommagé, non reçu…) : répondez avec un message et des photos, le support KOMORIKO tranche."
+              : "Problems your customers report (missing, damaged, not received…): reply with a message and photos, KOMORIKO support decides."
         }
         breadcrumbs={[{ label: fr ? "Vendeur" : "Seller", href: "/seller" }, { label: title }]}
       />

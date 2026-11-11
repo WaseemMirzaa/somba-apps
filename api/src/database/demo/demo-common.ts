@@ -12,10 +12,23 @@ import { dirname } from 'path';
  * Everything the demo creates is tied to users with this e-mail domain (RFC 2606 reserves `.test`: it can never
  * be a real mailbox). Stores belong to those users, listings to those stores, orders to those users, and so on.
  */
-export const DEMO_DOMAIN = 'demo.sombateka.test';
+export const DEMO_DOMAIN = 'demo.komoriko.test';
+/**
+ * Domains the demo used before the rename to KOMORIKO. Servers seeded earlier still hold accounts on them until the
+ * next `seed:demo` renames them; the removal recognises both, so nothing is left behind either way.
+ */
+export const LEGACY_DEMO_DOMAINS = ['demo.sombateka.test'];
 export const demoEmail = (local: string) => `${local}@${DEMO_DOMAIN}`;
-export const isDemoEmail = (email: string | null | undefined) =>
-  (email ?? '').toLowerCase().endsWith(`@${DEMO_DOMAIN}`);
+export const isDemoEmail = (email: string | null | undefined) => {
+  const e = (email ?? '').toLowerCase();
+  return [DEMO_DOMAIN, ...LEGACY_DEMO_DOMAINS].some((d) => e.endsWith(`@${d}`));
+};
+/** The same address on the current demo domain (an address that is not a legacy demo one comes back unchanged). */
+export const currentDemoEmail = (email: string): string => {
+  const e = email.toLowerCase();
+  const legacy = LEGACY_DEMO_DOMAINS.find((d) => e.endsWith(`@${d}`));
+  return legacy ? `${e.slice(0, e.length - legacy.length)}${DEMO_DOMAIN}` : email;
+};
 
 /** Prefix of the keys, codes and names that belong to the demo but are not users (CMS blocks, promo codes, bins). */
 export const DEMO_KEY = 'demo-';
@@ -65,7 +78,7 @@ export function readCredentials(
     const line = raw.trim();
     const head = /^\[(.+@.+)\]$/.exec(line);
     if (head) {
-      email = head[1].toLowerCase();
+      email = currentDemoEmail(head[1].toLowerCase());
       out.set(email, { password: null, recoveryCodes: [] });
       continue;
     }

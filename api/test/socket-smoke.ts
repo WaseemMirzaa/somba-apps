@@ -73,7 +73,7 @@ function check(name: string, cond: boolean) {
 }
 
 async function main() {
-  console.log(`\n▶ Somba realtime smoke test against ${API}\n`);
+  console.log(`\n▶ KOMORIKO realtime smoke test against ${API}\n`);
 
   const customer = await login('customer@somba.app');
   const admin = await login('admin@somba.app');

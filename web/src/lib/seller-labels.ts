@@ -132,7 +132,7 @@ export const PAYOUT_STATUS_OPTIONS = PAYOUT_STATUSES.map((value) => ({
 const PAYOUT_METHOD: Record<string, { en: string; fr: string }> = {
   bank: { en: "Bank transfer", fr: "Virement bancaire" },
   mobile_money: { en: "Mobile money", fr: "Mobile money" },
-  wallet: { en: "Somba wallet", fr: "Portefeuille Somba" },
+  wallet: { en: "KOMORIKO wallet", fr: "Portefeuille KOMORIKO" },
 };
 export const payoutMethodLabel = (m: string, fr: boolean) =>
   PAYOUT_METHOD[m] ? (fr ? PAYOUT_METHOD[m].fr : PAYOUT_METHOD[m].en) : m;

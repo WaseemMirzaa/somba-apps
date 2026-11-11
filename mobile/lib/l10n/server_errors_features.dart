@@ -25,12 +25,12 @@ const Map<String, String> kServerErrorsAfterSale = {
   'Choose how many of each item to return.': 'Indiquez combien d’unités de chaque article vous retournez.',
   'An item appears twice in the request.': 'Un article apparaît deux fois dans la demande.',
   'One of the items is not on this order.': 'Un des articles ne fait pas partie de cette commande.',
-  'The response time has passed; Somba support decides now.': 'Le délai de réponse est dépassé : le support Somba tranche désormais.',
+  'The response time has passed; KOMORIKO support decides now.': 'Le délai de réponse est dépassé : le support KOMORIKO tranche désormais.',
   'This request was just updated by someone else. Refresh and try again.':
       'Cette demande vient d’être mise à jour par quelqu’un d’autre. Actualisez et réessayez.',
   'Wait for the seller to answer, or for the response time to pass.': 'Attendez la réponse du vendeur, ou la fin du délai de réponse.',
-  'Only returns can be escalated; a dispute is already with Somba support.':
-      'Seuls les retours peuvent être transmis au support ; un litige est déjà entre les mains du support Somba.',
+  'Only returns can be escalated; a dispute is already with KOMORIKO support.':
+      'Seuls les retours peuvent être transmis au support ; un litige est déjà entre les mains du support KOMORIKO.',
   'It is too late to cancel: the return is already on its way.': 'Il est trop tard pour annuler : le retour est déjà en cours.',
   'This request is closed.': 'Cette demande est close.',
   'Pick the item to replace.': 'Choisissez l’article à remplacer.',

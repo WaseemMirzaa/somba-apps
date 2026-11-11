@@ -72,7 +72,7 @@ export default function SellOnlinePage() {
             <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-tight tracking-tight lg:text-5xl">
               {fr ? "Développez votre activité —" : "Grow your business —"}
               <br />
-              {fr ? "vendez en ligne sur Somba&Teka" : "sell online on Somba&Teka"}
+              {fr ? "vendez en ligne sur KOMORIKO" : "sell online on KOMORIKO"}
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-white/88">
               {fr ? SELL_ONLINE_HERO.subtitleFr : SELL_ONLINE_HERO.subtitle}
@@ -187,7 +187,7 @@ export default function SellOnlinePage() {
             <span className="section-label">{fr ? "Tarifs" : "Pricing"}</span>
             <h2 className="section-title mt-4">{fr ? "Plans vendeur" : "Seller plans"}</h2>
             <p className="mt-4 text-slate-600">
-              {fr ? "Prix et limites d'annonces à jour, payables par portefeuille Somba ou Mobile Money." : "Current prices and listing limits, payable by Somba wallet or Mobile Money."}
+              {fr ? "Prix et limites d'annonces à jour, payables par portefeuille KOMORIKO ou Mobile Money." : "Current prices and listing limits, payable by KOMORIKO wallet or Mobile Money."}
             </p>
           </div>
           {plansError ? (
@@ -233,7 +233,7 @@ export default function SellOnlinePage() {
                     </ul>
                     {contact ? (
                       <a
-                        href="mailto:sales@somba.com?subject=Somba%20seller%20plan"
+                        href="mailto:sales@somba.com?subject=KOMORIKO%20seller%20plan"
                         className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-slate-200 py-3 text-sm font-semibold hover:bg-slate-50"
                       >
                         {fr ? "Contacter les ventes" : "Contact sales"}

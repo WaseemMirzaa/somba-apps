@@ -221,7 +221,7 @@ Body `{ limit?(<=200, default 50), offset?, q?, status?, from?, to?, format?: 'c
 ```
 city: string | null            // the delivery city only; never the street, number or contact
 tracking: null | {
-  carrier: 'Somba&Teka', currentLeg: kind | null, riderFirstName: string | null, lastUpdateAt,
+  carrier: 'KOMORIKO', currentLeg: kind | null, riderFirstName: string | null, lastUpdateAt,
   legs: [{ id, kind, status, riderFirstName, readyAt, receivedAt, pickedUpAt, deliveredAt, createdAt, updatedAt, attempts, failureReason }] }
 ```
 Built read-only from `delivery_tasks` (`kind`, `sellerId`, status, rider, timestamps); other sellers' pickup legs are hidden, and so is a customer leg of a split order that carries only other sellers' parcels (`delivery_tasks.sellerIds`, logistics contract §16). `packageStatus` can now be `delivered` (all the seller's live lines have `deliveredAt`); a part-cancel lowers the pending COD payment and the open delivery leg's cash is recomputed, not reduced blindly. Each line also carries `couponDiscountUsd`, `commissionPct`, `commissionUsd`.

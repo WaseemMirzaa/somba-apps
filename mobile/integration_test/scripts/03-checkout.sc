@@ -49,7 +49,7 @@ wait 1.5
 tap "textc:Blue Cotton||textc:T-shirt bleu" 2.4
 tap key:pd-buy-now 2.4
 tap key:pay-wallet 1
-say "Pay with the Somba&Teka wallet||Paiement avec le portefeuille Somba&Teka" 2.6
+say "Pay with the KOMORIKO wallet||Paiement avec le portefeuille KOMORIKO" 2.6
 scroll 600
 tap key:place-order 0.5
 until msg:trackOrder 20

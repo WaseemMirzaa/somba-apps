@@ -86,7 +86,7 @@ export function verifyTotp(secretB32: string, code: string, opts: { nowMs?: numb
 }
 
 /** The `otpauth://` link an authenticator app (or a QR code of it) takes. */
-export function otpauthUrl(secretB32: string, account: string, issuer = 'Somba&Teka'): string {
+export function otpauthUrl(secretB32: string, account: string, issuer = 'KOMORIKO'): string {
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`;
   const params = new URLSearchParams({ secret: secretB32, issuer, algorithm: 'SHA1', digits: String(TOTP_DIGITS), period: String(TOTP_STEP_SECONDS) });
   return `otpauth://totp/${label}?${params.toString()}`;

@@ -1,4 +1,4 @@
-# Somba & Teka — Backend: what is built, what remains, how it is deployed
+# KOMORIKO — Backend: what is built, what remains, how it is deployed
 
 _Companion to `BACKEND-AUDIT.md` and `PRODUCTION-READINESS-AUDIT.md`. Database target: **MySQL 8** (validated on MariaDB in CI-equivalent runs). Firebase is **optional, never enforced**._
 

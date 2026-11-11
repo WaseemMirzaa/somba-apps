@@ -53,7 +53,7 @@ const TEXT = {
     note: 'Commission is charged on delivered sales, after store coupons the seller funded. Commission on goods that were returned is credited. All amounts in US dollars.',
     page: 'Page',
     empty: 'No sales this month.',
-    platform: 'Somba&Teka marketplace',
+    platform: 'KOMORIKO marketplace',
   },
   fr: {
     title: 'FACTURE DE COMMISSION',
@@ -82,7 +82,7 @@ const TEXT = {
     note: 'La commission est calculée sur les ventes livrées, après les coupons financés par la boutique. La commission sur les articles retournés est créditée. Tous les montants sont en dollars américains.',
     page: 'Page',
     empty: 'Aucune vente ce mois-ci.',
-    platform: 'Place de marché Somba&Teka',
+    platform: 'Place de marché KOMORIKO',
   },
 } as const;
 
@@ -110,14 +110,14 @@ const dateOut = (iso: string, locale: 'en' | 'fr') => (locale === 'fr' ? `${iso.
 /** The commission invoice as a PDF, in the seller's language. */
 export function renderCommissionInvoice(d: InvoiceData): Buffer {
   const t = TEXT[d.locale];
-  const doc = new PdfDoc({ title: `${t.title} ${d.number}`, author: 'Somba&Teka' });
+  const doc = new PdfDoc({ title: `${t.title} ${d.number}`, author: 'KOMORIKO' });
   const L = 40;
   const R = PAGE_W - 40;
   let pageNo = 1;
 
   const header = () => {
     doc.rect(0, 0, PAGE_W, 78, 0.12);
-    doc.text(L, 38, 'Somba&Teka', { size: 20, bold: true, gray: 1 });
+    doc.text(L, 38, 'KOMORIKO', { size: 20, bold: true, gray: 1 });
     doc.text(L, 56, t.platform, { size: 9, gray: 0.85 });
     doc.text(R, 38, t.title, { size: 14, bold: true, align: 'right', gray: 1 });
     doc.text(R, 56, `${t.number} ${d.number}`, { size: 9, align: 'right', gray: 0.85 });
@@ -132,7 +132,7 @@ export function renderCommissionInvoice(d: InvoiceData): Buffer {
   // Parties and meta
   let y = 112;
   doc.text(L, y, t.from, { size: 8, bold: true, gray: 0.45 });
-  doc.text(L, y + 14, 'Somba&Teka', { size: 11, bold: true });
+  doc.text(L, y + 14, 'KOMORIKO', { size: 11, bold: true });
   doc.text(L, y + 28, t.platform, { size: 9, gray: 0.3 });
   const colB = 320;
   doc.text(colB, y, t.to, { size: 8, bold: true, gray: 0.45 });

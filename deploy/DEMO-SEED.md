@@ -1,6 +1,6 @@
 # Demo data: add it, use it, remove it
 
-This puts a complete set of test data on a running Somba&Teka server, so you can try the customer app and the seller portal (and the admin and warehouse portals) with real-looking stores, orders and messages.
+This puts a complete set of test data on a running KOMORIKO server, so you can try the customer app and the seller portal (and the admin and warehouse portals) with real-looking stores, orders and messages.
 
 - It only **adds**. It never wipes anything, never touches your real admin, your real warehouse or the geography, and never changes a setting, with two opt-in exceptions: `--with-cod` switches cash on delivery on and `--with-express` switches express delivery on (see "Cash on delivery" below).
 - Run it twice and the second run adds nothing.
@@ -10,9 +10,11 @@ This puts a complete set of test data on a running Somba&Teka server, so you can
 
 **While the demo is installed, real visitors can see it.** The demo stores and products show in the shop, and a real customer could add a demo product to a cart. The demo also sends notices to your real admins (new orders, new products to review). Install it for testing and remove it before you launch.
 
-**The demo super admin (`admin.super@demo.sombateka.test`) can do everything, including creating staff. Remove the demo before launch.**
+**The demo super admin (`admin.super@demo.komoriko.test`) can do everything, including creating staff. Remove the demo before launch.**
 
-Everything the demo creates belongs to an account with an e-mail ending in `@demo.sombateka.test`. That is how the removal finds it.
+Everything the demo creates belongs to an account with an e-mail ending in `@demo.komoriko.test`. That is how the removal finds it.
+
+A server seeded before the rename to KOMORIKO has its demo accounts on `@demo.sombateka.test`. The next `seed-demo.sh seed` moves them to `@demo.komoriko.test` (same name before the @, same passwords, no second set of accounts) and writes the new addresses to `/etc/somba/demo-credentials.txt`. The removal and `seed-demo.sh code EMAIL` accept both domains.
 
 ## Before you start
 
@@ -42,7 +44,7 @@ sudo cat /etc/somba/demo-credentials.txt   # every account, its password, its tw
 | Add the demo and also switch **cash on delivery** on (see "Cash on delivery") | `bash /opt/somba/deploy/seed-demo.sh --with-cod` (or `DEMO_WITH_COD=1 bash ...`) |
 | Give every demo account a new password | `bash /opt/somba/deploy/seed-demo.sh reset` |
 | Choose the password yourself (12+ characters) | `DEMO_PASSWORD='your-long-password' bash /opt/somba/deploy/seed-demo.sh reset` |
-| See the current two-factor code of an account | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.sombateka.test` |
+| See the current two-factor code of an account | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.komoriko.test` |
 | See what a removal would delete (changes nothing) | `bash /opt/somba/deploy/seed-demo.sh remove` |
 | Remove the demo | `bash /opt/somba/deploy/seed-demo.sh remove --yes` |
 | Refresh the dates (see "Time") | remove with `--yes`, then add again |
@@ -64,7 +66,7 @@ If you later switch on the platform rule "staff two-factor required", the demo a
 
 ## Orders to process, per store
 
-These orders are made through the real order service (basket, wallet payment, pickup legs, notices), so the seller portal, the customer app, the rider app and the warehouse desk all show them. Each customer's basket is different from their other baskets, and every order belongs to a demo customer, so the removal takes them out. Sign in as the **store owner** (`seller.a`, `seller.b`, `seller.c`, all `@demo.sombateka.test`) and open **Orders**; the customer is in the second column.
+These orders are made through the real order service (basket, wallet payment, pickup legs, notices), so the seller portal, the customer app, the rider app and the warehouse desk all show them. Each customer's basket is different from their other baskets, and every order belongs to a demo customer, so the removal takes them out. Sign in as the **store owner** (`seller.a`, `seller.b`, `seller.c`, all `@demo.komoriko.test`) and open **Orders**; the customer is in the second column.
 
 | Store | Order (customer) | What to try |
 |---|---|---|
@@ -140,7 +142,7 @@ Demo listings carry a preparation time from 0 to 5 days (food and oils 0, clothe
 
 ## The scenarios
 
-Sign in at the web portal (`/login`) for stores, admins, warehouse and riders, and in the customer app for customers. Email addresses below all end in `@demo.sombateka.test`.
+Sign in at the web portal (`/login`) for stores, admins, warehouse and riders, and in the customer app for customers. Email addresses below all end in `@demo.komoriko.test`.
 
 ### Customers
 
@@ -149,7 +151,7 @@ Sign in at the web portal (`/login`) for stores, admins, warehouse and riders, a
 | `customer.full` (Grace Mbuyi) | The full customer: verified, a large wallet, two pinned addresses (Gombe and Maluku) | Open **Orders**: 16 orders (17 with cash on delivery; the split-delivery and cash orders are described in "Orders to process"). Paid; seller preparing; ready for pickup; at the warehouse; out for delivery (open it to see the 4-digit code); delivered 2 days ago (can be returned and reviewed); delivered 35 days ago (return window closed, shows why); cancelled and refunded; a return waiting for the seller (with its timer); a return approved and refunded; an exchange; a replacement; a dispute; a basket from two sellers (one package at the warehouse, one not collected); an order using promo code `DEMO10`; one using the store coupon `MAISON5`; one going to Maluku through two warehouses. Also **Wishlist**, **Cart** (with a saved item that is out of stock), **Followed stores**, **Notifications** (read and unread), **Wallet history**, **Chats** (one with photos), **Support tickets** (one closed, one open with a photo), **Help**. |
 | `customer.new` (Patrick Kasongo) | New, verified, nothing yet | Empty orders, wallet, addresses, wishlist. Add the first address (type one, or use the map), then place the first order: it will ask you to top up the wallet first. |
 | `customer.unverified` (Chantal Ilunga) | Phone and e-mail not verified | Her cart has two items. Start checkout: it is blocked and asks you to verify. (Sending the code needs SMS or e-mail keys, see below.) |
-| `customer.fr` (Jean-Baptiste Mukendi) | Language French | The whole app in French. Product names are shown in French. Open the chat with Maison Kinshasa: he writes French, the store answers in English, tap to translate. A question he asked is answered in English. A return the store rejected is escalated to Somba. |
+| `customer.fr` (Jean-Baptiste Mukendi) | Language French | The whole app in French. Product names are shown in French. Open the chat with Maison Kinshasa: he writes French, the store answers in English, tap to translate. A question he asked is answered in English. A return the store rejected is escalated to KOMORIKO. |
 | `customer.suspended` (Albert Tshibangu) | Suspended | Sign-in is refused. In the admin portal (Customers) reactivate and sign in again. |
 | `customer.fraud` (Rita Banza) | Has fraud alerts | Nothing special in the app. In the admin portal, **Fraud** shows two open alerts for her. |
 | `reviewer.1` to `reviewer.4` | Past buyers | They wrote the reviews, photos and helpful votes on the product pages. One of them wrote an abusive 1-star review that store B reported. |
@@ -184,11 +186,11 @@ Sign in at the web portal (`/login`) for stores, admins, warehouse and riders, a
 
 ### Creating accounts live (to try sign-up yourself)
 
-Use any e-mail ending in `@demo.sombateka.test` so the removal also takes it out.
+Use any e-mail ending in `@demo.komoriko.test` so the removal also takes it out.
 
-**New customer** (app or web): name `Test Customer`, e-mail `my.customer@demo.sombateka.test`, phone `+243 900 000 901`, a password you choose (8+ characters). Afterwards the account is unverified: checkout is refused until a code is entered (needs SMS or e-mail).
+**New customer** (app or web): name `Test Customer`, e-mail `my.customer@demo.komoriko.test`, phone `+243 900 000 901`, a password you choose (8+ characters). Afterwards the account is unverified: checkout is refused until a code is entered (needs SMS or e-mail).
 
-**New store**: sign up as a seller with `my.store@demo.sombateka.test`, phone `+243 900 000 902`, then fill the KYC form:
+**New store**: sign up as a seller with `my.store@demo.komoriko.test`, phone `+243 900 000 902`, then fill the KYC form:
 
 | Field | Value |
 |---|---|

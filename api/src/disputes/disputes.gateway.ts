@@ -126,7 +126,7 @@ export class DisputesGateway {
     }
   }
 
-  /** A message in the thread: the customer, the seller (a team member with the orders permission) or Somba staff. */
+  /** A message in the thread: the customer, the seller (a team member with the orders permission) or KOMORIKO staff. */
   @SubscribeMessage('disputes:reply')
   async reply(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string; message?: string; text?: string; attachments?: string[] }) {
     try {
@@ -176,7 +176,7 @@ export class DisputesGateway {
     }
   }
 
-  /** Somba support approves or refuses a return the seller rejected or let lapse. */
+  /** KOMORIKO support approves or refuses a return the seller rejected or let lapse. */
   @SubscribeMessage('returns:decide')
   async decideReturn(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string; approve: boolean; reason?: string }) {
     try {
@@ -190,7 +190,7 @@ export class DisputesGateway {
     }
   }
 
-  /** Somba support decides a dispute: refund all or part, a replacement, or a refusal. */
+  /** KOMORIKO support decides a dispute: refund all or part, a replacement, or a refusal. */
   @SubscribeMessage('disputes:decide')
   async decide(
     @ConnectedSocket() client: AuthedSocket,

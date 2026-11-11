@@ -149,8 +149,8 @@ export function AftersaleCaseDetail({ type, idOrRef }: { type: CaseType; idOrRef
         <AftersaleRespond
           title={{ en: "This return needs your answer", fr: "Ce retour attend votre réponse" }}
           intro={{
-            en: "Accept it and the warehouse collects the goods from the customer, inspects them and refunds the returned items. Reject it with a reason and the customer can escalate to Somba support. If you do not answer in time, support decides.",
-            fr: "Acceptez-le : l'entrepôt collecte les articles chez le client, les inspecte et rembourse les articles retournés. Refusez-le avec un motif : le client pourra escalader au support Somba. Sans réponse dans le délai, le support décide.",
+            en: "Accept it and the warehouse collects the goods from the customer, inspects them and refunds the returned items. Reject it with a reason and the customer can escalate to KOMORIKO support. If you do not answer in time, support decides.",
+            fr: "Acceptez-le : l'entrepôt collecte les articles chez le client, les inspecte et rembourse les articles retournés. Refusez-le avec un motif : le client pourra escalader au support KOMORIKO. Sans réponse dans le délai, le support décide.",
           }}
           acceptHint={{
             en: `The customer will be told the return is accepted. A rider from the warehouse will collect the goods, and the customer is refunded for the returned items only (up to ${formatCurrency(itemsTotal, locale)}).`,
@@ -167,8 +167,8 @@ export function AftersaleCaseDetail({ type, idOrRef }: { type: CaseType; idOrRef
           <span>
             <strong>{fr ? "Ce litige attend votre réponse." : "This dispute is waiting for your reply."}</strong>{" "}
             {fr
-              ? "Répondez ci-dessous avec votre version des faits et des photos : le support Somba tranche ensuite."
-              : "Reply below with your side of the story and photos: Somba support then decides."}
+              ? "Répondez ci-dessous avec votre version des faits et des photos : le support KOMORIKO tranche ensuite."
+              : "Reply below with your side of the story and photos: KOMORIKO support then decides."}
           </span>
           <Countdown until={c.sellerDueAt} />
         </div>
@@ -177,16 +177,16 @@ export function AftersaleCaseDetail({ type, idOrRef }: { type: CaseType; idOrRef
         <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           {c.stage === "seller_timeout"
             ? fr
-              ? "Vous n'avez pas répondu dans le délai : le client peut escalader au support Somba, qui décidera."
-              : "You did not answer in time: the customer can escalate to Somba support, who will decide."
+              ? "Vous n'avez pas répondu dans le délai : le client peut escalader au support KOMORIKO, qui décidera."
+              : "You did not answer in time: the customer can escalate to KOMORIKO support, who will decide."
             : fr
-              ? "Vous avez refusé ce retour. Le client peut escalader au support Somba, qui décidera."
-              : "You rejected this return. The customer can escalate to Somba support, who will decide."}
+              ? "Vous avez refusé ce retour. Le client peut escalader au support KOMORIKO, qui décidera."
+              : "You rejected this return. The customer can escalate to KOMORIKO support, who will decide."}
         </p>
       )}
       {isReturn && c.stage === "escalated" && (
         <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          {fr ? "Le support Somba étudie cette demande. Vous pouvez ajouter des éléments dans la conversation ci-dessous." : "Somba support is reviewing this request. You can add details in the conversation below."}
+          {fr ? "Le support KOMORIKO étudie cette demande. Vous pouvez ajouter des éléments dans la conversation ci-dessous." : "KOMORIKO support is reviewing this request. You can add details in the conversation below."}
         </p>
       )}
 
@@ -236,7 +236,7 @@ export function AftersaleCaseDetail({ type, idOrRef }: { type: CaseType; idOrRef
               {open
                 ? isReturn
                   ? fr ? "Aucun remboursement pour le moment. Il couvre uniquement les articles retournés." : "No refund yet. It covers the returned items only."
-                  : fr ? "Aucune décision pour le moment : le support Somba peut rembourser tout ou partie, envoyer un remplacement ou refuser." : "No decision yet: Somba support can refund all or part, send a replacement or refuse."
+                  : fr ? "Aucune décision pour le moment : le support KOMORIKO peut rembourser tout ou partie, envoyer un remplacement ou refuser." : "No decision yet: KOMORIKO support can refund all or part, send a replacement or refuse."
                 : c.outcome === "reject" || c.status === "rejected"
                   ? fr ? "Aucun remboursement : la demande a été refusée." : "No refund: the request was refused."
                   : "—"}

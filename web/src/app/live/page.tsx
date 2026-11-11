@@ -211,7 +211,7 @@ export default function LiveConsolePage() {
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Realtime Console</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Live WebSocket link to the Somba&amp;Teka backend. Sign in as any
+            Live WebSocket link to the KOMORIKO backend. Sign in as any
             role — orders, deliveries and notifications update instantly across
             web and mobile.
           </p>

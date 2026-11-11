@@ -1367,7 +1367,7 @@ export class OrdersService {
     pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
-      body: `${saved.reference} was cancelled${opts.reason ? ` by Somba&Teka support: ${opts.reason}` : ''}.${refundedUsd > 0 ? ` $${refundedUsd.toFixed(2)} was refunded to your wallet.` : ''}`,
+      body: `${saved.reference} was cancelled${opts.reason ? ` by KOMORIKO support: ${opts.reason}` : ''}.${refundedUsd > 0 ? ` $${refundedUsd.toFixed(2)} was refunded to your wallet.` : ''}`,
       type: 'order',
       entityId: saved.id,
     });
@@ -1376,7 +1376,7 @@ export class OrdersService {
       await this.notifySellers(
         saved,
         'Order cancelled',
-        `${saved.reference} was cancelled${opts.reason ? ` (${opts.reason})` : operator ? ' by Somba&Teka' : ' by the customer'}. Do not pack it.`,
+        `${saved.reference} was cancelled${opts.reason ? ` (${opts.reason})` : operator ? ' by KOMORIKO' : ' by the customer'}. Do not pack it.`,
       );
     }
     return saved;

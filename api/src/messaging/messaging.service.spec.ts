@@ -88,9 +88,9 @@ describe('MessagingService with Twilio', () => {
   });
 
   it('keeps an alphanumeric sender name in From', async () => {
-    process.env.TWILIO_FROM = 'SombaTeka';
+    process.env.TWILIO_FROM = 'KOMORIKO';
     await new MessagingService().deliverSms('+243900000101', 'x');
-    expect(calls[0].body.get('From')).toBe('SombaTeka');
+    expect(calls[0].body.get('From')).toBe('KOMORIKO');
   });
 
   it('does not call Twilio for something that is not a phone number', async () => {

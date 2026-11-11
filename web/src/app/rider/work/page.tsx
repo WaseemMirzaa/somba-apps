@@ -65,8 +65,8 @@ export default function RiderWorkPage() {
           <p data-testid="work-salary-note" className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
             <Info className="mt-0.5 h-4 w-4 shrink-0" />
             {fr
-              ? "Vous êtes salarié de Somba&Teka. Ces chiffres montrent votre travail, pas votre paie."
-              : "You are paid a salary by Somba&Teka. These numbers show your work, not your pay."}
+              ? "Vous êtes salarié de KOMORIKO. Ces chiffres montrent votre travail, pas votre paie."
+              : "You are paid a salary by KOMORIKO. These numbers show your work, not your pay."}
           </p>
           {cashShown && (
             <>

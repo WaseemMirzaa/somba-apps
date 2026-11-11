@@ -80,8 +80,8 @@ function Tracking() {
               ? "Votre colis ne passe par aucun entrepôt : un livreur le prend chez le vendeur et vous l'apporte."
               : "Your parcel does not go through a warehouse: a rider takes it from the seller and brings it to you."
             : fr
-              ? "Votre colis passe par l'entrepôt Somba de la zone du vendeur, puis par celui de votre zone."
-              : "Your parcel goes through the Somba warehouse of the seller's area, then the one of your area."}
+              ? "Votre colis passe par l'entrepôt KOMORIKO de la zone du vendeur, puis par celui de votre zone."
+              : "Your parcel goes through the KOMORIKO warehouse of the seller's area, then the one of your area."}
         </p>
         {order.estimatedDeliveryDate && order.status !== "delivered" && order.status !== "cancelled" && (
           <p className="mt-1 text-sm text-slate-700">{fr ? "Livraison estimée :" : "Estimated delivery:"} <strong>{dayLabel(order.estimatedDeliveryDate, fr)}</strong></p>

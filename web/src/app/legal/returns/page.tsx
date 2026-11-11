@@ -24,12 +24,12 @@ export default function ReturnsPolicyPage() {
           : "Returns are closed at the moment."}</p>
       <h2>{fr ? "1. Comment demander un retour" : "1. How to request a return"}</h2>
       <p>{fr
-        ? "Ouvrez la commande concernée dans votre compte, choisissez « Retour », puis sélectionnez les articles et les quantités, indiquez le motif, ajoutez des photos (jusqu'à 6) et choisissez où recevoir le remboursement (portefeuille Somba ou téléphone Mobile Money). Vous recevez une référence et suivez chaque étape dans « Retours et échanges »."
-        : "Open the order in your account, choose “Return”, select the items and quantities, give the reason, add photos (up to 6) and choose where to receive the refund (Somba wallet or mobile-money phone). You receive a reference and follow every step under “Returns and exchanges”."}</p>
+        ? "Ouvrez la commande concernée dans votre compte, choisissez « Retour », puis sélectionnez les articles et les quantités, indiquez le motif, ajoutez des photos (jusqu'à 6) et choisissez où recevoir le remboursement (portefeuille KOMORIKO ou téléphone Mobile Money). Vous recevez une référence et suivez chaque étape dans « Retours et échanges »."
+        : "Open the order in your account, choose “Return”, select the items and quantities, give the reason, add photos (up to 6) and choose where to receive the refund (KOMORIKO wallet or mobile-money phone). You receive a reference and follow every step under “Returns and exchanges”."}</p>
       <h2>{fr ? "2. Réponse du vendeur et escalade" : "2. Seller answer and escalation"}</h2>
       <p>{fr
-        ? `Le vendeur dispose de ${hours} h pour accepter ou refuser votre retour (en indiquant un motif). S'il refuse ou ne répond pas à temps, vous pouvez demander au support Somba d'examiner votre demande ; c'est lui qui tranche alors.`
-        : `The seller has ${hours} h to accept or refuse your return (giving a reason). If they refuse or do not answer in time, you can ask Somba support to review your request, and support then decides.`}</p>
+        ? `Le vendeur dispose de ${hours} h pour accepter ou refuser votre retour (en indiquant un motif). S'il refuse ou ne répond pas à temps, vous pouvez demander au support KOMORIKO d'examiner votre demande ; c'est lui qui tranche alors.`
+        : `The seller has ${hours} h to accept or refuse your return (giving a reason). If they refuse or do not answer in time, you can ask KOMORIKO support to review your request, and support then decides.`}</p>
       <h2>{fr ? "3. Collecte et remboursement" : "3. Pickup and refund"}</h2>
       <p>{fr
         ? "Une fois le retour accepté, un livreur de l'entrepôt vient récupérer les articles chez vous et les amène à l'entrepôt ; le colis repart ensuite vers l'entrepôt du vendeur. Dès que les articles sont reçus à l'entrepôt, vous êtes remboursé des seuls articles retournés (remboursement partiel possible) ; seuls les articles revendables sont remis en stock. Aucun remboursement n'est émis avant la réception des articles."

@@ -52,7 +52,7 @@ const Map<String, (String, String)> kMessagesSocial = {
   'support_replied': ('Reply sent.', 'Réponse envoyée.'),
   'support_subject_required': ('Enter a subject.', 'Saisissez un objet.'),
   'support_message_required': ('Describe your problem.', 'Décrivez votre problème.'),
-  'support_staff': ('Somba support', 'Assistance Somba'),
+  'support_staff': ('KOMORIKO support', 'Assistance KOMORIKO'),
   'support_closed_resolved': (
     'This ticket is resolved. If you still need help, open a new ticket.',
     'Ce ticket est résolu. Si vous avez encore besoin d’aide, ouvrez un nouveau ticket.'
@@ -73,7 +73,7 @@ const Map<String, (String, String)> kMessagesSocial = {
   'notif_order': ('Orders and delivery', 'Commandes et livraison'),
   'notif_order_sub': ('Payments, delivery, returns and refunds', 'Paiements, livraison, retours et remboursements'),
   'notif_message': ('Messages and support', 'Messages et assistance'),
-  'notif_message_sub': ('Replies from sellers and from Somba support', 'Réponses des vendeurs et de l’assistance Somba'),
+  'notif_message_sub': ('Replies from sellers and from KOMORIKO support', 'Réponses des vendeurs et de l’assistance KOMORIKO'),
   'notif_question': ('Product questions', 'Questions sur les produits'),
   'notif_question_sub': ('Answers to the questions you asked', 'Réponses aux questions que vous avez posées'),
   'notif_review': ('Reviews', 'Avis'),

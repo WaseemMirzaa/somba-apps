@@ -1091,7 +1091,7 @@ class CardSheetDto {
     required this.publishableKey,
     this.amountUsd = 0,
     this.currency = 'usd',
-    this.merchantName = 'Somba & Teka',
+    this.merchantName = 'KOMORIKO',
   });
 
   factory CardSheetDto.fromJson(Map<String, dynamic> j) => CardSheetDto(
@@ -1100,7 +1100,7 @@ class CardSheetDto {
         publishableKey: j['publishableKey'] as String? ?? '',
         amountUsd: (j['amountUsd'] as num?)?.toDouble() ?? 0,
         currency: j['currency'] as String? ?? 'usd',
-        merchantName: (j['merchantName'] as String?)?.trim().isNotEmpty == true ? j['merchantName'] as String : 'Somba & Teka',
+        merchantName: (j['merchantName'] as String?)?.trim().isNotEmpty == true ? j['merchantName'] as String : 'KOMORIKO',
       );
 
   /// A usable answer carries both keys.

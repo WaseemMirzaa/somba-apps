@@ -47,7 +47,7 @@ order statuses, dispute/return/support/review models, address shape, zones).
 | CF-29 | Notification Centre | ✅ | `NotificationsScreen` |
 | CF-30 | Dispute Detail | ✅ | `DisputeScreen` |
 | CF-31 | Help / Account Deletion | ✅ | `HelpScreen` + `AccountDeleteScreen` |
-| CF-32 | Somba&Teka Wallet | 🚫 | Removed on request (no wallet/COD) |
+| CF-32 | KOMORIKO Wallet | 🚫 | Removed on request (no wallet/COD) |
 | CF-33 | Refer & Earn | ✅ | `ReferScreen` |
 | CF-34 | Exchange Request | ✅ | `ExchangeScreen` |
 | CF-35 | Support Ticket | 🟡 | `SupportListScreen` exists; no ticket **detail** thread (`/shop/support/:id`) |

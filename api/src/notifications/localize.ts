@@ -126,7 +126,7 @@ const TEAM_ROLES: Record<string, string> = {
   finance: 'finances',
   support: 'support client',
 };
-const BADGES: Record<string, string> = { bronze: 'bronze', silver: 'argent', gold: 'or', somba_assured: 'Somba Assuré' };
+const BADGES: Record<string, string> = { bronze: 'bronze', silver: 'argent', gold: 'or', somba_assured: 'KOMORIKO Assuré' };
 
 /** The legs of a parcel's journey, as the server names them in notices ("return to seller"). */
 const LEGS_FR: Record<string, string> = {
@@ -444,7 +444,7 @@ const BODIES: Rule[] = [
   ],
 
   // Orders and deliveries
-  [/^(\S+) reached the Somba&Teka warehouse and will be on its way soon\.$/, (m) => `${m[1]} est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.`],
+  [/^(\S+) reached the KOMORIKO warehouse and will be on its way soon\.$/, (m) => `${m[1]} est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.`],
   [/^Complete the card payment to confirm (\S+)\.$/, (m) => `Finalisez le paiement par carte pour confirmer ${m[1]}.`],
   [/^Approve the (.+) request on your phone to confirm (\S+)\.$/, (m) => `Validez la demande ${methodFr(m[1])} sur votre téléphone pour confirmer ${m[2]}.`],
   [/^We received (\S+)\. You'll get updates here in real time\.$/, (m) => `Nous avons reçu ${m[1]}. Vous recevrez les mises à jour ici en temps réel.`],
@@ -501,14 +501,14 @@ const BODIES: Rule[] = [
   [/^(\S+) was cancelled\.$/, (m) => `${m[1]} a été annulée.`],
   [/^(\S+) was cancelled: (.+)\.$/, (m) => `${m[1]} a été annulée : ${translateReason(m[2])}.`],
   [
-    /^(\S+) was cancelled by Somba&Teka support: (.+?)\.( \$([\d.]+) was refunded to your wallet\.)?$/,
+    /^(\S+) was cancelled by KOMORIKO support: (.+?)\.( \$([\d.]+) was refunded to your wallet\.)?$/,
     (m) =>
-      `${m[1]} a été annulée par l’assistance Somba&Teka : ${translateReason(m[2])}.${m[3] !== undefined ? ` ${moneyFr(m[4])} ont été remboursés sur votre portefeuille.` : ''}`,
+      `${m[1]} a été annulée par l’assistance KOMORIKO : ${translateReason(m[2])}.${m[3] !== undefined ? ` ${moneyFr(m[4])} ont été remboursés sur votre portefeuille.` : ''}`,
   ],
   [
-    /^(\S+) was cancelled( \((.+)\)| by Somba&Teka| by the customer)\. Do not pack it\.$/,
+    /^(\S+) was cancelled( \((.+)\)| by KOMORIKO| by the customer)\. Do not pack it\.$/,
     (m) => {
-      const who = m[3] !== undefined ? ` (${translateReason(m[3])})` : m[2] === ' by Somba&Teka' ? ' par Somba&Teka' : ' par le client';
+      const who = m[3] !== undefined ? ` (${translateReason(m[3])})` : m[2] === ' by KOMORIKO' ? ' par KOMORIKO' : ' par le client';
       return `${m[1]} a été annulée${who}. Ne la préparez pas.`;
     },
   ],

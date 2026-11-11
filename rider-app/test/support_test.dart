@@ -227,7 +227,7 @@ void main() {
         expect(find.text('Bonjour, le client ne répond pas au téléphone.'), findsOneWidget);
         expect(find.text('Merci, nous le contactons.'), findsOneWidget);
         expect(find.textContaining(s.threadYou), findsOneWidget);
-        expect(find.textContaining('Marie Support'), findsNothing, reason: 'an admin role shows as Somba support');
+        expect(find.textContaining('Marie Support'), findsNothing, reason: 'an admin role shows as KOMORIKO support');
         expect(find.textContaining(s.threadSupport), findsOneWidget);
         expect(find.byType(Image), findsOneWidget, reason: 'the agent attached a photo');
         expect(find.byKey(const ValueKey('thread-status')), findsOneWidget);

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Somba&Teka: create the MySQL database + user, generate and store every secret, and seed the first admin.
+# KOMORIKO: create the MySQL database + user, generate and store every secret, and seed the first admin.
 #
 # Run ON the droplet, as root, after the code is in $APP_DIR and the API is built (`npm ci && npm run build` in api/).
 # deploy/droplet-deploy.sh already does all of this; use this script when you want just the database and credentials step

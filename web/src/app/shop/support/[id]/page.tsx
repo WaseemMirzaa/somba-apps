@@ -81,7 +81,7 @@ function TicketThread() {
           return (
             <div key={i} className={`rounded-xl p-4 text-sm ${mine ? "ml-8 bg-blue-50" : "mr-8 bg-slate-50"}`}>
               <p className="text-xs font-medium text-slate-400">
-                {mine ? (fr ? "Vous" : "You") : `${m.from} · ${fr ? "Support Somba" : "Somba support"}`} · {new Date(m.at).toLocaleString()}
+                {mine ? (fr ? "Vous" : "You") : `${m.from} · ${fr ? "Support KOMORIKO" : "KOMORIKO support"}`} · {new Date(m.at).toLocaleString()}
               </p>
               {m.text && <p className="mt-1 whitespace-pre-wrap text-slate-800">{m.text}</p>}
               {(m.attachments ?? []).length > 0 && (

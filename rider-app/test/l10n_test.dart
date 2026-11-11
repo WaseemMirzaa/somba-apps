@@ -116,7 +116,7 @@ void main() {
     test('no user-visible English is hard-coded in lib/', () {
       final pattern = RegExp(
           r"""(?:(?:Text|SelectableText)\(\s*(?:const\s+)?|(?:hintText|labelText|helperText|errorText|tooltip|semanticLabel|applicationName):\s*)'((?:[^'\\]|\\.)*)'""");
-      const brand = {'Somba&Teka', 'EN', 'FR'};
+      const brand = {'KOMORIKO', 'EN', 'FR'};
       final offenders = <String>[];
       for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'))) {
         if (f.path.contains('/l10n/')) continue;

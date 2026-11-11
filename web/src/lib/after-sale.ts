@@ -57,10 +57,10 @@ export function stageText(d: Pick<Dispute, "type" | "status" | "stage" | "outcom
   if (d.status === "rejected") return fr ? "Clôturé sans remboursement" : "Closed without a refund";
   const map: Record<string, L> = {
     awaiting_seller: { en: "Waiting for the seller", fr: "En attente du vendeur" },
-    seller_replied: { en: "The seller replied — Somba support decides", fr: "Le vendeur a répondu — le support Somba décide" },
-    seller_rejected: { en: "The seller declined — you can ask Somba support to review", fr: "Le vendeur a refusé — vous pouvez demander l'avis du support Somba" },
-    seller_timeout: { en: "The seller did not answer in time — ask Somba support to review", fr: "Le vendeur n'a pas répondu à temps — demandez l'avis du support Somba" },
-    escalated: { en: "With Somba support", fr: "Chez le support Somba" },
+    seller_replied: { en: "The seller replied — KOMORIKO support decides", fr: "Le vendeur a répondu — le support KOMORIKO décide" },
+    seller_rejected: { en: "The seller declined — you can ask KOMORIKO support to review", fr: "Le vendeur a refusé — vous pouvez demander l'avis du support KOMORIKO" },
+    seller_timeout: { en: "The seller did not answer in time — ask KOMORIKO support to review", fr: "Le vendeur n'a pas répondu à temps — demandez l'avis du support KOMORIKO" },
+    escalated: { en: "With KOMORIKO support", fr: "Chez le support KOMORIKO" },
     approved: { en: "Approved — pickup being arranged", fr: "Approuvé — collecte en cours d'organisation" },
     pickup: { en: "A rider collects the items", fr: "Un livreur collecte les articles" },
     received: { en: "Items back at the warehouse — refund in progress", fr: "Articles à l'entrepôt — remboursement en cours" },
@@ -89,7 +89,7 @@ export function requestSteps(d: Dispute, fr: boolean): Step[] {
     steps.push({ key: "seller", label: replied ? t("Seller replied", "Le vendeur a répondu") : t("Seller reply", "Réponse du vendeur"), state: replied ? "done" : closed ? "todo" : "current" });
     steps.push({
       key: "decision",
-      label: d.status === "resolved" ? stageText(d, fr) : d.status === "rejected" ? t("Closed without a refund", "Clôturé sans remboursement") : t("Somba support decision", "Décision du support Somba"),
+      label: d.status === "resolved" ? stageText(d, fr) : d.status === "rejected" ? t("Closed without a refund", "Clôturé sans remboursement") : t("KOMORIKO support decision", "Décision du support KOMORIKO"),
       state: d.status === "resolved" ? "done" : d.status === "rejected" ? "bad" : replied ? "current" : "todo",
       at: closed ? d.updatedAt : null,
     });
@@ -104,7 +104,7 @@ export function requestSteps(d: Dispute, fr: boolean): Step[] {
   else if (timedOut) steps.push({ key: "seller", label: t("Seller did not answer in time", "Le vendeur n'a pas répondu à temps"), state: "bad" });
   else steps.push({ key: "seller", label: sellerAnswered ? t("Seller accepted", "Le vendeur a accepté") : t("Seller review", "Examen par le vendeur"), state: sellerAnswered ? "done" : closed ? "todo" : "current", at: d.sellerRespondedAt });
   if (d.escalatedAt || stage === "escalated" || stage === "seller_rejected" || stage === "seller_timeout") {
-    steps.push({ key: "support", label: t("Somba support review", "Examen par le support Somba"), state: stage === "escalated" ? "current" : d.escalatedAt ? "done" : "todo", at: d.escalatedAt });
+    steps.push({ key: "support", label: t("KOMORIKO support review", "Examen par le support KOMORIKO"), state: stage === "escalated" ? "current" : d.escalatedAt ? "done" : "todo", at: d.escalatedAt });
   }
   const pickupDone = stage === "received" || (stage === "closed" && !!d.receivedAt);
   steps.push({

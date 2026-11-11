@@ -1,6 +1,6 @@
 name: Rider App · Build APK
 
-# Builds and releases the Somba&Teka rider Flutter app (rider-app/) as an
+# Builds and releases the KOMORIKO rider Flutter app (rider-app/) as an
 # Android APK using Flutter 3.47.7.
 
 on:
@@ -155,12 +155,12 @@ jobs:
         run: flutter build apk --release --split-per-abi --dart-define-from-file="$DART_DEFINES_FILE"
 
       - name: Rename universal APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/somba-rider.apk
+        run: cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/komoriko-rider.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: somba-rider-apk
+          name: komoriko-rider-apk
           path: rider-app/build/app/outputs/flutter-apk/*.apk
           if-no-files-found: error
           retention-days: 90
@@ -170,15 +170,15 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: rider-apk-v${{ github.run_number }}
-          name: Somba Rider App — APK build ${{ github.run_number }}
+          name: KOMORIKO Rider App — APK build ${{ github.run_number }}
           body: |
-            Automated release of the Somba&Teka rider Android app.
+            Automated release of the KOMORIKO rider Android app.
 
             - Built with Flutter ${{ env.FLUTTER_VERSION }}
             - **Server: `${{ env.LIVE_SERVER_URL }}`** (the app talks to this server)
             - Commit: ${{ github.sha }}
 
-            Download `somba-rider.apk` (universal) below and install on any Android device.
+            Download `komoriko-rider.apk` (universal) below and install on any Android device.
           files: rider-app/build/app/outputs/flutter-apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

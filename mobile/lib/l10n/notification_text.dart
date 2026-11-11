@@ -106,7 +106,7 @@ String? _titlePattern(String title) {
 }
 
 final List<(RegExp, String Function(RegExpMatch))> _bodies = [
-  (RegExp(r'^(\S+) reached the Somba&Teka warehouse and will be on its way soon\.$'), (m) => '${m[1]} est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'),
+  (RegExp(r'^(\S+) reached the KOMORIKO warehouse and will be on its way soon\.$'), (m) => '${m[1]} est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'),
   (RegExp(r'^Approve the (.+) request on your phone to confirm (\S+)\.$'), (m) => 'Validez la demande ${_method(m[1]!)} sur votre téléphone pour confirmer ${m[2]}.'),
   (RegExp(r"^We received (\S+)\. You'll get updates here in real time\.$"), (m) => 'Nous avons reçu ${m[1]}. Vous recevrez les mises à jour ici en temps réel.'),
   (RegExp(r'^(\S+) is now (.+)\.$'), (m) => '${m[1]} est maintenant ${_status(m[2]!)}.'),

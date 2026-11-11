@@ -106,11 +106,11 @@ export function RequestForm({ orderId, mode }: { orderId: string; mode: "return"
           <p className="mt-3 text-xs text-slate-500">
             {isReturn
               ? fr
-                ? `Le vendeur a ${settings.sellerResponseHours} h pour répondre. S'il refuse ou ne répond pas, vous pourrez demander l'avis du support Somba.`
-                : `The seller has ${settings.sellerResponseHours} h to answer. If they decline or stay silent, you can ask Somba support to review.`
+                ? `Le vendeur a ${settings.sellerResponseHours} h pour répondre. S'il refuse ou ne répond pas, vous pourrez demander l'avis du support KOMORIKO.`
+                : `The seller has ${settings.sellerResponseHours} h to answer. If they decline or stay silent, you can ask KOMORIKO support to review.`
               : fr
-                ? "Le vendeur peut répondre dans la discussion ; le support Somba décide ensuite."
-                : "The seller can reply in the thread; Somba support then decides."}
+                ? "Le vendeur peut répondre dans la discussion ; le support KOMORIKO décide ensuite."
+                : "The seller can reply in the thread; KOMORIKO support then decides."}
           </p>
           {result.siblings && result.siblings.length > 0 && (
             <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
@@ -287,7 +287,7 @@ export function RequestForm({ orderId, mode }: { orderId: string; mode: "return"
           {isReturn && (
             <fieldset className="space-y-2">
               <legend className="mb-1 text-sm font-medium text-slate-700">{fr ? "Rembourser vers" : "Refund to"}</legend>
-              {([["wallet", fr ? "Mon portefeuille Somba (immédiat)" : "My Somba wallet (instant)"], ["phone", fr ? "Mon téléphone Mobile Money" : "My mobile-money phone"]] as const).map(([v, label]) => (
+              {([["wallet", fr ? "Mon portefeuille KOMORIKO (immédiat)" : "My KOMORIKO wallet (instant)"], ["phone", fr ? "Mon téléphone Mobile Money" : "My mobile-money phone"]] as const).map(([v, label]) => (
                 <label key={v} className="flex cursor-pointer items-center gap-3 rounded-xl border border-[var(--border)] p-3 text-sm">
                   <input type="radio" name="refundTo" checked={refundTo === v} onChange={() => setRefundTo(v)} />
                   {label}

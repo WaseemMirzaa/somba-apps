@@ -11,7 +11,7 @@ const sweepMs = () => Number(process.env.AFTER_SALE_SWEEP_MS ?? 60_000);
 /**
  * Replacements and exchanges give the seller a response time too (`sellerDueAt`, the platform's `sellerResponseHours`).
  * When it runs out with no answer, nothing used to happen: an exchange kept the customer's price difference held in
- * limbo and the seller's "Overdue" pill just sat there. Now the customer, the seller and Somba support are told once
+ * limbo and the seller's "Overdue" pill just sat there. Now the customer, the seller and KOMORIKO support are told once
  * (`sellerLapsedAt` is the mark, set by a conditional update so two API instances cannot both tell), and support
  * can approve or refuse it on the seller's behalf, as before. The request itself keeps its status: a late answer
  * from the seller is still accepted until support decides.

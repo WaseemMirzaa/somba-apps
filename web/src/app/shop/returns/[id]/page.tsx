@@ -88,7 +88,7 @@ function RequestStatus() {
       patch(upd);
       setShowEscalate(false);
       setNote("");
-      toast(fr ? "Le support Somba examine votre demande" : "Somba support is reviewing your request");
+      toast(fr ? "Le support KOMORIKO examine votre demande" : "KOMORIKO support is reviewing your request");
     } catch (e) {
       toast((e as Error).message, "error");
     } finally {
@@ -126,19 +126,19 @@ function RequestStatus() {
             <div>
               <p className="text-sm text-slate-700">
                 {d.stage === "seller_timeout"
-                  ? (fr ? "Le vendeur n'a pas répondu à temps. Le support Somba peut décider à sa place." : "The seller did not answer in time. Somba support can decide for them.")
-                  : (fr ? "Le vendeur a refusé. Vous pouvez demander au support Somba de réexaminer votre demande." : "The seller declined. You can ask Somba support to review your request.")}
+                  ? (fr ? "Le vendeur n'a pas répondu à temps. Le support KOMORIKO peut décider à sa place." : "The seller did not answer in time. KOMORIKO support can decide for them.")
+                  : (fr ? "Le vendeur a refusé. Vous pouvez demander au support KOMORIKO de réexaminer votre demande." : "The seller declined. You can ask KOMORIKO support to review your request.")}
               </p>
               {showEscalate ? (
                 <div className="mt-2 space-y-2">
                   <textarea className="input-premium w-full px-3 py-2 text-sm" rows={2} placeholder={fr ? "Un mot pour le support (facultatif)" : "A note for support (optional)"} value={note} onChange={(e) => setNote(e.target.value)} />
                   <div className="flex gap-2">
-                    <Button onClick={escalate} disabled={busy === "escalate"}>{busy === "escalate" ? "…" : fr ? "Demander l'avis du support" : "Ask Somba support"}</Button>
+                    <Button onClick={escalate} disabled={busy === "escalate"}>{busy === "escalate" ? "…" : fr ? "Demander l'avis du support" : "Ask KOMORIKO support"}</Button>
                     <Button variant="ghost" onClick={() => setShowEscalate(false)}>{fr ? "Annuler" : "Cancel"}</Button>
                   </div>
                 </div>
               ) : (
-                <Button className="mt-2" onClick={() => setShowEscalate(true)}>{fr ? "Demander l'avis du support Somba" : "Ask Somba support to review"}</Button>
+                <Button className="mt-2" onClick={() => setShowEscalate(true)}>{fr ? "Demander l'avis du support KOMORIKO" : "Ask KOMORIKO support to review"}</Button>
               )}
             </div>
           )}
@@ -211,7 +211,7 @@ function RequestStatus() {
                   <div key={m.id} className={`rounded-xl p-3 text-sm ${mine ? "bg-blue-50" : "bg-slate-50"}`}>
                     <p className="text-xs font-semibold text-slate-700">
                       {mine ? (fr ? "Vous" : "You") : m.authorName}
-                      <span className="ml-1 font-normal text-slate-500">· {m.role === "seller" ? (fr ? "vendeur" : "seller") : m.role.startsWith("admin") ? "Somba" : m.role} · {new Date(m.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</span>
+                      <span className="ml-1 font-normal text-slate-500">· {m.role === "seller" ? (fr ? "vendeur" : "seller") : m.role.startsWith("admin") ? "KOMORIKO" : m.role} · {new Date(m.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</span>
                     </p>
                     <p className="mt-1 whitespace-pre-line text-slate-800">{m.text}</p>
                     <Photos urls={m.attachments ?? []} fr={fr} />

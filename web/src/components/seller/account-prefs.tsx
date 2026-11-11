@@ -166,8 +166,8 @@ export function PayoutAccountCard() {
     <div className="space-y-3">
       <p className="text-sm text-slate-500">
         {fr
-          ? "Les versements de votre équipe (rôle Finance) partent uniquement vers ce compte ou vers le portefeuille Somba. Seul le propriétaire peut le modifier."
-          : "Payouts requested by your team (Finance role) only go to this account or to the Somba wallet. Only the owner can change it."}
+          ? "Les versements de votre équipe (rôle Finance) partent uniquement vers ce compte ou vers le portefeuille KOMORIKO. Seul le propriétaire peut le modifier."
+          : "Payouts requested by your team (Finance role) only go to this account or to the KOMORIKO wallet. Only the owner can change it."}
       </p>
       {acct.set && !editing ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">

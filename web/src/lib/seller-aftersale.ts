@@ -178,7 +178,7 @@ const RETURN_STAGE: Table = {
   awaiting_seller: { en: "Awaiting your answer", fr: "En attente de votre réponse", variant: "warning" },
   seller_rejected: { en: "You rejected it", fr: "Vous l'avez refusé", variant: "danger" },
   seller_timeout: { en: "No answer in time", fr: "Délai de réponse dépassé", variant: "danger" },
-  escalated: { en: "With Somba support", fr: "Chez le support Somba", variant: "info" },
+  escalated: { en: "With KOMORIKO support", fr: "Chez le support KOMORIKO", variant: "info" },
   approved: { en: "Approved, pickup to plan", fr: "Approuvé, collecte à planifier", variant: "info" },
   pickup: { en: "Pickup in progress", fr: "Collecte en cours", variant: "info" },
   received: { en: "At the warehouse", fr: "À l'entrepôt", variant: "info" },
@@ -230,7 +230,7 @@ const CATEGORY: Table = {
 export const caseCategoryLabel = (c: string | null | undefined, fr: boolean) => lab(CATEGORY, c, fr);
 
 const REFUND_TO: Record<string, { en: string; fr: string }> = {
-  wallet: { en: "the customer's Somba wallet", fr: "le portefeuille Somba du client" },
+  wallet: { en: "the customer's KOMORIKO wallet", fr: "le portefeuille KOMORIKO du client" },
   phone: { en: "the customer's mobile money", fr: "le mobile money du client" },
 };
 export const refundToLabel = (to: string | null | undefined, fr: boolean) =>
@@ -239,10 +239,10 @@ export const refundToLabel = (to: string | null | undefined, fr: boolean) =>
 const THREAD_ROLE: Record<string, { en: string; fr: string }> = {
   customer: { en: "Customer", fr: "Client" },
   seller: { en: "You / your team", fr: "Vous / votre équipe" },
-  admin: { en: "Somba support", fr: "Support Somba" },
-  admin_support: { en: "Somba support", fr: "Support Somba" },
-  admin_operations: { en: "Somba support", fr: "Support Somba" },
-  admin_finance: { en: "Somba finance", fr: "Finance Somba" },
+  admin: { en: "KOMORIKO support", fr: "Support KOMORIKO" },
+  admin_support: { en: "KOMORIKO support", fr: "Support KOMORIKO" },
+  admin_operations: { en: "KOMORIKO support", fr: "Support KOMORIKO" },
+  admin_finance: { en: "KOMORIKO finance", fr: "Finance KOMORIKO" },
   warehouse_staff: { en: "Warehouse", fr: "Entrepôt" },
 };
 export const threadRoleLabel = (role: string, fr: boolean) =>

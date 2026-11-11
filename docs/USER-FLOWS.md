@@ -1,4 +1,4 @@
-# Somba&Teka — Users, Apps and Flows
+# KOMORIKO — Users, Apps and Flows
 
 | | |
 |---|---|
@@ -68,7 +68,7 @@ flowchart LR
     WP["🌐 Warehouse portal - /warehouse"]
     AP["🌐 Admin portal - /admin"]
   end
-  API[("Somba&Teka API<br/>one live connection per signed-in user")]
+  API[("KOMORIKO API<br/>one live connection per signed-in user")]
   G --> CM & WS
   C --> CM & WS
   S --> SP & WS
@@ -648,7 +648,7 @@ flowchart TD
 
 | Page | Data | Options | Status |
 |---|---|---|---|
-| `/` home | Demo products and categories | Search, Browse products, Sell on Somba&Teka, Shop now (→ app stores), FAQ, seller plans | MOCK |
+| `/` home | Demo products and categories | Search, Browse products, Sell on KOMORIKO, Shop now (→ app stores), FAQ, seller plans | MOCK |
 | `/shop/products` | Live catalogue (`products:list`, ⚡ `product:*`) | Sort (popularity, price ↑↓, rating, discount), filters (category, brand, rating, discount, max price), ♥, open product, "Buy again" (recently viewed) | LIVE data, LOCAL filters |
 | `/shop/search?q=` | Live catalogue | Text match on name, category, seller | LIVE |
 | `/shop/categories` | `categories:list` | Category → search | LIVE |
@@ -1316,7 +1316,7 @@ flowchart TD
   RR -- yes --> CN[Live connection → ready → load tasks, work stats, notifications] --> D([Deliveries])
   RR -- "401/403 or other role" --> L
   L --> LP["POST /auth/login"] --> LR{Result}
-  LR -- "not a rider" --> LE[This app is for Somba&Teka riders] --> L
+  LR -- "not a rider" --> LE[This app is for KOMORIKO riders] --> L
   LR -- "wrong password / 429 / offline" --> LE2[Message under the form] --> L
   LR -- ok --> CN
   D -.-> SE{{Suspended or role changed by admin}} -.-> L

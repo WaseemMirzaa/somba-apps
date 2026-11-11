@@ -151,8 +151,8 @@ export function DisputeActions({ dispute }: { dispute: DisputeRow }) {
         <p className="text-sm text-slate-600">
           {undecided
             ? fr
-              ? "Personne n'a encore décidé : le support Somba peut approuver (une collecte est planifiée chez le client) ou refuser avec un motif."
-              : "Nobody has decided yet: Somba support can approve (a pickup from the customer is planned) or refuse with a reason."
+              ? "Personne n'a encore décidé : le support KOMORIKO peut approuver (une collecte est planifiée chez le client) ou refuser avec un motif."
+              : "Nobody has decided yet: KOMORIKO support can approve (a pickup from the customer is planned) or refuse with a reason."
             : dispute.stage === "approved" || dispute.stage === "pickup"
               ? fr ? "Accepté : l'entrepôt collecte chez le client puis scanne le colis ; le remboursement des articles retournés suit automatiquement." : "Accepted: the warehouse collects from the customer and scans the parcel in; the refund of the returned items follows automatically."
               : fr ? "Marchandise à l'entrepôt : le remboursement automatique a échoué ou la demande est antérieure au nouveau flux." : "The goods are at the warehouse: the automatic refund failed or the request pre-dates the new flow."}

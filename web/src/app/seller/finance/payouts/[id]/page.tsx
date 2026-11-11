@@ -51,7 +51,7 @@ export default function SellerPayoutDetailPage() {
             { label: fr ? "Référence" : "Reference", value: payout.id },
             { label: t("amount"), value: formatCurrency(payout.amount, locale) },
             { label: fr ? "Méthode" : "Method", value: payoutMethodLabel(payout.methodKey, fr) },
-            { label: fr ? "Compte de destination" : "Destination account", value: payout.account || (payout.methodKey === "wallet" ? (fr ? "Portefeuille Somba" : "Somba wallet") : "—") },
+            { label: fr ? "Compte de destination" : "Destination account", value: payout.account || (payout.methodKey === "wallet" ? (fr ? "Portefeuille KOMORIKO" : "KOMORIKO wallet") : "—") },
             { label: t("status"), value: label },
             { label: t("date"), value: payout.date },
             {

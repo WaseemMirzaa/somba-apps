@@ -136,7 +136,7 @@ void main() {
       expect(find.text('Category: Delivery · Order SOM-1042'), findsOneWidget);
       expect(find.text('It has been a week.'), findsOneWidget);
       expect(find.text('We are checking with the carrier.'), findsOneWidget);
-      expect(find.text('Somba support'), findsOneWidget);
+      expect(find.text('KOMORIKO support'), findsOneWidget);
       expect(find.byKey(const ValueKey('ticket-photo-tm2-0')), findsOneWidget);
       final mine = tester.getCenter(find.text('It has been a week.')).dx;
       final theirs = tester.getCenter(find.text('We are checking with the carrier.')).dx;
@@ -283,7 +283,7 @@ void main() {
       await open(tester, SupportTicketDetailScreen(ticket: withStaffReply(unread: 0, status: 'resolved')), lang: 'fr');
       expect(find.textContaining('Ce ticket est résolu'), findsOneWidget);
       expect(find.text('Ouvrir un nouveau ticket'), findsOneWidget);
-      expect(find.text('Assistance Somba'), findsOneWidget);
+      expect(find.text('Assistance KOMORIKO'), findsOneWidget);
     });
   });
 
