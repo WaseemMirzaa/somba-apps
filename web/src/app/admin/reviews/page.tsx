@@ -261,7 +261,7 @@ function ReviewsInner() {
                       const r = row as unknown as ReviewRow;
                       return (
                         <div className="max-w-md space-y-2">
-                          <TranslatableText kind="review" id={r.id} text={r.text} className="whitespace-pre-line break-words text-slate-700" />
+                          <TranslatableText kind="review" id={r.id} auto text={r.text} sourceLang={r.sourceLang} i18n={r.textI18n} className="whitespace-pre-line break-words text-slate-700" />
                           <AttachmentGallery urls={r.photos} />
                           {r.sellerReply && (
                             <div className="rounded-lg border-l-2 border-[var(--primary)] bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -269,7 +269,7 @@ function ReviewsInner() {
                                 {fr ? "Réponse du vendeur" : "Seller reply"}
                                 {r.sellerReplyAt ? ` · ${localDay(String(r.sellerReplyAt))}` : ""}
                               </p>
-                              <TranslatableText kind="review_reply" id={r.id} text={r.sellerReply} className="mt-0.5 whitespace-pre-line break-words" />
+                              <TranslatableText kind="review_reply" id={r.id} auto text={r.sellerReply} i18n={r.replyI18n} className="mt-0.5 whitespace-pre-line break-words" />
                             </div>
                           )}
                         </div>

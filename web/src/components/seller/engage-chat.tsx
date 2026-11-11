@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Languages, Lock, MessageCircle, Package, Receipt, Send } from "lucide-react";
+import { ArrowLeft, Lock, MessageCircle, Package, Receipt, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState, LoadError, SectionLoader } from "@/components/seller/data-state";
 import { AttachmentGallery, AttachmentPicker } from "@/components/seller/attachments";
@@ -14,7 +14,8 @@ import { useToast } from "@/context/toast-context";
 import { useSellerAccess } from "@/lib/seller";
 import { assetUrl, sellerRequest, useLiveQuery, useSocketEvent } from "@/lib/seller-api";
 import { errMessage } from "@/lib/seller-labels";
-import { useTranslationEnabled } from "@/lib/shop-live";
+import { TranslatableText } from "@/components/shop/translatable-text";
+import { previewText } from "@/lib/text-i18n";
 import {
   agoText,
   CHAT_MAX_CHARS,
@@ -60,9 +61,9 @@ export function ChatInbox() {
     return (list.data ?? []).filter(
       (c) =>
         (!unreadOnly || c.unread > 0) &&
-        (!needle || [c.buyerName, c.productName, c.productNameFr, c.orderReference, c.lastMessagePreview].some((v) => (v ?? "").toLowerCase().includes(needle))),
+        (!needle || [c.buyerName, c.productName, c.productNameFr, c.orderReference, c.lastMessagePreview, previewText(c.lastMessageI18n, locale, c.lastMessagePreview)].some((v) => (v ?? "").toLowerCase().includes(needle))),
     );
-  }, [list.data, unreadOnly, q]);
+  }, [list.data, unreadOnly, q, locale]);
   const unreadTotal = (list.data ?? []).reduce((n, c) => n + c.unread, 0);
 
   return (
@@ -99,7 +100,7 @@ export function ChatInbox() {
                     <span className={cn("truncate text-sm", c.unread > 0 ? "font-bold text-slate-900" : "font-semibold text-slate-800")}>{c.buyerName}</span>
                     <span className="shrink-0 text-[11px] text-slate-400">{agoText(c.lastMessageAt, fr)}</span>
                   </span>
-                  <span className={cn("block truncate text-sm", c.unread > 0 ? "text-slate-800" : "text-slate-500")}>{c.lastMessagePreview || "…"}</span>
+                  <span className={cn("block truncate text-sm", c.unread > 0 ? "text-slate-800" : "text-slate-500")}>{previewText(c.lastMessageI18n, locale, c.lastMessagePreview) || "…"}</span>
                   <span className="mt-1 flex flex-wrap gap-1.5">
                     <ContextChips c={c} fr={fr} />
                   </span>
@@ -126,16 +127,8 @@ export function ChatInbox() {
 }
 
 // ─── Thread ─────────────────────────────────────────────────────────────────────────────────────────────────────────
-interface Translation {
-  busy: boolean;
-  shown: boolean;
-  text?: string;
-  same?: boolean;
-}
-
 export function ChatThread({ id }: { id: string }) {
   const { locale } = useLocale();
-  const translationOn = useTranslationEnabled();
   const fr = locale === "fr";
   const { toast } = useToast();
   const router = useRouter();
@@ -152,7 +145,6 @@ export function ChatThread({ id }: { id: string }) {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [seenAt, setSeenAt] = useState<string | null>(null);
-  const [tr, setTr] = useState<Record<string, Translation>>({});
   const bottom = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
@@ -232,26 +224,6 @@ export function ChatThread({ id }: { id: string }) {
     }
   }
 
-  async function translate(m: ChatMessage) {
-    const cur = tr[m.id];
-    if (cur?.shown) {
-      setTr((t) => ({ ...t, [m.id]: { ...cur, shown: false } }));
-      return;
-    }
-    if (cur?.text !== undefined) {
-      setTr((t) => ({ ...t, [m.id]: { ...cur, shown: true } }));
-      return;
-    }
-    setTr((t) => ({ ...t, [m.id]: { busy: true, shown: false } }));
-    try {
-      const r = await sellerRequest<{ text: string; sourceLang?: string; same?: boolean }>("translate:text", { kind: "chat_message", id: m.id, target: fr ? "fr" : "en" });
-      setTr((t) => ({ ...t, [m.id]: { busy: false, shown: !r.same, text: r.text, same: !!r.same } }));
-    } catch (e) {
-      setTr((t) => ({ ...t, [m.id]: { busy: false, shown: false } }));
-      toast(errMessage(e), "error");
-    }
-  }
-
   const lastOwnId = [...messages].reverse().find((m) => m.senderSide === "seller")?.id;
   const readOnly = access.suspended || !access.can("support");
 
@@ -294,32 +266,20 @@ export function ChatThread({ id }: { id: string }) {
         )}
         {messages.map((m) => {
           const mine = m.senderSide === "seller";
-          const t = tr[m.id];
           return (
             <div key={m.id} className={cn("flex", mine ? "justify-end" : "justify-start")} data-testid={mine ? "msg-mine" : "msg-theirs"}>
               <div className={cn("max-w-[85%] rounded-2xl px-4 py-2 text-sm", mine ? "bg-[var(--primary)] text-white" : "bg-slate-100 text-slate-800")}>
                 <p className={cn("text-[10px] font-semibold uppercase tracking-wide", mine ? "text-white/70" : "text-slate-500")}>
                   {mine ? m.senderName || (fr ? "Vous" : "You") : m.senderName} · {new Date(m.createdAt).toLocaleString(locale)}
                 </p>
-                {m.text && <p className="mt-1 whitespace-pre-wrap break-words">{m.text}</p>}
-                {t?.shown && t.text !== undefined && (
-                  <p className="mt-1 whitespace-pre-wrap break-words border-t border-slate-300/60 pt-1 text-slate-700" data-testid="msg-translation">
-                    {t.text}
-                  </p>
-                )}
+                {m.text && (mine ? (
+                  <p className="mt-1 whitespace-pre-wrap break-words">{m.text}</p>
+                ) : (
+                  <div className="mt-1">
+                    <TranslatableText kind="chat_message" id={m.id} auto text={m.text} i18n={m.textI18n} className="whitespace-pre-wrap break-words" />
+                  </div>
+                ))}
                 {m.attachments?.length > 0 && <AttachmentGallery urls={m.attachments} className="mt-2" />}
-                {translationOn && !mine && m.text && (
-                  <button type="button" onClick={() => void translate(m)} disabled={t?.busy} className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--primary)] hover:underline disabled:opacity-60">
-                    <Languages className="h-3 w-3" aria-hidden="true" />
-                    {t?.busy
-                      ? fr ? "Traduction…" : "Translating…"
-                      : t?.shown
-                        ? fr ? "Voir l'original" : "Show original"
-                        : t?.same
-                          ? fr ? "Déjà dans votre langue" : "Already in your language"
-                          : fr ? "Traduire" : "Translate"}
-                  </button>
-                )}
                 {mine && m.id === lastOwnId && seenAt && seenAt > m.createdAt && (
                   <p className="mt-0.5 text-right text-[10px] text-white/70">{fr ? "Vu" : "Seen"}</p>
                 )}

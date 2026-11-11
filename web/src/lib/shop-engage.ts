@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useSocketEvent } from "@/lib/shop-live";
+import type { TextI18n } from "@/lib/text-i18n";
 
 // ───────────────────────── campaign tracking ─────────────────────────
 
@@ -234,6 +235,8 @@ export interface ChatMessage {
   senderSide: "buyer" | "seller";
   senderName: string;
   text: string;
+  /** The text in English and French (absent: the page asks `translate:text`). */
+  textI18n?: TextI18n | null;
   attachments: string[];
   createdAt: string;
 }
@@ -255,6 +258,8 @@ export interface ChatConversationRow {
   orderReference: string | null;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  /** The last message in English and French, for the list preview (`previewText`). */
+  lastMessageI18n?: TextI18n | null;
   unread: number;
 }
 

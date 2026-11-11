@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLiveQuery, useSocketEvent, type LiveQuery } from "@/lib/seller-api";
 import { pickText } from "@/lib/i18n-fields";
+import type { TextI18n } from "@/lib/text-i18n";
 
 // ─── Reviews ────────────────────────────────────────────────────────────────────────────────────────────────────────
 export interface EngageReview {
@@ -24,6 +25,9 @@ export interface EngageReview {
   status?: "visible" | "hidden";
   sellerReply?: string | null;
   sellerReplyAt?: string | null;
+  /** The review text and the store's reply in English and French (absent: the page asks `translate:text`). */
+  textI18n?: TextI18n | null;
+  replyI18n?: TextI18n | null;
   reportCount?: number;
   moderationReason?: string | null;
   createdAt: string;
@@ -52,6 +56,9 @@ export interface EngageQuestion {
   answer: string | null;
   answeredBy: string | null;
   answeredAt: string | null;
+  /** The question and the answer in English and French. */
+  questionI18n?: TextI18n | null;
+  answerI18n?: TextI18n | null;
   createdAt: string;
 }
 
@@ -73,6 +80,8 @@ export interface ChatConversation {
   orderReference: string | null;
   lastMessageAt: string;
   lastMessagePreview: string;
+  /** The last message in English and French, for the list preview (`previewText`). */
+  lastMessageI18n?: TextI18n | null;
   unread: number;
 }
 
@@ -83,6 +92,8 @@ export interface ChatMessage {
   senderSide: "buyer" | "seller";
   senderName: string;
   text: string;
+  /** The text in English and French (absent: the page asks `translate:text`). */
+  textI18n?: TextI18n | null;
   attachments: string[];
   createdAt: string;
 }

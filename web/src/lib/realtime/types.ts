@@ -1,3 +1,4 @@
+import type { TextI18n } from "@/lib/text-i18n";
 // Shapes mirrored from the API (api/src/database/entities). Kept minimal —
 // only what the web needs from real-time payloads.
 
@@ -557,6 +558,10 @@ export interface Review {
   sellerReplyAt?: string | null;
   /** Detected language of the review text (absent on an old server). */
   sourceLang?: "en" | "fr" | null;
+  /** The review text in English and French (absent when the server has nothing: the page asks `translate:text`). */
+  textI18n?: TextI18n | null;
+  /** The seller's reply in English and French. */
+  replyI18n?: TextI18n | null;
 }
 
 /**

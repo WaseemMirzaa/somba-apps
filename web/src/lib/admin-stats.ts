@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { TextI18n } from "@/lib/text-i18n";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { errMsg } from "@/lib/admin-live";
@@ -154,6 +155,10 @@ export interface ReviewRow {
   status: "visible" | "hidden";
   sellerReply: string | null;
   sellerReplyAt: string | null;
+  /** Language the review was written in, and its text / the seller's reply in English and French. */
+  sourceLang?: string | null;
+  textI18n?: TextI18n | null;
+  replyI18n?: TextI18n | null;
   /** Open reports from sellers (the review stays visible until a moderator acts). */
   reportCount?: number;
   /** Why a moderator hid it (sent to the author and the seller). */
