@@ -271,7 +271,7 @@ class ChatBubble extends StatelessWidget {
               if (m.text.isNotEmpty)
                 mine
                     ? Text(m.text, style: textStyle)
-                    : TranslatableText(kind: 'chat_message', id: m.id, text: m.text, style: textStyle),
+                    : TranslatableText(kind: 'chat_message', id: m.id, auto: true, i18n: m.textI18n, text: m.text, style: textStyle),
               if (m.attachments.isNotEmpty)
                 Padding(
                   padding: EdgeInsets.only(top: m.text.isEmpty ? 0 : AppSpace.sm),

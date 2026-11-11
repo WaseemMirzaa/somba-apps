@@ -312,6 +312,46 @@ void main() {
       expect(find.text('Yes, the front is wide.'), findsOneWidget);
     });
 
+    testWidgets('translations that arrive with the data show at once with no request, follow a language switch, and a live update brings its own', (tester) async {
+      var requests = 0;
+      RealtimeStore.instance.debugTranslateRequest = (event, [body]) async {
+        requests++;
+        return {'text': 'never', 'sourceLang': 'fr', 'same': false};
+      };
+      final row = {
+        ..._answered,
+        'question': 'Le 42 va-t-il à un pied large ?',
+        'answer': 'Oui, la pointe est large.',
+        'questionI18n': {'sourceLang': 'fr', 'en': 'Does the 42 suit a wide foot?', 'fr': 'Le 42 va-t-il à un pied large ?'},
+        'answerI18n': {'sourceLang': 'fr', 'en': 'Yes, the front is wide.', 'fr': 'Oui, la pointe est large.'},
+      };
+      await _section(tester, [row]);
+      await settle(tester);
+      expect(find.text('Does the 42 suit a wide foot?'), findsOneWidget);
+      expect(find.text('Yes, the front is wide.'), findsOneWidget);
+      expect(find.text('See original'), findsNWidgets(2));
+
+      await tester.pumpWidget(section('fr'));
+      await settle(tester);
+      expect(find.text('Oui, la pointe est large.'), findsOneWidget);
+      expect(find.text('Le 42 va-t-il à un pied large ?'), findsOneWidget);
+      expect(find.byType(MachineNote), findsNothing, reason: 'written in French, read in French');
+      expect(find.byKey(const ValueKey('tt-link-answer-q1')), findsNothing);
+
+      // The seller edits the answer: the live update carries its own translations.
+      RealtimeStore.instance.debugEmit('question:updated', {
+        ...row,
+        'answer': 'Oui, très large.',
+        'answerI18n': {'sourceLang': 'fr', 'en': 'Yes, very wide.', 'fr': 'Oui, très large.'},
+      });
+      await settle(tester);
+      expect(find.text('Oui, très large.'), findsOneWidget);
+      await tester.pumpWidget(section('en'));
+      await settle(tester);
+      expect(find.text('Yes, very wide.'), findsOneWidget);
+      expect(requests, 0);
+    });
+
     testWidgets('text already in the app language is left alone (no link, no note)', (tester) async {
       RealtimeStore.instance.debugTranslateRequest = (event, [body]) async => {'text': '', 'sourceLang': 'en', 'same': true};
       await _section(tester, [_answered]);

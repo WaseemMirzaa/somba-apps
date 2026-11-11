@@ -150,7 +150,7 @@ class _QaSectionState extends State<QaSection> {
         const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primary),
         const SizedBox(width: 8),
         Expanded(
-            child: TranslatableText(kind: 'question', id: q.id, auto: true, text: q.question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+            child: TranslatableText(kind: 'question', id: q.id, auto: true, i18n: q.questionI18n, text: q.question, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
       ]),
       Padding(
         padding: const EdgeInsets.only(left: 24, top: 2),
@@ -177,7 +177,7 @@ class _QaSectionState extends State<QaSection> {
             if (q.answeredAt != null)
               Text(s.qaAnsweredOn(s.date(q.answeredAt!)), key: ValueKey('qa-answered-at-${q.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
             const SizedBox(height: 3),
-            TranslatableText(kind: 'answer', id: q.id, auto: true, text: q.answer!, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35)),
+            TranslatableText(kind: 'answer', id: q.id, auto: true, i18n: q.answerI18n, text: q.answer!, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35)),
           ]),
         ),
     ]);
