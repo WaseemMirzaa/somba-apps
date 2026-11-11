@@ -72,7 +72,7 @@ describe('SellerScoringService', () => {
   }
   async function line(sellerId: string, productId: string, fulfilment: OrderItem['fulfilment'], orderStatus: Order['status']) {
     const orders = ds.getRepository(Order);
-    const o = await orders.save(orders.create({ reference: `R${Math.random().toString(36).slice(2, 8)}`, customerId: 'c', customerName: 'c', status: orderStatus, paymentMethod: 'cod', subtotalUsd: 1, totalUsd: 1 } as DeepPartial<Order>));
+    const o = await orders.save(orders.create({ reference: `R${Math.random().toString(36).slice(2, 8)}`, customerId: 'c', customerName: 'c', status: orderStatus, paymentMethod: 'wallet', subtotalUsd: 1, totalUsd: 1 } as DeepPartial<Order>));
     const items = ds.getRepository(OrderItem);
     return items.save(items.create({ orderId: o.id, productId, productName: 'P', qty: 1, priceUsd: 1, sellerId, fulfilment } as DeepPartial<OrderItem>));
   }

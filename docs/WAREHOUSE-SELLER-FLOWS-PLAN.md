@@ -62,7 +62,7 @@ and the delivery to the customer.
   1. **Pickup leg:** one task per seller on the order. The rider collects from the seller's pickup location and brings
      it to the hub. Hub scan-in completes the leg.
   2. **Delivery leg:** created when every pickup is scanned in. A rider takes it from the hub to the customer, with the
-     delivery code and COD as today.
+     delivery code as today.
   - Customer order statuses stay the same words: confirmed → processing (pickup) → shipped (at hub) →
     out for delivery → delivered.
 - **Assignment:** warehouse staff assign a rider from **their own hub** for each leg. Riders of other hubs can't see or
@@ -72,7 +72,7 @@ and the delivery to the customer.
 - **Removed:** the admin zones page, zone pickers and fees on web and app, rider "My zone" and zone pills,
   preferred zones. The old `zoneId` columns stay nullable for history. The API ignores a `zoneId` sent by old app
   builds.
-- **Fixed alongside:** hub scoping leaks (`warehouse:parcels/aged/batches/reconcile/receive`, `buildBatch` task check),
+- **Fixed alongside:** hub scoping leaks (`warehouse:parcels/aged/batches/receive`, `buildBatch` task check),
   warehouse staff not receiving stock/product updates, and analytics "by zone" → "by warehouse".
 - **Seed and bootstrap:** Kinshasa and Paris hubs get coordinates, riders get hubs, and demo addresses get pins.
 

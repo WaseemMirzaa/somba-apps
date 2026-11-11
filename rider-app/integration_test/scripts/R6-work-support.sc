@@ -8,7 +8,6 @@ scroll 250
 say "Completed by type: deliveries, pickups, transfers. Riders are salaried, so no pay here||Terminées par type : livraisons, collectes, transferts. Les livreurs sont salariés, aucune paie ici" 4
 scroll 300
 wait 1
-say "Cash from cash-on-delivery is handed over at the warehouse, which records it||Les espèces sont remises à l'entrepôt, qui les enregistre" 3.6
 tap "icon:two_wheeler_rounded#last" 1.4
 tap key:tab-1 1.6
 say "History: every finished task with its status||Historique : chaque tâche terminée avec son statut" 3

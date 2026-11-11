@@ -74,16 +74,9 @@ const EXACT: Record<string, string> = {
   "Keep the note under 200 characters.": "Gardez la note sous 200 caractères.",
   "That code is too long.": "Ce code est trop long.",
 
-  // ── cash on delivery (C-cod) ──
-  "Only supervisors and managers can record a rider's cash hand-over.": "Seuls les superviseurs et les responsables peuvent enregistrer la remise d'espèces d'un livreur.",
+  // ── rider lookups ──
   "This rider belongs to another warehouse.": "Ce livreur appartient à un autre entrepôt.",
   "Rider not found.": "Livreur introuvable.",
-  "Enter the amount received, more than 0.": "Saisissez le montant reçu, supérieur à 0.",
-  "Enter the amount in dollars and cents, for example 25.50.": "Saisissez le montant en dollars et centimes, par exemple 25,50.",
-  "This rider's cash was just updated. Refresh and try again.": "Les espèces de ce livreur viennent d'être mises à jour. Actualisez et réessayez.",
-  "This receipt reference was already used for a different hand-over.": "Cette référence de reçu a déjà servi pour une autre remise.",
-  "No cash is due on this delivery: it is already paid.": "Aucun paiement en espèces n'est dû pour cette livraison : elle est déjà payée.",
-  "Enter the cash you collected as an amount in dollars.": "Saisissez les espèces encaissées sous forme de montant en dollars.",
 
   // ── logistics ──
   "Your warehouse assigns your tasks. You cannot accept a task yourself.": "Votre entrepôt vous assigne vos tâches. Vous ne pouvez pas en accepter une vous-même.",
@@ -486,13 +479,8 @@ const PATTERNS: Rule[] = [
   [/^(.+) is on the sheet twice\.$/, (m) => `${m[1]} figure deux fois sur la feuille.`],
   [/^(.+) in bin (.+) changed while you were counting \(now (\d+)\)\. Refresh and count again\.$/, (m) => `${m[1]} dans l'emplacement ${m[2]} a changé pendant le comptage (maintenant ${m[3]}). Actualisez et recomptez.`],
   [/^(.+) in bin (.+) was just updated\. Refresh and count again\.$/, (m) => `${m[1]} dans l'emplacement ${m[2]} vient d'être mis à jour. Actualisez et recomptez.`],
-  [/^(.+) holds no cash to hand in\.$/, (m) => `${m[1]} ne détient aucune espèce à remettre.`],
-  [/^(.+) holds \$([\d.,]+): you cannot record \$([\d.,]+)\.$/, (m) => `${m[1]} détient ${m[2]} $ : vous ne pouvez pas enregistrer ${m[3]} $.`],
   [/^Wrong delivery code\. Ask the customer for the 4-digit code shown in their app\. (\d+) tr(?:y|ies) left before this step locks\.$/, (m) => `Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application. Il vous reste ${m[1]} ${m[1] === "1" ? "essai" : "essais"} avant le verrouillage.`],
   [/^Too many wrong delivery codes\. The code step is locked for (\d+) minutes?\. Ask the customer to confirm the code in their app, or call the warehouse\.$/, (m) => `Trop de codes de livraison erronés. La saisie du code est verrouillée pendant ${m[1]} ${m[1] === "1" ? "minute" : "minutes"}. Demandez au client de confirmer le code dans son application, ou appelez l'entrepôt.`],
-  [/^Confirm the cash you collected: \$([\d.,]+) is due on this delivery\.$/, (m) => `Confirmez les espèces encaissées : ${m[1]} $ sont dus pour cette livraison.`],
-  [/^The cash you entered \(\$([\d.,]+)\) is not the amount to collect \(\$([\d.,]+)\)\. Collect exactly \$([\d.,]+), or ask the warehouse if the amount changed\.$/, (m) => `Les espèces saisies (${m[1]} $) ne correspondent pas au montant à encaisser (${m[2]} $). Encaissez exactement ${m[3]} $, ou demandez à l'entrepôt si le montant a changé.`],
-  [/^This delivery is already complete with \$([\d.,]+) collected\.$/, (m) => `Cette livraison est déjà terminée avec ${m[1]} $ encaissés.`],
   [/^(.+) must be (\d+)-(\d+) characters\.$/, (m) => `${areaField(m[1])} : ${m[2]} à ${m[3]} caractères.`],
   [/^(.+) must be (?:a number|a whole number) between (\d+) and (\d+)\.$/, (m) => `${areaField(m[1])} : un nombre entre ${m[2]} et ${m[3]}.`],
   [/^Level must be one of: .+\.$/, () => "Le niveau doit être : pays, province, ville, district, commune ou quartier."],

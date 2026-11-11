@@ -27,7 +27,6 @@ All questionnaire answers applied to the prototype.
 | Method | Status |
 |--------|--------|
 | Stripe card | Mock at checkout |
-| COD | OTP verification, limits, address blocking |
 | Airtel Money | Checkout + wallet top-up |
 | KOMORIKO Wallet | Store credit, top-up, transaction history |
 | Refunds | Original method OR wallet |
@@ -49,16 +48,16 @@ Home, search, categories, PDP (Q&A + reviews), cart, checkout (4-step), wallet, 
 7-step product wizard, health badges, payout request form, promotions, finance, analytics
 
 ### Admin (22 routes)
-Moderation, fraud/COD risk, flash sales (date picker), CMS blocks, roles, audit log, finance, marketing
+Moderation, fraud alerts, flash sales (date picker), CMS blocks, roles, audit log, finance, marketing
 
 ### Warehouse (27 routes)
-Multi-hub (`/warehouse/hubs`), batch builder, barcode scanner (camera sim), COD shift reconciliation
+Multi-hub (`/warehouse/hubs`), batch builder, barcode scanner (camera sim)
 
 ### Rider Web
 `/rider/*` — tasks, work stats, profile
 
 ### Rider Flutter (separate app)
-`rider-app/` — tasks assigned by the warehouse, navigation in the maps app, COD, open box, work stats, profile
+`rider-app/` — tasks assigned by the warehouse, navigation in the maps app, open box, work stats, profile
 
 ## 6. Technical
 

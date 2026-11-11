@@ -10,9 +10,6 @@ export const KYC_REVIEWERS: readonly string[] = ['admin', 'admin_moderation', 'a
 /** Admin roles that run the returns desk (receive and grade returned goods). Support decides a return but never touches the goods. */
 export const RETURNS_DESK_ADMINS: readonly string[] = ['admin', 'admin_operations'];
 
-/** Admin roles that see rider cash hand-overs and the cash reconciliation. Warehouse supervisors and managers do for their own warehouse. */
-export const CASH_DESK_ADMINS: readonly string[] = ['admin', 'admin_finance', 'admin_operations'];
-
 /** Is the role a store-application reviewer? */
 export const isKycReviewer = (role: string | null | undefined): boolean => KYC_REVIEWERS.includes(role ?? '');
 

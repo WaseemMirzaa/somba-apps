@@ -6,7 +6,6 @@ describe('paymentMethodLabel', () => {
     ['orange_money', 'Orange Money'],
     ['vodacom_mpesa', 'Vodacom M-Pesa'],
     ['stripe_card', 'Card'],
-    ['cod', 'Cash on delivery'],
     ['wallet', 'Wallet'],
     ['some_new_network', 'Some New Network'],
     ['', ''],
@@ -31,7 +30,6 @@ describe('paymentMethodId', () => {
     ['airtel money', 'airtel_money'],
     ['Vodacom M-Pesa', 'vodacom_mpesa'],
     ['vodacom mpesa', 'vodacom_mpesa'],
-    ['Cash on delivery', 'cod'],
     ['Wallet', 'wallet'],
     ['Mystery', null],
   ])('%s -> %s', (text, id) => {

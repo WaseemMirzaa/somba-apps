@@ -271,10 +271,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   };
   const payOf = async (orderId) => (await req(s, 'payments:list')).data.find((p) => p.orderId === orderId);
 
-  console.log('\n— Cash on delivery is off by default');
-  await req(admin, 'settings:set', { key: 'codEnabled', value: 'false' }); // (another suite may have enabled it)
+  console.log('\n— Payment is always up front: cod is refused like any unknown method');
   a = await req(s, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'cod' });
-  ok(!a.ok && /not available/i.test(a.error ?? ''), 'COD refused while codEnabled is false', a.error ?? '');
+  ok(!a.ok && /Unknown payment method/i.test(a.error ?? ''), 'cod is refused like any unknown payment method', a.error ?? '');
   a = await req(s, 'orders:create', { shippingAddress: ADDRESS, items: [{ productId: pid, qty: 1 }], paymentMethod: 'bitcoin' });
   ok(!a.ok, 'unknown payment method refused');
 

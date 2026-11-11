@@ -4,7 +4,7 @@
  *
  * The API must run with a short fraud sweep (FRAUD_SWEEP_MS=3000) and MM_PROVIDER=sandbox. Failed payments and
  * returns are written straight into the database the API uses (read from api/.env: DB_*), because no API call fails a
- * payment or files a return on demand. Everything this suite changes is put back (staff 2FA flag, thresholds, COD).
+ * payment or files a return on demand. Everything this suite changes is put back (staff 2FA flag, thresholds).
  */
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const crypto = require('crypto');
@@ -272,20 +272,9 @@ const totp = (secret, offset = 0) => {
     ok(a.ok, 'moving it back reactivates the account');
     r = await rest('/api/v1/auth/login', { email: `failer${tag}@fraud.test`, password: 'Fraud-Pass-2026' });
     ok(r.status === 200, 'and they can sign in again');
-
-    section('Fraud: cash on delivery cap (only while COD is offered)');
-    await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
-    const cod1 = await register('cod1'); sockets.push(cod1.sock);
-    a = await place(cod1, 'cod');
-    ok(!a.ok, 'COD is refused while the flag is off, so no COD alert can exist');
-    await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
-    await req(admin.sock, 'settings:set', { key: 'codCapUsd', value: '1' });
-    a = await place(cod1, 'cod');
-    const cod = a.ok ? await until(async () => (await alertsFor(cod1)).find((x) => x.type === 'cod_risk')) : null;
-    ok(!!cod && /^Cash-on-delivery order of \$\d+\.\d\d is above the \$1\.00 cap\.$/.test(cod.reason), 'with COD on, an order above the cap raises the COD alert with its reason', a.error ?? JSON.stringify(cod));
   } finally {
     // put back what this suite changed
-    for (const k of ['codEnabled', 'codCapUsd', 'requireStaffTwoFactor', 'fraudNewAccountOrders24h', 'fraudAddressChanges24h', 'fraudSharedAccounts', 'fraudFailedPayments24h', 'fraudReturnMinOrders', 'fraudReturnRatePct']) {
+    for (const k of ['requireStaffTwoFactor', 'fraudNewAccountOrders24h', 'fraudAddressChanges24h', 'fraudSharedAccounts', 'fraudFailedPayments24h', 'fraudReturnMinOrders', 'fraudReturnRatePct']) {
       if (saved[k] !== undefined) await req(restorer.sock, 'settings:set', { key: k, value: saved[k] }).catch(() => undefined);
     }
     await db.end().catch(() => undefined);

@@ -33,14 +33,12 @@ KOMORIKO is a general marketplace with a hub (Jumia model), so it keeps the mult
   Migration `api/src/database/migrations/1792300000000-SellerPackages.ts` (backfills existing lines).
 - **Each seller readies only their package**; the rider/hub is released only when **every** seller has packed.
 - **Seller partial cancel** (`orders:sellerCancel {orderId, reason, itemIds?}`): only that seller's lines are
-  cancelled, restocked and refunded (prepaid → wallet, promo discount shared pro rata; COD → less cash to collect);
+  cancelled, restocked and refunded (prepaid → wallet, promo discount shared pro rata);
   the rest of the order continues; if nothing is left the whole order is cancelled.
 - A later full cancel/refund never pays back or restocks a seller-cancelled line twice (`PaymentsService.outstanding`).
 - The hub scan receives only packed packages; cancelled sellers drop off the pickup list.
 - Seller views show only their lines, their subtotal, their **package status** and how many sellers share the order.
-  Seller revenue, stats and payouts exclude cancelled lines. COD orders (which stay `pending` until the rider
-  collects) can now be readied — previously they never could.
-- Customer app, web storefront, seller portal and admin show **"Sold by"**, packages per seller and cancelled lines.
+  Seller revenue, stats and payouts exclude cancelled lines.- Customer app, web storefront, seller portal and admin show **"Sold by"**, packages per seller and cancelled lines.
 - Tests: `api/test/multi-seller-smoke.cjs` (30 end-to-end checks), `api/test/p0-fixes-smoke.cjs` (122), `api/src/orders/package-status.spec.ts`.
 
 ### Still open
@@ -57,13 +55,13 @@ KOMORIKO is a general marketplace with a hub (Jumia model), so it keeps the mult
 | # | Problem | Where | Status |
 |---|---|---|---|
 | A-B1 | Admin list/detail show one seller, no packages | `admin/orders/page.tsx`, `[id]/page.tsx` | ✅ |
-| A-B2 | "Move to Delivered" by hand skipped the rider, COD collection and unlocked payouts; any status jump allowed | `orders.service.ts updateStatus`, `admin-live.ts` | ✅ one forward step; delivered closes the task and records COD |
+| A-B2 | "Move to Delivered" by hand skipped the rider and unlocked payouts; any status jump allowed | `orders.service.ts updateStatus`, `admin-live.ts` | ✅ one forward step; delivered closes the task |
 | A-B3 | Seller partial cancel + later full cancel refunded the line twice and restocked twice | `orders.service.ts`, `payments.service.ts` | ✅ |
 | A-B4 | "Refund to original method" moved no money | `payments.service.ts refund` | ✅ refused with a clear message; wallet refund only |
 | A-B5 | Refund forced `returned`, never restocked, left the rider delivering | `payments.service.ts refund` | ✅ |
 | A-B6 | Percent coupons rounded to whole dollars | `content/promos.service.ts` | ✅ |
 | A-B7 | Coupons could not be paused; flash sales could not be ended or listed once over | gateway, `promotions`, `flash-sales` pages | ✅ |
-| A-B8 | Fraud "Block" blocks nothing; alert raised after fulfilment opens | `ops/fraud.service.ts` | 🔶 Block now suspends the account (confirmed, audited, noticed; super admin / support right) and unblock reactivates; the alert is still raised after the order is placed, and the only rule is the COD cap |
+| A-B8 | Fraud "Block" blocks nothing; alert raised after fulfilment opens | `ops/fraud.service.ts` | 🔶 Block now suspends the account (confirmed, audited, noticed; super admin / support right) and unblock reactivates; the alert is still raised after the order is placed, and the rules are failed payments, new-account orders, shared identity, return rate and address changes |
 | A-B9 | Broadcast "all" notifies customers only; no confirm; not audited | `ops/broadcasts.service.ts` | 🔶 "all" means all customers: count, label and delivery agree; audited with audience and recipient count; unknown audiences refused. No send confirmation yet |
 | A-B10 | Nav vs server permissions disagree (Support can't open disputes; Moderation can't save categories) | `lib/admin-access.ts`, gateway `GROUPS`, `common/role-groups.ts` | ✅ product moderation, campaign decisions, support tickets and the warehouse supervisor/manager pages are enforced per role/tier on the server; Categories moved from the Moderation menu to Marketing (server group `catalog`) |
 | A-B11 | Super Admin gets no alert for payouts, disputes, seller applications, tickets | role-targeted notifications | ⬜ P1 |
@@ -119,7 +117,7 @@ KOMORIKO is a general marketplace with a hub (Jumia model), so it keeps the mult
 | Customers | Wallet view + adjust with reason, blocklists, timeline | ✓ | ✓ | ✓ | ✗ | P1 |
 | Promotions | Coupon pause / resume, flash sale end, list all, price check | ✓ | ✓ | ✓ | ✅ | — |
 | Promotions | Scope by category / seller, seller-funded, budgets | ✓ | ✓ | ✓ | ✗ | P1 |
-| Fraud | Velocity / address / device rules, hold-for-review, real block | ✓ | ✓ | ✓ | COD alert only | P1 |
+| Fraud | Velocity / address / device rules, hold-for-review, real block | ✓ | ✓ | ✓ | 5 alert rules, no hold-for-review | P1 |
 | Staff | Editable permission matrix, deactivate staff, 2FA, full audit + export | ✓ | ✓ | ✓ | fixed roles, partial audit | P1 |
 | Reports | CSV export anywhere, scheduled reports | ✓ | ✓ | ✓ | ✗ | P1 |
 | Settings | Tax rates, return window, handling time, free-shipping threshold | ✓ | ✓ | ✓ | ✗ | P1 |

@@ -275,9 +275,6 @@ async function run() {
   const setRepo = ds.getRepository(Setting);
   await setRepo.save([
     setRepo.create({ key: 'fxRate', value: '2850' }),
-    setRepo.create({ key: 'codCapUsd', value: '500' }),
-    // Demo cash orders below need COD on; it is switched back to the client scope (off) right after.
-    setRepo.create({ key: 'codEnabled', value: 'true' }),
     // Delivery fee = base + per km (destination warehouse -> customer pin), capped, + a transfer fee between warehouses.
     setRepo.create({ key: 'deliveryBaseUsd', value: '2' }),
     setRepo.create({ key: 'deliveryPerKmUsd', value: '0.5' }),
@@ -353,14 +350,14 @@ async function run() {
   if (customer && createdProducts.length) {
     const specs: {
       items: { productId: string; qty: number }[];
-      paymentMethod: 'cod' | 'stripe_card' | 'wallet';
+      paymentMethod: 'stripe_card' | 'wallet';
       advanceTo?: 'processing' | 'out_for_delivery' | 'delivered';
     }[] = [
-      { items: [{ productId: pick(0).id, qty: 1 }], paymentMethod: 'cod' },
+      { items: [{ productId: pick(0).id, qty: 1 }], paymentMethod: 'stripe_card' },
       { items: [{ productId: pick(1).id, qty: 1 }, { productId: pick(2).id, qty: 2 }], paymentMethod: 'stripe_card', advanceTo: 'processing' },
-      { items: [{ productId: pick(3).id, qty: 1 }], paymentMethod: 'cod', advanceTo: 'out_for_delivery' },
-      { items: [{ productId: pick(4).id, qty: 1 }], paymentMethod: 'cod', advanceTo: 'delivered' },
-      { items: [{ productId: pick(2).id, qty: 3 }], paymentMethod: 'cod', advanceTo: 'delivered' },
+      { items: [{ productId: pick(3).id, qty: 1 }], paymentMethod: 'stripe_card', advanceTo: 'out_for_delivery' },
+      { items: [{ productId: pick(4).id, qty: 1 }], paymentMethod: 'stripe_card', advanceTo: 'delivered' },
+      { items: [{ productId: pick(2).id, qty: 3 }], paymentMethod: 'stripe_card', advanceTo: 'delivered' },
     ];
 
     // Saved, pinned addresses for the demo customer (the customer picks one at checkout).
@@ -427,8 +424,7 @@ async function run() {
         await delivery.updateStatus(fresh.id, 'picked_up', rider.id);
         await delivery.updateStatus(fresh.id, 'in_transit', rider.id);
         if (upTo === 'on_the_road') return;
-        // The seeded rider confirms the cash on a cash-on-delivery parcel, exactly as the app does.
-        await delivery.updateStatus(fresh.id, 'delivered', rider.id, undefined, undefined, fresh.codAmountUsd > 0 ? fresh.codAmountUsd : undefined);
+        await delivery.updateStatus(fresh.id, 'delivered', rider.id);
       }
     };
 
@@ -442,9 +438,6 @@ async function run() {
       if (spec.advanceTo === 'delivered') await run(order.id, 'delivered');
     }
   }
-
-  // Client scope: cash on delivery is disabled by default (admins can enable it in Settings).
-  await setRepo.update({ key: 'codEnabled' }, { value: 'false' });
 
   // ── Marketing campaigns, replacements, exchanges, exceptions ────────────────
   console.log('Seeding campaigns / replacements / exchanges / exceptions…');

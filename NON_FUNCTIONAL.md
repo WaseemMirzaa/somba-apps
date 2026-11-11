@@ -17,7 +17,6 @@ Track of stub features per portal and their implementation status.
 | Pincode/zone checker on PDP | ✅ |
 | Q&A submit | ✅ |
 | Checkout → payment split (CF-10/11) | ✅ |
-| COD cap check | ✅ |
 | Payment failure retry | ✅ |
 | Order confirm per ID (CF-12) | ✅ |
 | Live tracking map (CF-24) | ✅ Mock map |
@@ -53,7 +52,7 @@ Track of stub features per portal and their implementation status.
 | Refunds AF-15 | ✅ |
 | Payout approval AF-16 | ✅ |
 | Categories AF-18 | ✅ |
-| Editable settings AF-20/21 | ✅ Dual market, FX, COD, zones |
+| Editable settings AF-20/21 | ✅ Dual market, FX, zones |
 | Moderation approve/reject | ✅ |
 | Seller approve/reject | ✅ |
 | Flash sale create | ✅ |
@@ -64,17 +63,14 @@ Track of stub features per portal and their implementation status.
 |---------|--------|
 | Auto-assign rider suggestion (Δ6) | ✅ |
 | Aged parcels WF-11 | ✅ |
-| Shift reconciliation WF-12 | ✅ |
 | Barcode scanner | ✅ |
 | Batch create & assign | ✅ |
-| COD remittance | ✅ |
 
 ## Rider
 | Feature | Status |
 |---------|--------|
-| Full POD RF-09 | ✅ OTP/photo/COD |
+| Full POD RF-09 | ✅ OTP/photo |
 | Failed delivery RF-10 | ✅ |
-| COD shift summary RF-11 | ✅ |
 | Batch overview RF-07 | ✅ |
 | Task history RF-13 | ✅ |
 | Availability toggle RF-04 | ✅ |

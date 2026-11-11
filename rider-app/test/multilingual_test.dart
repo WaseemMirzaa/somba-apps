@@ -19,7 +19,6 @@ Map<String, dynamic> _taskJson({List<Map<String, dynamic>>? items}) => {
       'orderId': 'o1',
       'orderReference': 'SOM-101',
       'status': 'assigned',
-      'codAmountUsd': 0,
       'order': {
         'customerName': 'Aline',
         'shippingAddress': '{"line1":"12 avenue du Commerce","commune":"Gombe","city":"Kinshasa"}',
@@ -36,7 +35,6 @@ DeliveryTaskDto _task(String status, {List<OrderLine> items = const []}) => Deli
       orderId: 'o-$status',
       orderReference: 'SOM-9$status',
       status: status,
-      codAmountUsd: 0,
       addressRaw: '{"line1":"12 avenue du Commerce","commune":"Gombe","city":"Kinshasa"}',
       customerName: 'Aline',
       pickupAddress: 'Entrepôt central, Limete',

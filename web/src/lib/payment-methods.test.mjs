@@ -12,7 +12,7 @@ const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.M
 const { PAYMENT_METHODS, PAYMENT_METHOD_IDS, paymentMethodId, paymentMethodLabel } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
 test("every method the API can carry has a label in both languages", () => {
-  assert.deepEqual([...PAYMENT_METHOD_IDS].sort(), ["airtel_money", "cod", "orange_money", "stripe_card", "vodacom_mpesa", "wallet"]);
+  assert.deepEqual([...PAYMENT_METHOD_IDS].sort(), ["airtel_money", "orange_money", "stripe_card", "vodacom_mpesa", "wallet"]);
   for (const id of PAYMENT_METHOD_IDS) {
     assert.ok(PAYMENT_METHODS[id].en.trim(), `${id} has an English label`);
     assert.ok(PAYMENT_METHODS[id].fr.trim(), `${id} has a French label`);
@@ -24,9 +24,7 @@ test("the French order page names the wallet 'Portefeuille KOMORIKO' (bug 3)", (
   assert.equal(paymentMethodLabel("wallet", false), "KOMORIKO wallet");
 });
 
-test("each method is translated, not only cash on delivery and card", () => {
-  assert.equal(paymentMethodLabel("cod", true), "Paiement à la livraison");
-  assert.equal(paymentMethodLabel("cod", false), "Cash on delivery");
+test("each method is translated, not only the card", () => {
   assert.equal(paymentMethodLabel("stripe_card", true), "Carte");
   assert.equal(paymentMethodLabel("stripe_card", false), "Card");
   for (const id of ["airtel_money", "orange_money", "vodacom_mpesa"]) {
@@ -36,7 +34,6 @@ test("each method is translated, not only cash on delivery and card", () => {
 });
 
 test("older display names read as the method they stand for", () => {
-  assert.equal(paymentMethodId("COD"), "cod");
   assert.equal(paymentMethodId("Card"), "stripe_card");
   assert.equal(paymentMethodId("Wallet"), "wallet");
   assert.equal(paymentMethodLabel("Wallet", true), "Portefeuille KOMORIKO");

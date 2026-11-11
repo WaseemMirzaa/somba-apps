@@ -5,7 +5,6 @@ import { pageOf } from '../common/paging';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
-  CodHandover,
   DeliveryTask,
   Hub,
   Order,
@@ -27,10 +26,7 @@ import { riderFits } from '../logistics/leg-rules';
 import { DESK_ROLES, isDeskAdmin, tierAllows } from '../logistics/tiers';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
-import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 
-/** The customer kinds as an SQL list (the constants are fixed words, never input). */
-const CUSTOMER_SQL = CUSTOMER_KINDS.map((k) => `'${k}'`).join(',');
 import { ADMIN_ROLES, NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -250,47 +246,5 @@ export class WarehouseService {
     this.emitter.toRoles(DESK_ROLES, 'batch:updated', batch);
     if (hubId) this.emitter.toHub(hubId, 'batch:updated', batch);
     return batch;
-  }
-
-  /**
-   * COD cash per rider (C-cod), from the delivered parcels of one warehouse (all warehouses for an admin, `hubId` null):
-   * `codUsd` is what the delivered parcels were due to bring in, `collectedUsd` what the rider recorded taking at the door,
-   * `handedOverUsd` what the warehouse has received since, `heldUsd` what they still hold. Deliveries made before the
-   * cash record existed count in `codUsd` and `parcels` only (their cash was settled outside the system).
-   */
-  async reconcile(hubId?: string | null) {
-    const qb = this.tasks
-      .createQueryBuilder('t')
-      .select('t.riderId', 'riderId')
-      .addSelect('COUNT(*)', 'parcels')
-      .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'codUsd')
-      .addSelect('COALESCE(SUM(t.codCollectedUsd), 0)', 'collectedUsd')
-      .addSelect('COALESCE(SUM(CASE WHEN t.codCollectedUsd IS NULL THEN 0 ELSE t.codHandedOverUsd END), 0)', 'handedOverUsd')
-      .where(`t.status = 'delivered' AND t.kind IN (${CUSTOMER_SQL})`);
-    if (hubId) qb.andWhere('(t.hubId = :hubId OR t.fromHubId = :hubId OR t.toHubId = :hubId)', { hubId });
-    const rows = await qb
-      .groupBy('t.riderId')
-      .getRawMany<{ riderId: string | null; parcels: string; codUsd: string; collectedUsd: string; handedOverUsd: string }>();
-    const ids = rows.map((r) => r.riderId).filter((x): x is string => !!x);
-    const last = new Map<string, Date>();
-    if (ids.length) {
-      for (const h of await this.tasks.manager.getRepository(CodHandover).find({ where: { riderId: In(ids), ...(hubId ? { hubId } : {}) }, order: { createdAt: 'DESC' }, take: 2000 })) {
-        if (!last.has(h.riderId)) last.set(h.riderId, h.createdAt);
-      }
-    }
-    const money = (x: string | number) => Number(Number(x).toFixed(2));
-    return rows.map((r) => {
-      const collectedUsd = money(r.collectedUsd);
-      const handedOverUsd = money(r.handedOverUsd);
-      return {
-        riderId: r.riderId ?? 'unassigned',
-        parcels: Number(r.parcels),
-        codUsd: money(r.codUsd),
-        collectedUsd,
-        handedOverUsd,
-        heldUsd: Math.max(0, money(collectedUsd - handedOverUsd)),
-        lastHandoverAt: r.riderId ? (last.get(r.riderId) ?? null) : null,
-      };
-    });
   }
 }

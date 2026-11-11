@@ -41,7 +41,6 @@ import type { AdminDepartment } from "@/lib/admin-access";
 import { getWarehouseNav, getWarehouseRoleLabel } from "@/lib/warehouse-access";
 import type { WarehouseStaffRole } from "@/lib/admin-entities";
 import { useHubs } from "@/lib/logistics";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import type { LucideIcon } from "lucide-react";
 
 export type NavItem = {
@@ -179,8 +178,7 @@ export function DashboardLayout({
   const adminSections = portal === "admin" ? getAdminSections(department) : null;
 
   const warehouseRole = (persona.warehouseRole ?? "manager") as WarehouseStaffRole;
-  const codOffered = useCodOffered();
-  const warehouseNav = portal === "warehouse" ? getWarehouseNav(warehouseRole, codOffered) : null;
+  const warehouseNav = portal === "warehouse" ? getWarehouseNav(warehouseRole) : null;
 
   // Only one nav item may appear selected at a time. Several hrefs can match
   // the current path at once — e.g. "/admin/warehouses" is a prefix of

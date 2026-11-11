@@ -84,8 +84,6 @@ export interface WarehouseAnalytics {
   unassigned: number;
   inTransit: number;
   delivered: number;
-  /** COD of parcels not delivered and not failed. */
-  codToCollect: number;
   /** Every leg by status. */
   byStatus: Record<string, number>;
   /** Open legs per kind (pickup, transfer, delivery, ...). */
@@ -242,35 +240,6 @@ export interface HubRow {
   active?: boolean;
   lat?: number | null;
   lng?: number | null;
-}
-
-export interface ReconcileRow {
-  riderId: string;
-  parcels: number;
-  /** What the delivered parcels were due to bring in. */
-  codUsd: number;
-  /** What the riders recorded taking at the door (deliveries before the cash record are not in it). */
-  collectedUsd: number;
-  /** What the warehouse has received since. */
-  handedOverUsd: number;
-  /** collected - handed over: the cash the rider still holds. */
-  heldUsd: number;
-  lastHandoverAt: string | null;
-}
-
-/** One recorded hand-over of a rider's cash at the warehouse (`cash:history`, `cash:handover`). */
-export interface CashHandover {
-  id: string;
-  riderId: string;
-  riderName: string;
-  hubId: string | null;
-  amountUsd: number;
-  heldBeforeUsd: number;
-  heldAfterUsd: number;
-  receivedById: string;
-  receivedByName: string;
-  note: string | null;
-  createdAt: string;
 }
 
 export interface InventoryRow {

@@ -77,8 +77,7 @@ final List<(RegExp, String Function(RegExpMatch))> _bodies = [
   (RegExp(r'^(\S+) is packed and ready\.$'), (m) => '${m[1]} est emballé et prêt.'),
   (RegExp(r'^(\S+) · \$([\d.]+) from (.+)$'), (m) => '${m[1]} · ${_usdFr(m[2]!)} de ${m[3]}'),
   (RegExp(r'^(\S+) was cancelled\.$'), (m) => '${m[1]} a été annulée.'),
-  (RegExp(r'^(\S+)(?: · collect \$([\d.]+) cash)?\. Open the app to accept it\.$'),
-      (m) => m[2] == null ? '${m[1]}. Ouvrez l’application pour l’accepter.' : '${m[1]} · ${_usdFr(m[2]!)} à encaisser. Ouvrez l’application pour l’accepter.'),
+  (RegExp(r'^(\S+)\. Open the app to accept it\.$'), (m) => '${m[1]}. Ouvrez l’application pour l’accepter.'),
   (RegExp(r'^(\S+) is now in your deliveries\.$'), (m) => '${m[1]} est maintenant dans vos livraisons.'),
   (RegExp(r'^(.+) — collect them at the warehouse\.$'), (m) => '${m[1]} — à récupérer à l’entrepôt.'),
 ];

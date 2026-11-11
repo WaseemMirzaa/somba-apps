@@ -36,25 +36,25 @@ const customer = { id: 'c1', name: 'Cust' };
 describe('OrdersService.create: commission snapshot', () => {
   it('stores the rate and the amount on every line (rounded to cents)', async () => {
     const { svc, saved } = make({ commissionPct: '12' }, live);
-    await expect(svc.create(customer, { items: [{ productId: 'p1', qty: 3 }], paymentMethod: 'cod' })).rejects.toThrow('stop here');
+    await expect(svc.create(customer, { items: [{ productId: 'p1', qty: 3 }], paymentMethod: 'stripe_card' })).rejects.toThrow('stop here');
     expect(saved[0].items[0]).toMatchObject({ commissionPct: 12, commissionUsd: 7.2 }); // 19.99 * 3 * 12% = 7.1964
   });
 
   it('defaults to 12% when the setting is absent and clamps to 0-100', async () => {
     let r = make({}, live);
-    await expect(r.svc.create(customer, { items: [{ productId: 'p1', qty: 1 }], paymentMethod: 'cod' })).rejects.toThrow();
+    await expect(r.svc.create(customer, { items: [{ productId: 'p1', qty: 1 }], paymentMethod: 'stripe_card' })).rejects.toThrow();
     expect(r.saved[0].items[0].commissionPct).toBe(12);
     r = make({ commissionPct: '250' }, live);
-    await expect(r.svc.create(customer, { items: [{ productId: 'p1', qty: 1 }], paymentMethod: 'cod' })).rejects.toThrow();
+    await expect(r.svc.create(customer, { items: [{ productId: 'p1', qty: 1 }], paymentMethod: 'stripe_card' })).rejects.toThrow();
     expect(r.saved[0].items[0]).toMatchObject({ commissionPct: 100, commissionUsd: 19.99 });
     r = make({ commissionPct: '-5' }, live);
-    await expect(r.svc.create(customer, { items: [{ productId: 'p1', qty: 1 }], paymentMethod: 'cod' })).rejects.toThrow();
+    await expect(r.svc.create(customer, { items: [{ productId: 'p1', qty: 1 }], paymentMethod: 'stripe_card' })).rejects.toThrow();
     expect(r.saved[0].items[0]).toMatchObject({ commissionPct: 0, commissionUsd: 0 });
   });
 
   it('also stores it on client-priced (external) lines', async () => {
     const { svc, saved } = make({ commissionPct: '10' }, null);
-    await expect(svc.create(customer, { items: [{ name: 'Ext thing', priceUsd: 50, qty: 2 }], paymentMethod: 'cod' })).rejects.toThrow('stop here');
+    await expect(svc.create(customer, { items: [{ name: 'Ext thing', priceUsd: 50, qty: 2 }], paymentMethod: 'stripe_card' })).rejects.toThrow('stop here');
     expect(saved[0].items[0]).toMatchObject({ commissionPct: 10, commissionUsd: 10 });
   });
 });

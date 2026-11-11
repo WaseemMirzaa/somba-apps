@@ -54,7 +54,7 @@ export class RiderService {
 
   /**
    * Work stats for a rider (grouped counts, not every task in memory). Riders are salaried: the platform pays nothing per
-   * task, so there is no money here except `codCollectedUsd`, the company's cash the rider collected at the door.
+   * task, so there is no money here.
    * `completed` counts every finished leg of any kind (customer deliveries, seller pickups, transfers, return legs).
    * "Today" and "the last 7 days" are UTC calendar days (the API stores and compares dates in UTC): the last 7 days are
    * today and the 6 days before it. `delivered` repeats `completed` for app versions that predate work stats.
@@ -65,11 +65,10 @@ export class RiderService {
       .select('t.status', 'status')
       .addSelect('t.kind', 'kind')
       .addSelect('COUNT(*)', 'n')
-      .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'cod')
       .where('t.riderId = :riderId', { riderId })
       .groupBy('t.status')
       .addGroupBy('t.kind')
-      .getRawMany<{ status: string; kind: string; n: string; cod: string }>();
+      .getRawMany<{ status: string; kind: string; n: string }>();
     const sum = (list: { n: string }[]) => list.reduce((s, r) => s + Number(r.n), 0);
     const done = rows.filter((r) => r.status === 'delivered');
     const completed = sum(done);
@@ -88,7 +87,6 @@ export class RiderService {
       completedLast7Days,
       successRate: finished > 0 ? Math.round((completed / finished) * 100) : null,
       byKind: DELIVERY_KINDS.map((kind) => ({ kind, count: sum(done.filter((r) => r.kind === kind)) })).filter((k) => k.count > 0),
-      codCollectedUsd: Number(done.reduce((s, r) => s + Number(r.cod), 0).toFixed(2)),
       delivered: completed, // deprecated: old clients read this; drop it one release after the work-stats apps ship
     };
   }
@@ -128,7 +126,6 @@ export class RiderService {
         orderReference: t.orderReference,
         status: t.status,
         hubId: t.hubId ?? null,
-        codAmountUsd: t.codAmountUsd,
         address: t.address,
         lat: t.lat,
         lng: t.lng,

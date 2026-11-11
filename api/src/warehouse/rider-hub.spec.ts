@@ -60,15 +60,15 @@ describe('riders, warehouses and tasks', () => {
   it('workStats: counts completed, failed and active across every kind, with the breakdown by kind (counts only)', async () => {
     const h1 = await mkHub('H1');
     const [me, other] = [await mkRider(h1.id), await mkRider(h1.id)];
-    await mkTask({ orderId: 'o1', riderId: me.id, status: 'delivered', kind: 'delivery', codAmountUsd: 40, hubId: h1.id });
-    await mkTask({ orderId: 'o2', riderId: me.id, status: 'delivered', kind: 'delivery', codAmountUsd: 10, hubId: h1.id });
+    await mkTask({ orderId: 'o1', riderId: me.id, status: 'delivered', kind: 'delivery', hubId: h1.id });
+    await mkTask({ orderId: 'o2', riderId: me.id, status: 'delivered', kind: 'delivery', hubId: h1.id });
     await mkTask({ orderId: 'o3', riderId: me.id, status: 'delivered', kind: 'pickup', hubId: h1.id });
     await mkTask({ orderId: 'o4', riderId: me.id, status: 'delivered', kind: 'transfer', hubId: h1.id });
-    await mkTask({ orderId: 'o5', riderId: me.id, status: 'in_transit', kind: 'delivery', codAmountUsd: 99, hubId: h1.id });
+    await mkTask({ orderId: 'o5', riderId: me.id, status: 'in_transit', kind: 'delivery', hubId: h1.id });
     await mkTask({ orderId: 'o6', riderId: me.id, status: 'failed', kind: 'delivery', hubId: h1.id });
     await mkTask({ orderId: 'o7', riderId: other.id, status: 'delivered', kind: 'delivery', hubId: h1.id });
     const e = await svc.workStats(me.id);
-    expect(e).toMatchObject({ totalTasks: 6, completed: 4, active: 1, failed: 1, codCollectedUsd: 50, successRate: 80, delivered: 4 });
+    expect(e).toMatchObject({ totalTasks: 6, completed: 4, active: 1, failed: 1, successRate: 80, delivered: 4 });
     expect(e.byKind).toEqual([
       { kind: 'pickup', count: 1 },
       { kind: 'transfer', count: 1 },
@@ -108,21 +108,21 @@ describe('riders, warehouses and tasks', () => {
     expect((await svc.workStats(me.id)).successRate).toBe(50);
   });
 
-  it('workStats: riders are salaried, so there is no money in the payload but the cash collected', async () => {
+  it('workStats: riders are salaried, so there is no money in the payload', async () => {
     const h1 = await mkHub('H1');
     const me = await mkRider(h1.id);
-    await mkTask({ orderId: 'o1', riderId: me.id, status: 'delivered', hubId: h1.id, codAmountUsd: 12 });
+    await mkTask({ orderId: 'o1', riderId: me.id, status: 'delivered', hubId: h1.id });
     const e = await svc.workStats(me.id);
     const json = JSON.stringify(e);
     expect(json).not.toMatch(/earning|perTask|payUsd|rateUsd/i);
-    expect(Object.keys(e).filter((k) => /usd/i.test(k))).toEqual(['codCollectedUsd']);
+    expect(Object.keys(e).filter((k) => /usd/i.test(k))).toEqual([]);
     expect(e.byKind.every((k) => Object.keys(k).sort().join() === 'count,kind')).toBe(true);
   });
 
   it('workStats: a rider with nothing done has zeros, no rate and an empty breakdown', async () => {
     const me = await mkRider(null);
     expect(await svc.workStats(me.id)).toEqual({
-      totalTasks: 0, completed: 0, active: 0, failed: 0, completedToday: 0, completedLast7Days: 0, successRate: null, byKind: [], codCollectedUsd: 0, delivered: 0,
+      totalTasks: 0, completed: 0, active: 0, failed: 0, completedToday: 0, completedLast7Days: 0, successRate: null, byKind: [], delivered: 0,
     });
   });
 

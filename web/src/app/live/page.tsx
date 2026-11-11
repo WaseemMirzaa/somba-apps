@@ -18,7 +18,6 @@ import {
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { DEMO_MODE } from "@/lib/demo-mode";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import type {
   DeliveryStatus,
   DeliveryTask,
@@ -66,7 +65,6 @@ function StatusPill({ status }: { status: string }) {
 
 export default function LiveConsolePage() {
   const rt = useRealtime();
-  const codOffered = useCodOffered();
   const [email, setEmail] = useState(DEMO_MODE ? "customer@somba.app" : "");
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [busy, setBusy] = useState(false);
@@ -101,14 +99,14 @@ export default function LiveConsolePage() {
   );
 
   const placeTestOrder = useCallback(
-    async (paymentMethod: "cod" | "wallet") => {
+    async () => {
       const p = rt.products[0];
       if (!p) return;
       setBusy(true);
       try {
         await rt.placeOrder({
           items: [{ productId: p.id, qty: 1 }],
-          paymentMethod,
+          paymentMethod: "wallet",
           shippingAddress: JSON.stringify({
             city: "Kinshasa",
             line1: "12 Ave du Commerce",
@@ -352,17 +350,8 @@ export default function LiveConsolePage() {
                   <Package className="h-4 w-4" /> Storefront
                 </h2>
                 <div className="flex gap-2">
-                  {codOffered && (
-                    <button
-                      onClick={() => placeTestOrder("cod")}
-                      disabled={busy || !rt.products.length}
-                      className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                    >
-                      Order (COD)
-                    </button>
-                  )}
                   <button
-                    onClick={() => placeTestOrder("wallet")}
+                    onClick={() => placeTestOrder()}
                     disabled={busy || !rt.products.length}
                     className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >

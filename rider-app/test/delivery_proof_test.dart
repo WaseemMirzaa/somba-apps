@@ -1,5 +1,5 @@
 // Proof of delivery in the rider app: the signature pad, the sheet that opens when a delivery to the customer is completed,
-// its place in the completion flow (cash, then proof, then the delivery code, unchanged), and the upload request.
+// its place in the completion flow (proof, then the delivery code, unchanged), and the upload request.
 import 'dart:convert';
 import 'dart:io';
 
@@ -322,7 +322,6 @@ void main() {
       final store = RiderStore.instance;
       store.user = BackendUser(id: 'r', email: 'rider@somba.app', name: 'Jean', role: 'rider', phone: '+243810000000');
       store.loaded = true;
-      store.codEnabled = false;
       store.requireDeliveryCode = false;
       store.myTasks.clear();
       store.transport = (event, body) async {

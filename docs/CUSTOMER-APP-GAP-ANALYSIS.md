@@ -11,8 +11,8 @@ mobile money, pickup stations), **Amazon** and **Flipkart**, focused on **cart**
 > estimated delivery date shown to the shopper (no date choice) and to seller, admin and rider;
 > server-side search with typo tolerance; phone-code login; call the rider (shared only while shipped / out for
 > delivery); buy again, receipt, replace/exchange, review prompt; seller logo/banner/description in the app;
-> rider navigation to the pin (or the address without the landmark). Left out by decision: **cash on
-> delivery** and **pickup stations**. Still open: live rider map needs a Google Maps key; the P2 rows below.
+> rider navigation to the pin (or the address without the landmark). Left out by decision: **pickup
+> stations**. Still open: live rider map needs a Google Maps key; the P2 rows below.
 > The tables keep the original "before" assessment.
 
 Priority: **P0** blocks or breaks a core flow today · **P1** expected by shoppers of any major marketplace ·
@@ -60,7 +60,6 @@ Priority: **P0** blocks or breaks a core flow today · **P1** expected by shoppe
 | Delivery date / time slot | ✓ | ✓ | ✓ | ✗ | P1 |
 | Mobile money (Airtel / Orange / M-Pesa) | ✓ | — | — | ✓ | — |
 | Wallet | ✓ JumiaPay | ✓ | ✓ | ✓ | — |
-| Cash on delivery | ✓ | ✓ | ✓ | ✗ in app (server supports it, off by setting) | P1 for DRC |
 | Cards | ✓ | ✓ | ✓ | ✗ (server mock only) | P2 |
 | Split payment (wallet + mobile money) | ✓ | ✓ | ✓ | ✗ | P2 |
 | Gift / order note for the rider | — | ✓ | — | ✓ web, ✗ app | P2 |
@@ -121,4 +120,4 @@ Priority: **P0** blocks or breaks a core flow today · **P1** expected by shoppe
 4. **Server-side cart** (sync across devices; enables abandoned-cart reminders).
 5. **Live rider map + call rider** on the order tracking screen.
 6. **Reorder, exchange/replacement, invoice, review prompt after delivery.**
-7. **Pickup stations** and **COD** (business decisions first).
+7. **Pickup stations** (business decision first).

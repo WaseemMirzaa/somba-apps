@@ -413,7 +413,7 @@ curl -fsSL https://raw.githubusercontent.com/waseemmirzaa/somba-apps/main/deploy
 DOMAIN=your.domain ADMIN_EMAIL=you@example.com bash deploy.sh      # an IP: DOMAIN=<ip> ... SSL=0
 ```
 
-The full operator page (check, seed demo data, credentials, API/web/app keys, COD and mobile money, test APKs, troubleshooting) is
+The full operator page (check, seed demo data, credentials, API/web/app keys, mobile money, test APKs, troubleshooting) is
 [`deploy/LIVE-RUNBOOK.md`](../deploy/LIVE-RUNBOOK.md).
 
 Backups: the script installs a nightly dump (`/var/backups/somba`, 14 days); take one by hand with `somba-backup` before a risky
@@ -557,7 +557,7 @@ temp files, touching nothing real, with `bash deploy/tests/set-secret-smtp.test.
 
 **Payment keys.** Mobile money through pawaPay is in `docs/PAYMENTS-PAWAPAY.md`; bank cards through Stripe are in `docs/PAYMENTS-STRIPE.md`. Either way, put the keys on the server with `deploy/set-secret.sh` (hidden prompt, or `--stdin`; it writes `/etc/somba/api.extra.env` and `/opt/somba/api/.env` atomically, mode 600, reloads the API and prints only the last 4 characters). Never paste a key into a shell line, a chat or a ticket.
 
-* Cash on delivery is **off** by default (`codEnabled=false`); an admin can enable it in Settings.
+* Payment is always taken up front: wallet, mobile money (pawaPay) or card (Stripe).
 * Delivery fees are server-side: set the `deliveryZones` setting (list of `{id,name,city,feeUsd}`); checkout requires a valid `zoneId`.
 * The nginx config rate-limits `/api/v1/auth/` (10 requests/min/IP, burst 8) on top of the API's own throttling.
 

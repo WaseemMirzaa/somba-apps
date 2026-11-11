@@ -295,7 +295,7 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
   if (S['warehouse.maluku']) ok(((data(await req(S['warehouse.maluku'].sock, 'logistics:queue', { status: 'open', limit: 50 }))?.tasks) ?? []).length >= 1, 'the demo warehouse expects the transfer');
 
 
-  section('Orders to process: every store, split delivery, failed attempt, cash on delivery');
+  section('Orders to process: every store, split delivery, failed attempt');
   const settings = S['admin.super'] ? data(await req(S['admin.super'].sock, 'settings:get')) : null;
   const sellerOrders = async (l) => (S[l] ? list(await req(S[l].sock, 'orders:sellerList', { limit: 200 })) : []);
   const names = (o) => (o.items ?? []).map((i) => i.productName);
@@ -383,24 +383,6 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(arr.some((x) => x.kind === 'delivery' && x.attempts === 2 && ['assigned', 'picked_up', 'in_transit'].includes(x.status)), 'failed attempt: the rider has the retry (attempt 2)');
   }
 
-  // Cash on delivery: only when the server has it on.
-  if (settings?.codEnabled === 'true') {
-    if (S['seller.a']) {
-      const o = (sellerSide['seller.a'] ?? (await sellerOrders('seller.a'))).find((x) => has(x, ['Leather Handbag']) && x.paymentMethod === 'cod');
-      ok(o?.packageStatus === 'to_pack', 'cash on delivery: an order to pack (store A)', JSON.stringify(o?.packageStatus));
-    }
-    if (S['customer.full']) {
-      const o = list(await req(S['customer.full'].sock, 'orders:list', { limit: 100 })).find((x) => has(x, ['Argan Hair Oil 100 ml', 'Ground Coffee 500 g']));
-      ok(o?.paymentMethod === 'cod' && o.status === 'delivered', 'cash on delivery: a delivered order paid in cash', JSON.stringify([o?.paymentMethod, o?.status]));
-      if (S['rider']) {
-        const t = data(await req(S['rider'].sock, 'rider:tasks', {}));
-        const arr = Array.isArray(t) ? t : (t?.tasks ?? t?.items ?? []);
-        const leg = arr.find((x) => x.orderReference === o?.reference && x.kind === 'delivery');
-        ok(leg && leg.codAmountUsd > 0 && Math.abs(leg.codCollectedUsd - leg.codAmountUsd) < 0.005 && leg.codCollectedAt, 'cash on delivery: the cash is recorded on the leg (amount, time)', JSON.stringify([leg?.codAmountUsd, leg?.codCollectedUsd]));
-      }
-    }
-  } else console.log('  (cash on delivery is off on this server: the cash orders are not made and not checked. Seed with --with-cod to get them.)');
-
   // Express (store C, Kasa-Vubu): only when the server has express on.
   if (settings?.expressDeliveryEnabled === 'true') {
     const nm = { pack: ['USB Fast Charger'], out: ['Rechargeable Stand Fan'], done: ['Steam Iron'] };
@@ -418,10 +400,8 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
       ok(code && /^\d{4}$/.test(String(code.code ?? '')), 'express: the customer has the 4-digit code', JSON.stringify(code));
       const done = orders.find((o) => has(o, nm.done));
       ok(done?.deliveryMode === 'express' && done.status === 'delivered' && (done.items ?? []).every((i) => !!i.deliveredAt), 'express: a delivered order, lines stamped delivered', JSON.stringify([done?.deliveryMode, done?.status]));
-      if (settings?.codEnabled === 'true') {
-        const x = orders.find((o) => has(o, ['Electric Kettle 1.7 L', 'USB Fast Charger']) && o.paymentMethod === 'cod');
-        ok(x?.deliveryMode === 'express', 'express: a cash-on-delivery express order to pack', JSON.stringify([x?.deliveryMode, x?.paymentMethod]));
-      }
+      const x = orders.find((o) => has(o, ['Electric Kettle 1.7 L', 'USB Fast Charger']));
+      ok(x?.deliveryMode === 'express' && x.paymentMethod === 'wallet', 'express: an order to pack (paid from the wallet)', JSON.stringify([x?.deliveryMode, x?.paymentMethod]));
     }
     if (S['rider']) {
       const t = data(await req(S['rider'].sock, 'rider:tasks', {}));

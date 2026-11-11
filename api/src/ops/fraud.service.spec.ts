@@ -19,9 +19,9 @@ const addUser = (over: Partial<User>) =>
 
 const addAlert = async (customerId: string, ref: string, over: Partial<FraudAlert> = {}) => {
   const order = await ds.getRepository(Order).save(
-    ds.getRepository(Order).create({ reference: ref, customerId, customerName: 'Awa Diallo', status: 'pending', paymentMethod: 'cod', totalUsd: 500 }),
+    ds.getRepository(Order).create({ reference: ref, customerId, customerName: 'Awa Diallo', status: 'pending', paymentMethod: 'wallet', totalUsd: 500 }),
   );
-  return ds.getRepository(FraudAlert).save(ds.getRepository(FraudAlert).create({ type: 'cod_risk', severity: 'high', customer: 'Awa Diallo', orderId: order.id, score: 90, status: 'open', ...over }));
+  return ds.getRepository(FraudAlert).save(ds.getRepository(FraudAlert).create({ type: 'failed_payments', severity: 'high', customer: 'Awa Diallo', orderId: order.id, score: 90, status: 'open', ...over }));
 };
 
 const actions = async () => (await ds.getRepository(AuditLog).find({ order: { createdAt: 'ASC' } })).map((a) => `${a.action}:${a.entity}:${a.entityId}`);
@@ -49,11 +49,6 @@ describe('who follows fraud alerts live', () => {
   it('fraud:updated goes to the super admin, finance and support (the departments with a fraud page); not operations, moderation or marketing', async () => {
     await svc.setStatus(alert.id, 'reviewed', as());
     expect(adminRooms('fraud:updated')).toEqual([['admin', 'admin_finance', 'admin_support']]);
-  });
-
-  it('fraud:created goes to the same three', async () => {
-    await svc.flagCodRisk('Awa Diallo', 'order-9', 900, 300, customer.id);
-    expect(adminRooms('fraud:created')).toEqual([['admin', 'admin_finance', 'admin_support']]);
   });
 });
 

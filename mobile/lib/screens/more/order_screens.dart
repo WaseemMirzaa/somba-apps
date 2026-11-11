@@ -71,8 +71,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         }
         final payment = store.paymentForOrder(o.id);
         final cancellable = o.status == 'pending' || o.status == 'confirmed';
-        final trackable = const {'confirmed', 'processing', 'shipped', 'out_for_delivery'}.contains(o.shownStatus);
-        final c = switch (o.shownStatus) {
+        final trackable = const {'confirmed', 'processing', 'shipped', 'out_for_delivery'}.contains(o.status);
+        final c = switch (o.status) {
           'delivered' => AppColors.success,
           'cancelled' || 'returned' => AppColors.danger,
           'out_for_delivery' || 'shipped' => AppColors.primary,
@@ -95,7 +95,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(s.orderStatus(o.shownStatus), key: const ValueKey('order-status'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                      Text(s.orderStatus(o.status), key: const ValueKey('order-status'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                       const SizedBox(height: 2),
                       if (o.createdAt != null)
                         Text(s.orderPlacedWhen(s.when(o.createdAt!)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
@@ -165,7 +165,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${_paymentState(s, payment, cod: showsCod(o.isCod))} · ${shownPaymentLabel(s, o.paymentMethod)}',
+                        '${_paymentState(s, payment)} · ${shownPaymentLabel(s, o.paymentMethod)}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                       ),
                     ),
@@ -260,11 +260,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
-  static String _paymentState(Strings s, PaymentDto? p, {bool cod = false}) {
+  static String _paymentState(Strings s, PaymentDto? p) {
     if (p == null) return s.orderPaid;
     return switch (p.status) {
       'succeeded' => s.orderPaid,
-      'pending' => cod ? s.orderPayOnDelivery : s.orderAwaiting,
+      'pending' => s.orderAwaiting,
       'refunded' => s.orderRefunded,
       _ => s.orderPayFailed,
     };

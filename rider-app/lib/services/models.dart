@@ -288,7 +288,7 @@ abstract final class LegKind {
   static const replacementDelivery = 'replacement_delivery';
 
   /// Seller -> customer, straight, with no warehouse (same commune, one store). Like a delivery it meets the customer,
-  /// asks the code, collects the cash and takes the proof photo, but the rider collects at the store, not at a warehouse.
+  /// asks the code and takes the proof photo, but the rider collects at the store, not at a warehouse.
   static const express = 'express';
 
   static const all = [pickup, transfer, delivery, express, returnPickup, returnTransfer, returnToSeller, replacementDelivery];
@@ -365,7 +365,6 @@ class DeliveryTaskDto {
   final String orderId;
   final String orderReference;
   final String status; // assigned | picked_up | in_transit | delivered | failed (unassigned never reaches a rider)
-  final double codAmountUsd;
   final String? addressRaw;
   final String? customerName;
   final String? paymentMethod;
@@ -434,7 +433,6 @@ class DeliveryTaskDto {
     required this.orderId,
     required this.orderReference,
     required this.status,
-    required this.codAmountUsd,
     this.addressRaw,
     this.customerName,
     this.paymentMethod,
@@ -490,7 +488,6 @@ class DeliveryTaskDto {
 
   bool get isActive => const {'assigned', 'picked_up', 'in_transit'}.contains(status);
   bool get isFinished => status == 'delivered' || status == 'failed';
-  bool get collectsCash => codAmountUsd > 0;
 
   /// The leg ends at a warehouse: staff scan the parcel in, the rider can never mark it delivered.
   bool get endsAtHub => LegKind.hubBound.contains(kind);
@@ -597,7 +594,6 @@ class DeliveryTaskDto {
       orderId: j['orderId'] as String? ?? '',
       orderReference: j['orderReference'] as String? ?? '',
       status: j['status'] as String? ?? 'assigned',
-      codAmountUsd: (j['codAmountUsd'] as num?)?.toDouble() ?? 0,
       addressRaw: (o['shippingAddress'] as String?) ?? (j['address'] as String?),
       customerName: _str(o['customerName']) ?? (to?.isCustomer == true ? to!.name : from?.isCustomer == true ? from!.name : null),
       paymentMethod: o['paymentMethod'] as String?,
@@ -648,7 +644,6 @@ class DeliveryTaskDto {
       orderId: orderId,
       orderReference: orderReference,
       status: status,
-      codAmountUsd: codAmountUsd,
       addressRaw: addressRaw ?? old.addressRaw,
       customerName: customerName ?? old.customerName,
       paymentMethod: old.paymentMethod,
@@ -706,7 +701,7 @@ class WorkStatsKind {
 }
 
 /// The server's work stats for the rider (`rider:workStats`). Riders are salaried: there is no pay in here, only the
-/// workload and [codCollectedUsd], the company's cash the rider took at the door. [completed] counts every finished leg,
+/// workload. [completed] counts every finished leg,
 /// not only customer deliveries; [successRate] is a whole percent, null until a task has finished or failed.
 class WorkStatsDto {
   final int totalTasks;
@@ -716,7 +711,6 @@ class WorkStatsDto {
   final int completedToday;
   final int completedLast7Days;
   final int? successRate;
-  final double codCollectedUsd;
   final List<WorkStatsKind> byKind;
 
   const WorkStatsDto({
@@ -727,7 +721,6 @@ class WorkStatsDto {
     this.completedToday = 0,
     this.completedLast7Days = 0,
     this.successRate,
-    this.codCollectedUsd = 0,
     this.byKind = const [],
   });
 
@@ -739,53 +732,9 @@ class WorkStatsDto {
         completedToday: (j['completedToday'] as num?)?.toInt() ?? 0,
         completedLast7Days: (j['completedLast7Days'] as num?)?.toInt() ?? 0,
         successRate: (j['successRate'] as num?)?.round(),
-        codCollectedUsd: (j['codCollectedUsd'] as num?)?.toDouble() ?? 0,
         byKind: [
           for (final k in (j['byKind'] as List?) ?? const [])
             if (k is Map) WorkStatsKind.fromJson(k.map((a, b) => MapEntry(a.toString(), b))),
-        ],
-      );
-}
-
-/// One receipt of the rider's cash at the warehouse: who took how much, when, and what the rider still held after it.
-class CashHandoverDto {
-  final String id;
-  final double amountUsd;
-  final double heldAfterUsd;
-  final String receivedByName;
-  final String? note;
-  final DateTime? at;
-
-  const CashHandoverDto({required this.id, required this.amountUsd, required this.heldAfterUsd, required this.receivedByName, this.note, this.at});
-
-  factory CashHandoverDto.fromJson(Map<String, dynamic> j) => CashHandoverDto(
-        id: '${j['id'] ?? ''}',
-        amountUsd: (j['amountUsd'] as num?)?.toDouble() ?? 0,
-        heldAfterUsd: (j['heldAfterUsd'] as num?)?.toDouble() ?? 0,
-        receivedByName: j['receivedByName'] as String? ?? '',
-        note: j['note'] as String?,
-        at: DateTime.tryParse('${j['createdAt'] ?? ''}')?.toLocal(),
-      );
-}
-
-/// The rider's cash in hand (`cash:mine`): collected on cash-on-delivery orders, not yet handed in at the warehouse.
-class CashDto {
-  final double collectedUsd;
-  final double handedOverUsd;
-  final double heldUsd;
-  final int openTasks;
-  final List<CashHandoverDto> handovers;
-
-  const CashDto({this.collectedUsd = 0, this.handedOverUsd = 0, this.heldUsd = 0, this.openTasks = 0, this.handovers = const []});
-
-  factory CashDto.fromJson(Map<String, dynamic> j) => CashDto(
-        collectedUsd: (j['collectedUsd'] as num?)?.toDouble() ?? 0,
-        handedOverUsd: (j['handedOverUsd'] as num?)?.toDouble() ?? 0,
-        heldUsd: (j['heldUsd'] as num?)?.toDouble() ?? 0,
-        openTasks: (j['openTasks'] as num?)?.toInt() ?? 0,
-        handovers: [
-          for (final h in (j['handovers'] as List?) ?? const [])
-            if (h is Map) CashHandoverDto.fromJson(h.map((a, b) => MapEntry(a.toString(), b))),
         ],
       );
 }

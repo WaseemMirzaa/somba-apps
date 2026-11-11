@@ -88,7 +88,7 @@ void main() {
       for (final st in ['delivered', 'out_for_delivery', 'shipped', 'confirmed', 'pending', 'cancelled', 'returned', 'processing']) {
         expect(s.has('hint_$st'), isTrue, reason: 'hint_$st');
       }
-      for (final m in ['stripe_card', 'cod', 'wallet']) {
+      for (final m in ['stripe_card', 'wallet']) {
         expect(s.has('pay_$m'), isTrue, reason: 'pay_$m');
       }
       for (final m in ['france', 'drc']) {

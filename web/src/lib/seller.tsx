@@ -606,7 +606,7 @@ function buildSellerData(input: BuildInput) {
     const paymentStatus =
       o.status === "cancelled" || o.status === "returned" || o.packageStatus === "cancelled"
         ? "refunded"
-        : o.status === "pending" || (o.paymentMethod === "cod" && o.status !== "delivered")
+        : o.status === "pending"
           ? "pending"
           : "paid";
     const past = (list: string[]) => list.includes(o.status);
@@ -647,7 +647,7 @@ function buildSellerData(input: BuildInput) {
       paymentStatus,
       /** Money already refunded to the customer for this seller's cancelled lines. */
       refunded,
-      /** Paid (or COD in progress) and not cancelled / returned: counts in sales and revenue. */
+      /** Paid and not cancelled / returned: counts in sales and revenue. */
       countsAsSale: countsAsSale(o),
       /** Package still to pack: work waiting for the seller. */
       needsPacking: isPendingWork(o),
@@ -714,7 +714,7 @@ function buildSellerData(input: BuildInput) {
 
   // Per-order earnings (delivered = earned; the rest is on its way).
   const sellerPayoutPendingItems: SellerPayoutPendingItem[] = sellerOrderList
-    // Not cancelled / returned, and not an unpaid (non-COD) pending order.
+    // Not cancelled / returned, and not an unpaid pending order.
     .filter((o) => !["cancelled", "returned", "pending"].includes(o.packageStatus))
     .map((o) => {
       const status: SellerPayoutItemStatus =
@@ -858,7 +858,7 @@ function buildSellerData(input: BuildInput) {
   const sellerDisputeList = disputes.filter((d) => d.type === "dispute").map(toCase);
 
   // Dashboard stats (live).
-  // Pending work = packages still to pack (an unpaid non-COD order is not work yet).
+  // Pending work = packages still to pack (an unpaid order is not work yet).
   const pendingOrders = sellerOrderList.filter((o) => o.needsPacking).length;
   const todayStr = localDay(new Date());
   const todayOrders = sellerOrderList.filter(

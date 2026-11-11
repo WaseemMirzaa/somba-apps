@@ -4,9 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { paymentMethodLabel } from "@/lib/payment-methods";
-import { isCustomerLeg, isPartialLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
-import type { CashHandover } from "@/lib/warehouse-live";
-import { parseCodEnabled } from "@/lib/rider-cod";
+import { isPartialLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
 
 /**
  * Live rider data layer. `rider:tasks` returns ONLY the legs assigned to this rider (their warehouse assigns them;
@@ -30,8 +28,7 @@ interface RiderQueueRow extends Omit<TaskView, "desk"> {
 }
 
 /**
- * `rider:workStats`. Riders are salaried, so there is no pay in here: the workload, and `codCollectedUsd`, the company's
- * cash the rider collected at the door.
+ * `rider:workStats`. Riders are salaried, so there is no pay in here: just the workload.
  */
 export interface RiderWorkStats {
   totalTasks: number;
@@ -45,7 +42,6 @@ export interface RiderWorkStats {
   successRate: number | null;
   /** Completed tasks by kind, counts only. */
   byKind: { kind: LegKind; count: number }[];
-  codCollectedUsd: number;
 }
 
 export type RiderTaskStatus = "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";
@@ -123,9 +119,9 @@ function toRiderTask(row: RiderQueueRow) {
     hops: row.hops ?? 1,
     orderId: row.orderReference,
     orderUuid: row.orderId,
-    amount: row.codAmountUsd > 0 ? row.codAmountUsd : o?.totalUsd,
+    amount: o?.totalUsd,
     paymentType: paymentMethodLabel(o?.paymentMethod, false),
-    /** The raw method id (cod, wallet…): pages turn it into a label in the rider's language. */
+    /** The raw method id (wallet, stripe_card…): pages turn it into a label in the rider's language. */
     paymentMethod: o?.paymentMethod ?? "",
     items: legItems.length ? legItems.reduce((s, it) => s + it.qty, 0) : items.reduce((s, it) => s + it.qty, 0),
     legItems,
@@ -139,7 +135,7 @@ function toRiderTask(row: RiderQueueRow) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     needsCode: !!row.needsCode,
-    /** An express run: the rider goes from the seller straight to the customer, takes the cash and the customer's code. */
+    /** An express run: the rider goes from the seller straight to the customer, takes the customer's code. */
     express: row.kind === "express",
     /** A partial delivery of a split order: `completesOrder` false (more follows) or the order says so. */
     partial: isPartialLeg(row.kind, row.completesOrder, o?.partial),
@@ -155,7 +151,6 @@ function toRiderTask(row: RiderQueueRow) {
       qty: it.qty,
     })),
     stepsDone,
-    codAmount: isCustomerLeg(row.kind) ? row.codAmountUsd : 0,
   };
 }
 
@@ -212,7 +207,6 @@ export function useRiderData() {
       email: rt.user?.email ?? "",
       phone: rt.user?.phone ?? null,
       completedToday: stats?.completedToday ?? 0,
-      codCollected: stats?.codCollectedUsd ?? 0,
       activeTasks: stats?.active ?? active.length,
     };
     return {
@@ -264,76 +258,4 @@ export function useRiderAssignment() {
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
   return { data, error, reload };
-}
-
-/** The rider's cash in hand (`cash:mine`): collected on cash-on-delivery orders, not yet handed in at the warehouse. */
-export interface RiderCash {
-  collectedUsd: number;
-  handedOverUsd: number;
-  heldUsd: number;
-  openTasks: number;
-  handovers: CashHandover[];
-}
-
-/** Live: re-read after every task change and every hand-over the warehouse records (`cash:updated`). */
-export function useRiderCash() {
-  const rt = useRealtime();
-  const [cash, setCash] = useState<RiderCash | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const ready = rt.status === "connected" && rt.user?.role === "rider";
-
-  const refresh = useCallback(async () => {
-    try {
-      setCash(await socketClient.request<RiderCash>("cash:mine"));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load your cash.");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void refresh();
-    const s = socketClient.current;
-    const onPush = () => void refresh();
-    s?.on("cash:updated", onPush);
-    s?.on("task:updated", onPush);
-    return () => {
-      s?.off("cash:updated", onPush);
-      s?.off("task:updated", onPush);
-    };
-  }, [ready, refresh]);
-
-  return { cash, error, refresh };
-}
-
-/**
- * The public setting `codEnabled`, live (`settings:get`, then `settings:updated`). False until it is known and whenever it
- * is off, so a COD surface never flashes up first. See `lib/rider-cod.ts` for what hides.
- */
-export function useCodEnabled(): boolean {
-  const rt = useRealtime();
-  const [on, setOn] = useState(false);
-  const ready = rt.status === "connected";
-
-  useEffect(() => {
-    if (!ready) return;
-    let live = true;
-    socketClient
-      .request<Record<string, unknown>>("settings:get")
-      .then((all) => live && setOn(parseCodEnabled(all?.codEnabled)))
-      .catch(() => undefined);
-    const s = socketClient.current;
-    const onPush = (all: Record<string, unknown>) => {
-      if (all && "codEnabled" in all) setOn(parseCodEnabled(all.codEnabled));
-    };
-    s?.on("settings:updated", onPush);
-    return () => {
-      live = false;
-      s?.off("settings:updated", onPush);
-    };
-  }, [ready]);
-
-  return on;
 }

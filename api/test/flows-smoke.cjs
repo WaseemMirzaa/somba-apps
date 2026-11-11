@@ -71,7 +71,6 @@ const register = async (label, role = 'customer') => {
   const cust = await register('buyer');
   const other = await register('other');
   const guest = { sock: await connect() };
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
 
   // an approved seller with a pickup address
   const sellerU = await register('shop', 'seller');
@@ -601,7 +600,7 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(sellerU.sock, 'sellers:subscribe', { plan: 'nope', method: 'wallet' })).ok, 'an unknown plan is refused');
   ok(!(await req(sellerU.sock, 'sellers:subscribe', { plan: 'free', method: 'wallet' })).ok, 'the free plan needs no payment');
   ok(!(await req(sellerU.sock, 'sellers:subscribe', { plan: 'enterprise', method: 'wallet' })).ok, 'enterprise is sold by the sales team');
-  ok(!(await req(sellerU.sock, 'sellers:subscribe', { plan: 'pro', method: 'cod' })).ok, 'cash on delivery is not a way to pay for a plan');
+  ok(!(await req(sellerU.sock, 'sellers:subscribe', { plan: 'pro', method: 'cod' })).ok, 'cod is not a way to pay for a plan');
   a = await req(sellerU.sock, 'sellers:subscribe', { plan: 'pro', method: 'wallet' });
   ok(!a.ok && /insufficient/i.test(a.error ?? ''), 'paying from an empty wallet is refused', a.error ?? '');
   ok(!(await req(sellerU.sock, 'sellers:subscribe', { plan: 'starter', method: 'airtel_money', phone: 'abc' })).ok, 'a mobile-money plan payment needs a valid phone');

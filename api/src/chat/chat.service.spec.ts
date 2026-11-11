@@ -110,7 +110,7 @@ describe('chat: starting a conversation', () => {
     const buyer = await user('buyer');
     const other = await user('other');
     const orders = ds.getRepository(Order);
-    const order = await orders.save(orders.create({ reference: 'SOM-1', customerId: buyer.id, customerName: 'buyer', status: 'confirmed', paymentMethod: 'cod', subtotalUsd: 10, totalUsd: 10 } as DeepPartial<Order>));
+    const order = await orders.save(orders.create({ reference: 'SOM-1', customerId: buyer.id, customerName: 'buyer', status: 'confirmed', paymentMethod: 'wallet', subtotalUsd: 10, totalUsd: 10 } as DeepPartial<Order>));
     const items = ds.getRepository(OrderItem);
     await items.save(items.create({ orderId: order.id, productId: product.id, productName: 'Phone', qty: 1, priceUsd: 10, sellerId: seller.id } as DeepPartial<OrderItem>));
     const r = await chat.start(caller(buyer), { sellerId: seller.id, orderId: order.id, text: 'Where is it?' });

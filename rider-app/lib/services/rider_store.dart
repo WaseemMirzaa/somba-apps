@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import '../l10n/strings.dart';
 import 'auth_service.dart';
 import 'compliance_store.dart';
-import 'cod_visibility.dart' show parseCodEnabled;
 import 'location_reporter.dart';
 import 'models.dart';
 import 'push_service.dart';
@@ -40,15 +39,9 @@ class RiderStore extends ChangeNotifier {
   final List<NotificationDto> notifications = [];
   WorkStatsDto stats = const WorkStatsDto();
 
-  /// Cash in hand: collected on cash-on-delivery orders and not yet handed in at the warehouse.
-  CashDto cash = const CashDto();
-
   /// Public setting: when true the customer's 4-digit code is needed to deliver.
   bool requireDeliveryCode = false;
 
-  /// Public setting `codEnabled`. Cash on delivery is not offered, so every COD surface (cash card, receipts, note, cash
-  /// prompt) stays hidden unless this is true. False until the setting has been read. See `cod_visibility.dart`.
-  bool codEnabled = false;
 
   /// Home warehouse (null until loaded, or for an older server).
   RiderAssignment? assignment;
@@ -192,9 +185,7 @@ class RiderStore extends ChangeNotifier {
     ShiftStore.instance.clear();
     ComplianceStore.instance.clear();
     stats = const WorkStatsDto();
-    cash = const CashDto();
     requireDeliveryCode = false;
-    codEnabled = false;
     location.promptsAllowed = true;
     lastLocationAccess = null;
     assignment = null;
@@ -383,9 +374,7 @@ class RiderStore extends ChangeNotifier {
       applyRunPush(d);
       _pushRefresh();
     });
-    // The warehouse recorded a hand-over of this rider's cash: read the new balance and receipts.
-    _socket.on('cash:updated', (_) => unawaited(_readCash().then((_) => notifyListeners())));
-    // An administrator changed a public setting (COD on or off, the delivery code): the screens follow at once.
+    // An administrator changed a public setting (the delivery code): the screens follow at once.
     _socket.on('settings:updated', applySettingsPush);
     _socket.on('support:updated', (d) => SupportStore.instance.applyPush(d));
     // The rider's shift changed (here, on another phone, or the server closed a forgotten shift).
@@ -399,7 +388,7 @@ class RiderStore extends ChangeNotifier {
   }
 
   /// A `notification:new` push. "Task updated" means parcels were merged into one of this rider's tasks, so its items
-  /// and its cash changed: the `task:updated` push carries the new cash, and one re-read brings the order's lines.
+  /// changed: one re-read brings the order's lines.
   void applyNotificationPush(dynamic d) {
     if (d is! Map) return;
     final n = NotificationDto.fromJson(_map(d));
@@ -411,10 +400,9 @@ class RiderStore extends ChangeNotifier {
   /// The notice the server sends the rider when parcels were merged into a task they already have.
   static bool isTaskUpdatedNotice(String title) => title.trim() == 'Task updated';
 
-  /// A `settings:updated` push: the public settings the rider screens follow (COD on or off, the delivery code).
+  /// A `settings:updated` push: the public settings the rider screens follow (the delivery code).
   void applySettingsPush(dynamic d) {
     if (d is! Map) return;
-    if (d.containsKey('codEnabled')) codEnabled = parseCodEnabled(d['codEnabled']);
     if (d.containsKey('requireDeliveryCode')) requireDeliveryCode = '${d['requireDeliveryCode']}' == 'true';
     notifyListeners();
   }
@@ -557,7 +545,6 @@ class RiderStore extends ChangeNotifier {
         ..clear()
         ..addAll(rows.where((t) => t.status != 'unassigned')); // an older server may still list its open pool: not ours
       stats = WorkStatsDto.fromJson(_map(await request('rider:workStats')));
-      await _readCash();
       unawaited(_readRuns());
       if (full) {
         notifications
@@ -617,26 +604,16 @@ class RiderStore extends ChangeNotifier {
     try {
       final m = _map(await request('settings:get'));
       requireDeliveryCode = '${m['requireDeliveryCode']}' == 'true';
-      codEnabled = parseCodEnabled(m['codEnabled']);
     } catch (_) {/* keep the last known value */}
   }
 
-  /// The rider's cash in hand. An older server without it leaves the last known value.
-  Future<void> _readCash() async {
-    try {
-      cash = CashDto.fromJson(_map(await request('cash:mine')));
-    } catch (_) {/* keep the last known value */}
-  }
-
-  /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`; [cashUsd] is the cash the
-  /// rider took on a cash-on-delivery `delivered` (the server records it and refuses any amount but the one due).
-  Future<void> advance(String taskId, String status, {String? reason, String? code, double? cashUsd}) async {
+  /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`.
+  Future<void> advance(String taskId, String status, {String? reason, String? code}) async {
     await request('delivery:updateStatus', {
       'taskId': taskId,
       'status': status,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
-      if (cashUsd != null) 'cashUsd': cashUsd,
     });
     await refresh(light: true);
   }

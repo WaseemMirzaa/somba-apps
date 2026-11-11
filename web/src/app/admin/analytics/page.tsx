@@ -22,7 +22,6 @@ import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { rankSellers, shortDate, useSocketQuery, type AdminStatsFull, type RevenuePoint, type WarehouseStats } from "@/lib/admin-stats";
 import type { Seller } from "@/lib/realtime/types";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { useCodOffered } from "@/lib/use-cod-offered";
 
 function minutesLabel(m: number | null): string {
   if (m === null) return "—";
@@ -33,7 +32,6 @@ function minutesLabel(m: number | null): string {
 export default function AdminAnalyticsPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const codOffered = useCodOffered();
   const rt = useRealtime();
   const [days, setDays] = useState<PeriodDays>(30);
   const refreshKey = useLiveKey();
@@ -189,11 +187,7 @@ export default function AdminAnalyticsPage() {
                 <StatCard title={fr ? "Enlèvement → livraison" : "Pickup to delivery"} value={minutesLabel(w.avgPickupToDeliveryMinutes)} icon={Clock} trend={w.pickupToDeliverySamples ? `${w.pickupToDeliverySamples} ${fr ? "colis (30 j)" : "parcels (30 d)"}` : fr ? "pas assez de données" : "no sample yet"} />
                 <StatCard title={fr ? "Taux d'échec" : "Failure rate"} value={w.failureRatePct === null ? "—" : `${w.failureRatePct}%`} icon={PackageX} trend={`${w.failed30} ${fr ? "échecs" : "failed"} · ${w.delivered30} ${fr ? "livrés (30 j)" : "delivered (30 d)"}`} />
                 <StatCard title={fr ? "Ouverts depuis plus de 24 h" : "Open over 24 h"} value={formatNumber(w.agedOver24h, locale)} icon={Truck} />
-                {codOffered ? (
-                  <StatCard title={fr ? "COD à collecter" : "COD to collect"} value={formatCurrency(w.codToCollect, locale)} icon={DollarSign} trend={`${w.unassigned} ${fr ? "non assignés" : "unassigned"} · ${w.inTransit} ${fr ? "en route" : "in transit"}`} />
-                ) : (
-                  <StatCard title={fr ? "Sans livreur" : "Waiting for a rider"} value={formatNumber(w.unassigned, locale)} icon={DollarSign} trend={`${w.inTransit} ${fr ? "en route" : "in transit"}`} />
-                )}
+                <StatCard title={fr ? "Sans livreur" : "Waiting for a rider"} value={formatNumber(w.unassigned, locale)} icon={DollarSign} trend={`${w.inTransit} ${fr ? "en route" : "in transit"}`} />
               </div>
               <GroupedBarChart
                 data={w.throughput.map((d) => ({ date: d.date, values: [d.received, d.pickedUp, d.delivered] }))}

@@ -1,5 +1,5 @@
 // The delivery model's two new things for the rider (docs/contracts/logistics.md sections 15-16 and the express leg):
-// the `express` kind (seller -> customer: meets the customer, asks the code, collects the cash, takes the proof, no warehouse),
+// the `express` kind (seller -> customer: meets the customer, asks the code, takes the proof, no warehouse),
 // a customer leg that carries only part of the order (the leg's own lines and a "Part of the order" badge), "Task updated"
 // when parcels are merged into a task, and the status errors that now read "An express delivery that is ...".
 import 'package:flutter/material.dart';
@@ -42,7 +42,6 @@ void main() {
     store.user = BackendUser(id: 'r', email: 'rider@somba.app', name: 'Jean', role: 'rider', phone: '+243810000000');
     store.loaded = true;
     store.requireDeliveryCode = false;
-    store.codEnabled = true;
     store.myTasks.clear();
     store.notifications.clear();
     store.transport = (event, body) async {
@@ -52,7 +51,7 @@ void main() {
         case 'rider:tasks':
           return <dynamic>[];
         case 'rider:workStats':
-          return {'totalTasks': 0, 'completed': 0, 'active': 0, 'failed': 0, 'completedToday': 0, 'completedLast7Days': 0, 'successRate': null, 'codCollectedUsd': 0, 'byKind': []};
+          return {'totalTasks': 0, 'completed': 0, 'active': 0, 'failed': 0, 'completedToday': 0, 'completedLast7Days': 0, 'successRate': null, 'byKind': []};
         case 'notifications:list':
           return <dynamic>[];
         default:
@@ -63,7 +62,7 @@ void main() {
 
   group('the express kind', () {
     test('it is a customer leg: meets the customer, asks the code, takes the proof, never ends at a warehouse', () {
-      final t = leg('express', id: 'e', cod: 14);
+      final t = leg('express', id: 'e');
       expect(t.kind, LegKind.express);
       expect(LegKind.all, contains('express'));
       expect(t.isExpress, isTrue);
@@ -72,8 +71,6 @@ void main() {
       expect(t.needsCode, isTrue);
       expect(t.takesProof, isTrue);
       expect(t.endsAtHub, isFalse);
-      expect(t.collectsCash, isTrue);
-      expect(t.codAmountUsd, 14);
     });
 
     test('its pickup is at the store and its drop-off at the customer; no warehouse at either end', () {
@@ -111,7 +108,7 @@ void main() {
       expect(DeliveryTaskDto.fromJson({'id': 'x', 'kind': 'pickup'}).needsCode, isFalse);
     });
 
-    test('the prepaid note and the cash rules follow a customer leg, standard or express', () {
+    test('a customer leg, standard or express, is active once picked up', () {
       expect(leg('express', id: 'e', status: 'picked_up').isActive, isTrue);
     });
   });
@@ -142,15 +139,14 @@ void main() {
     for (final lang in ['en', 'fr']) {
       final s = Strings(lang);
 
-      testWidgets('express before pickup: collect at the store, then the customer; cash; no warehouse hand-over ($lang)', (t) async {
-        await show(t, lang, [leg('express', id: 'e', cod: 20)], code: true);
+      testWidgets('express before pickup: collect at the store, then the customer; no warehouse hand-over ($lang)', (t) async {
+        await show(t, lang, [leg('express', id: 'e')], code: true);
         expect(find.text(s.legExpressTitle('Boutique Les Merveilles de Kinshasa')), findsOneWidget);
         expect(find.text(s.t('kind_express')), findsWidgets, reason: 'the kind pill');
         expect(find.text(s.collectAt('27, avenue Kasa-Vubu, Bandalungwa')), findsOneWidget, reason: 'the pickup is at the store');
         expect(find.text('Aline Kabila Mwamba'), findsOneWidget);
         expect(find.text(s.deliverTo('12, avenue du Commerce, près du marché central, Gombe, Kinshasa')), findsOneWidget);
         expect(find.text('+243812345678'), findsOneWidget);
-        expect(find.text(s.collectCash(s.usd(20))), findsOneWidget);
         expect(find.byKey(const ValueKey('handover-e')), findsNothing, reason: 'no warehouse on an express run');
         expect(find.text(s.theWarehouse), findsNothing);
         expect(find.text(s.t('act_picked_up_seller')), findsOneWidget);
@@ -158,19 +154,13 @@ void main() {
         expectButtonRules(t);
       });
 
-      testWidgets('express on the road: the code hint, "delivered", the cash; a failure can still be reported ($lang)', (t) async {
-        await show(t, lang, [leg('express', id: 'e', status: 'in_transit', cod: 20)], code: true);
+      testWidgets('express on the road: the code hint, "delivered"; a failure can still be reported ($lang)', (t) async {
+        await show(t, lang, [leg('express', id: 'e', status: 'in_transit')], code: true);
         expect(find.byKey(const ValueKey('code-hint-e')), findsOneWidget);
         expect(find.text(s.actDelivered), findsOneWidget);
-        expect(find.text(s.collectCash(s.usd(20))), findsOneWidget);
         expect(find.byKey(const ValueKey('fail-e')), findsOneWidget);
         expect(find.byKey(const ValueKey('handover-e')), findsNothing);
         expect(find.text(s.collectAt('27, avenue Kasa-Vubu, Bandalungwa')), findsNothing, reason: 'the parcel is already with the rider');
-      });
-
-      testWidgets('a prepaid express order says so instead of asking for cash ($lang)', (t) async {
-        await show(t, lang, [leg('express', id: 'e', status: 'in_transit')]);
-        expect(find.text(s.alreadyPaid), findsOneWidget);
       });
 
       testWidgets('a part of the order: only the leg\'s lines and the "Part of the order" badge ($lang)', (t) async {
@@ -189,15 +179,9 @@ void main() {
       });
     }
 
-    testWidgets('express delivered: the cash dialog, the proof sheet, the code, then the call carries all of it', (t) async {
-      await show(t, 'en', [leg('express', id: 'e', status: 'in_transit', cod: 20)], code: true);
+    testWidgets('express delivered: the proof sheet, the code, then the call carries all of it', (t) async {
+      await show(t, 'en', [leg('express', id: 'e', status: 'in_transit')], code: true);
       await t.tap(find.byKey(const ValueKey('next-e')));
-      await t.pumpAndSettle();
-      // cash first
-      expect(find.byType(CashCollectDialog), findsOneWidget);
-      final field = find.descendant(of: find.byType(CashCollectDialog), matching: find.byType(TextField));
-      if (field.evaluate().isNotEmpty) await t.enterText(field.first, '20');
-      await t.tap(find.descendant(of: find.byType(CashCollectDialog), matching: find.byType(FilledButton)).first);
       await t.pumpAndSettle();
       await continueWithoutProof(t);
       expect(find.byKey(const ValueKey('delivery-code-field')), findsOneWidget, reason: 'express asks the customer\'s code');
@@ -237,13 +221,13 @@ void main() {
       expect(merged.withOrderFrom(old).partial, isFalse);
     });
 
-    test('a merge: the push brings the new cash and lines at once, the order snapshot is kept', () {
+    test('a merge: the push brings the new lines at once, the order snapshot is kept', () {
       final store = RiderStore.instance;
-      store.myTasks.add(DeliveryTaskDto.fromJson(legJson('delivery', id: 'a', cod: 10, partial: true, orderItems: [
+      store.myTasks.add(DeliveryTaskDto.fromJson(legJson('delivery', id: 'a', partial: true, orderItems: [
         {'productName': 'Écouteurs sans fil', 'qty': 1},
       ])));
       store.applyTaskPush({
-        ...legJson('delivery', id: 'a', cod: 32.5, withOrder: false),
+        ...legJson('delivery', id: 'a', withOrder: false),
         'items': [
           {'orderItemId': 'i1', 'productId': 'p1', 'name': 'Chaussures de course Air Comfort Pro', 'qty': 2},
           {'orderItemId': 'i2', 'productId': 'p2', 'name': 'Écouteurs sans fil', 'qty': 1},
@@ -251,13 +235,12 @@ void main() {
         'completesOrder': true,
       });
       final t = store.myTasks.single;
-      expect(t.codAmountUsd, 32.5);
       expect(t.items.map((i) => i.qty), [2, 1]);
       expect(t.partial, isFalse);
       expect(t.customerName, 'Aline Kabila Mwamba');
     });
 
-    test('"Task updated" re-reads the tasks (items and cash); other notices do not', () async {
+    test('"Task updated" re-reads the tasks (items); other notices do not', () async {
       final store = RiderStore.instance;
       expect(RiderStore.isTaskUpdatedNotice('Task updated'), isTrue);
       expect(RiderStore.isTaskUpdatedNotice('New task assigned to you'), isFalse);

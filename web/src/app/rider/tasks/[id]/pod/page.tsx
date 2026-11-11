@@ -8,7 +8,7 @@ import { DeliveredForm } from "@/components/warehouse/rider-task-actions";
 import { useRiderData } from "@/lib/rider";
 import { useLocale } from "@/context/locale-context";
 
-/** Proof of delivery = the delivered step: the customer's 4-digit code (and cash for COD), sent to the server. */
+/** Proof of delivery = the delivered step: the customer's 4-digit code, sent to the server. */
 export default function RiderPodPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();

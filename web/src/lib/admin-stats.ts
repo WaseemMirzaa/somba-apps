@@ -94,8 +94,6 @@ export interface FinanceStats {
     oldestMinutes: number;
     byMethod: { method: string; count: number; amountUsd: number; oldestMinutes: number }[];
   };
-  codOutstandingUsd: number;
-  codOutstandingCount: number;
   walletLiabilityUsd: number;
   series30: FinanceSeriesPoint[];
 }
@@ -105,7 +103,6 @@ export interface WarehouseStats {
   unassigned: number;
   inTransit: number;
   delivered: number;
-  codToCollect: number;
   byStatus: Record<string, number>;
   throughput: { date: string; received: number; pickedUp: number; delivered: number }[];
   avgPickupToDeliveryMinutes: number | null;

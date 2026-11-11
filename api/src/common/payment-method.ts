@@ -8,7 +8,6 @@ const LABELS: Record<string, string> = {
   vodacom_mpesa: 'Vodacom M-Pesa',
   stripe_card: 'Card',
   card: 'Card',
-  cod: 'Cash on delivery',
   wallet: 'Wallet',
 };
 

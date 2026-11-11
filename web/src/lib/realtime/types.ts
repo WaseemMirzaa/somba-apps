@@ -92,7 +92,7 @@ export type ItemFulfilment = "open" | "ready" | "received" | "cancelled";
 
 /**
  * One seller's package on an order, as the server derives it (`OrdersService.packageStatus`):
- * all their lines cancelled → cancelled; unpaid non-COD order → pending; every live line at the
+ * all their lines cancelled → cancelled; unpaid order → pending; every live line at the
  * hub → the order's delivery status (or "at_hub" before it ships); every live line packed → ready.
  */
 export type PackageStatus =
@@ -173,7 +173,7 @@ export interface Order {
   customerId: string;
   customerName: string;
   status: OrderStatus;
-  paymentMethod: "stripe_card" | "cod" | "airtel_money" | "wallet";
+  paymentMethod: "stripe_card" | "airtel_money" | "wallet";
   subtotalUsd: number;
   deliveryFeeUsd: number;
   /** Promo-code discount already deducted from the total. */
@@ -333,11 +333,6 @@ export interface DeliveryTask {
   disputeId?: string | null;
   replacementId?: string | null;
   exchangeId?: string | null;
-  codAmountUsd: number;
-  /** The cash record: what the rider confirmed taking, when, and how much of it the warehouse has received. */
-  codCollectedUsd?: number | null;
-  codCollectedAt?: string | null;
-  codHandedOverUsd?: number;
   lat: number | null;
   lng: number | null;
   createdAt: string;

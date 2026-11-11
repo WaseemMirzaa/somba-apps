@@ -9,7 +9,7 @@ const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.M
 const { fraudTypeLabel, fraudReason, FRAUD_TYPE_LABEL } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
 test("every rule the server raises has an English and a French name", () => {
-  for (const t of ["cod_risk", "failed_payments", "new_account_orders", "shared_identity", "return_rate", "address_changes"]) {
+  for (const t of ["failed_payments", "new_account_orders", "shared_identity", "return_rate", "address_changes"]) {
     const l = FRAUD_TYPE_LABEL[t];
     assert.ok(l, t);
     assert.ok(l.en && l.fr && l.en !== l.fr, t);

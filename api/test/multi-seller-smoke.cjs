@@ -71,7 +71,6 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
     return null;
   };
   const moderation = (await req(admin.sock, 'settings:get')).data?.productModeration;
-  const cod = (await req(admin.sock, 'settings:get')).data?.codEnabled;
   const verified = (await req(admin.sock, 'settings:get')).data?.requireVerifiedForCheckout;
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' });
@@ -184,24 +183,25 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
   ok(!(await tasksOf(admin, hubOrder.id)).some((t) => t.kind === 'delivery'), 'but there is no delivery leg until B\'s parcel is also at the hub');
   await req(cust.sock, 'orders:cancel', { orderId: hubOrder.id });
 
-  section('Cash on delivery: less to collect');
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }, { productId: prodB.id, qty: 1 }], paymentMethod: 'cod', shippingAddress: ADDRESS });
+  section('A part cancelled before the parcel reaches the hub: the delivery carries only what is left');
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }, { productId: prodB.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: ADDRESS });
   if (a.ok) {
-    const codOrder = a.data;
-    a = await req(shopB.sock, 'orders:sellerCancel', { orderId: codOrder.id, reason: 'Wrong colour in stock' });
-    ok(a.ok, 'seller B cancels their part of the cash order', a.error ?? '');
-    const codDelivery = await receiveAtHub(admin, codOrder.id, demoRider); // A's parcel reaches the hub, the delivery leg is created
-    ok(Math.abs(codDelivery.codAmountUsd - (codOrder.totalUsd - 20)) < 0.01, 'the rider collects 20 less at the door', `${codOrder.totalUsd} → ${codDelivery?.codAmountUsd}`);
+    const partOrder = a.data;
+    const w2 = await wallet();
+    a = await req(shopB.sock, 'orders:sellerCancel', { orderId: partOrder.id, reason: 'Wrong colour in stock' });
+    ok(a.ok, 'seller B cancels their part of the prepaid order', a.error ?? '');
+    ok(Math.abs((await wallet()) - w2 - 20) < 0.01, "B's line (20) is refunded to the wallet", `${w2} → ${await wallet()}`);
+    const partDelivery = await receiveAtHub(admin, partOrder.id, demoRider); // A's parcel reaches the hub, the delivery leg is created
+    const partCargo = JSON.parse(partDelivery?.itemsJson ?? '[]');
+    ok(partDelivery && partCargo.length === 1 && partCargo[0].productId === prodA.id, "the delivery leg carries A's line only", JSON.stringify(partCargo.map((c) => c.productId)));
   } else {
-    ok(false, 'COD order placed', a.error);
+    ok(false, 'prepaid order placed', a.error);
   }
 
-  section('Cash on delivery per leg: a split leg takes its own share, and another seller\'s cancel does not touch it');
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }, { productId: prodB.id, qty: 1 }], paymentMethod: 'cod', shippingAddress: ADDRESS });
+  section("A split leg carries its own seller's lines, and another seller's cancel does not touch it");
+  a = await req(cust.sock, 'orders:create', { items: [{ productId: prodA.id, qty: 1 }, { productId: prodB.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: ADDRESS });
   if (a.ok) {
     const split = a.data;
-    const fee = Math.round((split.totalUsd - 50) * 100) / 100;
     const sA = split.items.find((i) => i.productId === prodA.id).sellerId;
     const pk = await until(async () => { const t = (await tasksOf(admin, split.id)).filter((x) => x.kind === 'pickup'); return t.length === 2 ? t : null; });
     const pkA = pk?.find((t) => t.sellerId === sA);
@@ -210,17 +210,18 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
     const ran = await req(admin.sock, 'warehouseOps:runNow', { asOf: new Date(Date.now() + 25 * 3_600_000).toISOString(), only: ['split'] });
     ok(ran.ok && ran.data.split >= 1, 'once the first parcel has waited past the limit the job plans a partial leg', ran.error ?? JSON.stringify(ran.data));
     const partial = (await tasksOf(admin, split.id)).find((t) => t.kind === 'delivery');
-    ok(partial && Math.abs(partial.codAmountUsd - (30 + fee)) < 0.011, "the partial leg collects A's $30 plus the delivery fee, not the whole order", `${split.totalUsd} → ${partial?.codAmountUsd}`);
+    const partialCargo = JSON.parse(partial?.itemsJson ?? '[]');
+    ok(partial && JSON.stringify(partial.sellerIds) === JSON.stringify([sA]) && partialCargo.length === 1 && partialCargo[0].productId === prodA.id, "the partial leg carries A's line only, not the whole order", JSON.stringify([partial?.sellerIds, partialCargo.map((c) => c.productId)]));
     a = await req(shopB.sock, 'orders:sellerCancel', { orderId: split.id, reason: 'Damaged in storage' });
     ok(a.ok, 'seller B cancels their (not yet collected) part', a.error ?? '');
-    const after = (await tasksOf(admin, split.id)).find((t) => t.id === partial.id);
-    ok(after && Math.abs(after.codAmountUsd - (30 + fee)) < 0.011, "B's cancel does not take $20 off A's leg: it now finishes the order and takes the remainder of the lowered payment", `${partial?.codAmountUsd} → ${after?.codAmountUsd}`);
+    const legsAfter = (await tasksOf(admin, split.id)).filter((t) => t.kind === 'delivery' && t.status !== 'failed');
+    const afterCargo = JSON.parse(legsAfter[0]?.itemsJson ?? '[]');
+    ok(legsAfter.length === 1 && legsAfter[0].id === partial.id && afterCargo.length === 1 && afterCargo[0].productId === prodA.id, "B's cancel does not touch A's leg: still the same single leg with A's line", JSON.stringify(legsAfter.map((t) => [t.id, t.status])));
   } else {
-    ok(false, 'COD split order placed', a.error);
+    ok(false, 'prepaid split order placed', a.error);
   }
 
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: String(moderation ?? 'false') });
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: String(cod ?? 'false') });
   await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: String(verified ?? 'false') });
   console.log(`\n${pass} passed, ${fails.length} failed`);
   if (fails.length) { console.log(fails.map((f) => ` - ${f}`).join('\n')); process.exit(1); }

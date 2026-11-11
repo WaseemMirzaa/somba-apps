@@ -19,14 +19,11 @@ import { formatCurrency } from "@/lib/utils";
 import { ORDER_STATUS_BADGE, ORDER_STATUS_LABEL, orderStatusLabel, useFeedState } from "@/lib/admin-live";
 import { orderSellers, sellerSummary, type SellerRef } from "@/lib/order-packages";
 import { PAYMENT_METHOD_IDS, paymentMethodLabel } from "@/lib/payment-methods";
-import { withoutCodMethod } from "@/lib/cod-visibility";
-import { useCodOffered } from "@/lib/use-cod-offered";
 
 const STATUS_OPTIONS = Object.entries(ORDER_STATUS_LABEL).map(([value, l]) => ({ value, label: l.en, labelFr: l.fr }));
 
 export default function AdminOrdersPage() {
   const { t, locale } = useLocale();
-  const codOffered = useCodOffered();
   const fr = locale === "fr";
   const rt = useRealtime();
   const feed = useFeedState();
@@ -118,7 +115,7 @@ export default function AdminOrdersPage() {
           onChange={(e) => setMethodFilter(e.target.value)}
         >
           <option value="">{fr ? "Tous les modes" : "All methods"}</option>
-          {withoutCodMethod(PAYMENT_METHOD_IDS, codOffered).map((value) => (
+          {PAYMENT_METHOD_IDS.map((value) => (
             <option key={value} value={value}>{paymentMethodLabel(value, fr)}</option>
           ))}
         </select>

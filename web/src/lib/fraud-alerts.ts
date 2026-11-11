@@ -3,7 +3,6 @@
  * Alerts from before the reasons existed have none, and say so.
  */
 export const FRAUD_TYPE_LABEL: Record<string, { en: string; fr: string }> = {
-  cod_risk: { en: "Cash-on-delivery cap", fr: "Plafond paiement à la livraison" },
   failed_payments: { en: "Failed payments", fr: "Paiements échoués" },
   new_account_orders: { en: "New account, many orders", fr: "Compte récent, nombreuses commandes" },
   shared_identity: { en: "Shared phone or device", fr: "Téléphone ou appareil partagé" },

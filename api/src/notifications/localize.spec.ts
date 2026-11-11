@@ -141,7 +141,6 @@ describe('localizeNotice', () => {
       ['Delivery update', 'SOM-1 is now in your deliveries.', 'SOM-1 est maintenant dans vos livraisons.'],
       ['New order', 'SOM-1 · $40.00 from Jean Mukendi', 'SOM-1 · 40,00\u00A0$ de Jean Mukendi'],
       ['New order', 'SOM-1: 3 item(s) to pack — $40.00', 'SOM-1 : 3 article(s) à préparer — 40,00\u00A0$'],
-      ['New delivery available', 'SOM-1 · collect $40.00 cash. Open the app to accept it.', 'SOM-1 · à encaisser : 40,00\u00A0$ en espèces. Ouvrez l’application pour l’accepter.'],
       ['New delivery available', 'SOM-1. Open the app to accept it.', 'SOM-1. Ouvrez l’application pour l’accepter.'],
       ['3 deliveries assigned to you', 'SOM-1, SOM-2, SOM-3 — collect them at the warehouse.', 'SOM-1, SOM-2, SOM-3 — à récupérer à l’entrepôt.'],
       ['Parcel ready for pickup', 'SOM-1 is packed and ready.', 'SOM-1 : colis emballé et prêt.'],
@@ -157,7 +156,7 @@ describe('localizeNotice', () => {
       ],
       ['Payment', 'PAY-1 · airtel_money · $40.00 · pending', 'PAY-1 · Airtel Money · 40,00\u00A0$ · en attente'],
       ['Payment', 'PAY-1 · stripe_card · $40.00 · succeeded', 'PAY-1 · carte bancaire · 40,00\u00A0$ · réussi'],
-      ['Payment', 'PAY-1 · cod · $40.00 · pending', 'PAY-1 · paiement à la livraison · 40,00\u00A0$ · en attente'],
+      ['Payment', 'PAY-1 · wallet · $40.00 · pending', 'PAY-1 · portefeuille · 40,00\u00A0$ · en attente'],
       ['Payment failed', 'Payment was not approved.', 'Le paiement n’a pas été validé.'],
       ['Payment failed', 'Insufficient wallet balance.', 'Solde du portefeuille insuffisant.'],
       [
@@ -302,10 +301,8 @@ describe('payment method names (English display names, and the ids older notices
     ['vodacom mpesa', 'Vodacom M-Pesa'],
     ['Card', 'carte bancaire'],
     ['stripe_card', 'carte bancaire'],
-    ['Cash on delivery', 'paiement à la livraison'],
-    ['cod', 'paiement à la livraison'],
-    ['Wallet', 'portefeuille'],
     ['wallet', 'portefeuille'],
+    ['Wallet', 'portefeuille'],
     ['Some New Network', 'Some New Network'],
     ['some_new_network', 'some new network'],
   ])('methodFr(%s) -> %s', (method, french) => {
@@ -328,7 +325,6 @@ describe('payment method names (English display names, and the ids older notices
   it.each([
     ['PAY-1 · Airtel Money · $40.00 · pending', 'PAY-1 · Airtel Money · 40,00 $ · en attente'],
     ['PAY-1 · Vodacom M-Pesa · $40.00 · succeeded', 'PAY-1 · Vodacom M-Pesa · 40,00 $ · réussi'],
-    ['PAY-1 · Cash on delivery · $40.00 · pending', 'PAY-1 · paiement à la livraison · 40,00 $ · en attente'],
     ['PAY-1 · Card · $1234.50 · succeeded', 'PAY-1 · carte bancaire · 1 234,50 $ · réussi'],
     ['PAY-1 · airtel_money · $40.00 · failed', 'PAY-1 · Airtel Money · 40,00 $ · échoué'], // legacy id
   ])('the finance "Payment" notice: %s', (en, french) => {
@@ -377,9 +373,6 @@ describe('French money: 52,00 $ (comma decimals, non-breaking spaces)', () => {
   });
 
   it.each([
-    // the rider's "collect cash" notice (the reported case)
-    ['SOM-1001 · collect $52.00 cash. Open the app to accept it.', `SOM-1001 · à encaisser : 52,00${NBSP}$ en espèces. Ouvrez l’application pour l’accepter.`],
-    ['SOM-1001 · collect $1234.50 cash. Open the app to accept it.', `SOM-1001 · à encaisser : 1${NBSP}234,50${NBSP}$ en espèces. Ouvrez l’application pour l’accepter.`],
     ['SOM-1 · $0.50 from Jean', `SOM-1 · 0,50${NBSP}$ de Jean`],
     ['SOM-1: 3 item(s) to pack — $1500.00', `SOM-1 : 3 article(s) à préparer — 1${NBSP}500,00${NBSP}$`],
     ['$25.00 added to your wallet.', `25,00${NBSP}$ ajoutés à votre portefeuille.`],
@@ -394,7 +387,6 @@ describe('French money: 52,00 $ (comma decimals, non-breaking spaces)', () => {
 
   it('never leaves a dot-decimal amount or a plain-space dollar sign in a French body', () => {
     const samples = [
-      'SOM-1 · collect $52.00 cash. Open the app to accept it.',
       'SOM-1 · $12.50 from Jean',
       '$25.00 added to your wallet.',
       'PO-1 · $40.00 sent to your bank account (ref B-7).',

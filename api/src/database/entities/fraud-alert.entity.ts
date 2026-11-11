@@ -14,7 +14,7 @@ export class FraudAlert {
   id: string;
 
   @Column({ type: 'varchar' })
-  /** cod_risk | failed_payments | new_account_orders | shared_identity | return_rate | address_changes (older rows: velocity | address_block | otp_fail). */
+  /** failed_payments | new_account_orders | shared_identity | return_rate | address_changes (older rows: velocity | address_block | otp_fail). */
   type: string;
 
   @Column({ type: 'varchar', length: 10, default: 'medium' })
@@ -38,7 +38,7 @@ export class FraudAlert {
   @Column({ type: 'text', nullable: true })
   reasonFr: string | null;
 
-  /** `type:customerId:YYYY-MM-DD` (UTC): one alert per rule per customer per day. Null for alerts that are per order (COD). */
+  /** `type:customerId:YYYY-MM-DD` (UTC): one alert per rule per customer per day. */
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 96, nullable: true })
   dedupeKey: string | null;

@@ -46,7 +46,7 @@ void main() {
       ..addAll([
         leg('pickup', id: 'p1'),
         leg('transfer', id: 'p2', status: 'in_transit'),
-        leg('delivery', id: 'p3', status: 'in_transit', cod: 25.5),
+        leg('delivery', id: 'p3', status: 'in_transit'),
         leg('replacement_delivery', id: 'p4'),
         leg('return_to_seller', id: 'p5', status: 'picked_up'),
         leg('delivery', id: 'p6', status: 'failed', failure: 'Client injoignable'),

@@ -31,7 +31,6 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
   let setting: Record<string, string>;
   const notif = { toUser: jest.fn(async () => undefined), toUsers: jest.fn(async () => undefined), toAdmins: jest.fn(async () => undefined), toRole: jest.fn(async () => undefined) };
   const emitter = { toUser: jest.fn(), toRoles: jest.fn(), toRolesOnly: jest.fn(), toHub: jest.fn() };
-  const payments = { markCollected: jest.fn(async () => undefined) };
 
   let gombe: Hub;
   let limete: Hub;
@@ -63,7 +62,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
     );
 
   /** A confirmed order with one line per seller. */
-  const mkOrder = async (sellers: Seller[], opts: { pin?: { lat: number; lng: number } | null; cod?: boolean; city?: string; commune?: string } = {}) => {
+  const mkOrder = async (sellers: Seller[], opts: { pin?: { lat: number; lng: number } | null; city?: string; commune?: string } = {}) => {
     const n = ++seq;
     const pin = opts.pin === undefined ? GOMBE_PIN : opts.pin;
     const o = await ds.getRepository(Order).save(
@@ -72,7 +71,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
         customerId: 'cust1',
         customerName: 'Marie Dubois',
         status: 'confirmed',
-        paymentMethod: opts.cod ? 'cod' : 'stripe_card',
+        paymentMethod: 'stripe_card',
         totalUsd: 50,
         shippingAddress: JSON.stringify({ line1: '1 Rue', city: opts.city ?? 'Kinshasa', commune: opts.commune ?? 'Gombe', ...(pin ? { geo: pin } : {}) }),
         items: sellers.map((s) =>
@@ -142,7 +141,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       notif as never,
       emitter as never,
     );
-    delivery = new DeliveryService(ds.getRepository(DeliveryTask), ds.getRepository(Order), emitter as never, payments as never, settings as never, logistics, runs);
+    delivery = new DeliveryService(ds.getRepository(DeliveryTask), ds.getRepository(Order), emitter as never, settings as never, logistics, runs);
     gombe = await mkHub('Entrepôt Kinshasa', 'Kinshasa', -4.3105, 15.3136, 'CD-KN-GOM', ['CD-KN']);
     limete = await mkHub('Entrepôt Limete', 'Kinshasa', -4.354, 15.347, 'CD-KN-LMT', ['CD-KN-D-MAM', 'CD-KN-D-TSH']);
     lubum = await mkHub('Entrepôt Lubumbashi', 'Lubumbashi', -11.6609, 27.4794, 'CD-HK-LUB', ['CD-HK-LUB']);
@@ -496,10 +495,9 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       await expect(delivery.updateStatus(pickup.id, 'picked_up', riderL.id)).rejects.toThrow('Delivery task not found.');
     });
 
-    it('walks the customer delivery: needs the code, moves the order to out_for_delivery then delivered, collects COD', async () => {
+    it('walks the customer delivery: needs the code, moves the order to out_for_delivery then delivered', async () => {
       setting.requireDeliveryCode = 'true';
-      const { order } = await place([sellerG], { cod: true });
-      await ds.getRepository('Payment').save({ orderId: order.id, method: 'cod', amountUsd: 42, status: 'pending', purpose: 'order' } as never).catch(() => undefined);
+      const { order } = await place([sellerG]);
       const [pickup] = await tasksOf(order.id);
       const { next } = await assignAndScan(pickup.id);
       const d = next[0];
@@ -511,13 +509,8 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(await orderStatus(order.id)).toBe('out_for_delivery');
       await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, '0000')).rejects.toThrow(/Wrong delivery code/);
       const code = (await logistics.proofCodeOf(d.id)) as string;
-      // cash on delivery: the rider must confirm the exact amount due, and the server records it
-      await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code)).rejects.toThrow(/Confirm the cash you collected/);
-      await expect(delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code, 1)).rejects.toThrow(/not the amount to collect/);
-      await delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code, d.codAmountUsd);
+      await delivery.updateStatus(d.id, 'delivered', riderG.id, undefined, code);
       expect(await orderStatus(order.id)).toBe('delivered');
-      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: d.codAmountUsd, byId: riderG.id, source: 'rider' }));
-      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: d.id })).toMatchObject({ codCollectedUsd: d.codAmountUsd, codCollectedById: riderG.id });
     });
 
     it('needsCode on the delivery leg follows the requireDeliveryCode setting; other legs never need it', async () => {
@@ -1238,18 +1231,11 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       await logistics.assign(transfer.id, riderL.id, admin);
       return scan(transfer.id, gombe.id);
     };
-    const handOver = async (leg: DeliveryTask, rider: User, cash?: number) => {
+    const handOver = async (leg: DeliveryTask, rider: User) => {
       if (leg.status === 'unassigned') await logistics.assign(leg.id, rider.id, admin);
       await delivery.updateStatus(leg.id, 'picked_up', rider.id);
       await delivery.updateStatus(leg.id, 'in_transit', rider.id);
-      return delivery.updateStatus(leg.id, 'delivered', rider.id, undefined, (await codeOf(leg.id)) ?? undefined, cash);
-    };
-    const mkPayment = (order: Order, amountUsd: number) =>
-      ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: `PAY-${order.reference}`, orderId: order.id, orderReference: order.reference, userId: 'cust1', method: 'cod', amountUsd, status: 'pending' }));
-    /** $10 + $10 lines, a $5 delivery fee, so the order asks $25 (less any discount). */
-    const priced = async (order: Order, discountUsd = 0) => {
-      await ds.getRepository(Order).update({ id: order.id }, { subtotalUsd: 20, deliveryFeeUsd: 5, discountUsd, totalUsd: 25 - discountUsd });
-      return mkPayment(order, 25 - discountUsd);
+      return delivery.updateStatus(leg.id, 'delivered', rider.id, undefined, (await codeOf(leg.id)) ?? undefined);
     };
 
     it('waits for the other parcel until the oldest one has waited past the limit, then delivers what arrived; running the sweeper twice makes one leg', async () => {
@@ -1281,12 +1267,10 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(await customerLegs(order.id)).toHaveLength(1);
     });
 
-    it('the rest arrives while the partial leg is still unassigned: it is merged (cargo, sellers, cash), the code stays, and no second leg appears', async () => {
-      const { order, pL } = await gArrived({ cod: true });
-      await priced(order);
+    it('the rest arrives while the partial leg is still unassigned: it is merged (cargo, sellers), the code stays, and no second leg appears', async () => {
+      const { order, pL } = await gArrived();
       await logistics.planWaiting(hours(25));
       const before = (await openLeg(order.id))!;
-      expect(before.codAmountUsd).toBe(15); // G's $10 + the $5 fee
       const code = await codeOf(before.id);
       const arrived = await lArrives(pL);
       expect(arrived.next).toEqual([]); // merged, not a second leg
@@ -1295,7 +1279,6 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(legs[0].id).toBe(before.id);
       expect(legs[0].sellerIds?.slice().sort()).toEqual([sellerG.id, sellerL.id].sort());
       expect(JSON.parse(legs[0].itemsJson as string)).toHaveLength(2);
-      expect(legs[0].codAmountUsd).toBe(25); // now the leg that finishes the order: the whole payment
       expect(await codeOf(legs[0].id)).toBe(code);
       expect((await logistics.view(legs[0])).completesOrder).toBe(true);
     });
@@ -1361,43 +1344,6 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       await handOver((await openLeg(order.id))!, riderG);
       expect(titles()).toContain('Delivery update'); // "is now delivered": the order itself
       expect(titles()).not.toContain('Part of your order was delivered');
-    });
-
-    it('cash on delivery: the partial leg collects its share + the fee, the last leg the remainder, and the payment is collected once, with the total', async () => {
-      const { order, pL } = await gArrived({ cod: true });
-      await priced(order, 2); // $2 promo: the payment asks $23
-      await logistics.planWaiting(hours(25));
-      const first = (await openLeg(order.id))!;
-      expect(first.codAmountUsd).toBe(14); // $10 - its share of the discount ($1) + the $5 fee
-      await handOver(first, riderG, 14);
-      expect(payments.markCollected).not.toHaveBeenCalled(); // partial: the payment stays pending
-      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: first.id })).toMatchObject({ codCollectedUsd: 14, codCollectedById: riderG.id });
-      await lArrives(pL);
-      const second = (await openLeg(order.id))!;
-      expect(second.codAmountUsd).toBe(9); // the remainder: $23 - $14, no second fee
-      await expect(delivery.updateStatus(second.id, 'picked_up', riderG.id)).rejects.toThrow(); // not assigned to this rider yet
-      await handOver(second, riderG, 9);
-      expect(payments.markCollected).toHaveBeenCalledTimes(1);
-      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: 23, byId: riderG.id, taskId: second.id }));
-      const collected = (await customerLegs(order.id)).reduce((t, x) => t + (x.codCollectedUsd ?? 0), 0);
-      expect(collected).toBe(23);
-      // repeating the last "delivered" settles nothing twice
-      await delivery.updateStatus(second.id, 'delivered', riderG.id, undefined, undefined, 9);
-      expect(payments.markCollected).toHaveBeenCalledTimes(2); // asked again (a retry finishes a payment that missed it), the payment service ignores a settled one
-    });
-
-    it('a part-cancel works the open leg\'s cash out again (the blind subtraction is gone)', async () => {
-      const { order, pL } = await gArrived({ cod: true });
-      const payment = await priced(order);
-      await logistics.planWaiting(hours(25));
-      const leg = (await openLeg(order.id))!;
-      expect(leg.codAmountUsd).toBe(15);
-      // L's line is cancelled by its seller: $10 off the payment; the leg now finishes the order and takes the remainder
-      await ds.getRepository(OrderItem).update({ orderId: order.id, sellerId: sellerL.id }, { fulfilment: 'cancelled' });
-      await ds.getRepository(Payment).update({ id: payment.id }, { amountUsd: 15 });
-      await logistics.onSellerCancelled(order.id, [sellerL.id]);
-      expect((await openLeg(order.id))!.codAmountUsd).toBe(15);
-      void pL;
     });
 
     it('a failed leg is planned again with the same code and the next attempt, and with everything now at the warehouse', async () => {
@@ -1518,8 +1464,6 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
 
   describe('express delivery: one leg from the seller straight to the customer', () => {
     const expressLegs = async (orderId: string) => (await tasksOf(orderId)).filter((t) => t.kind === 'express');
-    const mkPayment = (order: Order, amountUsd: number) =>
-      ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: `PAY-${order.reference}`, orderId: order.id, orderReference: order.reference, userId: 'cust1', method: 'cod', amountUsd, status: 'pending' }));
     const lines = (orderId: string) => ds.getRepository(OrderItem).find({ where: { orderId } });
     const titlesToStaff = () => (notif.toUsers.mock.calls as unknown as [string[], { title: string }][]).map((c) => c[1].title);
 
@@ -1535,16 +1479,15 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       return { order: (await ds.getRepository(Order).findOne({ where: { id: order.id } }))!, route, planned };
     };
     const codeOf = (taskId: string) => logistics.proofCodeOf(taskId);
-    const walk = async (leg: DeliveryTask, cash?: number) => {
+    const walk = async (leg: DeliveryTask) => {
       await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
       await delivery.updateStatus(leg.id, 'in_transit', riderG.id);
-      return delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, (await codeOf(leg.id)) ?? undefined, cash);
+      return delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, (await codeOf(leg.id)) ?? undefined);
     };
 
-    it('an order recorded as express gets ONE express leg (no pickup, no transfer, no delivery): managed by the warehouse, carrying everything, with a code and the whole cash', async () => {
+    it('an order recorded as express gets ONE express leg (no pickup, no transfer, no delivery): managed by the warehouse, carrying everything, with a code', async () => {
       setting.requireDeliveryCode = 'true';
-      const placed = await placeExpress({ cod: true });
-      await mkPayment(placed.order, 42);
+      const placed = await placeExpress();
       const { order, planned } = await logistics.planOrder(placed.order).then(async (p) => ({ order: placed.order, planned: p }));
       expect(planned).toHaveLength(1);
       expect(await kinds(order.id)).toEqual(['express:unassigned']);
@@ -1620,46 +1563,26 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(sent[sent.length - 1][2]).toMatchObject({ kind: 'express', address: null, to: null });
     });
 
-    it('delivering needs the code and the full cash; it stamps the lines, collects the payment once and finishes the order', async () => {
+    it('delivering needs the code; it stamps the lines and finishes the order', async () => {
       setting.requireDeliveryCode = 'true';
-      const { order } = await placeExpress({ cod: true });
-      await mkPayment(order, 42);
+      const { order } = await placeExpress();
       const [leg] = await expressLegs(order.id);
       expect((await logistics.proofCodeOf(leg.id))?.length).toBe(4);
-      // COD is the whole payment, whatever the line prices say
-      await logistics.recomputeCod(order.id);
-      const fresh = await ds.getRepository(DeliveryTask).findOneByOrFail({ id: leg.id });
-      expect(fresh.codAmountUsd).toBe(42);
       await logistics.assign(leg.id, riderG.id, admin);
       await delivery.updateStatus(leg.id, 'picked_up', riderG.id);
       await delivery.updateStatus(leg.id, 'in_transit', riderG.id);
-      await expect(delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, '0000', 42)).rejects.toThrow(/Wrong delivery code/);
+      await expect(delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, '0000')).rejects.toThrow(/Wrong delivery code/);
       const code = (await codeOf(leg.id)) as string;
-      await expect(delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code)).rejects.toThrow(/Confirm the cash you collected/);
-      await expect(delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code, 40)).rejects.toThrow(/not the amount to collect/);
-      await delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code, 42);
+      await delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code);
       expect(await orderStatus(order.id)).toBe('delivered');
-      expect(payments.markCollected).toHaveBeenCalledTimes(1);
-      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: 42, byId: riderG.id, source: 'rider', taskId: leg.id }));
-      expect(await ds.getRepository(DeliveryTask).findOneByOrFail({ id: leg.id })).toMatchObject({ codCollectedUsd: 42, codCollectedById: riderG.id });
       expect((await lines(order.id)).every((l) => !!l.deliveredAt && l.deliveryTaskId === leg.id)).toBe(true);
-      // a repeated "delivered" records the cash once
-      await delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code, 42);
+      // a repeated "delivered" changes nothing
+      await delivery.updateStatus(leg.id, 'delivered', riderG.id, undefined, code);
       expect((await ds.getRepository(DeliveryTask).find({ where: { orderId: order.id } })).length).toBe(1);
-      // the customer's code is the express leg's, and it is not asked of a prepaid order's cash
       expect(await delivery.codeForOrder(order.id)).toBeNull(); // nothing open any more
     });
 
-    it('a prepaid express order takes no cash', async () => {
-      const { order } = await placeExpress();
-      const [leg] = await expressLegs(order.id);
-      expect(leg.codAmountUsd).toBe(0);
-      await logistics.assign(leg.id, riderG.id, admin);
-      await walk(leg);
-      expect(await orderStatus(order.id)).toBe('delivered');
-    });
-
-    it('the customer\'s code and the cash flows address the open express leg', async () => {
+    it('the customer\'s code addresses the open express leg', async () => {
       const { order } = await placeExpress();
       const [leg] = await expressLegs(order.id);
       expect(await delivery.codeForOrder(order.id)).toBe(await codeOf(leg.id));
@@ -1698,8 +1621,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
     });
 
     it('C4: a failure AFTER collection brings the parcel back with the SAME rider (a pickup to the warehouse); scanning it in plans a normal delivery, counted as the next attempt', async () => {
-      const { order } = await placeExpress({ cod: true });
-      await mkPayment(order, 42);
+      const { order } = await placeExpress();
       const [leg] = await expressLegs(order.id);
       await logistics.markSellerReady(order.id, [sellerG.id]);
       await logistics.assign(leg.id, riderG.id, admin);
@@ -1716,13 +1638,12 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       // staff scan it in at the warehouse: the chain plans a normal delivery
       const { next } = await logistics.onScanIn(back.id, gombe.id, staff(gombe, 'operator'));
       expect(next).toHaveLength(1);
-      expect(next[0]).toMatchObject({ kind: 'delivery', status: 'unassigned', hubId: gombe.id, fromHubId: gombe.id, sellerIds: [sellerG.id], attempts: 2, codAmountUsd: 42 });
+      expect(next[0]).toMatchObject({ kind: 'delivery', status: 'unassigned', hubId: gombe.id, fromHubId: gombe.id, sellerIds: [sellerG.id], attempts: 2 });
       expect(await kinds(order.id)).toEqual(['delivery:unassigned', 'express:failed', 'pickup:delivered']);
       // it is delivered like any delivery and finishes the order
       await logistics.assign(next[0].id, riderG.id, admin);
-      await walk(next[0], 42);
+      await walk(next[0]);
       expect(await orderStatus(order.id)).toBe('delivered');
-      expect(payments.markCollected).toHaveBeenCalledWith(order.id, expect.objectContaining({ amountUsd: 42 }));
     });
 
     it('the seller\'s tracking shows the express leg (and the customer\'s tracking too), without a warehouse', async () => {
@@ -1732,22 +1653,19 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
       expect(tracking.currentLeg).toBe('express');
     });
 
-    it('part-cancel while it waits: what the leg carries and collects follows the live lines', async () => {
+    it('part-cancel while it waits: what the leg carries follows the live lines', async () => {
       setting.expressDeliveryEnabled = 'true';
       await ds.getRepository(Seller).update({ id: sellerG.id }, { expressDelivery: true });
-      const order = await mkOrder([sellerG], { cod: true });
+      const order = await mkOrder([sellerG]);
       await ds.getRepository(OrderItem).save(Object.assign(new OrderItem(), { orderId: order.id, productId: 'p-extra', productName: 'Extra', variant: 'Default', qty: 1, priceUsd: 10, sellerId: sellerG.id, sellerName: sellerG.name, fulfilment: 'open' }));
       const route = await routing.route({ shippingAddress: order.shippingAddress, sellerIds: [sellerG.id] });
       await ds.getRepository(Order).update({ id: order.id }, { destinationHubId: route.destinationHubId, originHubIds: route.originHubIds, originBySeller: route.originBySeller, routeBySeller: route.routeBySeller, deliveryMode: 'express' });
-      await mkPayment(order, 42);
       await logistics.planOrder((await ds.getRepository(Order).findOne({ where: { id: order.id } }))!);
       const [leg] = await expressLegs(order.id);
       expect(JSON.parse(leg.itemsJson as string)).toHaveLength(2);
       await ds.getRepository(OrderItem).update({ orderId: order.id, productId: 'p-extra' }, { fulfilment: 'cancelled' });
-      await ds.getRepository(Payment).update({ orderId: order.id }, { amountUsd: 31 });
-      await logistics.recomputeCod(order.id);
+      await logistics.refreshOpenLegCargo(order.id);
       const after = await ds.getRepository(DeliveryTask).findOneByOrFail({ id: leg.id });
-      expect(after.codAmountUsd).toBe(31);
       expect(JSON.parse(after.itemsJson as string)).toHaveLength(1);
     });
   });

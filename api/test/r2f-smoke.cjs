@@ -1,7 +1,7 @@
 /* Round 2, seller portal and customer app: following a store (and the new-product notice to followers), photos in
  * reviews (4 at most, hidden with the review), the return deadline and the response-time timers (returns, disputes,
  * replacements, exchanges), vacation mode pushed live and ended by the sweep, what a Support team member may call, the
- * Help contact settings, and cash on delivery staying off.
+ * Help contact settings, and cash on delivery being refused as an unknown payment method.
  *
  * Runs against a RUNNING API seeded with `npm run seed` (fake translator). It reads and writes the same MySQL database
  * to age orders (mark them delivered / old); DB_HOST, DB_USERNAME, DB_PASSWORD, DB_DATABASE as for the API.
@@ -79,7 +79,6 @@ const hasNotice = async (u, pred, ms) => !!(await until(async () => (await notic
   const sql = async (q, p = []) => (await db.query(q, p))[0];
   const admin = await login('admin@somba.app', process.env.ADMIN_PW ?? PW);
   const guest = { sock: await connect() };
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'returnWindowDays', value: '7' });
@@ -226,7 +225,7 @@ const hasNotice = async (u, pred, ms) => !!(await until(async () => (await notic
   ok(!a.ok && /within 7 days/.test(a.error ?? ''), 'an order delivered 9 days ago is outside the 7-day window', a.error);
   // A later leg of the same order (a seller pickup, a return leg, a replacement) must not extend the window.
   await sql("UPDATE delivery_tasks SET status = 'delivered', deliveredAt = ? WHERE orderId = ? AND kind <> 'delivery'", [new Date(), old.id]);
-  await sql("INSERT INTO delivery_tasks (id, orderId, orderReference, status, kind, deliveredAt, codAmountUsd, createdAt, updatedAt) VALUES (UUID(), ?, 'X', 'delivered', 'return_pickup', ?, 0, NOW(), NOW())", [old.id, new Date()]);
+  await sql("INSERT INTO delivery_tasks (id, orderId, orderReference, status, kind, deliveredAt, createdAt, updatedAt) VALUES (UUID(), ?, 'X', 'delivered', 'return_pickup', ?, NOW(), NOW())", [old.id, new Date()]);
   a = await req(cust.sock, 'disputes:eligibility', { orderId: old.id });
   ok(a.ok && a.data.eligible === false && Math.abs(new Date(a.data.endsAt) - (Date.now() - 2 * 86400000)) < 120000, 'a pickup or return leg delivered today does not move the end of the window (it stays 9 days - 7 = 2 days ago)', JSON.stringify(a.data && { e: a.data.eligible, ends: a.data.endsAt }));
   const fresh = await delivered(cust, [{ productId: pB.id, qty: 1 }], 6);
@@ -349,10 +348,9 @@ const hasNotice = async (u, pred, ms) => !!(await until(async () => (await notic
   for (const k of ['supportPhone', 'supportEmail']) await req(admin.sock, 'settings:set', { key: k, value: '' });
 
   // ═════════════════════════════════════════════════════════════════════════
-  section('Cash on delivery stays off');
-  ok((await req(cust.sock, 'settings:get')).data.codEnabled === 'false', 'the shopper settings say cash on delivery is off');
+  section('Cash on delivery is refused like any unknown payment method');
   a = await req(cust.sock, 'orders:create', { items: [{ productId: pC.id, qty: 1 }], paymentMethod: 'cod', shippingAddress: ADDRESS });
-  ok(!a.ok, 'the server refuses an order paid on delivery', a.error);
+  ok(!a.ok && /Unknown payment method/.test(a.error ?? ''), "cod is refused as an 'Unknown payment method'", a.error);
 
   await db.end();
   console.log(`\n${pass} passed, ${fails.length} failed`);

@@ -148,7 +148,7 @@ describe('warehouse tiers', () => {
     expect(tierAllows('admin_operations', undefined, 'assign')).toBe(true);
   });
 
-  it('oversight (aged parcels, COD cash, incidents, after-sale statuses, return grading) starts at supervisor, like the web pages', () => {
+  it('oversight (aged parcels, incidents, after-sale statuses, return grading) starts at supervisor, like the web pages', () => {
     expect(tierAllows('warehouse_staff', 'operator', 'oversee')).toBe(false);
     expect(tierAllows('warehouse_staff', null, 'oversee')).toBe(false);
     expect(tierAllows('warehouse_staff', 'supervisor', 'oversee')).toBe(true);

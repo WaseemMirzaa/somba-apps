@@ -5,7 +5,7 @@ export type WarehouseTier = 'operator' | 'supervisor' | 'manager';
 export const WAREHOUSE_TIERS: readonly WarehouseTier[] = ['operator', 'supervisor', 'manager'];
 /**
  * scan = operator work; assign = hand parcels to riders; oversee = the supervisor pages the web hides from operators
- * (aged parcels, COD cash, incidents, after-sale statuses, return grading); manage = manager pages (analytics, the hub).
+ * (aged parcels, incidents, after-sale statuses, return grading); manage = manager pages (analytics, the hub).
  */
 export type DeskAction = 'scan' | 'assign' | 'oversee' | 'manage';
 

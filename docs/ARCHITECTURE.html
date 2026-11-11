@@ -240,11 +240,6 @@ main li { margin-block: 0.2rem; }
 <td>Full lifecycle, signed webhook, idempotent settlement, expiry, late-success credit — <strong>but no real aggregator adapter yet</strong> (production refuses mobile money until one is configured)</td>
 </tr>
 <tr>
-<td>Payments — COD</td>
-<td><span class="st">✅</span> (disabled)</td>
-<td>Implemented and tested, <strong>switched off</strong> per client scope (<code>codEnabled=false</code>)</td>
-</tr>
-<tr>
 <td>Payments — card</td>
 <td><span class="st">❌</span></td>
 <td>Mock only, refused in production</td>
@@ -252,12 +247,12 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td>Fulfilment &amp; delivery</td>
 <td><span class="st">🟡</span></td>
-<td>Delivery task pool, rider claim/assign, forward-only status, live GPS, COD collection. <strong>No proof of delivery, no seller &quot;ready to ship&quot; step, no per-seller sub-orders</strong></td>
+<td>Delivery task pool, rider claim/assign, forward-only status, live GPS. <strong>No proof of delivery, no seller &quot;ready to ship&quot; step, no per-seller sub-orders</strong></td>
 </tr>
 <tr>
 <td>Warehouse</td>
 <td><span class="st">🟡</span></td>
-<td>Hubs, parcels by stage, aged parcels, batches, transfers, exceptions, COD reconciliation. <strong>No hub inventory, no receiving/sorting model; about half of the warehouse pages are mock</strong></td>
+<td>Hubs, parcels by stage, aged parcels, batches, transfers, exceptions. <strong>No hub inventory, no receiving/sorting model; about half of the warehouse pages are mock</strong></td>
 </tr>
 <tr>
 <td>After-sales</td>
@@ -984,7 +979,7 @@ main li { margin-block: 0.2rem; }
         varchar customerId FK
         varchar customerName
         varchar status  "default pending"
-        varchar paymentMethod  "default cod"
+        varchar paymentMethod
         float subtotalUsd  "default 0"
         float deliveryFeeUsd  "default 0"
         float discountUsd  "default 0"
@@ -1062,7 +1057,6 @@ main li { margin-block: 0.2rem; }
         varchar status  "default unassigned"
         text address  "encrypted, nullable"
         varchar zoneId  "nullable"
-        float codAmountUsd  "default 0"
         float lat  "nullable"
         float lng  "nullable"
         datetime createdAt
@@ -2653,9 +2647,9 @@ main li { margin-block: 0.2rem; }
 <td><code>paymentMethod</code></td>
 <td>varchar(20)</td>
 <td></td>
-<td>cod</td>
+<td>wallet</td>
 <td></td>
-<td>Values: stripe_card, cod, airtel_money, orange_money, vodacom_mpesa, wallet</td>
+<td>Values: stripe_card, airtel_money, orange_money, vodacom_mpesa, wallet</td>
 </tr>
 <tr>
 <td><code>subtotalUsd</code></td>
@@ -3203,14 +3197,6 @@ main li { margin-block: 0.2rem; }
 <td></td>
 <td></td>
 <td></td>
-</tr>
-<tr>
-<td><code>codAmountUsd</code></td>
-<td>float</td>
-<td></td>
-<td>0</td>
-<td></td>
-<td>COD amount to collect (USD); 0 for prepaid.</td>
 </tr>
 <tr>
 <td><code>lat</code></td>
@@ -4441,11 +4427,11 @@ main li { margin-block: 0.2rem; }
   pending --&gt; cancelled: mobile money failed or expired 🔒
   pending --&gt; cancelled: customer cancels 🔒
   confirmed --&gt; cancelled: customer cancels 🔒 (restock + wallet refund)
-  pending --&gt; processing: rider accepts (COD orders stay pending until then)
+  pending --&gt; processing: rider accepts
   confirmed --&gt; processing: rider accepts / assigned
   processing --&gt; shipped: rider picked_up
   shipped --&gt; out_for_delivery: rider in_transit
-  out_for_delivery --&gt; delivered: rider delivered (COD collected)
+  out_for_delivery --&gt; delivered: rider delivered
   delivered --&gt; returned: admin refund or dispute refund 🔒
   cancelled --&gt; [*]
   returned --&gt; [*]</pre></div>
@@ -4473,8 +4459,8 @@ main li { margin-block: 0.2rem; }
 <h3 id="52-payment-paymentsstatus"><a class="anchor" href="#52-payment-paymentsstatus" aria-hidden="true">#</a>5.2 Payment (<code>payments.status</code>)</h3>
 <div class="diagram"><pre class="mermaid">stateDiagram-v2
   [*] --&gt; succeeded: wallet / card mock (immediate)
-  [*] --&gt; pending: mobile money (prompt sent) / COD
-  pending --&gt; succeeded: signed webhook or sandbox 🔒 / COD delivered
+  [*] --&gt; pending: mobile money (prompt sent)
+  pending --&gt; succeeded: signed webhook or sandbox 🔒
   pending --&gt; failed: declined, provider error, or expired after MM_PENDING_TTL_MIN 🔒
   failed --&gt; refunded: late success → amount credited to wallet 🔒
   succeeded --&gt; refunded: cancel of a paid order / admin refund / dispute refund 🔒
@@ -4482,7 +4468,7 @@ main li { margin-block: 0.2rem; }
 <p>Purposes: <code>order</code> (linked to an order) and <code>topup</code> (wallet top-up; on success the wallet is credited in the same transaction).</p>
 <h3 id="53-delivery-task-delivery_tasksstatus--forward-only"><a class="anchor" href="#53-delivery-task-delivery_tasksstatus--forward-only" aria-hidden="true">#</a>5.3 Delivery task (<code>delivery_tasks.status</code>) 🔒 forward-only</h3>
 <div class="diagram"><pre class="mermaid">stateDiagram-v2
-  [*] --&gt; unassigned: order paid (or COD) → openFulfilment
+  [*] --&gt; unassigned: order paid → openFulfilment
   unassigned --&gt; assigned: rider accepts / ops assigns 🔒
   assigned --&gt; picked_up 🔒
   picked_up --&gt; in_transit 🔒
@@ -4547,7 +4533,7 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td>Fraud alert</td>
 <td><code>open</code> → <code>reviewed</code> / <code>blocked</code></td>
-<td>Manual; alerts raised only for COD orders above <code>codCapUsd</code></td>
+<td>Manual; alerts raised by the rules failed payments, new-account orders, shared identity, return rate and address changes</td>
 </tr>
 <tr>
 <td>Warehouse batch</td>
@@ -4596,7 +4582,7 @@ main li { margin-block: 0.2rem; }
 <p>Gaps: no login lockout / progressive delay per account; refresh tokens are not rotated or stored server-side (no &quot;active devices&quot; list, no single-session revoke); no 2FA for staff.</p>
 <h3 id="f3-browsing-the-catalogue---"><a class="anchor" href="#f3-browsing-the-catalogue---" aria-hidden="true">#</a>F3. Browsing the catalogue ✅ / 🟡</h3>
 <ul>
-<li>Guests and customers: <code>products:list</code> (live only), <code>products:get</code>, <code>categories:list</code>, <code>reviews:list</code>, <code>questions:list</code>, <code>flashsales:list</code>, <code>sellers:storefront</code>, <code>cms:list</code>, <code>settings:get</code> (public subset: <code>fxRate</code>, <code>codEnabled</code>, <code>codCapUsd</code>, <code>deliveryZones</code>).</li>
+<li>Guests and customers: <code>products:list</code> (live only), <code>products:get</code>, <code>categories:list</code>, <code>reviews:list</code>, <code>questions:list</code>, <code>flashsales:list</code>, <code>sellers:storefront</code>, <code>cms:list</code>, <code>settings:get</code> (public subset: <code>fxRate</code>, <code>deliveryZones</code>).</li>
 <li>Live pushes <code>product:created/updated</code>, <code>categories:updated</code>, <code>flashsale:updated</code>, <code>cms:updated</code>, <code>settings:updated</code> update every open screen (e.g. a price change appears in carts instantly).</li>
 <li>Gaps: <code>products:list</code> returns <strong>everything</strong> (no pagination, sort or server search); search is done on the client; no recommendations, recently viewed or &quot;buy again&quot; on the server.</li>
 </ul>
@@ -4681,13 +4667,11 @@ main li { margin-block: 0.2rem; }
     API--&gt;&gt;WH: delivery:location
   end
   R-&gt;&gt;API: delivery:updateStatus in_transit → out_for_delivery
-  R-&gt;&gt;API: delivery:updateStatus delivered (COD: "cash collected?" confirm)
-  API-&gt;&gt;API: COD payment → succeeded, order → delivered
+  R-&gt;&gt;API: delivery:updateStatus delivered (with the customer's code when required)
+  API-&gt;&gt;API: order → delivered
   API--&gt;&gt;C: order:updated (delivered) + notification</pre></div>
-<p>Missing for a professional operation: <strong>seller fulfilment step</strong> (seller accepts, packs, marks ready; pickup from seller or drop-off at hub), <strong>inbound / receiving / sorting</strong> at the hub (pages exist, not modelled), <strong>proof of delivery</strong> (customer OTP, photo, signature — the web has a <code>pod</code> page, mock), <strong>failed-delivery handling</strong> (reason codes, re-attempt scheduling, return to hub, customer contact), <strong>delivery slots</strong>, <strong>shift assignment for riders</strong> (zones and warehouses are assigned: WAREHOUSE-ZONES.md), <strong>route optimisation</strong>, <strong>rider cash hand-over ledger</strong> (reconcile exists as a read-only aggregate), <strong>multi-seller orders split into parcels</strong>.</p>
-<h3 id="f9-cash-on-delivery--disabled"><a class="anchor" href="#f9-cash-on-delivery--disabled" aria-hidden="true">#</a>F9. Cash on delivery ✅ (disabled)</h3>
-<p>Off by default (<code>codEnabled=false</code>). When enabled by an admin: payment <code>pending</code> from creation, fulfilment opens immediately, the order is flagged to fraud review when total &gt; <code>codCapUsd</code>, the rider confirms cash on <code>delivered</code>, <code>warehouse:reconcile</code> sums cash per rider.</p>
-<h3 id="f10-seller-onboarding-and-listing-"><a class="anchor" href="#f10-seller-onboarding-and-listing-" aria-hidden="true">#</a>F10. Seller onboarding and listing 🟡</h3>
+<p>Missing for a professional operation: <strong>seller fulfilment step</strong> (seller accepts, packs, marks ready; pickup from seller or drop-off at hub), <strong>inbound / receiving / sorting</strong> at the hub (pages exist, not modelled), <strong>proof of delivery</strong> (customer OTP, photo, signature — the web has a <code>pod</code> page, mock), <strong>failed-delivery handling</strong> (reason codes, re-attempt scheduling, return to hub, customer contact), <strong>delivery slots</strong>, <strong>shift assignment for riders</strong> (zones and warehouses are assigned: WAREHOUSE-ZONES.md), <strong>route optimisation</strong>, <strong>multi-seller orders split into parcels</strong>.</p>
+<h3 id="f9-seller-onboarding-and-listing-"><a class="anchor" href="#f9-seller-onboarding-and-listing-" aria-hidden="true">#</a>F9. Seller onboarding and listing 🟡</h3>
 <ol>
 <li>Register with role <code>seller</code> (F1) → <code>sellers:register {name}</code> → store <code>pending</code> → admins get <code>seller:updated</code>.</li>
 <li>Admin/moderation/operations <code>sellers:setStatus approved</code> (or <code>rejected</code> / <code>suspended</code> → sessions revoked).</li>
@@ -4695,7 +4679,7 @@ main li { margin-block: 0.2rem; }
 <li>Edit (<code>products:update</code>), remove (<code>products:delete</code> → <code>removed</code>), answer questions, view reviews, campaigns.</li>
 </ol>
 <p>Missing: KYC documents (ID, business registration, tax number), bank / mobile-money payout account, store profile (logo, banner, policies, address), product moderation queue, variants/SKUs and multiple images, bulk import, seller subscription plans (pages exist, mock), seller staff accounts.</p>
-<h3 id="f11-seller-payouts-"><a class="anchor" href="#f11-seller-payouts-" aria-hidden="true">#</a>F11. Seller payouts 🟡</h3>
+<h3 id="f10-seller-payouts-"><a class="anchor" href="#f10-seller-payouts-" aria-hidden="true">#</a>F10. Seller payouts 🟡</h3>
 <div class="diagram"><pre class="mermaid">sequenceDiagram
   actor S as Seller
   participant API
@@ -4708,26 +4692,26 @@ main li { margin-block: 0.2rem; }
   API-&gt;&gt;API: credit seller's in-app wallet
   API--&gt;&gt;S: payout:updated</pre></div>
 <p>Missing: real disbursement (bank transfer / mobile money B2C) and its reconciliation, payout schedule (e.g. weekly automatic), statements/invoices with commission and fees, tax reports (pages exist, mock), returns/chargebacks netted against future payouts.</p>
-<h3 id="f12-disputes-and-returns-"><a class="anchor" href="#f12-disputes-and-returns-" aria-hidden="true">#</a>F12. Disputes and returns 🟡</h3>
+<h3 id="f11-disputes-and-returns-"><a class="anchor" href="#f11-disputes-and-returns-" aria-hidden="true">#</a>F11. Disputes and returns 🟡</h3>
 <p><code>disputes:open {orderId, type: dispute|return, reason}</code> (customer, paid, non-cancelled, one open per order) → admins get <code>dispute:created</code> → <code>disputes:resolve {refund?}</code> (refund only by admin/finance; uses the refund path of F7) or <code>disputes:reject</code>. Missing: return shipment (pickup task, label, receipt/inspection at hub), partial refunds per item, evidence attachments, seller participation in the dispute thread, SLA timers and auto-escalation.</p>
-<h3 id="f13-exchanges-and-replacements-"><a class="anchor" href="#f13-exchanges-and-replacements-" aria-hidden="true">#</a>F13. Exchanges and replacements 🟡</h3>
+<h3 id="f12-exchanges-and-replacements-"><a class="anchor" href="#f12-exchanges-and-replacements-" aria-hidden="true">#</a>F12. Exchanges and replacements 🟡</h3>
 <p>Customer <code>exchanges:create</code> / <code>replacements:create</code> against an order → ops progress the status (<code>*:setStatus</code>), customer notified on each step. Missing: enforced transitions, linking to stock movements and to a delivery task for the outbound item, price-difference payment for exchanges.</p>
-<h3 id="f14-support---"><a class="anchor" href="#f14-support---" aria-hidden="true">#</a>F14. Support ✅ / 🟡</h3>
+<h3 id="f13-support---"><a class="anchor" href="#f13-support---" aria-hidden="true">#</a>F13. Support ✅ / 🟡</h3>
 <p><code>support:open {subject, category, message, orderId?}</code> → ticket with a message thread → <code>support:reply</code> (staff reply sets <code>pending</code>, customer reply sets <code>open</code>) → <code>support:setStatus</code>. Missing: attachments, assignment to an agent, SLA, canned replies, email notification of replies, satisfaction rating.</p>
-<h3 id="f15-promotions-flash-sales-and-campaigns-"><a class="anchor" href="#f15-promotions-flash-sales-and-campaigns-" aria-hidden="true">#</a>F15. Promotions, flash sales and campaigns 🟡</h3>
+<h3 id="f14-promotions-flash-sales-and-campaigns-"><a class="anchor" href="#f14-promotions-flash-sales-and-campaigns-" aria-hidden="true">#</a>F14. Promotions, flash sales and campaigns 🟡</h3>
 <ul>
 <li><strong>Promo codes</strong> (<code>promos:create</code>): percent/fixed, <code>minOrder</code>, <code>maxUses</code>, <code>perUserLimit</code>, <code>expiresAt</code>, <code>isPublic</code>; previewed with <code>promos:validate</code>, <strong>re-validated at order creation</strong>.</li>
 <li><strong>Flash sales</strong> (<code>flashsales:create</code>): product, flash price, window. ⚠ the flash price is <strong>not applied by the order pricing</strong> (checkout uses the product price).</li>
 <li><strong>Campaigns</strong>: seller proposes, admin sets status. ⚠ campaign discounts are not applied to prices; no scheduler.</li>
 <li>Missing: referral programme, loyalty points, bundle / buy-X-get-Y, free-delivery rules, automatic start/end jobs.</li>
 </ul>
-<h3 id="f16-notifications---"><a class="anchor" href="#f16-notifications---" aria-hidden="true">#</a>F16. Notifications ✅ / 🟡</h3>
+<h3 id="f15-notifications---"><a class="anchor" href="#f15-notifications---" aria-hidden="true">#</a>F15. Notifications ✅ / 🟡</h3>
 <p><code>NotificationsService.toUser / toUsers / toRole / toAdmins</code> → row in <code>notifications</code> + live <code>notification:new</code> (with <code>link</code>, the page it opens) → <code>PushService</code> sends FCM with <code>{type, entityId, notificationId, link}</code>, the Android channel <code>somba_default</code> and the iOS default sound (if Firebase is configured; invalid tokens pruned). A user with <code>prefs.push = false</code> gets no push. Role notices go to that role&#39;s <strong>web</strong> devices; phones only get marketing and rider-task pushes. Clients: <code>notifications:list</code> (with <code>link</code>), <code>markRead</code>, <code>markAllRead</code>, <code>devices:register/unregister</code>, <code>devices:test</code>. Both apps open the right screen from a tap (also for a tap that launched the app), and the portals have a bell, desktop alerts and web push. See MOBILE-PUSH.md. Email/SMS only for verification and reset. Missing: transactional email/SMS for order milestones, per-category preference enforcement, push texts in the user&#39;s language, quiet hours.</p>
-<h3 id="f17-administration-and-moderation---"><a class="anchor" href="#f17-administration-and-moderation---" aria-hidden="true">#</a>F17. Administration and moderation ✅ / 🟡</h3>
+<h3 id="f16-administration-and-moderation---"><a class="anchor" href="#f16-administration-and-moderation---" aria-hidden="true">#</a>F16. Administration and moderation ✅ / 🟡</h3>
 <p>Customers (<code>customers:list</code>, <code>setActive</code> → kick + revoke), sellers (<code>sellers:list/setStatus</code>), staff and roles (<code>roles:staff</code>, <code>roles:setRole</code> → kick, audited), settings (<code>settings:set</code>, audited), audit log, fraud alerts, analytics (<code>analytics:admin/revenue/warehouse</code>), broadcasts. Missing: staff invitation flow (create staff account with temporary password + first-login change — the rider web has a mock <code>first-password</code> page), admin 2FA, zones editor UI, report exports (CSV), impersonation for support (read-only).</p>
-<h3 id="f18-account-deletion-"><a class="anchor" href="#f18-account-deletion-" aria-hidden="true">#</a>F18. Account deletion ✅</h3>
+<h3 id="f17-account-deletion-"><a class="anchor" href="#f17-account-deletion-" aria-hidden="true">#</a>F17. Account deletion ✅</h3>
 <p><code>me:delete {password}</code> (customer/seller): PII anonymised (tombstone email, name &quot;Deleted user&quot;, phone/address/avatar/prefs cleared), password randomised, <code>tokenVersion</code> bumped, <code>active=false</code>, sockets closed. Orders are kept for accounting. Missing: data export (&quot;download my data&quot;), grace period / undo.</p>
-<h3 id="f19-password-reset-"><a class="anchor" href="#f19-password-reset-" aria-hidden="true">#</a>F19. Password reset ✅</h3>
+<h3 id="f18-password-reset-"><a class="anchor" href="#f18-password-reset-" aria-hidden="true">#</a>F18. Password reset ✅</h3>
 <p><code>POST /auth/forgot</code> (same response for unknown emails) → 60-minute single-use token by email → <code>POST /auth/reset</code> → new bcrypt hash, <code>tokenVersion</code> bumped (all sessions end).</p>
 <h2 id="7-api-reference"><a class="anchor" href="#7-api-reference" aria-hidden="true">#</a>7. API reference</h2>
 <h3 id="71-rest"><a class="anchor" href="#71-rest" aria-hidden="true">#</a>7.1 REST</h3>
@@ -4821,7 +4805,7 @@ main li { margin-block: 0.2rem; }
 <td><code>orders:create</code></td>
 <td>Signed-in</td>
 <td><code>{ items: [{ productId?, name?, priceUsd?, qty, variant? }], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress? (JSON), paymentPhone?, promoCode? }</code></td>
-<td>Server prices, stock reservation, promo, zone fee, payment start; COD fraud check above <code>codCapUsd</code></td>
+<td>Server prices, stock reservation, promo, zone fee, payment start</td>
 </tr>
 <tr>
 <td><code>orders:updateStatus</code></td>
@@ -4871,7 +4855,7 @@ main li { margin-block: 0.2rem; }
 <td><code>delivery:updateStatus</code></td>
 <td>rider (assigned)</td>
 <td><code>{ taskId: string; status: DeliveryStatus }</code></td>
-<td>Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered</td>
+<td>Forward-only: assigned→picked_up→in_transit→delivered, or →failed</td>
 </tr>
 <tr>
 <td><code>delivery:location</code></td>
@@ -5199,7 +5183,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 </thead><tbody><tr>
 <td><code>settings:get</code></td>
-<td>Public subset (fxRate, codEnabled, codCapUsd, deliveryZones); group config sees all</td>
+<td>Public subset (fxRate, deliveryZones); group config sees all</td>
 <td><code>—</code></td>
 <td></td>
 </tr>
@@ -5430,12 +5414,6 @@ main li { margin-block: 0.2rem; }
 <td>Groups task ids for one rider</td>
 </tr>
 <tr>
-<td><code>warehouse:reconcile</code></td>
-<td>Ops (any admin_* role, warehouse_staff)</td>
-<td><code>—</code></td>
-<td>COD cash reconciliation</td>
-</tr>
-<tr>
 <td><code>warehouse:transfers</code></td>
 <td>Ops (any admin_* role, warehouse_staff)</td>
 <td><code>—</code></td>
@@ -5459,7 +5437,7 @@ main li { margin-block: 0.2rem; }
 <td><code>rider:workStats</code></td>
 <td>rider (own; other roles refused)</td>
 <td><code>—</code></td>
-<td>Work stats, no pay (riders are salaried): <code>{ totalTasks, completed, active, failed, completedToday, completedLast7Days, successRate, byKind: [{kind,count}], codCollectedUsd, delivered }</code></td>
+<td>Work stats, no pay (riders are salaried): <code>{ totalTasks, completed, active, failed, completedToday, completedLast7Days, successRate, byKind: [{kind,count}], delivered }</code></td>
 </tr>
 <tr>
 <td><code>rider:earnings</code></td>
@@ -5888,7 +5866,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 </thead><tbody><tr>
 <td>Screens</td>
-<td><code>RiderLoginScreen</code> (no prefilled credentials, no offline entry), <code>ForgotPasswordScreen</code>, <code>RiderShell</code> with tabs <strong>Deliveries</strong> (Active / Available / Done, claim, next step, fail with confirmation, cash confirmation for COD), <strong>My work</strong> (work stats: tasks completed today / this week / all time, completed, in progress, failed, success rate, completed by type, cash collected; riders are salaried, so no pay is shown), <strong>Profile</strong> (notifications, language EN/FR, sign out)</td>
+<td><code>RiderLoginScreen</code> (no prefilled credentials, no offline entry), <code>ForgotPasswordScreen</code>, <code>RiderShell</code> with tabs <strong>Deliveries</strong> (Active / Available / Done, claim, next step, fail with confirmation), <strong>My work</strong> (work stats: tasks completed today / this week / all time, completed, in progress, failed, success rate, completed by type; riders are salaried, so no pay is shown), <strong>Profile</strong> (notifications, language EN/FR, sign out)</td>
 </tr>
 <tr>
 <td>State</td>
@@ -5907,7 +5885,7 @@ main li { margin-block: 0.2rem; }
 <td>3 widget tests; live-API test (sign in → claim → picked up → in transit → GPS reaches customer → delivered → work stats → forward-only rule)</td>
 </tr>
 </tbody></table></div>
-<p>Gaps: background location (foreground service + <code>ACCESS_BACKGROUND_LOCATION</code>, battery handling), navigation hand-off (Google Maps intent), proof of delivery (OTP / photo), failed-delivery reasons, shift/availability toggle (the <code>users.active</code> &quot;availability&quot; comment exists but no rider UI), batches view, cash hand-over. (New-task pushes, tap-to-open and the home warehouse with preferred zones are done.)</p>
+<p>Gaps: background location (foreground service + <code>ACCESS_BACKGROUND_LOCATION</code>, battery handling), navigation hand-off (Google Maps intent), proof of delivery (OTP / photo), failed-delivery reasons, shift/availability toggle (the <code>users.active</code> &quot;availability&quot; comment exists but no rider UI), batches view. (New-task pushes, tap-to-open and the home warehouse with preferred zones are done.)</p>
 <h3 id="83-web--nextjs-16--react-19-web"><a class="anchor" href="#83-web--nextjs-16--react-19-web" aria-hidden="true">#</a>8.3 Web — Next.js 16 / React 19 (<code>web/</code>)</h3>
 <p><strong>Structure</strong></p>
 <div class="table-wrap"><table><thead><tr>
@@ -6113,10 +6091,10 @@ main li { margin-block: 0.2rem; }
 <td>Daily Google character budget (over it, jobs wait for the next day)</td>
 </tr>
 </tbody></table></div>
-<p><strong>Admin-editable settings</strong> (<code>settings</code> table): <code>fxRate</code> (CDF per USD), <code>codEnabled</code>, <code>codCapUsd</code>, <code>deliveryZones</code>, <code>commissionPct</code>.</p>
+<p><strong>Admin-editable settings</strong> (<code>settings</code> table): <code>fxRate</code> (CDF per USD), <code>deliveryZones</code>, <code>commissionPct</code>.</p>
 <h3 id="92-database-lifecycle"><a class="anchor" href="#92-database-lifecycle" aria-hidden="true">#</a>9.2 Database lifecycle</h3>
 <ul>
-<li>Development: SQLite with <code>synchronize</code>, <code>npm run seed</code> (demo users for every role, catalogue, orders, campaigns…; seed switches COD back off).</li>
+<li>Development: SQLite with <code>synchronize</code>, <code>npm run seed</code> (demo users for every role, catalogue, orders, campaigns…).</li>
 <li>Production: MySQL, <code>npm run migration:run</code> (4 hand-written migrations, verified up/down/up on MariaDB), <code>bootstrap:prod</code> (admin, categories, settings, hubs). The demo seed must never run in production.</li>
 </ul>
 <h3 id="93-ci-github-actions"><a class="anchor" href="#93-ci-github-actions" aria-hidden="true">#</a>9.3 CI (GitHub Actions)</h3>
@@ -6234,7 +6212,7 @@ main li { margin-block: 0.2rem; }
 <td>Zones live in a JSON setting</td>
 <td><code>settings.deliveryZones</code></td>
 <td>No editing UI, no geometry, no per-zone rules</td>
-<td><code>zones</code> table (name, city, polygon/communes, fee, ETA, active, COD allowed)</td>
+<td><code>zones</code> table (name, city, polygon/communes, fee, ETA, active)</td>
 <td>P1</td>
 </tr>
 <tr>
@@ -6424,7 +6402,7 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td>O5</td>
 <td>Rider management</td>
-<td>Shifts/availability, zone assignment, capacity, ratings, documents (licence, ID), payout of rider earnings, cash hand-over ledger with sign-off</td>
+<td>Shifts/availability, zone assignment, capacity, ratings, documents (licence, ID), payout of rider earnings</td>
 <td>P1</td>
 </tr>
 <tr>
@@ -6877,7 +6855,6 @@ main li { margin-block: 0.2rem; }
     json polygon
     decimal fee
     int etaHours
-    bool codAllowed
     bool active
   }
   RiderShift {
@@ -6904,7 +6881,7 @@ main li { margin-block: 0.2rem; }
 <li>Multi-seller orders: <code>seller_orders</code> + seller fulfilment step + shipments; order timeline (<code>order_events</code>); explicit transition tables for orders, exchanges, replacements, exceptions, campaigns.</li>
 <li>Hub operations: inventory per hub, stock movements, receiving/sorting/dispatch, real transfers.</li>
 <li>Returns logistics and refunds per item; dispute thread with evidence.</li>
-<li>Rider operations: shifts, zones, background GPS, failed-delivery workflow, cash hand-over.</li>
+<li>Rider operations: shifts, zones, background GPS, failed-delivery workflow.</li>
 <li>Push notifications end-to-end (Firebase), transactional email/SMS templates, deep links.</li>
 <li>Finish wiring the ~74 demo web pages; staff invitations + 2FA; seller KYC; invoices and statements.</li>
 <li>Security: sessions table with refresh rotation, secure token storage, audit of every sensitive change, dependency scanning.</li>
@@ -6942,7 +6919,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>Zones</td>
-<td>List of communes/zones, fees, ETAs, COD per zone</td>
+<td>List of communes/zones, fees, ETAs</td>
 </tr>
 <tr>
 <td>Firebase</td>

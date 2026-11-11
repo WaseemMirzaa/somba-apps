@@ -320,41 +320,14 @@ describe('fraud alerts: one per rule per customer per day', () => {
   });
 });
 
-describe('fraud rules after an order, and the COD cap', () => {
+describe('fraud rules after an order', () => {
   const placed = async (u: User, paymentMethod: Order['paymentMethod'], totalUsd: number) => {
     const o = await addOrder(u, { paymentMethod, totalUsd });
     await rules.afterOrder({ id: u.id, name: u.name }, o);
     return o;
   };
 
-  it('raises no COD alert while codEnabled is not true (the COD-cap rule is gated on the flag)', async () => {
-    const u = await addUser();
-    await placed(u, 'cod', 900);
-    settingsMap.codEnabled = 'false';
-    await placed(u, 'cod', 900);
-    expect(await alertsOf(u)).toEqual([]);
-  });
-
-  it('raises the COD alert above the cap when COD is on, with the reason and the customer id', async () => {
-    settingsMap.codEnabled = 'true';
-    settingsMap.codCapUsd = '500';
-    const u = await addUser();
-    await placed(u, 'cod', 450);
-    expect(await alertsOf(u)).toEqual([]);
-    await placed(u, 'cod', 600);
-    const [alert] = await alertsOf(u);
-    expect(alert).toMatchObject({ type: 'cod_risk', customerId: u.id, severity: 'medium' });
-    expect(alert.reason).toBe('Cash-on-delivery order of $600.00 is above the $500.00 cap.');
-  });
-
-  it('a non-COD order never raises a COD alert even with COD on', async () => {
-    settingsMap.codEnabled = 'true';
-    const u = await addUser();
-    await placed(u, 'wallet', 9000);
-    expect(await alertsOf(u)).toEqual([]);
-  });
-
-  it('runs the other rules too: the 3rd order of a new account raises an alert tied to that order', async () => {
+  it('the 3rd order of a new account raises an alert tied to that order', async () => {
     const u = await addUser({ createdAt: hoursAgo(2) });
     await placed(u, 'wallet', 10);
     await placed(u, 'wallet', 10);

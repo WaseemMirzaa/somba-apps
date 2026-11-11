@@ -9,7 +9,7 @@ describe('csv words', () => {
     expect(w.packageStatus('to_pack')).toBe('to_pack');
     expect(w.payoutStatus('requested')).toBe('requested');
     expect(w.kind('refund')).toBe('refund');
-    expect(w.method('cod')).toBe('cod');
+    expect(w.method('wallet')).toBe('wallet');
   });
 
   it('French has a word for every order status, package step, payout status, kind and common payment method', () => {
@@ -19,7 +19,7 @@ describe('csv words', () => {
     expect(w.packageStatus('delivered')).toBe('livrée'); // a package past the warehouse carries the order's own status
     for (const s of ['requested', 'sending', 'rejected', 'paid']) expect(w.payoutStatus(s)).not.toBe(s);
     for (const k of ['sale', 'refund', 'payout']) expect(w.kind(k)).not.toBe(k);
-    expect(w.method('cod')).toBe('Paiement à la livraison');
+    expect(w.method('wallet')).toBe('Portefeuille');
     expect(w.method('airtel_money')).toBe('airtel_money'); // brand names stay
     expect(w.method(null)).toBe('');
   });

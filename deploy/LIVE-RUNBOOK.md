@@ -84,10 +84,6 @@ unset DEMO_PASSWORD
 (Without `DEMO_PASSWORD` the script generates two random ones: customers and store owners share one, staff share another.)
 An account that already exists keeps its password unless you run `reset` (section 5).
 
-Cash on delivery is off, so the two cash-on-delivery demo orders are skipped. `bash /opt/somba/deploy/seed-demo.sh --with-cod` (or
-`DEMO_WITH_COD=1`) switches `codEnabled` on and makes them; it is the only setting the seed ever changes, and the removal leaves it on
-(turn it off as in section 7).
-
 Express delivery is off too, so the express demo orders of store C are skipped. `seed-demo.sh --with-express` (or
 `DEMO_WITH_EXPRESS=1`) switches `expressDeliveryEnabled` on and makes them (it changes only that setting; the removal leaves it on).
 **Do that only once the client has installed the current rider app build** (section 9): it is the one that knows the express job.
@@ -163,23 +159,9 @@ Card and webhook endpoints need a public HTTPS address. `komoriko.com` points at
 Let's Encrypt certificate and redirects HTTP to HTTPS (the DNS A record must already point at the droplet when you run it). The
 APK workflows default to `https://komoriko.com`.
 
-## 7. Switching on cash on delivery and mobile money
+## 7. Mobile money
 
-**Cash on delivery.** It is the platform setting `codEnabled` (off at launch; the server refuses COD orders unless it is exactly
-`true`). Related: `codCapUsd` (COD orders above it raise a fraud alert). The admin web page **Admin > Settings > Checkout and
-delivery** has the "Cash on delivery" row and the COD cap, **but while COD is off that page shows "Not offered" instead of a
-toggle, and hides the cap**, so it cannot switch it on. Switch it on directly (root; nothing needs a restart, the API reads
-the setting on each request; users see it after they reopen the app or reload the page):
-
-```bash
-mysql somba -e "UPDATE settings SET \`value\`='true' WHERE \`key\`='codEnabled'"
-mysql somba -e "SELECT \`key\`,\`value\` FROM settings WHERE \`key\` IN ('codEnabled','codCapUsd')"
-```
-
-To turn it off again, set it to `'false'`. Once it is `true` the toggle and the cap appear on the admin page and can be changed there.
-(`mysql` as root uses the local socket, the same way `droplet-deploy.sh` creates the database.)
-
-**Mobile money (pawaPay).** Root, in this order, one value at a time (hidden prompt):
+Mobile money goes through pawaPay. Root, in this order, one value at a time (hidden prompt):
 
 ```bash
 bash /opt/somba/deploy/set-secret.sh PAWAPAY_API_TOKEN

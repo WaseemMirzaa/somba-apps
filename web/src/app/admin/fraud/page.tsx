@@ -20,7 +20,6 @@ import { useToast } from "@/context/toast-context";
 import { useRealtime } from "@/context/realtime-context";
 import { errMsg } from "@/lib/admin-live";
 import { canSuspendAccounts, fraudDialogText, type FraudDialogMode } from "@/lib/fraud-block";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import { fraudReason, fraudTypeLabel } from "@/lib/fraud-alerts";
 
 const severityVariant = { low: "default", medium: "warning", high: "danger" } as const;
@@ -35,7 +34,6 @@ const STATUS_OPTIONS = [
 export default function AdminFraudPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const codOffered = useCodOffered();
   const { fraudAlerts, setFraudStatus, loading, error, reload } = useAdminData({ fraud: true });
   const { toast } = useToast();
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
@@ -89,7 +87,7 @@ export default function AdminFraudPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? `Alertes levées par le serveur avec leur raison (paiements échoués, comptes récents, téléphone ou appareil partagé, retours, changements d'adresse${codOffered ? ", plafond paiement à la livraison" : ""}) — examinez-les ; bloquer suspend le compte du client` : `Alerts raised by the server, each with its reason (failed payments, new accounts, shared phone or device, returns, address changes${codOffered ? ", cash-on-delivery cap" : ""}) — review them; blocking suspends the customer's account`} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
+      <PageHeader title={fr ? "Fraude et risque de paiement" : "Fraud & Payment Risk"} subtitle={fr ? `Alertes levées par le serveur avec leur raison (paiements échoués, comptes récents, téléphone ou appareil partagé, retours, changements d'adresse) — examinez-les ; bloquer suspend le compte du client` : `Alerts raised by the server, each with its reason (failed payments, new accounts, shared phone or device, returns, address changes) — review them; blocking suspends the customer's account`} breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Fraude" : "Fraud" }]} />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard title={fr ? "Alertes ouvertes" : "Open Alerts"} value={fraudAlerts.filter((a) => a.status === "open").length} icon={AlertTriangle} />

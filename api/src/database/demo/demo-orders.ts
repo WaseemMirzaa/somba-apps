@@ -104,7 +104,7 @@ async function splitOrder(c: Scenario, both: boolean): Promise<void> {
     return;
   }
 
-  // First leg: delivered to the customer with their code (and the cash share when the order is cash on delivery).
+  // First leg: delivered to the customer with their code.
   await driver.drive(c.order.id, 'delivered', (t) => t.kind === 'delivery');
   const leg1At = new Date(now - 72 * H);
   await stampTask(ds, made[0].id, {
@@ -179,8 +179,8 @@ async function failedOnce(c: Scenario): Promise<void> {
 }
 
 /**
- * What each store has waiting, a split delivery on the road and one delivered in two legs, cash on delivery, and a failed
- * attempt. `cod` specs are made only when `codEnabled` is on (see `--with-cod`).
+ * What each store has waiting, a split delivery on the road and one delivered in two legs, and a failed
+ * attempt.
  */
 export function orderTypeSpecs(): OrderSpec[] {
   return [
@@ -331,7 +331,7 @@ export function orderTypeSpecs(): OrderSpec[] {
       express: true,
     },
     {
-      // Cash on delivery and express together: waiting to be packed; the customer pays the rider at the door.
+      // Express: waiting to be packed.
       key: 'X-C1',
       customer: 'reviewer.1',
       lines: [{ sku: 'MC-KTL' }, { sku: 'MC-CHG' }],
@@ -339,29 +339,6 @@ export function orderTypeSpecs(): OrderSpec[] {
       stage: 'placed',
       placedAgoH: 1,
       express: true,
-      cod: true,
-    },
-
-    // ── Cash on delivery (only while cash on delivery is on) ──
-    {
-      key: 'C-1',
-      customer: 'reviewer.3',
-      lines: [{ sku: 'MK-BAG' }],
-      address: 'bandalungwa',
-      stage: 'placed',
-      placedAgoH: 3,
-      cod: true,
-    },
-    {
-      // Delivered, the rider recorded the exact cash on the leg, and the payment was marked collected.
-      key: 'C-2',
-      customer: 'customer.full',
-      lines: [{ sku: 'MK-OIL' }, { sku: 'MK-COF' }],
-      address: 'gombe',
-      stage: 'delivered',
-      placedAgoH: 3 * 24,
-      deliveredAgoH: 2 * 24,
-      cod: true,
     },
   ];
 }

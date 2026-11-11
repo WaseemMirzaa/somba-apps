@@ -2,7 +2,7 @@ import { RealtimeGateway } from './realtime.gateway';
 
 /** `rider:workStats` (and its deprecated alias `rider:earnings`): riders only, same answer on both names. */
 describe('rider:workStats (gateway)', () => {
-  const stats = { totalTasks: 3, completed: 2, active: 0, failed: 1, completedToday: 1, completedLast7Days: 2, successRate: 67, byKind: [{ kind: 'delivery', count: 2 }], codCollectedUsd: 5, delivered: 2 };
+  const stats = { totalTasks: 3, completed: 2, active: 0, failed: 1, completedToday: 1, completedLast7Days: 2, successRate: 67, byKind: [{ kind: 'delivery', count: 2 }], delivered: 2 };
   let rider: { workStats: jest.Mock };
   let gw: RealtimeGateway;
   const as = (role: string, id = 'r1') => ({ data: { user: { id, role, name: `${role} name` } } }) as never;

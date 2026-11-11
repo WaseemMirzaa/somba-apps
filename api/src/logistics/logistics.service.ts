@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { RETURN_TO_SELLER_ADMINS } from '../common/staff-access';
 import { withOrderLock } from '../common/order-lock';
-import { cents2, lineShareUsd } from '../common/delivery/split';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomInt } from 'crypto';
 import { EntityManager, In, IsNull, Not, Repository } from 'typeorm';
@@ -14,7 +13,6 @@ import {
   Hub,
   Order,
   OrderItem,
-  Payment,
   Product,
   Replacement,
   Seller,
@@ -107,11 +105,6 @@ export interface TaskView {
   replacementId: string | null;
   exchangeId: string | null;
   attempts: number;
-  codAmountUsd: number;
-  /** The cash record (C-cod): what the rider confirmed taking, when, and how much of it the warehouse has received. Null before any. */
-  codCollectedUsd: number | null;
-  codCollectedAt: Date | null;
-  codHandedOverUsd: number;
   address: string | null;
   pickupAddress: string | null;
   lat: number | null;
@@ -387,10 +380,6 @@ export class LogisticsService {
         replacementId: t.replacementId ?? null,
         exchangeId: t.exchangeId ?? null,
         attempts: t.attempts,
-        codAmountUsd: t.codAmountUsd,
-        codCollectedUsd: t.codCollectedUsd ?? null,
-        codCollectedAt: t.codCollectedAt ?? null,
-        codHandedOverUsd: t.codHandedOverUsd ?? 0,
         address: t.address,
         pickupAddress: t.pickupAddress,
         lat: t.lat,
@@ -422,7 +411,7 @@ export class LogisticsService {
       };
       if (audience === 'seller') {
         // A seller sees where their parcel is, never the customer.
-        return { ...base, sellerIds: null, codeFailures: 0, codeLockedUntil: null, codeLocked: false, address: null, codAmountUsd: 0, codCollectedUsd: null, codCollectedAt: null, codHandedOverUsd: 0, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
+        return { ...base, sellerIds: null, codeFailures: 0, codeLockedUntil: null, codeLocked: false, address: null, lat: null, lng: null, from: base.from?.type === 'customer' ? null : base.from, to: base.to?.type === 'customer' ? null : base.to, riderName: base.riderName ? base.riderName.split(' ')[0] : null };
       }
       return base;
     });
@@ -468,7 +457,6 @@ export class LogisticsService {
     const row = repo.create({
       status: 'unassigned',
       attempts: 1,
-      codAmountUsd: 0,
       fromHubId: null,
       toHubId: null,
       sellerId: null,
@@ -528,14 +516,6 @@ export class LogisticsService {
   private async hubAddressText(hubId: string | null): Promise<string> {
     const h = hubId ? await this.hubs.findOne({ where: { id: hubId } }) : null;
     return h ? [h.name, h.address ?? h.city].filter(Boolean).join(' — ') : 'KOMORIKO hub';
-  }
-
-  /** The cash to collect at the door (0 for prepaid; follows partial refunds that lowered the payment). */
-  private async codFor(order: Order): Promise<number> {
-    if (order.paymentMethod !== 'cod') return 0;
-    const pay = await this.tasks.manager.findOne(Payment, { where: { orderId: order.id } });
-    if (!pay) return order.totalUsd;
-    return pay.status === 'pending' ? pay.amountUsd : 0;
   }
 
   /**
@@ -601,7 +581,7 @@ export class LogisticsService {
   }
 
   /**
-   * An order was paid (or is cash on delivery): create one pickup task per seller, from that seller's origin
+   * An order was paid: create one pickup task per seller, from that seller's origin
    * warehouse. The next legs appear as the parcels are scanned in (see {@link onScanIn}). Safe to call twice.
    */
   async planOrder(order: Order): Promise<DeliveryTask[]> {
@@ -670,7 +650,7 @@ export class LogisticsService {
 
   /**
    * An EXPRESS order: ONE leg from the seller to the customer, managed by the warehouse the route recorded (origin = destination).
-   * It carries the whole order, the full cash to collect (it always completes the order), a handover code and, like every customer
+   * It carries the whole order (it always completes the order), a handover code and, like every customer
    * leg, a proof photo. It is not auto-assigned until the seller marks the package ready (see {@link markSellerReady}).
    * Returns null when the order's warehouse no longer exists (the caller then plans it as a standard order).
    */
@@ -692,7 +672,6 @@ export class LogisticsService {
       sellerIds: [key],
       address: order.shippingAddress,
       pickupAddress: `${seller.name} — ${seller.pickupAddress || 'address not provided, contact the seller'}`,
-      codAmountUsd: await this.codFor(order),
       itemsJson: JSON.stringify(lines.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr))),
     });
     // C14: after-sale (returns, replacements) runs through this warehouse, so the route is recorded as origin = destination = the managing warehouse.
@@ -729,26 +708,6 @@ export class LogisticsService {
     return order ? this.completesFor(task, order) : true;
   }
 
-  /**
-   * The cash a customer leg collects at the door (0 for prepaid). A leg that finishes the order takes the REMAINDER (what the
-   * payment still asks, after the cash earlier legs collected), so rounding can never leave the payment a cent apart. Any other
-   * leg takes its sellers' lines (the same pro-rata discount a seller's part-cancel refunds by) plus the delivery fee when no
-   * customer leg has delivered yet. A payment that is not pending any more asks for nothing.
-   */
-  private async codShare(m: EntityManager, order: Order, leg: Pick<DeliveryTask, 'id' | 'sellerIds'>, legs: DeliveryTask[], cargo: OrderItem[], completes: boolean): Promise<number> {
-    if (order.paymentMethod !== 'cod') return 0;
-    const pay = await m.findOne(Payment, { where: { orderId: order.id } });
-    if (pay && pay.status !== 'pending') return 0;
-    const total = pay ? pay.amountUsd : order.totalUsd;
-    const delivered = legs.filter((t) => isCustomerKind(t.kind) && t.status === 'delivered' && t.id !== leg.id);
-    const collected = cents2(delivered.reduce((t, x) => t + (x.codCollectedUsd ?? 0), 0));
-    const left = Math.max(0, cents2(total - collected));
-    if (completes) return left;
-    const value = cargo.reduce((t, i) => t + i.priceUsd * i.qty, 0);
-    const fee = delivered.length ? 0 : (order.deliveryFeeUsd ?? 0);
-    return Math.min(left, cents2(lineShareUsd(order, value) + fee));
-  }
-
   /** The live lines of these sellers that have not reached the customer. */
   private static undelivered(groups: Map<string, OrderItem[]>, keys: Iterable<string>): OrderItem[] {
     const out: OrderItem[] = [];
@@ -762,13 +721,13 @@ export class LogisticsService {
    * the sweeper at the same moment, a retry after a crash) changes nothing the second time.
    *
    *  - There is at most ONE open customer leg per order. While it is unassigned or assigned, parcels that arrive are merged into it
-   *    (its sellers, cargo and cash change). While it is on the road they wait; when it ends, the next pass plans the next leg.
+   *    (its sellers and cargo change). While it is on the road they wait; when it ends, the next pass plans the next leg.
    *  - With none open: once every parcel with goods left is at the destination, the leg is planned for all of them; before that,
    *    only when the oldest waiting parcel has waited `splitAfterHours` (0 = never) and then only for the parcels that arrived.
    *  - `retryOf`: a failed leg is planned again at once (with everything at the warehouse), keeping its proof code.
    */
-  private async planCustomerLeg(m: EntityManager, orderId: string, opts: { now: Date; splitHours: number; retryOf?: DeliveryTask | null }): Promise<{ created: DeliveryTask | null; merged: DeliveryTask | null; shipped: boolean; finished: boolean; cod: DeliveryTask | null }> {
-    const none = { created: null, merged: null, shipped: false, finished: false, cod: null };
+  private async planCustomerLeg(m: EntityManager, orderId: string, opts: { now: Date; splitHours: number; retryOf?: DeliveryTask | null }): Promise<{ created: DeliveryTask | null; merged: DeliveryTask | null; shipped: boolean; finished: boolean; refreshed: DeliveryTask | null }> {
+    const none = { created: null, merged: null, shipped: false, finished: false, refreshed: null };
     const order = await m.findOne(Order, { where: { id: orderId } });
     if (!order || ['cancelled', 'returned', 'delivered'].includes(order.status)) return none;
     const all = await m.find(DeliveryTask, { where: { orderId, disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() }, order: { createdAt: 'ASC' } });
@@ -828,8 +787,8 @@ export class LogisticsService {
           merged = (await m.findOne(DeliveryTask, { where: { id: open.id } }))!;
         }
       }
-      const cod = await this.recomputeOpenCod(m, order, groups, merged ?? open, all);
-      return { ...none, shipped, merged, cod };
+      const refreshed = await this.refreshOpenLeg(m, groups, merged ?? open);
+      return { ...none, shipped, merged, refreshed };
     }
     if (!arrived.length) return { ...none, shipped, finished };
 
@@ -856,7 +815,6 @@ export class LogisticsService {
         hubId: dest,
         address: order.shippingAddress,
         sellerIds: leg.sellerIds,
-        codAmountUsd: await this.codShare(m, order, leg, all, cargo, complete),
         itemsJson: JSON.stringify(cargo.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr))),
         pickupAddress: await this.hubAddressText(dest),
         // A retry keeps the proof code and counts as the next attempt; a new leg gets a new code (the first leg's rider has heard the old one).
@@ -867,33 +825,26 @@ export class LogisticsService {
     return { ...none, created, shipped };
   }
 
-  /** Re-work the open customer leg's cash from the current lines and payment (shares are recomputed on create, merge, re-plan and part-cancel). Returns the leg when its figure changed. */
-  private async recomputeOpenCod(m: EntityManager, order: Order, groups: Map<string, OrderItem[]>, leg: DeliveryTask, all: DeliveryTask[]): Promise<DeliveryTask | null> {
-    if (!isOpen(leg.status)) return null;
+  /** Re-read what an open express leg carries from the live lines (a seller's part-cancel removes lines from it). Returns the leg when its cargo changed. */
+  private async refreshOpenLeg(m: EntityManager, groups: Map<string, OrderItem[]>, leg: DeliveryTask): Promise<DeliveryTask | null> {
+    if (!isOpen(leg.status) || leg.kind !== 'express') return null;
     const keys = leg.sellerIds ? leg.sellerIds.map((k) => LogisticsService.keyOf(k)) : [...groups.keys()];
     const cargo = LogisticsService.undelivered(groups, keys);
-    const completes = await this.completesFor(leg, order);
-    const due = await this.codShare(m, order, leg, all, cargo, completes);
-    // An express leg exists while its seller can still cancel lines: what it carries follows the live lines.
-    let itemsJson: string | null = null;
-    if (leg.kind === 'express') {
-      const frNames = await frenchLineNames(m, cargo.map((i) => i.id));
-      const json = JSON.stringify(cargo.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr)));
-      if (json !== leg.itemsJson) itemsJson = json;
-    }
-    if (Math.abs(due - leg.codAmountUsd) < 0.005 && !itemsJson) return null;
-    await m.update(DeliveryTask, { id: leg.id }, { codAmountUsd: due, ...(itemsJson ? { itemsJson } : {}) });
+    const frNames = await frenchLineNames(m, cargo.map((i) => i.id));
+    const json = JSON.stringify(cargo.map((i) => LogisticsService.cargoLine(i, frNames.get(i.id)?.nameFr ?? i.productNameFr)));
+    if (json === leg.itemsJson) return null;
+    await m.update(DeliveryTask, { id: leg.id }, { itemsJson: json });
     return (await m.findOne(DeliveryTask, { where: { id: leg.id } })) ?? null;
   }
 
-  /** Recompute what the open customer leg of an order collects (after a part-cancel lowered the payment, say) and tell the rider. */
-  async recomputeCod(orderId: string): Promise<void> {
+  /** After a part-cancel: re-read the open express leg's cargo and tell the rider. */
+  async refreshOpenLegCargo(orderId: string): Promise<void> {
     const changed = await withOrderLock(this.tasks.manager, orderId, async (m) => {
       const order = await m.findOne(Order, { where: { id: orderId } });
       if (!order) return null;
       const all = await m.find(DeliveryTask, { where: { orderId, disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() }, order: { createdAt: 'ASC' } });
       const open = all.find((t) => isCustomerKind(t.kind) && isOpen(t.status));
-      return open ? this.recomputeOpenCod(m, order, await this.groupBySeller(order), open, all) : null;
+      return open ? this.refreshOpenLeg(m, await this.groupBySeller(order), open) : null;
     });
     if (changed) await this.emitTask(changed);
   }
@@ -911,7 +862,7 @@ export class LogisticsService {
     // that went back to `confirmed` forward (the re-opened leg does that when its rider picks it up).
     if (out.shipped && !opts.retryOf) await this.advanceOrder(anchor.orderId, 'shipped', { notice: 'warehouse' });
     if (out.merged) await this.afterMerge(out.merged);
-    else if (out.cod) await this.emitTask(out.cod);
+    else if (out.refreshed) await this.emitTask(out.refreshed);
     if (out.created) await this.announce(out.created);
     if (out.finished) await this.finishOrder(anchor.orderId);
     return out.created ? [out.created] : [];
@@ -987,21 +938,10 @@ export class LogisticsService {
 
   /**
    * Every line of the order has now reached the customer or was cancelled (a seller or a failed attempt took the last waiting parcel
-   * out): the order is delivered and its cash is settled. Idempotent.
+   * out): the order is delivered and settled. Idempotent.
    */
   private async finishOrder(orderId: string): Promise<void> {
     await this.advanceOrder(orderId, 'delivered', { notice: 'update' });
-    try {
-      await this.completion?.(orderId);
-    } catch (e) {
-      this.logger.warn(`settling ${orderId} failed: ${(e as Error).message}`);
-    }
-  }
-
-  private completion: ((orderId: string) => Promise<void>) | null = null;
-  /** DeliveryService settles the cash when an order completes without a rider finishing it (the last waiting parcel was cancelled). */
-  registerCompletionHandler(fn: (orderId: string) => Promise<void>): void {
-    this.completion = fn;
   }
 
   /**
@@ -1724,7 +1664,6 @@ export class LogisticsService {
       replacementId: failed.replacementId,
       exchangeId: failed.exchangeId,
       itemsJson: failed.itemsJson,
-      codAmountUsd: failed.codAmountUsd,
       readyAt: failed.readyAt,
       receivedAt: failed.receivedAt,
       finalHubId: failed.finalHubId,
@@ -1758,8 +1697,7 @@ export class LogisticsService {
         sellerId: failed.sellerId,
         sellerIds: failed.sellerIds,
         itemsJson: failed.itemsJson,
-        codAmountUsd: failed.codAmountUsd,
-        readyAt: failed.readyAt,
+          readyAt: failed.readyAt,
         attempts: failed.attempts + 1,
         proofCode: (await this.proofCodeOf(failed.id)) ?? undefined,
       });

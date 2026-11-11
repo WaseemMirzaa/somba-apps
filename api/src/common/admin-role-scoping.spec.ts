@@ -1,4 +1,3 @@
-import { CashGateway } from '../warehouse/cash.gateway';
 import { GeoGateway } from '../geo/geo.gateway';
 import { InventoryGateway } from '../inventory/inventory.gateway';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -69,21 +68,8 @@ describe('InventoryGateway: correcting any store’s stock is the super admin’
   });
 });
 
-describe('CashGateway, ShiftGateway, RiderComplianceGateway: the desk checks happen at the door too', () => {
+describe('ShiftGateway, RiderComplianceGateway: the desk checks happen at the door too', () => {
   const users = { findOne: jest.fn(async () => null) };
-
-  it('rider cash: the super admin, finance and Operations; support, marketing and moderation are refused', async () => {
-    const cash = { history: jest.fn(async () => []), handOver: jest.fn(async () => ({ ok: 1 })) };
-    const gw = new CashGateway(cash as never, users as never);
-    for (const role of ['admin_support', 'admin_marketing', 'admin_moderation']) {
-      expect(await gw.history(as(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
-      expect(await gw.handover(as(role), { riderId: 'r', amountUsd: 5 })).toEqual({ ok: false, error: 'Not allowed.' });
-    }
-    expect(cash.history).not.toHaveBeenCalled();
-    expect(cash.handOver).not.toHaveBeenCalled();
-    for (const role of ['admin', 'admin_finance', 'admin_operations']) expect((await gw.history(as(role), {})).ok).toBe(true);
-    expect(cash.history).toHaveBeenCalledTimes(3);
-  });
 
   it('rider attendance: the super admin and Operations; every other department is refused', async () => {
     const shifts = { forStaff: jest.fn(async () => ({ ok: 1 })) };

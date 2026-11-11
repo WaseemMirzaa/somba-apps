@@ -60,9 +60,9 @@ const handshake = (token) => new Promise((resolve) => {
   try {
     section('Work stats (riders are salaried: workload, never pay)');
     let w = await req(me.sock, 'rider:workStats');
-    const keys = ['totalTasks', 'completed', 'active', 'failed', 'completedToday', 'completedLast7Days', 'successRate', 'byKind', 'codCollectedUsd'];
+    const keys = ['totalTasks', 'completed', 'active', 'failed', 'completedToday', 'completedLast7Days', 'successRate', 'byKind'];
     ok(w.ok && keys.every((k) => k in w.data), 'a rider reads their work stats (rider:workStats)', JSON.stringify(w));
-    ok(w.ok && !/earning|perTask/i.test(JSON.stringify(w.data)) && Object.keys(w.data).filter((k) => /usd/i.test(k)).join() === 'codCollectedUsd', 'the payload has no pay, only the cash collected');
+    ok(w.ok && !/earning|perTask/i.test(JSON.stringify(w.data)) && Object.keys(w.data).filter((k) => /usd/i.test(k)).length === 0, 'the payload has no money at all (no pay, no cash collected)');
     ok(w.ok && w.data.byKind.every((k) => Object.keys(k).sort().join() === 'count,kind' && k.count > 0), 'byKind is counts only');
     ok(w.ok && w.data.completedToday <= w.data.completedLast7Days && w.data.completedLast7Days <= w.data.completed, 'today <= last 7 days <= all time');
     ok(w.ok && (w.data.successRate === null || (Number.isInteger(w.data.successRate) && w.data.successRate >= 0 && w.data.successRate <= 100)), 'the success rate is a whole percent or null', String(w.data?.successRate));
@@ -126,24 +126,10 @@ const handshake = (token) => new Promise((resolve) => {
     ok(r.status === 201 || r.status === 200, 'this phone\'s fresh refresh token keeps working', String(r.status));
     ok((await handshake(fresh.accessToken)) === 'ready', 'and its fresh access token is let in');
 
-    section('COD is not offered: what the rider is told (codEnabled) and web push for the rider portal');
-    const admin = await login('admin@somba.app');
-    const adminSettings = await req(admin.sock, 'settings:get');
-    const codWas = adminSettings.data?.codEnabled;
-    let st = await req(me.sock, 'settings:get');
-    ok(st.ok && 'codEnabled' in st.data, 'a rider can read the public setting codEnabled (settings:get)', JSON.stringify(st));
-    ok(st.ok && st.data.codEnabled === 'false', 'it is "false" on a launch-configured platform: the rider app and portal hide every COD surface', String(st.data?.codEnabled));
+    section('What the rider is told (public settings) and web push for the rider portal');
+    const st = await req(me.sock, 'settings:get');
+    ok(st.ok && !('codEnabled' in st.data) && !('codCapUsd' in st.data), 'a rider can read the public settings (settings:get), which no longer carry any cash-on-delivery setting', JSON.stringify(st));
     ok(st.ok && !('commissionPct' in st.data) && !('minPayoutUsd' in st.data), 'the rider is not sent the admin-only settings');
-    const pushes = [];
-    me.sock.on('settings:updated', (d) => pushes.push(d));
-    a = await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
-    ok(a.ok, 'an admin switches COD on', a.error ?? '');
-    ok(await until(() => pushes.some((d) => d.codEnabled === 'true')), 'the rider is pushed settings:updated {codEnabled: "true"}: the apps show COD at once');
-    a = await req(admin.sock, 'settings:set', { key: 'codEnabled', value: codWas ?? 'false' });
-    ok(a.ok, 'and back off', a.error ?? '');
-    ok(await until(() => pushes.some((d) => d.codEnabled === (codWas ?? 'false'))), 'the rider is pushed the change back: the apps hide COD again');
-    st = await req(me.sock, 'settings:get');
-    ok(st.ok && st.data.codEnabled === (codWas ?? 'false'), 'settings:get agrees', String(st.data?.codEnabled));
     const webToken = `r2e-web-token-${Date.now()}`;
     a = await req(me.sock, 'devices:register', { token: webToken, platform: 'web', app: 'web' });
     ok(a.ok && a.data.registered === true, 'the rider portal registers its browser for web push (devices:register, platform web)', JSON.stringify(a));
@@ -155,8 +141,6 @@ const handshake = (token) => new Promise((resolve) => {
     ok(a.ok && a.data.devices >= 1, '... and it is still registered', JSON.stringify(a));
     a = await req(me.sock, 'devices:unregister', { token: webToken });
     ok(a.ok, 'sign-out removes the browser token (devices:unregister)', JSON.stringify(a));
-    me.sock.removeAllListeners('settings:updated');
-    admin.sock.close();
 
     section('Put everything back');
     const back = await login(RIDER, NEW_PW);

@@ -1,14 +1,14 @@
 /* Express delivery: when the seller and the customer are in the same commune and the seller has express on, a rider goes straight
  * from the seller to the customer, skipping the warehouse. Runs against a RUNNING dev API seeded with `npm run seed`. It turns
- * express, cash on delivery, the delivery code and the Kinshasa warehouse's auto-assignment (open round the clock) on for itself,
- * and puts every setting back.
+ * express, the delivery code and the Kinshasa warehouse's auto-assignment (open round the clock) on for itself, and puts every
+ * setting back. Orders are prepaid (card): nothing is collected at the door.
  *
  *   API_URL=http://localhost:3001 node test/delivery-express-smoke.cjs
  *
  * Scenarios: (1) the store toggle (needs a pin) and the quote: the express fee and date, then orders:create gives ONE express leg
  * (no pickup, no transfer) that waits for the seller. (2) The seller marks it ready, which auto-assigns it; the rider walks
- * picked_up -> in_transit -> delivered with the code and the cash; the order status follows, the seller is told "Package collected",
- * and COD collects the full payment. (3) Each exclusion quotes a standard route: setting off, two sellers, seller toggle off,
+ * picked_up -> in_transit -> delivered with the code; the order status follows, the seller is told "Package collected",
+ * and the payment stays succeeded. (3) Each exclusion quotes a standard route: setting off, two sellers, seller toggle off,
  * a different commune, no customer pin, farther than expressMaxKm. (4) Both failures: before collection the express leg opens
  * again; after collection a pickup leg brings the parcel back with the same rider and a normal delivery follows.
  * (5) aged:returnToSeller on an express leg is refused.
@@ -75,10 +75,10 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   const finance = await login('finance@somba.app');
   const demoRider = await login('rider@somba.app');
   const get = async (key) => (await req(admin.sock, 'settings:get')).data?.[key];
-  const KEYS = ['productModeration', 'codEnabled', 'codCapUsd', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'];
+  const KEYS = ['productModeration', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'];
   const was = Object.fromEntries(await Promise.all(KEYS.map(async (k) => [k, await get(k)])));
   const set = (key, value) => req(admin.sock, 'settings:set', { key, value: String(value) });
-  for (const [k, v] of Object.entries({ productModeration: 'false', codEnabled: 'true', codCapUsd: '5000', requireDeliveryCode: 'true', requireVerifiedForCheckout: 'false', expressDeliveryEnabled: 'true', expressDeliveryDays: '1', expressBaseUsd: '3', expressPerKmUsd: '1', expressMaxUsd: '10', expressMaxKm: '0' })) await set(k, v);
+  for (const [k, v] of Object.entries({ productModeration: 'false', requireDeliveryCode: 'true', requireVerifiedForCheckout: 'false', expressDeliveryEnabled: 'true', expressDeliveryDays: '1', expressBaseUsd: '3', expressPerKmUsd: '1', expressMaxUsd: '10', expressMaxKm: '0' })) await set(k, v);
 
   // The Kinshasa warehouse works round the clock and auto-assigns for the duration of the smoke (its own values are put back at the end).
   const kin = ((await req(admin.sock, 'hubs:list')).data ?? []).find((h) => h.name === 'Entrepôt Kinshasa');
@@ -89,7 +89,6 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   const legsOf = async (orderId, kind) => (await tasksOf(admin, orderId)).filter((t) => (kind ? t.kind === kind : true));
   const statusOf = async (cust, orderId) => (await req(cust.sock, 'orders:list')).data.find((o) => o.id === orderId);
   const payOf = async (orderId) => ((await req(finance.sock, 'payments:list', { limit: 300 })).data ?? []).find((p) => p.orderId === orderId);
-  const held = async () => money((await req(demoRider.sock, 'cash:mine')).data.heldUsd);
   /** The leg is the demo rider's (auto-assignment may have picked another rider of the warehouse). */
   const toDemoRider = async (taskId) => {
     const a = await req(admin.sock, 'logistics:assign', { taskId, riderId: demoRider.user.id });
@@ -138,7 +137,7 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   ok(q?.prepDays === 2 && q.routeDays === 1 && q.estimateDays === 3 && /^\d{4}-\d{2}-\d{2}$/.test(q.estimatedDeliveryDate ?? ''), 'the days are prep 2 + expressDeliveryDays 1, with a date', JSON.stringify([q?.prepDays, q?.routeDays, q?.estimateDays, q?.estimatedDeliveryDate]));
 
   section('orders:create gives one express leg that waits for the seller');
-  const place = async (lines, method = 'cod', where = GOMBE) => {
+  const place = async (lines, method = 'stripe_card', where = GOMBE) => {
     const r = await req(cust.sock, 'orders:create', { items: lines, paymentMethod: method, shippingAddress: addr(where) });
     if (!r.ok) throw new Error(`orders:create: ${r.error}`);
     return r.data;
@@ -151,7 +150,7 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   const leg = legs?.[0];
   ok(leg && leg.hubId === kin.id && leg.fromHubId === null && leg.toHubId === null && leg.sellerId === shop.store.id, 'it has no warehouse at either end and is managed by the Kinshasa warehouse', JSON.stringify([leg?.hubId === kin.id, leg?.fromHubId, leg?.toHubId]));
   ok(leg && JSON.stringify(leg.sellerIds) === JSON.stringify([shop.store.id]) && leg.status === 'unassigned' && leg.readyAt === null, 'it carries the seller and is not offered to a rider before the seller is ready', JSON.stringify([leg?.sellerIds, leg?.status, leg?.readyAt]));
-  ok(leg && Math.abs(leg.codAmountUsd - order.totalUsd) < 0.011, 'its cash is the full payment', `${leg?.codAmountUsd} vs ${order.totalUsd}`);
+  ok((await payOf(order.id))?.status === 'succeeded', 'the payment succeeded from the start (prepaid)');
   await sleep(1500);
   ok((await legsOf(order.id, 'express'))[0].status === 'unassigned', 'it stays unassigned while the seller has not packed it (auto-assignment waits)');
   a = await req(admin.sock, 'aged:returnToSeller', { taskId: leg.id });
@@ -159,7 +158,6 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
 
   // ── 2. The lifecycle ────────────────────────────────────────────────────────────────────────────────────────────
   section('The seller marks it ready: it is auto-assigned, and the rider walks it to the customer');
-  const cash0 = await held();
   a = await req(shop.sock, 'orders:sellerReady', { orderId: order.id });
   ok(a.ok && a.data.kind === 'express', 'orders:sellerReady finds the express leg', a.error ?? JSON.stringify(a.data?.kind));
   const assigned = await until(async () => { const l = (await legsOf(order.id, 'express'))[0]; return l?.status === 'assigned' ? l : null; });
@@ -180,21 +178,16 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   ok(a.ok && (await statusOf(cust, order.id)).status === 'out_for_delivery', 'in transit: out for delivery');
   const code = (await req(cust.sock, 'orders:deliveryCode', { orderId: order.id })).data;
   ok(code?.required === true && /^\d{4}$/.test(code?.code ?? ''), 'the customer has the code of the express leg', JSON.stringify(code));
-  a = await forward(leg.id, 'delivered', { code: '0000', cashUsd: order.totalUsd });
+  a = await forward(leg.id, 'delivered', { code: '0000' });
   ok(!a.ok && /Wrong delivery code/.test(a.error ?? ''), 'a wrong code is refused', a.error ?? 'was allowed');
-  a = await forward(leg.id, 'delivered', { code: code.code });
-  ok(!a.ok && /Confirm the cash you collected/.test(a.error ?? ''), 'the cash must be confirmed', a.error ?? 'was allowed');
-  a = await forward(leg.id, 'delivered', { code: code.code, cashUsd: money(order.totalUsd - 1) });
-  ok(!a.ok && /not the amount to collect/.test(a.error ?? ''), 'a different amount is refused', a.error ?? 'was allowed');
   a = await forward(leg.id, 'picked_up');
   ok(!a.ok && a.error === 'An express delivery that is in transit cannot become picked up.', 'a status that is not allowed is refused in the leg\'s own words ("An express delivery …")', a.error ?? 'was allowed');
-  a = await forward(leg.id, 'delivered', { code: code.code, cashUsd: order.totalUsd });
-  ok(a.ok && a.data.status === 'delivered', 'the code and the exact cash hand the parcel over', a.error ?? '');
+  a = await forward(leg.id, 'delivered', { code: code.code });
+  ok(a.ok && a.data.status === 'delivered', 'the code alone hands the parcel over', a.error ?? '');
   view = await statusOf(cust, order.id);
   ok(view.status === 'delivered' && view.items.every((i) => !!i.deliveredAt), 'the order is delivered and its lines are stamped', view.status);
-  const pay = await until(async () => { const p = await payOf(order.id); return p?.status === 'succeeded' ? p : null; });
-  ok(pay && Math.abs(pay.amountUsd - order.totalUsd) < 0.011, 'COD collected the full payment', JSON.stringify(pay && [pay.status, pay.amountUsd]));
-  ok(Math.abs((await held()) - cash0 - order.totalUsd) < 0.011, "the rider's cash in hand grew by the order total", `${await held()} vs ${cash0 + order.totalUsd}`);
+  const pay = await payOf(order.id);
+  ok(pay && pay.status === 'succeeded' && Math.abs(pay.amountUsd - order.totalUsd) < 0.011, 'the payment is still the one succeeded payment for the total', JSON.stringify(pay && [pay.status, pay.amountUsd]));
 
   // ── 3. Every exclusion is a standard route ─────────────────────────────────────────────────────────────────────
   section('Each exclusion quotes a standard route');
@@ -222,7 +215,7 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   await set('expressMaxKm', '0');
   q = (await quote(GOMBE, [line(prod)])).data;
   ok(q?.deliveryMode === 'express', 'switching everything back brings express back', q?.deliveryMode);
-  const stdOrder = await (async () => { await set('expressDeliveryEnabled', 'false'); const o = await place([line(prod)], 'cod'); await set('expressDeliveryEnabled', 'true'); return o; })();
+  const stdOrder = await (async () => { await set('expressDeliveryEnabled', 'false'); const o = await place([line(prod)]); await set('expressDeliveryEnabled', 'true'); return o; })();
   ok(stdOrder.deliveryMode === 'standard', 'an order placed with the setting off is recorded standard', stdOrder.deliveryMode);
   const stdLegs = await until(async () => { const l = await legsOf(stdOrder.id); return l.length ? l : null; });
   ok(stdLegs?.length === 1 && stdLegs[0].kind === 'pickup', 'and gets the usual pickup leg (never an express one)', JSON.stringify(stdLegs?.map((l) => l.kind)));
@@ -265,15 +258,14 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   ok(a.ok, 'warehouse staff scan the parcel in', a.error ?? '');
   const next = await until(async () => (await legsOf(f2.order.id, 'delivery'))[0]);
   ok(next && next.attempts === 2 && next.hubId === kin.id && JSON.stringify(next.sellerIds) === JSON.stringify([shop.store.id]), 'a normal delivery leg follows from the warehouse, counted as the second attempt', JSON.stringify(next && [next.attempts, next.sellerIds]));
-  ok(next && Math.abs(next.codAmountUsd - f2.order.totalUsd) < 0.011, 'it collects the whole payment');
   await toDemoRider(next.id);
   await forward(next.id, 'picked_up');
   await forward(next.id, 'in_transit');
   const code2 = (await req(cust.sock, 'orders:deliveryCode', { orderId: f2.order.id })).data?.code;
-  a = await forward(next.id, 'delivered', { code: code2, cashUsd: f2.order.totalUsd });
+  a = await forward(next.id, 'delivered', { code: code2 });
   ok(a.ok && (await statusOf(cust, f2.order.id)).status === 'delivered', 'the delivery hands it over and the order is delivered', a.error ?? '');
-  const pay2 = await until(async () => { const p = await payOf(f2.order.id); return p?.status === 'succeeded' ? p : null; });
-  ok(pay2 && Math.abs(pay2.amountUsd - f2.order.totalUsd) < 0.011, 'the payment is collected once, with the total', JSON.stringify(pay2 && [pay2.status, pay2.amountUsd]));
+  const pay2 = await payOf(f2.order.id);
+  ok(pay2 && pay2.status === 'succeeded' && Math.abs(pay2.amountUsd - f2.order.totalUsd) < 0.011, 'the payment is one succeeded payment for the total', JSON.stringify(pay2 && [pay2.status, pay2.amountUsd]));
 
   await req(admin.sock, 'hubSettings:update', { hubId: kin.id, autoAssign: !!hubBefore.autoAssign, workStart: hubBefore.workStart, workEnd: hubBefore.workEnd, workDays: hubBefore.workDays });
   for (const [key, value] of Object.entries(was)) if (value !== undefined) await set(key, value);

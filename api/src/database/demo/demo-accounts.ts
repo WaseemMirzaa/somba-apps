@@ -166,7 +166,7 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
     'warehouse.supervisor',
     'Demo Warehouse Supervisor',
     'warehouse_staff',
-    'Supervisor of Entrepôt Kinshasa: assigns riders, transfer runs, returns, exceptions, COD cash.',
+    'Supervisor of Entrepôt Kinshasa: assigns riders, transfer runs, returns, exceptions.',
     { hub: 'main', tier: 'supervisor', phone: '+243 900 000 122' },
   ),
   a(

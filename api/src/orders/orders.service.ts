@@ -9,7 +9,6 @@ import {
   OrderItem,
   OrderRequest,
   OrderStatus,
-  Payment,
   PaymentMethod,
   Seller,
   User,
@@ -22,7 +21,7 @@ import {
   NotificationsService,
 } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { CodReceipt, PaymentsService } from '../payments/payments.service';
+import { PaymentsService } from '../payments/payments.service';
 import { recordRefund } from '../payments/refund-ledger';
 import type { RefundKind } from '../database/entities';
 import { WalletService } from '../wallet/wallet.service';
@@ -564,8 +563,7 @@ export class OrdersService {
     }
     progress.written = true;
 
-    // Charge for the order. Wallet confirms immediately; COD stays pending
-    // until the rider collects; mobile money stays pending until the subscriber
+    // Charge for the order. Wallet confirms immediately; mobile money stays pending until the subscriber
     // approves on their phone, and a Stripe card until the customer completes
     // the card sheet (the webhook then confirms). Without Stripe (non-production
     // only) the card is a mock that confirms at once.
@@ -578,7 +576,7 @@ export class OrdersService {
       await release();
       throw err;
     }
-    const awaitingPayment = payment.status === 'pending' && payment.method !== 'cod';
+    const awaitingPayment = payment.status === 'pending';
     if (payment.status === 'succeeded') {
       saved.status = 'confirmed';
       saved = await this.orders.save(saved);
@@ -616,7 +614,7 @@ export class OrdersService {
     return saved;
   }
 
-  /** Make a paid (or COD) order visible: the pickup legs are planned, then admins, warehouses and sellers are told. */
+  /** Make a paid order visible: the pickup legs are planned, then admins, warehouses and sellers are told. */
   private async openFulfilment(order: Order): Promise<void> {
     await this.logistics.planOrder(order);
     await this.announceOrder(order);
@@ -800,11 +798,10 @@ export class OrdersService {
   }
 
   /**
-   * Sellers may pack (or cancel) once the money is in — or right away for cash on
-   * delivery, whose order stays `pending` until the rider collects at the door.
+   * Sellers may pack (or cancel) once the money is in.
    */
   static fulfillable(order: Pick<Order, 'status' | 'paymentMethod'>): boolean {
-    return ['confirmed', 'processing'].includes(order.status) || (order.status === 'pending' && order.paymentMethod === 'cod');
+    return ['confirmed', 'processing'].includes(order.status);
   }
 
   /**
@@ -940,7 +937,7 @@ export class OrdersService {
   /**
    * A seller cannot fulfil their part of an order (out of stock, damaged…): only
    * THEIR lines are cancelled — restocked, refunded on their own (prepaid → the
-   * customer's wallet; COD → the amount to collect drops) — and the other
+   * customer's wallet) — and the other
    * sellers' packages carry on. When nothing is left, the whole order is cancelled.
    */
   async sellerCancel(user: { id: string }, orderId: string, reasonRaw: string, itemIds?: string[]): Promise<unknown> {
@@ -1007,7 +1004,7 @@ export class OrdersService {
    * Cancel some lines of an order and settle them on their own (taken out of `sellerCancel`, shared with a delivery that was given up):
    *  - claim the lines atomically, from the fulfilment states in `from`: two concurrent cancels refund once;
    *  - prepaid: refund their value less their share of the promo discount to the customer's wallet (recorded and capped like every refund);
-   *  - cash on delivery: the payment, still pending, asks for that much less, and the open customer leg's cash is worked out again;
+   *  - the open express leg's cargo is read again from the live lines;
    *  - restock them.
    * Returns `done: false` when another request cancelled them first. The caller tells the people involved.
    */
@@ -1021,7 +1018,7 @@ export class OrdersService {
     const value = targets.reduce((t, i) => t + i.priceUsd * i.qty, 0);
     const refund = lineShareUsd(order, value);
     const payment = await this.payments.forOrder(order.id);
-    const prepaid = order.paymentMethod !== 'cod' && payment?.status === 'succeeded';
+    const prepaid = payment?.status === 'succeeded';
 
     const done = await this.orders.manager.transaction(async (m) => {
       // Claim the lines atomically: two concurrent cancels refund once.
@@ -1041,14 +1038,10 @@ export class OrdersService {
         await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: opts.kind, memo: opts.memo });
         await this.wallet.apply(order.customerId, 'refund', refund, opts.memo, m);
       }
-      if (order.paymentMethod === 'cod' && refund > 0 && payment && payment.status === 'pending') {
-        // Less to collect at the door.
-        await m.update(Payment, { id: payment.id }, { amountUsd: Math.max(0, Number((payment.amountUsd - refund).toFixed(2))) });
-      }
       return true;
     });
     if (!done) return { done, refund, prepaid };
-    if (order.paymentMethod === 'cod' && refund > 0) await this.logistics.recomputeCod(order.id);
+    if (order.deliveryMode === 'express') await this.logistics.refreshOpenLegCargo(order.id);
     for (const i of targets) {
       if (!i.productId.startsWith('ext:')) await this.products.restock(i.productId, i.qty, { variant: i.variant, orderId: order.id, reason: 'cancel_restock' });
     }
@@ -1129,7 +1122,7 @@ export class OrdersService {
 
   /**
    * The attempts ran out on a customer leg that cannot take the whole order down with it (part of the order was delivered already,
-   * or the leg carries only some sellers): ONLY its lines are cancelled (refunded, or less cash to collect, and restocked), a
+   * or the leg carries only some sellers): ONLY its lines are cancelled (refunded and restocked), a
    * `return_to_seller` leg per seller brings the goods back from the warehouse, and the customer is told. If nothing is left to
    * deliver, the order is delivered; otherwise the parcels still waiting are planned as usual.
    */
@@ -1148,7 +1141,7 @@ export class OrdersService {
         entityId: order.id,
       });
     }
-    // Plan what waits; an order with nothing left to deliver is delivered there and its cash is settled.
+    // Plan what waits; an order with nothing left to deliver is delivered there.
     await this.logistics.planNext(order.id);
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
@@ -1210,7 +1203,7 @@ export class OrdersService {
   /**
    * Operator moves an order ONE step forward (see [nextOrderStatus]); anything else
    * is refused so a status can never skip steps or rewind. Marking it `delivered`
-   * by hand also closes the open delivery task(s) and collects cash on delivery.
+   * by hand also closes the open delivery task(s).
    */
   async updateStatus(
     orderId: string,
@@ -1227,7 +1220,7 @@ export class OrdersService {
     if (nextOrderStatus(from) !== status) {
       throw new BadRequestException(`Cannot move an order from ${from} to ${status}.`);
     }
-    if (from === 'pending' && order.paymentMethod !== 'cod') {
+    if (from === 'pending') {
       const pay = await this.payments.forOrder(order.id);
       if (pay && pay.status === 'pending') {
         throw new BadRequestException('Awaiting payment — this order cannot be fulfilled yet.');
@@ -1246,32 +1239,20 @@ export class OrdersService {
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
 
     if (status === 'delivered') {
-      // Close the delivery by hand: the open task(s) are delivered, COD is collected.
+      // Close the delivery by hand: the open task(s) are delivered.
       const open = await this.deliveries.find({
         where: { orderId: saved.id, status: In(['unassigned', 'assigned', 'picked_up', 'in_transit']) },
       });
       const now = new Date();
-      let receipt: CodReceipt | undefined;
       for (const task of open) {
         task.status = 'delivered';
         task.deliveredAt = now;
-        // C-cod: the operator who closes a COD delivery by hand takes responsibility for its cash. It is recorded as collected
-        // by them and settled at once (it never shows up as cash a rider holds), and it goes in the payment's audit line.
-        const due = isCustomerKind(task.kind) ? Math.round(task.codAmountUsd * 100) / 100 : 0;
-        if (due > 0 && actor && !task.codCollectedAt) {
-          task.codCollectedUsd = due;
-          task.codCollectedAt = now;
-          task.codCollectedById = actor.id;
-          task.codHandedOverUsd = due;
-          receipt = { amountUsd: due, byId: actor.id, byName: actor.name, byRole: actor.role, at: now, taskId: task.id, source: 'admin_close' };
-        }
         await this.deliveries.save(task);
         await this.logistics.emitTask(task);
       }
       // Every line that had not reached the customer has now (the order is delivered by hand): stamp them with the closing leg.
       const closer = open.find((t) => isCustomerKind(t.kind));
       await this.orders.manager.update(OrderItem, { orderId: saved.id, deliveredAt: IsNull(), fulfilment: Not('cancelled') }, { deliveredAt: now, deliveryTaskId: closer?.id ?? null });
-      await this.payments.markCollected(saved.id, receipt);
     }
 
     // Everyone who cares about this order hears about it instantly.
@@ -1349,7 +1330,7 @@ export class OrdersService {
     }
     const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
 
-    // Was the money actually received? (pending mobile money / COD: no refund due)
+    // Was the money actually received? (pending mobile money: no refund due)
     const refundedUsd = await this.payments.refundCancelledOrder(saved);
 
     // Return reserved stock.

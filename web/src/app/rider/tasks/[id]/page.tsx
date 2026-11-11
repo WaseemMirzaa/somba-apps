@@ -12,8 +12,7 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RIDER_STATUS_LABEL, riderStatusVariant } from "@/components/warehouse/rider-task-card";
 import { TaskActions } from "@/components/warehouse/rider-task-actions";
-import { useCodEnabled, useRiderData } from "@/lib/rider";
-import { riderPaymentLabel, showTaskCash } from "@/lib/rider-cod";
+import { useRiderData } from "@/lib/rider";
 import { riderBrief } from "@/lib/rider-actions";
 import { usePublicSettings } from "@/lib/shop-live";
 import { formatCurrency } from "@/lib/utils";
@@ -27,7 +26,6 @@ export default function RiderTaskDetailPage() {
   const fr = locale === "fr";
   const { getRiderTask, refresh, loading } = useRiderData();
   const task = getRiderTask(id);
-  const codEnabled = useCodEnabled();
   const settings = usePublicSettings();
 
   if (!task) {
@@ -41,8 +39,8 @@ export default function RiderTaskDetailPage() {
   const label = RIDER_STATUS_LABEL[task.status];
   const statusLabel = fr ? label.fr : label.en;
   const done = task.status === "delivered" || task.status === "failed";
-  // Cash and the customer's code only when they will really be asked for (COD offered, the code setting on).
-  const brief = riderBrief({ ...task, codAmount: showTaskCash(codEnabled, task) ? task.codAmount : 0 }, fr, { requireCode: settings.requireDeliveryCode, cash: formatCurrency(task.codAmount, locale) });
+  // The customer's code only when it will really be asked for (the code setting on).
+  const brief = riderBrief(task, fr, { requireCode: settings.requireDeliveryCode });
   const mapsUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
 
   return (
@@ -52,7 +50,6 @@ export default function RiderTaskDetailPage() {
       <div className="flex flex-wrap gap-2">
         <Badge variant={riderStatusVariant(task.status)}>{statusLabel}</Badge>
         {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts} sur 3` : `Attempt ${task.attempts} of 3`}</Badge>}
-        {showTaskCash(codEnabled, task) && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}
         <Badge variant={task.kind === "express" ? "purple" : "primary"}>{pickL(LEG_KIND[task.kind], fr)}</Badge>
         {task.partial && <Badge variant="info">{fr ? "Partie de la commande" : "Part of the order"}</Badge>}
       </div>
@@ -120,7 +117,7 @@ export default function RiderTaskDetailPage() {
         <InfoGrid
           items={[
             { label: fr ? "N° commande" : "Order ID", value: task.orderId },
-            { label: fr ? "Paiement" : "Payment", value: task.paymentMethod ? riderPaymentLabel(codEnabled, task.paymentMethod, paymentMethodLabel(task.paymentMethod, fr), task) : task.paymentType },
+            { label: fr ? "Paiement" : "Payment", value: task.paymentMethod ? paymentMethodLabel(task.paymentMethod, fr) : task.paymentType },
             { label: fr ? "Montant" : "Amount", value: task.amount ? formatCurrency(task.amount, locale) : "—" },
             { label: fr ? "Articles" : "Items", value: task.items },
             { label: fr ? "Tentatives" : "Attempts", value: task.attempts },

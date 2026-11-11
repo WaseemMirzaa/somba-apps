@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Bike, CheckCircle, ListChecks, Warehouse, Banknote } from "lucide-react";
+import { Bike, CheckCircle, ListChecks, Warehouse } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RiderTaskCard } from "@/components/warehouse/rider-task-card";
 import { RiderRunCard } from "@/components/warehouse/rider-run-card";
 import { useLocale } from "@/context/locale-context";
-import { useCodEnabled, useRiderAssignment, useRiderCash, useRiderData } from "@/lib/rider";
-import { showCashSummary } from "@/lib/rider-cod";
+import { useRiderAssignment, useRiderData } from "@/lib/rider";
 import { RiderAlertsCard } from "@/components/rider/rider-alerts-card";
 import { looseTasks } from "@/lib/rider-runs";
 import { useRiderRuns } from "@/lib/rider-runs-live";
-import { formatCurrency } from "@/lib/utils";
 
 function Kpi({ title, value, icon: Icon }: { title: string; value: string; icon: React.ComponentType<{ className?: string }> }) {
   return (
@@ -36,8 +34,6 @@ export default function RiderDashboardPage() {
   const { riderProfile, getActiveRiderTasks, mine, stats, error, loading } = useRiderData();
   const rr = useRiderRuns(mine);
   const assignment = useRiderAssignment();
-  const { cash } = useRiderCash();
-  const codEnabled = useCodEnabled();
   // A transfer run is one card; its parcels are not listed again as tasks of their own.
   const activeTasks = looseTasks(getActiveRiderTasks(), rr.runs);
   const activeCount = activeTasks.length + rr.activeRuns.length;
@@ -57,7 +53,6 @@ export default function RiderDashboardPage() {
         <Kpi title={fr ? "Mon entrepôt" : "My warehouse"} value={assignment.data?.hub?.name ?? "—"} icon={Warehouse} />
         <Kpi title={t("completedToday")} value={String(stats?.completedToday ?? 0)} icon={CheckCircle} />
         <Kpi title={fr ? "Tâches terminées" : "Tasks done"} value={String(stats?.completed ?? 0)} icon={ListChecks} />
-        {showCashSummary(codEnabled) && <Kpi title={fr ? "Espèces à remettre" : "Cash to hand over"} value={formatCurrency(cash?.heldUsd ?? 0, locale)} icon={Banknote} />}
       </div>
 
       <p className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-sm text-emerald-900">

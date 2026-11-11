@@ -25,7 +25,7 @@ const ownerCtx = (o: User) => ctxSvc.resolve({ id: o.id, role: 'seller', name: o
 async function sale(seller: Seller, orderStatus: Order['status'], fulfilment: OrderItem['fulfilment'] = 'open') {
   const p = await addProduct(ds, { sellerId: seller.id });
   const orders = ds.getRepository(Order);
-  const o = await orders.save(orders.create({ reference: `R${Math.random().toString(36).slice(2, 8)}`, customerId: 'c', customerName: 'c', status: orderStatus, paymentMethod: 'cod', subtotalUsd: 1, totalUsd: 1 } as DeepPartial<Order>));
+  const o = await orders.save(orders.create({ reference: `R${Math.random().toString(36).slice(2, 8)}`, customerId: 'c', customerName: 'c', status: orderStatus, paymentMethod: 'wallet', subtotalUsd: 1, totalUsd: 1 } as DeepPartial<Order>));
   const items = ds.getRepository(OrderItem);
   await items.save(items.create({ orderId: o.id, productId: p.id, productName: 'P', qty: 1, priceUsd: 1, sellerId: seller.id, fulfilment } as DeepPartial<OrderItem>));
   return o;

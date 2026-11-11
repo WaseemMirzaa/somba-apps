@@ -118,18 +118,6 @@ test("the permission refusals of the tiers and departments are French (least pri
   assert.equal(localizeApiError("Only managers can see this.", "en"), "Only managers can see this.");
 });
 
-test("the cash-on-delivery sentences are French (C-cod)", () => {
-  const fr = (m) => localizeApiError(m, "fr");
-  assert.match(fr("Only supervisors and managers can record a rider's cash hand-over."), /superviseurs et les responsables/);
-  assert.equal(fr("Rider One holds $40.00: you cannot record $40.01."), "Rider One détient 40.00 $ : vous ne pouvez pas enregistrer 40.01 $.");
-  assert.equal(fr("Rider One holds no cash to hand in."), "Rider One ne détient aucune espèce à remettre.");
-  assert.match(fr("The cash you entered ($35.00) is not the amount to collect ($40.00). Collect exactly $40.00, or ask the warehouse if the amount changed."), /ne correspondent pas au montant à encaisser \(40\.00 \$\)/);
-  assert.match(fr("Confirm the cash you collected: $40.00 is due on this delivery."), /Confirmez les espèces/);
-  assert.match(fr("This delivery is already complete with $40.00 collected."), /déjà terminée/);
-  const m = "The cash you entered ($35.00) is not the amount to collect ($40.00). Collect exactly $40.00, or ask the warehouse if the amount changed.";
-  assert.equal(localizeApiError(m, "en"), m);
-});
-
 test("rider vehicle and document errors map to French (docs/contracts/rider-compliance.md)", () => {
   const fr = (m) => localizeApiError(m, "fr");
   assert.equal(fr("Give a reason of 3-300 characters."), "Indiquez un motif de 3 à 300 caractères.");

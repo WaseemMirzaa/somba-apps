@@ -62,10 +62,10 @@ test("amounts exclude cancelled lines", () => {
   assert.equal(m.refundedAmount(items), 5.5);
 });
 
-test("sales and pending work (unpaid non-COD pending orders are neither)", () => {
+test("sales and pending work (unpaid pending orders are neither)", () => {
   assert.equal(m.countsAsSale({ status: "confirmed", packageStatus: "to_pack" }), true);
   assert.equal(m.countsAsSale({ status: "pending", packageStatus: "pending" }), false);
-  assert.equal(m.countsAsSale({ status: "pending", packageStatus: "to_pack" }), false); // pending COD: work, not yet a sale
+  assert.equal(m.countsAsSale({ status: "pending", packageStatus: "to_pack" }), false); // not yet a sale
   assert.equal(m.countsAsSale({ status: "confirmed", packageStatus: "cancelled" }), false);
   assert.equal(m.countsAsSale({ status: "returned", packageStatus: "returned" }), false);
   assert.equal(m.isPendingWork({ packageStatus: "to_pack" }), true);
@@ -126,7 +126,6 @@ test("normalizeOrder fills package status / seller count for a full order", () =
   const base = { id: "o1", reference: "ORD-1", paymentMethod: "wallet", createdAt: "x", customerName: "A B", totalUsd: 30, items: [line({ qty: 2 })] };
   assert.equal(m.normalizeOrder({ ...base, status: "confirmed" }).packageStatus, "to_pack");
   assert.equal(m.normalizeOrder({ ...base, status: "pending" }).packageStatus, "pending");
-  assert.equal(m.normalizeOrder({ ...base, status: "pending", paymentMethod: "cod" }).packageStatus, "to_pack");
   assert.equal(m.normalizeOrder({ ...base, status: "delivered" }).packageStatus, "delivered");
   assert.equal(m.normalizeOrder({ ...base, status: "confirmed", items: [line({ fulfilment: "ready" })] }).packageStatus, "ready");
   assert.equal(m.normalizeOrder({ ...base, status: "confirmed", items: [line({ fulfilment: "received" })] }).packageStatus, "at_hub");

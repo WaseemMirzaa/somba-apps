@@ -35,9 +35,8 @@ test("cancelled order -> cancelled", () => {
   assert.equal(packageStatus(paid("cancelled"), [line("a", "open")]), "cancelled");
 });
 
-test("unpaid pending non-COD order -> pending; COD pending is packed normally", () => {
+test("unpaid pending order -> pending", () => {
   assert.equal(packageStatus({ status: "pending", paymentMethod: "airtel_money" }, [line("a", "open")]), "pending");
-  assert.equal(packageStatus({ status: "pending", paymentMethod: "cod" }, [line("a", "open")]), "to_pack");
 });
 
 test("all live lines received -> at_hub until the order ships, then the order status", () => {

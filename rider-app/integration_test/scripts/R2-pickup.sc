@@ -3,7 +3,7 @@ act riderClear
 include rsetup.sc
 flash
 say "Jean is on shift: nothing assigned yet||Jean est en service : rien d'affecté pour l'instant" 2.8
-act rFixture stage=pickup commune=Gombe pay=cod product=Instant -> ord
+act rFixture stage=pickup commune=Gombe pay=wallet product=Instant -> ord
 wait 1.5
 say "The warehouse assigns a pickup: the card appears live||L'entrepôt affecte une collecte : la carte apparaît en direct" 3
 say "Seller, address, parcel and where to bring it: Entrepôt Kinshasa||Vendeur, adresse, colis et lieu de dépôt : Entrepôt Kinshasa" 3.4

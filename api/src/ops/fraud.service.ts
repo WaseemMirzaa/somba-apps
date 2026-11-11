@@ -47,39 +47,13 @@ export class FraudService {
     this.rules = rules;
   }
 
-  /** An order was just placed: run the fraud rules for its customer (the cash-on-delivery cap only while COD is offered). Never throws. */
+  /** An order was just placed: run the fraud rules for its customer Never throws. */
   async afterOrder(customer: { id: string; name: string }, order: { id: string; paymentMethod: string; totalUsd: number }): Promise<void> {
     await this.rules?.afterOrder(customer, order);
   }
 
   list(): Promise<FraudAlert[]> {
     return this.repo.find({ order: { createdAt: 'DESC' }, take: 200 });
-  }
-
-  /** Raise a COD-risk alert when a large COD order is placed. */
-  async flagCodRisk(
-    customer: string,
-    orderId: string,
-    amountUsd: number,
-    capUsd: number,
-    customerId?: string,
-  ): Promise<FraudAlert | null> {
-    if (amountUsd <= capUsd) return null;
-    const alert = await this.repo.save(
-      this.repo.create({
-        type: 'cod_risk',
-        severity: amountUsd > capUsd * 2 ? 'high' : 'medium',
-        customer,
-        customerId: customerId ?? null,
-        orderId,
-        reason: `Cash-on-delivery order of $${amountUsd.toFixed(2)} is above the $${capUsd.toFixed(2)} cap.`,
-        reasonFr: `Commande à payer à la livraison de ${amountUsd.toFixed(2)} $ au-dessus du plafond de ${capUsd.toFixed(2)} $.`,
-        score: Math.min(99, Math.round((amountUsd / capUsd) * 40)),
-        status: 'open',
-      }),
-    );
-    this.emitter.toRoles(FRAUD_ROLES, 'fraud:created', alert);
-    return alert;
   }
 
   /** The account an alert is about: the customer it names, or else the customer of the order that raised it. */

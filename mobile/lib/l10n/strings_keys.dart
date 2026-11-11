@@ -68,8 +68,6 @@ extension StringsKeys on Strings {
   String get statusCancelled => t('status_cancelled');
   String get statusReturned => t('status_returned');
   String get payStripeCard => t('pay_stripe_card');
-  String get payCod => t('pay_cod');
-  String get payCodNote => t('pay_cod_note');
   String get payWallet => t('pay_wallet');
   String get send => t('send');
   String get close => t('close');
@@ -546,7 +544,6 @@ extension StringsKeys on Strings {
   String get orderHelp => t('order_help');
   String get orderPaid => t('order_paid');
   String get orderAwaiting => t('order_awaiting');
-  String get orderPayOnDelivery => t('order_pay_on_delivery');
   String get orderRefunded => t('order_refunded');
   String get orderPayFailed => t('order_pay_failed');
   String get trackPlaced => t('track_placed');

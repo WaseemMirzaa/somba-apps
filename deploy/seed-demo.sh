@@ -4,7 +4,6 @@
 # warehouse or the geography. Run ON the server, as root, after the normal deploy (which ran the bootstrap).
 #
 #   bash /opt/somba/deploy/seed-demo.sh              add the demo (a second run adds nothing)
-#   bash /opt/somba/deploy/seed-demo.sh --with-cod   add the demo AND switch cash on delivery on (see below)
 #   bash /opt/somba/deploy/seed-demo.sh --with-express  add the demo AND switch express delivery on (see below)
 #   bash /opt/somba/deploy/seed-demo.sh reset        same, and give every demo account a NEW password
 #   bash /opt/somba/deploy/seed-demo.sh remove       show what would be removed (changes nothing)
@@ -14,11 +13,7 @@
 # Accounts and passwords go to /etc/somba/demo-credentials.txt (root only, mode 600). Never into git or the screen.
 # Optional: DEMO_PASSWORD='12+ characters' (otherwise a random one), SKIP_RELOAD=1 (do not reload the API).
 #
-# --with-cod (or DEMO_WITH_COD=1) is the ONE thing that changes a setting: it sets codEnabled=true so the cash-on-delivery demo
-# orders can be made (production has it off). Without it those orders are skipped and the seed says so. The removal leaves the
-# setting on and prints how to turn it off (Admin > Settings > Checkout and delivery > Cash on delivery).
-#
-# --with-express (or DEMO_WITH_EXPRESS=1) does the same for expressDeliveryEnabled (the same-commune express orders of store C).
+# --with-express (or DEMO_WITH_EXPRESS=1) is the ONE thing that changes a setting: it sets expressDeliveryEnabled (the same-commune express orders of store C).
 # Switch it on only once the current rider app build (it knows the express job) is installed on the riders' phones.
 # =============================================================================
 set -euo pipefail
@@ -31,10 +26,10 @@ CRED="$CONF_DIR/demo-credentials.txt"
 API_ENV="$APP_DIR/api/.env"
 die() { printf 'seed-demo: %s\n' "$*" >&2; exit 1; }
 
-# --with-cod may stand anywhere; the other arguments keep their order.
+# --with-express may stand anywhere; the other arguments keep their order. An old --with-cod is accepted and ignored.
 args=()
 for a in "$@"; do
-  if [[ "$a" == "--with-cod" ]]; then export DEMO_WITH_COD=1; elif [[ "$a" == "--with-express" ]]; then export DEMO_WITH_EXPRESS=1; else args+=("$a"); fi
+  if [[ "$a" == "--with-cod" ]]; then echo "Cash on delivery was removed from the product; the flag does nothing." >&2; elif [[ "$a" == "--with-express" ]]; then export DEMO_WITH_EXPRESS=1; else args+=("$a"); fi
 done
 set -- ${args[@]+"${args[@]}"}
 cmd="${1:-seed}"
@@ -46,7 +41,7 @@ envval() { grep -E "^$1=" "$API_ENV" | head -1 | cut -d= -f2- || true; }
 export UPLOAD_DIR="$(envval UPLOAD_DIR)" PRIVATE_UPLOAD_DIR="$(envval PRIVATE_UPLOAD_DIR)" PUBLIC_API_URL="$(envval PUBLIC_API_URL)"
 [[ -n "$PUBLIC_API_URL" && -n "$UPLOAD_DIR" ]] || die "PUBLIC_API_URL and UPLOAD_DIR must be set in $API_ENV."
 
-run_as_app() { if [[ $EUID -eq 0 ]]; then sudo -u "$APP_USER" --preserve-env=UPLOAD_DIR,PRIVATE_UPLOAD_DIR,PUBLIC_API_URL,DEMO_PASSWORD,DEMO_RESET_PASSWORDS,DEMO_WITH_COD,DEMO_WITH_EXPRESS,DEMO_CREDENTIALS_FILE "$@"; else "$@"; fi; }
+run_as_app() { if [[ $EUID -eq 0 ]]; then sudo -u "$APP_USER" --preserve-env=UPLOAD_DIR,PRIVATE_UPLOAD_DIR,PUBLIC_API_URL,DEMO_PASSWORD,DEMO_RESET_PASSWORDS,DEMO_WITH_EXPRESS,DEMO_CREDENTIALS_FILE "$@"; else "$@"; fi; }
 reload_api() { [[ "${SKIP_RELOAD:-}" == "1" ]] && return 0; [[ $EUID -eq 0 ]] && sudo -u "$APP_USER" bash -c 'pm2 reload somba-api --update-env >/dev/null' && echo "API reloaded." || true; }
 
 case "$cmd" in
@@ -64,7 +59,7 @@ case "$cmd" in
   seed|reset)
     [[ "$cmd" == "reset" ]] && export DEMO_RESET_PASSWORDS=1
     [[ "${DEMO_WITH_EXPRESS:-}" == "1" ]] && echo "*** --with-express: express delivery will be SWITCHED ON for the whole platform (setting expressDeliveryEnabled). Only do this once the current rider app is installed. The removal does not switch it off again." >&2
-    [[ "${DEMO_WITH_COD:-}" == "1" ]] && echo "*** --with-cod: cash on delivery will be SWITCHED ON for the whole platform (setting codEnabled). The removal does not switch it off again." >&2
+    [[ "${DEMO_WITH_COD:-}" == "1" ]] && echo "Cash on delivery was removed from the product; DEMO_WITH_COD does nothing." >&2
     work="$(mktemp -d)"; chmod 700 "$work"; [[ $EUID -eq 0 ]] && chown "$APP_USER:$APP_USER" "$work"
     trap 'rm -rf "$work"' EXIT
     # The previous file goes in so accounts that already exist keep their passwords; the app user cannot read /etc/somba.
@@ -82,5 +77,5 @@ case "$cmd" in
     ( cd "$APP_DIR/api" && run_as_app npm run --silent seed:demo:remove:prod -- "$@" )
     if [[ " $* " == *" --yes "* ]]; then rm -f "$CRED"; echo "Credentials file removed."; reload_api; fi
     ;;
-  *) die "unknown command '$cmd' (seed, reset, remove, code; --with-cod and --with-express anywhere)";;
+  *) die "unknown command '$cmd' (seed, reset, remove, code; --with-express anywhere)";;
 esac

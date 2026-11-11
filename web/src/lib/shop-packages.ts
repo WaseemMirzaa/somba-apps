@@ -82,7 +82,7 @@ const DELIVERY_STAGES: readonly string[] = ["shipped", "out_for_delivery", "deli
 /**
  * Status of one seller's package.
  * all lines cancelled -> cancelled; order cancelled -> cancelled;
- * unpaid pending non-COD order -> pending;
+ * unpaid pending order -> pending;
  * all live lines received -> the order status once it is shipped/out_for_delivery/delivered/returned, else at_hub;
  * all live lines ready or received -> ready; otherwise to_pack.
  */
@@ -92,7 +92,7 @@ export function packageStatus(
 ): PackageStatus {
   if (lines.length > 0 && lines.every(isCancelledLine)) return "cancelled";
   if (order.status === "cancelled") return "cancelled";
-  if (order.status === "pending" && order.paymentMethod !== "cod") return "pending";
+  if (order.status === "pending") return "pending";
   const live = lines.filter((l) => !isCancelledLine(l));
   // Split delivery: this seller's parcel already reached the customer while the rest of the order is still on its way.
   if (live.length > 0 && live.every((l) => !!l.deliveredAt)) return "delivered";

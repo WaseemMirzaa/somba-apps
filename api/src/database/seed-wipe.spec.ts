@@ -57,7 +57,7 @@ describe('seed wipe', () => {
         customerId: 'c1',
         customerName: 'Marie',
         status: 'confirmed',
-        paymentMethod: 'cod',
+        paymentMethod: 'wallet',
         totalUsd: 10,
         shippingAddress: '{}',
         destinationHubId: l.id,

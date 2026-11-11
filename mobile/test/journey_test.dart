@@ -153,7 +153,7 @@ void main() {
 
   group('payload compatibility', () {
     test('an order from before the warehouse routing parses with no hubs and no legs', () {
-      final o = OrderDto.fromJson({'id': 'o', 'reference': 'SOM-9', 'status': 'delivered', 'paymentMethod': 'cod', 'totalUsd': 5, 'zoneId': 'gombe'});
+      final o = OrderDto.fromJson({'id': 'o', 'reference': 'SOM-9', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5, 'zoneId': 'gombe'});
       expect(o.destinationHubId, isNull);
       expect(o.originHubIds, isEmpty);
       expect(o.legs, isEmpty);

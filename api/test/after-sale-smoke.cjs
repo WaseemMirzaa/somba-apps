@@ -94,7 +94,6 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   const agent = await promote('agent', 'admin_support');
   const mod = await promote('mod', 'admin_moderation');
   const guest = { sock: await connect() };
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'requireDeliveryCode', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'returnWindowDays', value: '7' });

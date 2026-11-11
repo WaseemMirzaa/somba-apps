@@ -23,7 +23,6 @@ export type OrderStatus =
 
 export type PaymentMethod =
   | 'stripe_card'
-  | 'cod'
   | 'airtel_money'
   | 'orange_money'
   | 'vodacom_mpesa'
@@ -53,7 +52,7 @@ export class Order {
   @Column({ type: 'varchar', length: 20, default: 'pending' })
   status: OrderStatus;
 
-  @Column({ type: 'varchar', length: 20, default: 'cod' })
+  @Column({ type: 'varchar', length: 20, default: 'wallet' })
   paymentMethod: PaymentMethod;
 
   @Column({ type: 'float', default: 0 })

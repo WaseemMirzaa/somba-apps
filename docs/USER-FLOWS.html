@@ -239,13 +239,13 @@ main li { margin-block: 0.2rem; }
 <td>Rider</td>
 <td>Created by the admin (role <code>rider</code>)</td>
 <td>Rider app, rider web</td>
-<td>Take deliveries from the pool or by assignment, pick up, deliver, share live location, collect cash (if COD is on), see their work stats (riders are salaried, no per-task pay)</td>
+<td>Take deliveries from the pool or by assignment, pick up, deliver, share live location, see their work stats (riders are salaried, no per-task pay)</td>
 </tr>
 <tr>
 <td>Warehouse staff</td>
 <td>Created by the admin (role <code>warehouse_staff</code>)</td>
 <td>Warehouse portal</td>
-<td>Parcels by stage, batches, assign riders, exceptions, transfers, exchanges, replacements, returns, cash reconciliation</td>
+<td>Parcels by stage, batches, assign riders, exceptions, transfers, exchanges, replacements, returns</td>
 </tr>
 <tr>
 <td>Admin (super admin)</td>
@@ -367,7 +367,7 @@ main li { margin-block: 0.2rem; }
   subgraph Rider
     R1([⚡ Task appears in Available]) --&gt; R2["delivery:accept"]
     R2 --&gt; R3[Picked up] --&gt; R4[On the way, GPS shared] --&gt; R5{Delivered?}
-    R5 -- Yes --&gt; R6["delivered (cash confirmed if COD)"]
+    R5 -- Yes --&gt; R6["delivered"]
     R5 -- No --&gt; R7[Could not deliver]
   end
   subgraph Seller
@@ -1881,7 +1881,7 @@ main li { margin-block: 0.2rem; }
   SRV -.-&gt; GAP["⚠ buttons on this page change the screen only today"]
   RF(["/admin/refunds"]) --&gt; RFA[Authorise - demo]
   OR(["Order"]) -.-&gt; ORF["Server supports orders:refund (to wallet or original method) - no button yet"]
-  FR(["/admin/fraud"]) --&gt; FRL["fraud:list - COD orders above the cap are flagged"] --&gt; FRO[Open the order]</pre></div>
+  FR(["/admin/fraud"]) --&gt; FRL["fraud:list - orders raised by the fraud rules"] --&gt; FRO[Open the order]</pre></div>
 <h4 id="a-6-marketing-and-content"><a class="anchor" href="#a-6-marketing-and-content" aria-hidden="true">#</a>A-6 Marketing and content</h4>
 <div class="diagram"><pre class="mermaid">flowchart TD
   FS(["Flash sales"]) --&gt; FSL["flashsales:list"] --&gt; FSC[Create: name, dates, discount] --&gt; FSX[Screen only today]
@@ -1898,7 +1898,7 @@ main li { margin-block: 0.2rem; }
   RO -.-&gt; RS["Server supports roles:staff and roles:setRole&lt;br/&gt;(change a user's role, ends their sessions) - no screen yet"]
   AU(["Audit log"]) --&gt; AL["audit:list - who did what, when"]
   SE(["Settings"]) --&gt; SF[Commission, FX rate, minimum payout, clearance hours]
-  SF -.-&gt; SS["Server supports settings:set (codEnabled, codCapUsd,&lt;br/&gt;deliveryZones, fxRate, commissionPct) - Save not wired"]
+  SF -.-&gt; SS["Server supports settings:set (deliveryZones,&lt;br/&gt;fxRate, commissionPct) - Save not wired"]
   ZN(["Zones"]) --&gt; ZA[Add zone, assign riders, pause - local today]
   WH(["Warehouses"]) --&gt; WC[Create hub + portal credentials, staff - local today]</pre></div>
 <h3 id="74-gaps-in-the-admin-portal"><a class="anchor" href="#74-gaps-in-the-admin-portal" aria-hidden="true">#</a>7.4 Gaps in the admin portal</h3>
@@ -1912,7 +1912,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>2</td>
-<td>No screen yet for: order status change, order refund or cancel, payout approve/reject, dispute reject, fraud status, role assignment and staff list, settings save (COD on/off, zones, FX, commission), promo codes, flash-sale create, CMS edit, broadcasts, categories (server CRUD), campaigns, support tickets</td>
+<td>No screen yet for: order status change, order refund or cancel, payout approve/reject, dispute reject, fraud status, role assignment and staff list, settings save (zones, FX, commission), promo codes, flash-sale create, CMS edit, broadcasts, categories (server CRUD), campaigns, support tickets</td>
 </tr>
 <tr>
 <td>3</td>
@@ -2268,27 +2268,23 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>3</td>
-<td>COD cash reconciliation (<code>warehouse:reconcile</code>) has no screen</td>
-</tr>
-<tr>
-<td>4</td>
 <td>Barcode scanning is simulated (no camera)</td>
 </tr>
 <tr>
-<td>5</td>
+<td>4</td>
 <td>Dashboard, analytics, deliveries-by-type and settings are demo</td>
 </tr>
 <tr>
-<td>6</td>
+<td>5</td>
 <td>All warehouse staff share one server account in demo mode, so data is not scoped per hub</td>
 </tr>
 <tr>
-<td>7</td>
+<td>6</td>
 <td>Links to admin and shop pages bounce warehouse users back to their dashboard</td>
 </tr>
 </tbody></table></div>
 <h2 id="9-rider--mobile-app-flutter-and-web-portal-rider"><a class="anchor" href="#9-rider--mobile-app-flutter-and-web-portal-rider" aria-hidden="true">#</a>9. Rider — mobile app (Flutter) and web portal (<code>/rider</code>)</h2>
-<p>The <strong>mobile app is the complete rider tool</strong> (claim, status updates, live GPS, cash confirmation, work stats). The web rider portal is mostly read-only today.</p>
+<p>The <strong>mobile app is the complete rider tool</strong> (claim, status updates, live GPS, work stats). The web rider portal is mostly read-only today.</p>
 <h3 id="91-rider-mobile-app--navigation"><a class="anchor" href="#91-rider-mobile-app--navigation" aria-hidden="true">#</a>9.1 Rider mobile app — navigation</h3>
 <div class="diagram"><pre class="mermaid">flowchart TD
   SP([Splash]) --&gt; RS{Saved session and role = rider?}
@@ -2324,13 +2320,13 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>— Available tab</td>
-<td>Unclaimed deliveries: reference, COD amount, address, items</td>
+<td>Unclaimed deliveries: reference, address, items</td>
 <td><strong>Accept this delivery</strong> (<code>delivery:accept</code>)</td>
 </tr>
 <tr>
 <td>— Active tab</td>
-<td>My deliveries: status, customer, address, phone, items, cash banner, GPS status</td>
-<td><strong>Picked up the parcel</strong> → <strong>On my way</strong> → <strong>Delivered</strong> (<code>delivery:updateStatus</code>), cash confirmation for COD, <strong>Could not deliver</strong> (confirm)</td>
+<td>My deliveries: status, customer, address, phone, items, GPS status</td>
+<td><strong>Picked up the parcel</strong> → <strong>On my way</strong> → <strong>Delivered</strong> (<code>delivery:updateStatus</code>), <strong>Could not deliver</strong> (confirm)</td>
 </tr>
 <tr>
 <td>— Done tab</td>
@@ -2339,7 +2335,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>My work</td>
-<td>Tasks completed today, this week and all time; completed, in progress, failed, success rate; completed by type (counts only); cash in hand. Riders are salaried: no pay is shown</td>
+<td>Tasks completed today, this week and all time; completed, in progress, failed, success rate; completed by type (counts only). Riders are salaried: no pay is shown</td>
 <td>Pull to refresh</td>
 </tr>
 <tr>
@@ -2373,12 +2369,8 @@ main li { margin-block: 0.2rem; }
   PU --&gt; C2[⚡ customer: shipped] --&gt; GPS[GPS sharing starts - see R-3]
   PU --&gt;|On my way to the customer| IT["delivery:updateStatus in_transit"]
   IT --&gt; C3[⚡ customer: out for delivery]
-  IT --&gt;|Delivered| COD{Cash on delivery order?}
-  COD -- no --&gt; DL["delivery:updateStatus delivered"]
-  COD -- yes --&gt; CQ{Cash collected?}
-  CQ -- "Not yet" --&gt; IT
-  CQ -- "Yes, collected" --&gt; DL
-  DL --&gt; C4[⚡ customer: delivered, cash marked collected, seller sale counts toward payout]
+  IT --&gt;|Delivered| DL["delivery:updateStatus delivered"]
+  DL --&gt; C4[⚡ customer: delivered, seller sale counts toward payout]
   DL --&gt; DN([Done tab])
   PU &amp; IT --&gt;|Could not deliver| FC{Confirm mark as failed?}
   FC -- Cancel --&gt; IT
@@ -2399,7 +2391,7 @@ main li { margin-block: 0.2rem; }
   LOOP --&gt; S</pre></div>
 <h4 id="r-4-work-stats-notifications-sign-out"><a class="anchor" href="#r-4-work-stats-notifications-sign-out" aria-hidden="true">#</a>R-4 Work stats, notifications, sign out</h4>
 <div class="diagram"><pre class="mermaid">flowchart TD
-  E([My work]) --&gt; ER["rider:workStats"] --&gt; EV[Completed today / week / all time, in progress, failed, success rate, by type, cash collected to hand over]
+  E([My work]) --&gt; ER["rider:workStats"] --&gt; EV[Completed today / week / all time, in progress, failed, success rate, by type]
   P([Profile]) --&gt; N[Notifications list ⚡ notification:new] --&gt; NR["tap → notifications:markRead"]
   P --&gt; LG[EN / FR]
   P --&gt; SO[Sign out] --&gt; X[Stop GPS, forget tokens, close connection] --&gt; L([Sign in])</pre></div>
@@ -2449,7 +2441,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td><code>/rider/work</code></td>
-<td>Work stats (<code>rider:workStats</code>): completed today / this week / all time, completed, in progress, failed, success rate, by type, cash collected. <code>/rider/earnings</code> redirects here</td>
+<td>Work stats (<code>rider:workStats</code>): completed today / this week / all time, completed, in progress, failed, success rate, by type. <code>/rider/earnings</code> redirects here</td>
 <td>Refresh</td>
 <td>LIVE</td>
 </tr>
@@ -2506,7 +2498,7 @@ main li { margin-block: 0.2rem; }
 </tr>
 <tr>
 <td>4</td>
-<td>No batches, zone, shift / availability or cash hand-over in the app</td>
+<td>No batches, zone or shift / availability in the app</td>
 </tr>
 <tr>
 <td>5</td>
@@ -2843,17 +2835,6 @@ main li { margin-block: 0.2rem; }
 <td><code>delivery:location</code></td>
 </tr>
 <tr>
-<td>Cash collected (COD, when enabled)</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-<td>—</td>
-<td><span class="st">🧪</span> reconcile (server ready)</td>
-<td><span class="st">✅</span></td>
-<td><span class="st">🧪</span></td>
-<td><code>delivery:updateStatus delivered</code>, <code>warehouse:reconcile</code></td>
-</tr>
-<tr>
 <td>Work stats</td>
 <td>—</td>
 <td>—</td>
@@ -2878,10 +2859,10 @@ main li { margin-block: 0.2rem; }
   classDef part fill:#fff4dc,stroke:#b7791f,color:#4a3208</pre></div>
 <h3 id="102-recommended-order-to-close-the-gaps"><a class="anchor" href="#102-recommended-order-to-close-the-gaps" aria-hidden="true">#</a>10.2 Recommended order to close the gaps</h3>
 <ol>
-<li><strong>Admin finance and operations actions</strong> — wire payout approve/reject, order refund/cancel/status, dispute reject, fraud status, settings save (COD, zones, FX, commission), role assignment. The server already supports all of them.</li>
-<li><strong>Warehouse and dispatch</strong> — wire rider assignment and batches (<code>delivery:assign</code>, <code>warehouse:buildBatch</code>), exceptions, exchanges, replacements, transfers and the COD reconciliation screen; give hub &quot;receiving&quot; its own server action.</li>
+<li><strong>Admin finance and operations actions</strong> — wire payout approve/reject, order refund/cancel/status, dispute reject, fraud status, settings save (zones, FX, commission), role assignment. The server already supports all of them.</li>
+<li><strong>Warehouse and dispatch</strong> — wire rider assignment and batches (<code>delivery:assign</code>, <code>warehouse:buildBatch</code>), exceptions, exchanges, replacements, transfers; give hub &quot;receiving&quot; its own server action.</li>
 <li><strong>Customer app fixes</strong> — open product cards from search, lists, store and wishlist; return to Sign in after account deletion; push notifications; remember the price-currency choice; verify phone/email later.</li>
-<li><strong>Rider</strong> — proof of delivery (customer code and photo), failure reasons, background location, cash hand-over.</li>
+<li><strong>Rider</strong> — proof of delivery (customer code and photo), failure reasons, background location.</li>
 <li><strong>Seller</strong> — show server errors, real approval gating, full product editing (images, variants, stock), seller fulfilment step, payouts with the server&#39;s available amount.</li>
 <li><strong>Web shop</strong> — add to cart and real checkout with saved addresses and mobile-money number, returns through <code>disputes:open</code>, support tickets on the server.</li>
 </ol>
@@ -2957,14 +2938,14 @@ main li { margin-block: 0.2rem; }
 <td>Warehouse portal</td>
 <td>1</td>
 <td>3</td>
-<td>3</td>
+<td>2</td>
 <td>2</td>
 </tr>
 <tr>
 <td>Rider app</td>
 <td>—</td>
 <td>2</td>
-<td>3</td>
+<td>2</td>
 <td>1</td>
 </tr>
 <tr>
@@ -2978,20 +2959,18 @@ main li { margin-block: 0.2rem; }
 <hr>
 <h3 id="113-system-wide-flows-that-do-not-make-sense"><a class="anchor" href="#113-system-wide-flows-that-do-not-make-sense" aria-hidden="true">#</a>11.3 System-wide flows that do not make sense</h3>
 <h4 id="x-1--in-production-nobody-can-pay-for-an-order"><a class="anchor" href="#x-1--in-production-nobody-can-pay-for-an-order" aria-hidden="true">#</a>X-1 🔴 In production nobody can pay for an order</h4>
-<p>Mobile money is the chosen payment method, but no aggregator is connected, so production refuses it. The wallet is the only other method, and the wallet can only be topped up with mobile money. COD is switched off and card is refused in production. A new customer therefore has no way to pay.</p>
+<p>Mobile money is the chosen payment method, but no aggregator is connected, so production refuses it. The wallet is the only other method, and the wallet can only be topped up with mobile money. Card is refused in production. A new customer therefore has no way to pay.</p>
 <div class="diagram"><pre class="mermaid">flowchart TD
   C([Customer at checkout - production]) --&gt; M{Payment method}
   M -- "Airtel / Orange / M-Pesa" --&gt; MM[No aggregator configured]:::bad --&gt; R1[Mobile money is not available yet]:::bad
   M -- Wallet --&gt; W{Balance ≥ total?}
   W -- "no - every new account starts at $0" --&gt; TU[Top up wallet]
   TU --&gt; TM[Top-up needs mobile money]:::bad --&gt; R1
-  M -- "Cash on delivery" --&gt; COD[Disabled by policy]:::bad
   M -- Card --&gt; CARD[Refused in production]:::bad
   R1 --&gt; DEAD([No order can be placed]):::bad
-  COD --&gt; DEAD
   CARD --&gt; DEAD
   classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410</pre></div>
-<p><strong>Fix:</strong> connect the aggregator (or a finance manual-confirmation fallback) before launch; until then, allow an admin to credit wallets or temporarily enable COD.</p>
+<p><strong>Fix:</strong> connect the aggregator (or a finance manual-confirmation fallback) before launch; until then, allow an admin to credit wallets.</p>
 <h4 id="x-2--a-failed-delivery-leaves-the-order-in-limbo"><a class="anchor" href="#x-2--a-failed-delivery-leaves-the-order-in-limbo" aria-hidden="true">#</a>X-2 🔴 A failed delivery leaves the order in limbo</h4>
 <p>When a rider taps <strong>Could not deliver</strong>, the delivery task becomes <code>failed</code>, but the order keeps its last status (<code>shipped</code> or <code>out for delivery</code>). Nothing re-attempts, returns the parcel, refunds or tells the customer. The customer can no longer cancel (only pending/confirmed can be cancelled) and cannot open a return (only delivered orders can).</p>
 <div class="diagram"><pre class="mermaid">flowchart TD
@@ -3394,7 +3373,7 @@ main li { margin-block: 0.2rem; }
 <tr>
 <td>AD-2</td>
 <td>Settings → Save</td>
-<td>Toast &quot;Settings saved (audit logged)&quot; but nothing is saved or audited (COD, zones, FX, commission cannot be changed from the portal)</td>
+<td>Toast &quot;Settings saved (audit logged)&quot; but nothing is saved or audited (zones, FX, commission cannot be changed from the portal)</td>
 <td>🔴</td>
 <td>Call <code>settings:set</code></td>
 </tr>
@@ -3527,13 +3506,6 @@ main li { margin-block: 0.2rem; }
 <td>Wire the <code>*:setStatus</code>, <code>exceptions:create</code>, <code>warehouse:createTransfer</code> events</td>
 </tr>
 <tr>
-<td>WH-6</td>
-<td>COD reconciliation</td>
-<td>No screen, although the server computes it</td>
-<td><span class="st">🟡</span></td>
-<td>Add a reconciliation page</td>
-</tr>
-<tr>
 <td>WH-7</td>
 <td>Demo hubs share one account</td>
 <td>All hubs see the same parcels</td>
@@ -3590,13 +3562,6 @@ main li { margin-block: 0.2rem; }
 <td>Tracking stops in the background; when permission is blocked there is no button to open settings</td>
 <td><span class="st">🟡</span></td>
 <td>Foreground service; &quot;open settings&quot; button</td>
-</tr>
-<tr>
-<td>RA-4</td>
-<td>Cash collected</td>
-<td>Shown as &quot;hand it over at the warehouse&quot; but there is no hand-over or reconciliation step</td>
-<td><span class="st">🟡</span></td>
-<td>Cash hand-over flow with warehouse sign-off</td>
 </tr>
 <tr>
 <td>RA-5</td>
