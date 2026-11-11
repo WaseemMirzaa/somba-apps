@@ -1,4 +1,5 @@
 import { ForbiddenException, SetMetadata } from '@nestjs/common';
+import { withErrorFr } from '../common/error-fr';
 
 /**
  * Accounts an administrator created (and accounts whose temporary password an administrator re-issued) carry
@@ -45,6 +46,6 @@ export function guardPasswordChange(socket: PasswordChangeSocket): void {
     const [event, ...rest] = packet;
     if (PASSWORD_CHANGE_OPEN_EVENTS.includes(String(event))) return next();
     const ack = [...rest].reverse().find((x) => typeof x === 'function') as ((r: unknown) => void) | undefined;
-    ack?.({ ok: false, error: PASSWORD_CHANGE_MESSAGE, code: PASSWORD_CHANGE_REQUIRED });
+    ack?.(withErrorFr({ ok: false, error: PASSWORD_CHANGE_MESSAGE, code: PASSWORD_CHANGE_REQUIRED }));
   });
 }

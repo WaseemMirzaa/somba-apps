@@ -1,12 +1,15 @@
 import { INestApplicationContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModulesContainer } from '@nestjs/core';
+import { MessageMappingProperties } from '@nestjs/websockets';
 import { GATEWAY_METADATA } from '@nestjs/websockets/constants';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
+import { Observable, map } from 'rxjs';
 import { Server, ServerOptions, Socket } from 'socket.io';
 import { guardPasswordChange } from '../auth/password-change';
+import { ackWithFr } from '../common/error-fr';
 import { StaffTwoFaPolicy, guardStaffTwoFa } from '../auth/staff-twofa';
 
 /**
@@ -81,6 +84,16 @@ export class SocketIoAdapter extends IoAdapter {
   private maxListeners(perGateway: 1 | 2): number {
     this.limit ??= this.gatewayCount();
     return Math.max(10, this.limit * perGateway);
+  }
+
+  /**
+   * Every reply of every handler of every gateway passes through `transform` on its way to the ack, so this is where a
+   * failure gets its French (`errorFr` next to `error`, `reasonFr` on a refusal nested in the data; see
+   * `common/error-fr.ts` and docs/contracts/error-text.md). Nest's global interceptors do NOT reach gateways (their
+   * context creators are built without the application config), which is why it is done here and not in an interceptor.
+   */
+  bindMessageHandlers(socket: Socket, handlers: MessageMappingProperties[], transform: (data: any) => Observable<any>): void {
+    super.bindMessageHandlers(socket, handlers, (data) => transform(data).pipe(map((response) => ackWithFr(response))));
   }
 
   bindClientConnect(server: Server, callback: Function): void {
