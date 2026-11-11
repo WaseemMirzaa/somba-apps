@@ -208,3 +208,45 @@ test("shopper-side sentences (cart, payments, wallet, store opening) map to Fren
   assert.equal(localizeApiError("Mobile money is not available yet. Please use another method.", "fr"), "Le mobile money n'est pas encore disponible. Utilisez un autre moyen de paiement.");
   assert.equal(localizeApiError("Insufficient wallet balance.", "en"), "Insufficient wallet balance.");
 });
+
+// The server sends its own French next to the English (docs/contracts/error-text.md). The rule: French page + field present
+// -> show it; otherwise the client's own mapping / the English.
+const { serverFrenchError, serverFrenchText, frenchRefusals } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+
+test("server French (errorFr / messageFr) is used in French only, and only when present", () => {
+  assert.equal(serverFrenchError("fr", "Il ne reste que 3 en stock."), "Il ne reste que 3 en stock.");
+  assert.equal(serverFrenchError("en", "Il ne reste que 3 en stock."), null);
+  assert.equal(serverFrenchError("fr", undefined), null);
+  assert.equal(serverFrenchError("fr", "  "), null);
+  // the first present field wins
+  assert.equal(serverFrenchError("fr", undefined, "Motif"), "Motif");
+});
+
+test("messageFr as a list is joined like message, junk is ignored", () => {
+  assert.equal(serverFrenchText(["Saisissez un e-mail valide.", "Mot de passe trop court."]), "Saisissez un e-mail valide. Mot de passe trop court.");
+  assert.equal(serverFrenchText(["a", 3, null]), "a");
+  assert.equal(serverFrenchText(null), "");
+});
+
+test("a refusal inside a successful ack shows reasonFr / errorFr in French and keeps the English", () => {
+  const data = { ok: false, discount: 0, reason: "Invalid code.", reasonFr: "Code invalide.", lines: [{ id: 1, reason: "Out of stock.", reasonFr: "Rupture de stock." }, { id: 2, reason: "Unknown." }] };
+  const fr = frenchRefusals(data, "fr");
+  assert.equal(fr.reason, "Code invalide.");
+  assert.equal(fr.reasonEn, "Invalid code.");
+  assert.equal(fr.discount, 0);
+  assert.equal(fr.lines[0].reason, "Rupture de stock.");
+  assert.equal(fr.lines[1].reason, "Unknown."); // no French sent: untouched
+  assert.equal(frenchRefusals(data, "en"), data); // English readers get the data as it is
+  assert.equal(frenchRefusals("text", "fr"), "text");
+  assert.equal(frenchRefusals({ payouts: [{ error: "Nope.", errorFr: "Non." }] }, "fr").payouts[0].error, "Non.");
+});
+
+const { httpErrorText } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+test("HTTP error bodies: messageFr in French, message otherwise; lists are joined", () => {
+  const body = { message: "File too large.", messageFr: "Fichier trop volumineux." };
+  assert.equal(httpErrorText(body, "fr"), "Fichier trop volumineux.");
+  assert.equal(httpErrorText(body, "en"), "File too large.");
+  assert.equal(httpErrorText({ message: ["a", "b"] }, "fr"), "a b");
+  assert.equal(httpErrorText({ message: ["a", "b"], messageFr: ["x", "y"] }, "fr"), "x y");
+  assert.equal(httpErrorText({}, "fr"), undefined);
+});

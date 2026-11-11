@@ -66,6 +66,10 @@ export function authErrorText(err: unknown, fr: boolean): string {
   const words = fr ? FR_FRIENDLY : EN_FRIENDLY;
   if (!raw) return words.generic;
 
+  // The server's own French (HTTP `messageFr`) wins in French; the list below covers what it did not translate.
+  const sent = (err as { messageFr?: unknown } | null)?.messageFr;
+  if (fr && typeof sent === "string" && sent.trim()) return sent.trim();
+
   // The browser's own message when the API cannot be reached.
   if (/failed to fetch|networkerror|network request failed|load failed|cannot reach the server/i.test(raw)) return words.unreachable;
   // @nestjs/throttler.

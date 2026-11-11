@@ -18,6 +18,8 @@ import {
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { LanguageToggle } from "@/components/ui/language-toggle";
+import { localized, localizedNotice } from "@/lib/i18n-fields";
+import { paymentMethodName } from "@/lib/shop-live";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { DEMO_MODE } from "@/lib/demo-mode";
 import type {
@@ -79,6 +81,10 @@ const STATUS_FR: Record<string, string> = {
   approved: "Approuvé",
   rejected: "Refusé",
   open: "Ouvert",
+  succeeded: "Réussi",
+  return: "Retour",
+  dispute: "Litige",
+  exchange: "Échange",
   resolved: "Résolu",
   refunded: "Remboursé",
   customer: "Client",
@@ -378,7 +384,7 @@ export default function LiveConsolePage() {
                 <div className="mt-3 space-y-1 border-t border-white/20 pt-2 text-xs text-sky-50">
                   {rt.walletTransactions.slice(0, 3).map((t) => (
                     <div key={t.id} className="flex justify-between">
-                      <span>{t.description}</span>
+                      <span>{localized(t, "description", fr)}</span>
                       <span className="font-semibold">
                         {t.type === "debit" ? "-" : "+"}${t.amount.toFixed(2)}
                       </span>
@@ -413,7 +419,7 @@ export default function LiveConsolePage() {
                     className="rounded-lg border border-slate-100 p-2 text-xs"
                   >
                     <p className="line-clamp-2 font-medium text-slate-700">
-                      {p.name}
+                      {localized(p, "name", fr)}
                     </p>
                     <p className="mt-1 text-slate-500">
                       ${p.price} · {fr ? "stock" : "stock"} {p.stock}
@@ -490,7 +496,7 @@ export default function LiveConsolePage() {
                       key={p.id}
                       className="flex justify-between rounded-lg border border-slate-100 px-2 py-1 text-xs"
                     >
-                      <span className="text-slate-700">{p.name}</span>
+                      <span className="text-slate-700">{localized(p, "name", fr)}</span>
                       <span className="text-slate-500">
                         ${p.price} · stock {p.stock}
                       </span>
@@ -558,7 +564,7 @@ export default function LiveConsolePage() {
                         </p>
                         <p className="text-xs text-slate-500">
                           {o.customerName} · ${o.totalUsd.toFixed(2)} ·{" "}
-                          {o.paymentMethod}
+                          {paymentMethodName(o.paymentMethod, fr)}
                         </p>
                       </div>
                       <StatusPill status={o.status} />
@@ -676,9 +682,9 @@ export default function LiveConsolePage() {
             >
               <div className="flex items-center gap-1.5 font-semibold text-slate-800">
                 {!n.read && <CheckCircle2 className="h-3 w-3 text-sky-500" />}
-                {n.title}
+                {localizedNotice(n, fr).title}
               </div>
-              <p className="text-slate-500">{n.body}</p>
+              <p className="text-slate-500">{localizedNotice(n, fr).body}</p>
             </button>
           ))}
 
@@ -699,7 +705,7 @@ export default function LiveConsolePage() {
                     <StatusPill status={p.status} />
                   </div>
                   <p className="text-slate-500">
-                    ${p.amountUsd.toFixed(2)} · {p.method.replace(/_/g, " ")}
+                    ${p.amountUsd.toFixed(2)} · {paymentMethodName(p.method, fr)}
                   </p>
                 </div>
               ))}
@@ -757,7 +763,7 @@ export default function LiveConsolePage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-700">
-                      {d.orderReference} · {d.type}
+                      {d.orderReference} · {statusText(d.type, fr)}
                     </span>
                     <StatusPill status={d.status} />
                   </div>

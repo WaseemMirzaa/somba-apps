@@ -15,6 +15,7 @@ import { addressCountryCode, addressLine } from "@/lib/countries";
 import { UnpinnedWarning, pinRequiredText } from "@/components/shop/address-pin-editor";
 import { addressPin } from "@/lib/logistics";
 import type { Address } from "@/lib/realtime/types";
+import { addressLabelText } from "@/lib/address-label";
 
 type AddressForm = { label: string; line1: string; country: string; geo: AddressGeo | null };
 const EMPTY_FORM: AddressForm = { label: "", line1: "", country: "", geo: null };
@@ -116,7 +117,7 @@ export default function ShopAddressesPage() {
         {addresses.map((addr) => (
           <div key={addr.id} className="card-premium p-5">
             <div className="flex justify-between">
-              <p className="font-semibold">{addr.label} {addr.isDefault && <span className="text-xs text-[var(--primary)]">{fr ? "(Par défaut)" : "(Default)"}</span>}</p>
+              <p className="font-semibold">{addressLabelText(addr.label, fr)} {addr.isDefault && <span className="text-xs text-[var(--primary)]">{fr ? "(Par défaut)" : "(Default)"}</span>}</p>
               <div className="flex gap-3">
                 {!addr.isDefault && (
                   <button onClick={async () => { await updateAddress(addr.id, { isDefault: true }); toast(fr ? "Adresse par défaut mise à jour" : "Default address updated"); }} className="text-xs text-slate-500 hover:text-[var(--primary)]">{fr ? "Définir par défaut" : "Set default"}</button>

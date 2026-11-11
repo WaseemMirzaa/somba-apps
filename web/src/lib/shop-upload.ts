@@ -1,3 +1,4 @@
+import { httpErrorText } from "@/lib/api-errors";
 import { authApi } from "@/lib/realtime/auth-api";
 
 /** Photos the shopper may attach (returns, disputes, chat, support): JPEG/PNG/WebP up to 5 MB each. */
@@ -32,9 +33,9 @@ export async function uploadShopPhoto(file: File, fr = false): Promise<string> {
       }
     }
   }
-  const json = (await res.json().catch(() => ({}))) as { url?: string; message?: string | string[] };
+  const json = (await res.json().catch(() => ({}))) as { url?: string; message?: string | string[]; messageFr?: string | string[] };
   if (!res.ok || !json.url) {
-    const msg = Array.isArray(json.message) ? json.message.join(" ") : json.message;
+    const msg = httpErrorText(json, fr ? "fr" : "en");
     throw new Error(msg ?? (fr ? `Échec du téléversement (${res.status}).` : `Upload failed (${res.status}).`));
   }
   return json.url;

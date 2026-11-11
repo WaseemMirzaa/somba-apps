@@ -1,3 +1,4 @@
+import { httpErrorText, currentLocale } from "@/lib/api-errors";
 import { authApi } from "@/lib/realtime/auth-api";
 
 /** Upload one photo (JPEG/PNG/WebP, ≤ 5 MB) to the platform and return its URL (used for support attachments). */
@@ -29,9 +30,9 @@ export async function uploadPhoto(file: File): Promise<string> {
       }
     }
   }
-  const json = (await res.json().catch(() => ({}))) as { url?: string; message?: string | string[] };
+  const json = (await res.json().catch(() => ({}))) as { url?: string; message?: string | string[]; messageFr?: string | string[] };
   if (!res.ok || !json.url) {
-    const msg = Array.isArray(json.message) ? json.message.join(" ") : json.message;
+    const msg = httpErrorText(json, currentLocale());
     throw new Error(msg ?? `Upload failed (${res.status}).`);
   }
   return json.url;

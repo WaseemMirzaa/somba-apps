@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import type { Ack, RequestError } from "./types";
-import { currentLocale, localizeApiError } from "../api-errors";
+import { currentLocale, frenchRefusals, localizeApiError, serverFrenchError } from "../api-errors";
 import { localizeParcelError } from "../parcel-errors";
 import { PASSWORD_CHANGE_EVENT, PASSWORD_CHANGE_REQUIRED } from "../password-change";
 import { authApi } from "./auth-api";
@@ -49,13 +49,30 @@ class SocketClient {
   request<T>(event: string, body?: unknown, opts: { timeoutMs?: number } = {}): Promise<T> {
     return new Promise((resolve, reject) => {
       const s = this.socket;
-      if (!s) return reject(new Error("Socket not connected."));
+      if (!s) {
+        // `raw` keeps the English sentence for the callers that recognise it (see outcomeUnknown).
+        const failure = new Error(localizeApiError("Socket not connected.", currentLocale())) as RequestError;
+        failure.raw = "Socket not connected.";
+        return reject(failure);
+      }
       s.timeout(opts.timeoutMs ?? 8000).emit(event, body ?? {}, (err: Error | null, res: Ack<T>) => {
-        if (err) return reject(err);
+        if (err) {
+          // socket.io's ack timeout is English ("operation has timed out"): show the reader's language and flag it, so the
+          // callers that tell "no answer" from "refused" (checkout retries, area lookups) test `timedOut`, not the words.
+          const timedOut = /timed out|timeout/i.test(String(err.message ?? ""));
+          if (!timedOut) return reject(err);
+          const failure = new Error(localizeApiError("operation has timed out", currentLocale())) as RequestError;
+          failure.timedOut = true;
+          return reject(failure);
+        }
         if (!res || res.ok === false) {
           // `raw` keeps the server's English sentence so callers can recognise a known failure (e.g. "not served")
           // whatever language the message was shown in.
-          const failure = new Error(localizeParcelError(localizeApiError(res?.error ?? "Request failed.", currentLocale()), currentLocale() === "fr")) as RequestError;
+          // The server's own French (`errorFr`, docs/contracts/error-text.md) wins in French; the local lists only cover what it
+          // did not translate (and what this client says itself).
+          const loc = currentLocale();
+          const sent = serverFrenchError(loc, res && typeof res === "object" ? (res as { errorFr?: string }).errorFr : undefined);
+          const failure = new Error(sent ?? localizeParcelError(localizeApiError(res?.error ?? "Request failed.", loc), loc === "fr")) as RequestError;
           failure.raw = res?.error ?? "Request failed.";
           // The refusal's structured fields (docs/contracts/areas.md `not_served`: areaName, areaNameEn, servedCities…).
           if (res && typeof res === "object") {
@@ -67,7 +84,7 @@ class SocketClient {
           if (failure.code === PASSWORD_CHANGE_REQUIRED && typeof window !== "undefined") window.dispatchEvent(new Event(PASSWORD_CHANGE_EVENT));
           return reject(failure);
         }
-        resolve(res.data);
+        resolve(frenchRefusals(res.data, currentLocale()));
       });
     });
   }

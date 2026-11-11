@@ -547,6 +547,67 @@ function planPerkFr(perk: string): string {
 
 const normalise = (m: string) => m.trim().replace(/\s+/g, " ");
 
+/** A French version the server sent next to an English error: `errorFr` / `reasonFr` (string) or `messageFr` (string or list). */
+export type ServerFrench = string | readonly unknown[] | null | undefined;
+
+/** The text of a server-sent French field: a string as it is, a list joined with a space (like `message`), else "". */
+export function serverFrenchText(v: ServerFrench): string {
+  if (typeof v === "string") return v.trim();
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === "string" && x.trim() !== "").map((x) => x.trim()).join(" ");
+  return "";
+}
+
+/**
+ * The ONE rule for server errors (docs/contracts/error-text.md): when the page is French and the server sent its French
+ * (`errorFr` on a socket ack, `messageFr` on an HTTP error body), show it; otherwise null, and the caller keeps its own
+ * mapping of the English sentence. English readers never get the French field.
+ */
+export function serverFrenchError(locale: ErrLocale, ...fields: ServerFrench[]): string | null {
+  if (locale !== "fr") return null;
+  for (const f of fields) {
+    const t = serverFrenchText(f);
+    if (t) return t;
+  }
+  return null;
+}
+
+/**
+ * The text of an HTTP error body (`{ message, messageFr? }`, either may be a string or a list): the server's French in French
+ * when it sent it, else the English `message` (a list joined with a space). undefined when the body has neither.
+ */
+export function httpErrorText(body: { message?: unknown; messageFr?: unknown } | null | undefined, locale: ErrLocale): string | undefined {
+  const sent = serverFrenchError(locale, body?.messageFr as ServerFrench);
+  if (sent) return sent;
+  const m = body?.message;
+  if (Array.isArray(m)) return m.join(" ");
+  return typeof m === "string" ? m : undefined;
+}
+
+/**
+ * A refusal inside a successful ack (`{ ok: true, data: { ok: false, reason, reasonFr } }`): in French, `reason` / `error`
+ * become their `reasonFr` / `errorFr` sibling when there is one (the English stays in `reasonEn` / `errorEn`). Plain objects
+ * and lists up to 3 levels deep and 100 items wide are walked, like the server writes them; nothing else is touched.
+ */
+export function frenchRefusals<T>(data: T, locale: ErrLocale): T {
+  if (locale !== "fr") return data;
+  const walk = (v: unknown, depth: number): unknown => {
+    if (depth > 3 || v === null || typeof v !== "object") return v;
+    if (Array.isArray(v)) return v.map((x, i) => (i < 100 ? walk(x, depth + 1) : x));
+    const o = v as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(o)) out[k] = walk(o[k], depth + 1);
+    for (const [en, frKey] of [["reason", "reasonFr"], ["error", "errorFr"]] as const) {
+      const f = typeof o[frKey] === "string" ? (o[frKey] as string).trim() : "";
+      if (typeof o[en] === "string" && f) {
+        out[`${en}En`] = o[en];
+        out[en] = f;
+      }
+    }
+    return out;
+  };
+  return walk(data, 0) as T;
+}
+
 /** The message in `locale`. English (and unknown sentences) come back untouched. */
 export function localizeApiError(message: string | null | undefined, locale: ErrLocale): string {
   const raw = (message ?? "").toString();
@@ -585,6 +646,8 @@ export function currentLocale(): ErrLocale {
 // looked up last by `localizeApiError`, so an entry in EXACT / PATTERNS always wins. Found by comparing every English
 // sentence the API can throw with what the French tables cover.
 const SHOP_EXACT: Record<string, string> = {
+  // socket.io's own ack timeout (the socket client also flags it `timedOut`)
+  "operation has timed out": "Le serveur met trop de temps à répondre. Réessayez.",
   // cart / orders
   "Only customer accounts have a cart.": "Seuls les comptes clients ont un panier.",
   "An order needs at least one item.": "Une commande doit contenir au moins un article.",

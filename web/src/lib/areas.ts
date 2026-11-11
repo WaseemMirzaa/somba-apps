@@ -225,7 +225,7 @@ export function useStoredAreaChain(areaId: string | null | undefined): { chain: 
 type CommuneMode = "communes" | "flatten" | "legacy";
 let communeMode: CommuneMode = "communes";
 /** An event an old server does not know is never acknowledged: the request times out instead of failing. */
-const isTimeout = (e: unknown) => /timed out/i.test((e as Error | undefined)?.message ?? "");
+const isTimeout = (e: unknown) => (e as { timedOut?: boolean } | undefined)?.timedOut === true || /timed out/i.test((e as Error | undefined)?.message ?? "");
 const COMMUNE_TIMEOUT_MS = 4000;
 
 async function readCommunes(cityId: string): Promise<CommuneRow[]> {

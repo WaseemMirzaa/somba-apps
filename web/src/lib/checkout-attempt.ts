@@ -33,15 +33,15 @@ export function newAttemptKey(): string {
 
 /** socket.io's ack timeout ("operation has timed out"), as opposed to a refusal the server sent. */
 export function isNoAnswer(e: unknown): boolean {
-  const err = e as { raw?: unknown; message?: unknown } | null;
-  return !!err && err.raw === undefined && /timed out|timeout/i.test(String(err.message ?? ""));
+  const err = e as { raw?: unknown; message?: unknown; timedOut?: unknown } | null;
+  return !!err && err.raw === undefined && (err.timedOut === true || /timed out|timeout/i.test(String(err.message ?? "")));
 }
 
 /** Whether the attempt's result is still open after this error (keep the key), or the server answered (new key next time). */
 export function outcomeUnknown(e: unknown): boolean {
-  const err = e as { code?: unknown; message?: unknown } | null;
+  const err = e as { code?: unknown; message?: unknown; raw?: unknown } | null;
   // `order_processing`: the server says an earlier request with this key is still running.
-  return e instanceof AttemptUnknownError || isNoAnswer(e) || err?.code === "order_processing" || err?.message === "Socket not connected.";
+  return e instanceof AttemptUnknownError || isNoAnswer(e) || err?.code === "order_processing" || err?.message === "Socket not connected." || err?.raw === "Socket not connected.";
 }
 
 const TEXT = {

@@ -62,7 +62,7 @@ export default function SellOnlinePage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden text-white">
-        <Image src={SELL_ONLINE_IMAGE.src} alt={SELL_ONLINE_IMAGE.alt} fill priority className="object-cover object-center" sizes="100vw" />
+        <Image src={SELL_ONLINE_IMAGE.src} alt={fr ? SELL_ONLINE_IMAGE.altFr : SELL_ONLINE_IMAGE.alt} fill priority className="object-cover object-center" sizes="100vw" />
         <div className="hero-overlay absolute inset-0" />
         <div className="relative mx-auto max-w-7xl px-4 py-24 lg:py-32">
           <div className="max-w-2xl">

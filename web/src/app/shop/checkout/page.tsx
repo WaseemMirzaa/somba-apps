@@ -28,6 +28,7 @@ import { AddressMapPicker } from "@/components/shop/address-map-picker";
 import type { AddressGeo, PickedMeta, PickedParts } from "@/lib/google-maps";
 import { useVerificationStatus } from "@/lib/shop-live";
 import type { Address } from "@/lib/realtime/types";
+import { addressLabelText } from "@/lib/address-label";
 
 /** The one-line refusal used in a snackbar (the full message with the served cities is on the page). */
 function notServedLine(n: NotServedInfo, fr: boolean): string {
@@ -182,7 +183,7 @@ function CheckoutContent() {
             <label key={a.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${selectedId === a.id ? "border-blue-500 bg-blue-50" : "border-[var(--border)]"}`}>
               <input type="radio" name="address" checked={selectedId === a.id} onChange={() => setPickedAddress(a.id)} className="mt-1" />
               <div>
-                <p className="font-medium">{a.label} {a.isDefault && <span className="text-xs text-[var(--primary)]">{fr ? "(Par défaut)" : "(Default)"}</span>}</p>
+                <p className="font-medium">{addressLabelText(a.label, fr)} {a.isDefault && <span className="text-xs text-[var(--primary)]">{fr ? "(Par défaut)" : "(Default)"}</span>}</p>
                 <p className="text-sm text-slate-500">{[a.line1, a.commune, a.city].filter(Boolean).join(", ")}</p>
                 {a.areaChain && a.areaChain.length > 0 && (
                   <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
