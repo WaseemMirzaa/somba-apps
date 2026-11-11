@@ -278,6 +278,10 @@ describe('localizeWalletDescription', () => {
     ['Payout PO-1', 'Versement PO-1'],
     ['Seller plan pro', 'Abonnement vendeur pro'],
     ['Welcome store credit', 'Crédit de bienvenue'],
+    ['Refund: part of SOM-1 could not be delivered', 'Remboursement : une partie de SOM-1 n’a pas pu être livrée'],
+    ['Payment PAY-1 arrived after order SOM-1 was closed', 'Paiement PAY-1 reçu après la clôture de la commande SOM-1'],
+    ['Welcome credit from KOMORIKO (demo)', 'Crédit de bienvenue KOMORIKO (démo)'],
+    ['Demo starter credit (not real money)', 'Crédit de départ de la démo (pas de l’argent réel)'],
   ])('%s → %s', (en, french) => {
     expect(localizeWalletDescription(en, 'fr')).toBe(french);
   });

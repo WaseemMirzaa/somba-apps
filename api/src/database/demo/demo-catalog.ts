@@ -50,8 +50,6 @@ export interface DemoProduct {
   variants?: { name: string; options: string[] }[];
   /** Units per option label ("Size: M · Colour: Blue"). Keys are exactly the labels the checkout builds. */
   variantStock?: Record<string, number>;
-  /** Leave the French text to the machine translator (shows the "Translated automatically" badge on a live server). */
-  machineFr?: boolean;
 }
 
 export const DEMO_PRODUCTS: DemoProduct[] = [
@@ -207,7 +205,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 150,
     prepDays: 0,
-    machineFr: true,
     look: 'A bar or chunk of dark brown/black natural soap (African black soap), on a neutral background.',
   },
   {
@@ -354,7 +351,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 400,
     prepDays: 1,
-    machineFr: true,
     look: 'Colourful patterned throw cushions / cushion covers on a sofa or bed.',
   },
   {
@@ -448,7 +444,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 900,
     prepDays: 1,
-    machineFr: true,
     look: 'A rolled or unrolled yoga mat (purple, blue, green or grey), no readable brand.',
   },
   {
@@ -613,7 +608,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 2050,
     prepDays: 1,
-    machineFr: true,
     look: 'A bowl or pile of white flour (cassava flour) or cassava roots.',
   },
   {
@@ -632,7 +626,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 270,
     prepDays: 1,
-    machineFr: true,
     look: 'Dried hibiscus flowers or a glass of red hibiscus tea.',
   },
   {
@@ -650,7 +643,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 2400,
     prepDays: 2,
-    machineFr: true,
     look: 'Plastic storage bins / containers with lids, stacked.',
   },
   {
@@ -669,7 +661,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 380,
     prepDays: 1,
-    machineFr: true,
     look: 'A stainless steel / metal reusable water bottle, no readable brand.',
   },
   {
@@ -686,7 +677,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 480,
     prepDays: 1,
-    machineFr: true,
     look: 'Folded cotton bath towels (white or coloured).',
   },
   {
@@ -703,7 +693,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 600,
     prepDays: 1,
-    machineFr: true,
     look: 'A stack of notebooks / exercise books.',
   },
 
@@ -724,7 +713,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 2,
     weightGrams: 3600,
     prepDays: 2,
-    machineFr: true,
     look: 'An electric fan (stand fan or desk fan).',
   },
   {
@@ -743,7 +731,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 1100,
     prepDays: 2,
-    machineFr: true,
     look: 'A clothes iron (steam iron), no readable brand.',
   },
   {
@@ -762,7 +749,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 900,
     prepDays: 2,
-    machineFr: true,
     look: 'An electric kettle (steel or white), no readable brand.',
   },
   {
@@ -779,7 +765,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 90,
     prepDays: 1,
-    machineFr: true,
     look: 'A phone wall charger adapter with a USB cable, no readable brand.',
   },
 
@@ -817,7 +802,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 120,
     prepDays: 2,
-    machineFr: true,
     look: 'Colourful phone cases.',
   },
   {
@@ -834,7 +818,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 800,
     prepDays: 2,
-    machineFr: true,
     look: 'A ring light with tripod.',
   },
 
@@ -889,7 +872,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 90,
     prepDays: 3,
-    machineFr: true,
     look: 'A colourful beaded necklace or beaded jewelry.',
   },
   {
@@ -908,7 +890,6 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 1,
     weightGrams: 3500,
     prepDays: 5,
-    machineFr: true,
     look: 'An African hand drum (djembe style).',
   },
 ];

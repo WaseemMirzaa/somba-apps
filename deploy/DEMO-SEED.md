@@ -65,6 +65,39 @@ If you switch on the platform rule "staff two-factor required" while the demo ha
 - **38 orders** (42 with express too) in every state, with their legs, riders and warehouse scans, wallet payments, refunds, returns, an exchange, a replacement, a dispute, 16 reviews (8 with photos), questions, chats (with photos), support tickets, a payout, campaigns, a flash sale, promo codes, banners, fraud alerts, warehouse incidents and stock. Twelve of them are the "orders to process" of the next section: work waiting for each active store, a split delivery and a failed attempt.
 - A second warehouse, **Entrepôt Maluku (démo)**, that serves only the commune of Maluku, so one order can travel between two warehouses. It is the only change near real routing: a real customer pinned in Maluku would be routed to it while the demo is installed.
 
+## Both languages (English and French)
+
+Every demo record that people read exists in **both languages**, so the apps and the web show French in French mode and English in English mode, with or without a Google Translate key on the server:
+
+- **Products** (title, description, option labels such as Taille / Couleur), **stores** (description, returns and shipping policy), **banners**, **campaigns** and **flash sales** are written in English and get their French as an **author** row (the same kind a seller types by hand, never a machine row, so nothing is billed and the "Translated automatically" badge does not appear on them).
+- **Reviews, store replies, questions, answers and chat messages**: each text is in the language its demo author uses (Jean-Baptiste writes French, the others English) and the **other language is stored next to it** (`translations` rows `review` / `review_reply` / `question` / `answer` / `chat_message`, field `text` or `reply`), so a reader can switch language without a translate call.
+- **Notices** that quote a person's words (a new review, a question, a return reason...) or name a product get a French body that has the quote and the product name in French.
+
+How it works: `seed-demo.ts` runs the real services (they write one language), then `demo/demo-bilingual.ts` adds the other language from `demo/demo-texts.ts` (every demo sentence with its twin) and from the catalogue. It only **adds**: a row is inserted when none exists for that record, field and language, so text a person edited, a French row a person wrote or one Google produced is never replaced, and a second run adds nothing ("both languages: 0 author row(s) added").
+
+Adding a demo text (a new review, message, note...) without its twin in `demo-texts.ts` fails `demo-bilingual.spec.ts`; the seed prints `! no twin in demo-texts.ts for ...` for a text it does not know.
+
+Not stored in two languages, because the data model has no second-language field for them: promo and coupon descriptions, and the free text inside returns, disputes, exchanges, replacements and warehouse notes. The notices about them show the French of the sentence around the quote, and the quote itself in French (the demo texts are in the table).
+
+### One-off: bring French to a server that was seeded before this change
+
+The products and other records "were already there", so the older seed skipped them and French never arrived. After deploying the version with `demo-bilingual.ts` (the normal deploy, see "Commands"), on the server as root:
+
+```bash
+bash /opt/somba/deploy/seed-demo.sh        # idempotent top-up: adds the missing French/English author rows (about 30 seconds); reloads the API
+```
+
+The summary line says how many rows were added (`✓ both languages: N author row(s) added`). It touches only demo records, never overwrites a row that is already there, and costs nothing (no translation call).
+
+Then, for **any other record** (a seller's own products, categories, stores, banners, campaigns that has no French or English yet):
+
+```bash
+sudo -u somba bash -c "cd /opt/somba/api && npm run translate:backfill:prod -- --dry-run"   # how many records and characters, and the cost: writes nothing
+sudo -u somba bash -c "cd /opt/somba/api && npm run translate:backfill:prod"                 # queues them and translates (needs the Google key, see set-secret.sh)
+```
+
+The dry run prints the provider, the records per type, the characters and the estimate. Google Cloud Translation costs about **US$ 20 per million characters**, so the demo-sized catalogue (a few thousand characters) is a few cents, and a 1,000-product shop with 500-character descriptions is about US$ 10. A daily character limit (`TRANSLATE_DAILY_CHAR_LIMIT`, default 300,000) applies; what does not fit stays queued and the API's own 60-second sweeper finishes it the next day. The backfill only fills the missing language of products, categories, stores, campaigns, flash sales, banners and broadcasts; it never touches an author row. Reviews, questions and chat messages are translated when written or on demand instead.
+
 ## Orders to process, per store
 
 These orders are made through the real order service (basket, wallet payment, pickup legs, notices), so the seller portal, the customer app, the rider app and the warehouse desk all show them. Each customer's basket is different from their other baskets, and every order belongs to a demo customer, so the removal takes them out. Sign in as the **store owner** (`seller.a`, `seller.b`, `seller.c`, all `@demo.komoriko.test`) and open **Orders**; the customer is in the second column.
@@ -150,7 +183,7 @@ Sign in at the web portal (`/login`) for stores, admins, warehouse and riders, a
 | `customer.full` (Grace Mbuyi) | The full customer: verified, a large wallet, two pinned addresses (Gombe and Maluku) | Open **Orders**: 16 orders (the split-delivery orders are described in "Orders to process"). Paid; seller preparing; ready for pickup; at the warehouse; out for delivery (open it to see the 4-digit code); delivered 2 days ago (can be returned and reviewed); delivered 35 days ago (return window closed, shows why); cancelled and refunded; a return waiting for the seller (with its timer); a return approved and refunded; an exchange; a replacement; a dispute; a basket from two sellers (one package at the warehouse, one not collected); an order using promo code `DEMO10`; one using the store coupon `MAISON5`; one going to Maluku through two warehouses. Also **Wishlist**, **Cart** (with a saved item that is out of stock), **Followed stores**, **Notifications** (read and unread), **Wallet history**, **Chats** (one with photos), **Support tickets** (one closed, one open with a photo), **Help**. |
 | `customer.new` (Patrick Kasongo) | New, verified, nothing yet | Empty orders, wallet, addresses, wishlist. Add the first address (type one, or use the map), then place the first order: it will ask you to top up the wallet first. |
 | `customer.unverified` (Chantal Ilunga) | Phone and e-mail not verified | Her cart has two items. Start checkout: it is blocked and asks you to verify. (Sending the code needs SMS or e-mail keys, see below.) |
-| `customer.fr` (Jean-Baptiste Mukendi) | Language French | The whole app in French. Product names are shown in French. Open the chat with Maison Kinshasa: he writes French, the store answers in English, tap to translate. A question he asked is answered in English. A return the store rejected is escalated to KOMORIKO. |
+| `customer.fr` (Jean-Baptiste Mukendi) | Language French | The whole app in French. Product names are shown in French. Open the chat with Maison Kinshasa: he writes French, the store answers in English, and each message has its other language stored (no wait for a translation). A question he asked in French is answered in English and shows in both. A return the store rejected is escalated to KOMORIKO. |
 | `customer.suspended` (Albert Tshibangu) | Suspended | Sign-in is refused. In the admin portal (Customers) reactivate and sign in again. |
 | `customer.fraud` (Rita Banza) | Has fraud alerts | Nothing special in the app. In the admin portal, **Fraud** shows two open alerts for her. |
 | `reviewer.1` to `reviewer.4` | Past buyers | They wrote the reviews, photos and helpful votes on the product pages. One of them wrote an abusive 1-star review that store B reported. |
@@ -216,7 +249,7 @@ The demo phone numbers (`+243 900 000 xxx`) are made up, but a number is a numbe
 | SMTP (e-mail) | No verification e-mail, password reset or team invitation e-mail. |
 | Twilio (SMS) | No phone code. `customer.unverified` can be seen blocked, but cannot be verified. |
 
-Google Maps, Google Translate and Firebase push work if their keys are installed on the server (the translation of the French demo texts needs the Google key; without it the English text shows).
+Google Maps, Google Translate and Firebase push work if their keys are installed on the server. The demo's own texts do not need the Google key: both languages are stored (see "Both languages"). The key only matters for text that people type later.
 
 ## Time
 

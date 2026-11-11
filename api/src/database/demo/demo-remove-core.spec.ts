@@ -1,4 +1,4 @@
-import { AuditLog, Parcel, ParcelScan, WarehouseBatch } from '../entities';
+import { AuditLog, Conversation, ConversationMessage, Parcel, ParcelScan, Translation, WarehouseBatch } from '../entities';
 import { mkdtempSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -242,6 +242,30 @@ describe('demo removal', () => {
       .findOneOrFail({ where: { id: w.realProduct.id } });
     expect([p.rating, p.reviewsCount]).toEqual([0, 0]);
     expect(existsSync(join(dirs.up, 'keep.jpg'))).toBe(true); // not a demo file
+  });
+
+  it('removes the other-language rows of demo chat messages and reviews (keyed by message and review id), and keeps a real chat\'s', async () => {
+    const w = await world();
+    const dSeller = await ds.getRepository(Seller).findOneOrFail({ where: { name: 'Demo Store' } });
+    const realSeller = await ds.getRepository(Seller).findOneOrFail({ where: { name: 'Real Store' } });
+    const chat = async (buyer: { id: string; name: string }, sellerId: string, text: string) => {
+      const conv = await ds.getRepository(Conversation).save(
+        ds.getRepository(Conversation).create({ buyerId: buyer.id, buyerName: buyer.name, sellerId, contextKey: `k-${text}`, lastMessagePreview: text }),
+      );
+      return ds.getRepository(ConversationMessage).save(
+        ds.getRepository(ConversationMessage).create({ conversationId: conv.id, senderId: buyer.id, senderSide: 'buyer', senderName: buyer.name, text }),
+      );
+    };
+    const demoMsg = await chat(w.dCust, dSeller.id, 'Hello');
+    const realMsg = await chat(w.realCustomer, realSeller.id, 'Hi');
+    const rows = ds.getRepository(Translation);
+    const author = (type: Translation['entityType'], id: string) =>
+      rows.save(rows.create({ entityType: type, entityId: id, field: 'text', locale: 'fr', value: 'Bonjour', origin: 'author', sourceLang: 'en', sourceHash: 'h' }));
+    await author('chat_message', demoMsg.id);
+    await author('chat_message', realMsg.id);
+    const res = await removeDemo(ds, { yes: true, uploadDir: dirs.up, privateDir: dirs.priv });
+    expect(res.blockers).toEqual([]);
+    expect((await rows.find()).map((r) => r.entityId)).toEqual([realMsg.id]);
   });
 
   it('refuses while a real order contains a demo product, and deletes nothing', async () => {

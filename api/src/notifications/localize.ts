@@ -645,9 +645,14 @@ const WALLET_LINES: Rule[] = [
   [/^Exchange (\S+): price difference refunded$/, (m) => `Échange ${m[1]} : différence de prix remboursée`],
   [/^Exchange (\S+) rejected: price difference returned$/, (m) => `Échange ${m[1]} refusé : différence de prix restituée`],
   [/^Refund: seller cancelled part of (\S+)$/, (m) => `Remboursement : le vendeur a annulé une partie de ${m[1]}`],
+  [/^Refund: part of (\S+) could not be delivered$/, (m) => `Remboursement : une partie de ${m[1]} n’a pas pu être livrée`],
+  [/^Payment (\S+) arrived after order (\S+) was closed$/, (m) => `Paiement ${m[1]} reçu après la clôture de la commande ${m[2]}`],
   [/^Payout (\S+)$/, (m) => `Versement ${m[1]}`],
   [/^Seller plan (\S+)$/, (m) => `Abonnement vendeur ${m[1]}`],
   [/^Welcome store credit$/, () => 'Crédit de bienvenue'],
+  // The demo's starting balances (seed-demo)
+  [/^Welcome credit from KOMORIKO \(demo\)$/, () => 'Crédit de bienvenue KOMORIKO (démo)'],
+  [/^Demo starter credit \(not real money\)$/, () => 'Crédit de départ de la démo (pas de l’argent réel)'],
 ];
 
 /** A wallet history line ("Wallet top-up via airtel_money") in the user's language; unknown lines as received. */

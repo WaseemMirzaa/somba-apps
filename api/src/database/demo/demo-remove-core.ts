@@ -116,6 +116,8 @@ interface Ids {
   bins: string[];
   convs: string[];
   tickets: string[];
+  /** Chat and support messages: their translations are keyed by the message id. */
+  messages: string[];
   reviews: string[];
   questions: string[];
   campaigns: string[];
@@ -264,6 +266,10 @@ async function collect(ds: DataSource): Promise<Ids> {
     ['sellerId', ids.sellers],
   ]);
   ids.tickets = await col(SupportTicket, 'id', [['userId', ids.users]]);
+  ids.messages = uniq([
+    ...(await col(ConversationMessage, 'id', [['conversationId', ids.convs]])),
+    ...(await col(SupportMessage, 'id', [['ticketId', ids.tickets]])),
+  ]);
   ids.reviews = await col(Review, 'id', [
     ['productId', ids.products],
     ['userId', ids.users],
@@ -326,6 +332,7 @@ const entityIds = (i: Ids) =>
     ...i.hubs,
     ...i.convs,
     ...i.tickets,
+    ...i.messages,
     ...i.reviews,
     ...i.questions,
     ...i.campaigns,
