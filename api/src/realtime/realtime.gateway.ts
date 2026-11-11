@@ -1,3 +1,4 @@
+import { setLongTimeout, type LongTimer } from './long-timer';
 import { Logger, UseInterceptors } from '@nestjs/common';
 import {
   ConnectedSocket,
@@ -89,7 +90,7 @@ export const REAUTH_GRACE_MS = 60_000;
 /** When the access token behind the socket expires, and when the socket is closed if it was not renewed (ms since the epoch). */
 type SocketAuthData = { authExp?: number; authDeadline?: number };
 /** The pending `reauth` / deadline timer of each authenticated socket (cleared on disconnect). */
-const expiryTimers = new WeakMap<object, ReturnType<typeof setTimeout>>();
+const expiryTimers = new WeakMap<object, LongTimer>();
 /** Has the socket's token been expired for longer than the grace? Then nothing but `auth:reauth` goes through. */
 const pastDeadline = (client: { data: unknown }): boolean => {
   const deadline = (client.data as SocketAuthData).authDeadline;
@@ -332,7 +333,7 @@ export class RealtimeGateway
   }
 
   handleDisconnect(client: AuthedSocket): void {
-    clearTimeout(expiryTimers.get(client));
+    expiryTimers.get(client)?.clear();
     expiryTimers.delete(client);
     const u = client.data.user;
     if (u) this.logger.log(`disconnected ${u.role} ${u.id}`);
@@ -347,20 +348,18 @@ export class RealtimeGateway
    * for app builds that predate `reauth`. A revoked session cannot get a fresh token, so it ends there at the latest.
    */
   private watchExpiry(client: AuthedSocket, expSec: number): void {
-    clearTimeout(expiryTimers.get(client));
+    expiryTimers.get(client)?.clear();
     const { leadMs, graceMs } = this.reauthTiming ?? { leadMs: REAUTH_LEAD_MS, graceMs: REAUTH_GRACE_MS };
     const expMs = expSec * 1000;
     const data = client.data as SocketAuthData;
     data.authExp = expMs;
     data.authDeadline = expMs + graceMs;
-    const ask = setTimeout(() => {
+    const ask = setLongTimeout(() => {
       if (!client.connected) return;
       client.emit('reauth', { reason: 'token_expiring', expiresAt: new Date(expMs).toISOString() });
-      const deadline = setTimeout(() => this.expire(client), Math.max(0, expMs + graceMs - Date.now()));
-      deadline.unref?.();
+      const deadline = setLongTimeout(() => this.expire(client), Math.max(0, expMs + graceMs - Date.now()));
       expiryTimers.set(client, deadline);
     }, Math.max(0, expMs - leadMs - Date.now()));
-    ask.unref?.();
     expiryTimers.set(client, ask);
   }
 
