@@ -115,6 +115,19 @@ It sets **only** `expressDeliveryEnabled=true`, says so loudly, and from then on
 
 **Auto-assignment on "Entrepôt Kinshasa".** The warehouse the express order and the other demo orders use is the launch warehouse that `bootstrap:prod` creates, not a demo record: the demo removal does not delete it, and the seed does not change its settings (auto-assignment stays **off**, the platform default). To let the express order go to a rider the moment the seller presses Package Ready, turn it on yourself, and turn it off again after the demo if you wish: sign in as the warehouse manager (`warehouse.manager`) or an admin, open **Warehouse > Settings > How the warehouse runs** (an admin picks the warehouse in the scope bar first), tick **Auto-assignment** and save. It then hands new pickup and express legs to the least busy available rider while the warehouse is open.
 
+### Parcel labels and scanning
+
+Every demo package that is ready or further has KOMORIKO labels (`PKG-` and 8 characters), and the scans agree with each leg's state: legs already collected have their pickup scans, finished legs have both. About every third package is in **2 boxes**. The setting **Admin > Settings > Delivery model > Require parcel scanning** is on, so a rider cannot collect or hand over a parcel until every box was scanned.
+
+Try it with a phone (the camera needs `https`, which the demo server has):
+
+1. **Print a label.** `seller.a`: open an order marked ready (or press **Package Ready** on a waiting one, with the **Boxes** stepper at 2) > **Print labels**. Choose *Label 100 x 150 mm* or *A4 sheet*, print or **Save as PDF**, and open the PDF on a computer screen. Before the rider scanned anything the stepper can change the box count (new labels, the old ones are void); afterwards it is locked.
+2. **Scan out.** `rider` (rider app, or the rider web portal on the phone): open a leg that is *assigned*, tap **Scan parcels**, point the camera at the label on the screen: "1 of 2 scanned", then the second label. **Picked up** stays disabled until both are scanned; try typing the code (**Type the code**) and scanning a wrong code ("... is not part of this pickup.").
+3. **Scan in at the warehouse.** `warehouse.operator`: Warehouse > Desk > **Receive**, scan the boxes with the camera or type their codes: "PKG-... received · 1 of 2 boxes in", the leg is scanned in with the last box. `warehouse.manager` (or supervisor) can **Mark scanned by hand** a box whose label is damaged, with a reason (it is in the audit log).
+4. **Deliver.** `rider`: on the delivery leg scan the boxes at the customer; only then does **Delivered** and the customer's code step open.
+5. **Switch it off.** `admin.super`: turn **Require parcel scanning** off: scanning still records but nothing is blocked. Turn it on again.
+6. **A return.** `customer.full` (customer app or web): a return that is approved shows the box's **QR code** and its code with "write this code on the package"; the rider scans it when collecting.
+
 ### Preparation time
 
 Demo listings carry a preparation time from 0 to 5 days (food and oils 0, clothes and electronics 1 to 2, hand-made pieces 3 to 5; the Djembe drum of store G is 5), and the stores keep a handling time (A 1 day, B 2, C 1, G 3). The delivery estimate shown on a product and at checkout is the preparation time plus the platform's transit for the route.

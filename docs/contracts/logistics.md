@@ -545,3 +545,46 @@ Clearing the pin switches express off. `expressDelivery` is in `sellers:mine`, `
 **What clients must handle.** The new leg `kind: 'express'` (rider app: it meets the customer, needs the code and the proof photo, and its pickup end is the seller: `from.type === 'seller'`;
 web rider portal `RIDER_FINISHED`; the customer journey); `orders.deliveryMode`, the quote's `deliveryMode` / `express`; `sellerExpressDelivery` and `expressDelivery`; the new errors above and the `An?`
 status-error pattern; a rider's task list can show a `pickup` leg that is already `picked_up` (an express parcel coming back). Keep `expressDeliveryEnabled` `false` until those clients ship.
+
+## 18. Parcels, labels and scans (migration `1793470000001-ParcelLabelsAndScans`)
+
+**Owner's rule.** The rider scans every parcel, one by one, at the customer and at the warehouse, both when picking up and when delivering. The seller prints a KOMORIKO
+label for every parcel when marking a package ready; the code on the label never changes from the seller to the customer. A package may be split into several boxes: each box has its own label ("1/3", "2/3", "3/3") and every box is scanned.
+
+**Data.**
+- `parcels` (`parcel.entity.ts`): `id`, `code` (UNIQUE: `PKG-` + 8 characters of `23456789ABCDEFGHJKLMNPQRSTUVWXYZ`, so no 0 / O / 1 / I; random, collision checked, `parcel-code.ts`), `orderId`,
+  `sellerId` (the same key as the pickup leg's `sellerId`; null for a return parcel), `returnId` (the after-sale case id; null for a seller's parcel), `boxNo`, `boxCount`, `createdAt`, `voidedAt`.
+  Parcels are never deleted: a replaced label is voided, so scanning it says so.
+- `parcel_scans`: `id`, `parcelId`, `taskId` (the leg), `stage` (`pickup` | `dropoff`), `actorId`, `actorRole`, `hubId`, `at`, `manual` (typed code, or marked by hand), `reason` (staff mark); UNIQUE (`parcelId`, `taskId`, `stage`).
+- The migration back-fills one parcel (`boxCount` 1) for every seller package that is `ready` / `received`, not delivered or cancelled, of an order that is still alive (idempotent, reversible: `down` drops both tables).
+- The old per-leg desk code `PKG-<6 chars of the task id>` is **not** a physical label; the web desk still finds a leg with it, the 8-character codes are the real ones.
+
+**What a leg carries** (`parcel-rules.ts` `cargoMatches`, pure): `pickup` / `express` / `transfer` the seller's boxes of the order (`task.sellerId`); `delivery` the boxes of its `sellerIds` (null = every seller's);
+a return leg (`return_pickup`, `return_transfer`, `return_to_seller`) the return's own parcel (`disputeId` = `returnId`); replacement and exchange legs carry no labelled parcel. A leg with no parcel is complete on both stages (orders from before labels are not blocked).
+Every leg view (`TaskView`: `rider:tasks`, `logistics:queue`, `task:updated`) now has `parcels: [{code, boxNo, boxCount, pickupScannedAt, dropoffScannedAt}]`, `pickupComplete`, `dropoffComplete`, `scanRequired`.
+
+**Seller (`orders:sellerReady { orderId, boxCount? }`).** `boxCount` 1 to 20 (default 1) makes the labels; the answer is the task plus `labels: [{code, boxNo, boxCount, orderReference, storeName, destinationArea}]`, `boxCount`, `boxesLocked`.
+A label carries the area (commune, city) and never the customer's phone or street. `orders:sellerLabels { orderId }` returns `{labels, boxCount, locked}` for printing / reprinting until the package is delivered
+(`This package was delivered: its labels can no longer be printed.`; before ready: `Mark the package ready first: the labels are made then.`). `orders:sellerBoxes { orderId, boxCount }` changes the count **before the first pickup scan**: the old labels are voided
+and new ones made. **C-parcel-boxes:** after a pickup scan the count is locked, in the service and in the seller portal: `The rider already scanned these boxes. Contact support to change them.`
+`1 to 20`: `Boxes must be a whole number from 1 to 20.` A package or an order that is cancelled voids its labels.
+
+**Returns.** `createReturnPickup` creates the return's parcel (one box, `sellerId` null, `returnId` = the case id; idempotent). The customer reads it with `parcels:forReturn { returnId }` -> `{code, boxNo, boxCount, orderReference}` or `null` before the pickup exists (the owner of the order, or staff); the apps show its QR and the line "write the code on the package".
+
+**Rider (`rider:scanParcel { taskId | runId, code, stage, manual? }`).** The leg must be the rider's and open (same answer for missing and someone else's: `Delivery task not found.`); a `runId` covers every leg of a transfer run. Answers
+`{parcels, pickupComplete, dropoffComplete, taskId, stage, code, scanned, total, already, required}`. A repeat of the same scan by the same rider is idempotent (`already: true`, nothing written). A drop-off needs the leg to be picked up. `rider:legParcels { taskId | runId }` returns the checklist.
+Errors: `PKG-… is not part of this <pickup | delivery | transfer | express delivery | return pickup>.` / `PKG-… was already scanned.` (someone else scanned it on this leg and stage) / `PKG-… was cancelled; use the new label.` /
+`That is not a KOMORIKO parcel code. Codes look like PKG-7KQ2M9XA.` / `Collect PKG-… first: this leg is not picked up yet.` / `This leg is already closed.` / `Stage must be pickup or dropoff.`
+
+**C-parcel-scan: the enforcement** (setting `requireParcelScan`, public + writable, default **true**; Admin > Settings > Delivery model; unset counts as on). Enforced in the data layer (`ParcelsService.assertComplete`, called from `DeliveryService.updateStatus`, `LogisticsService.scanOut` / `onScanIn`, `RunsService.dispatch` / `receive`) and in the apps (buttons disabled with the counter):
+- a leg cannot be **picked up** until every box of its cargo has a `pickup` scan for THIS leg (rider tap, desk hand-over, run dispatch);
+- a leg cannot be **completed** until every box has a `dropoff` scan for this leg: the delivery to the customer (checked **before** the delivery code), express, a drop-off at a warehouse (staff scan-in) and a transfer run's receive;
+- a run is counted as a whole; the refusal reads `Scan every parcel first: 2 of 3 scanned.` (the numbers vary);
+- with the setting off scanning still records (and `required: false` is answered) but nothing blocks.
+
+**Warehouse desk.** `logistics:scanIn { taskId | code, manual? }` and `logistics:dispatchTransfer` / `logistics:scanOut { taskId | code, manual? }`. With a `code` the server finds the leg from the box (`PKG-… is not due at your warehouse.` / `…is not waiting to leave your warehouse.` /
+`A rider must collect PKG-… before it can be scanned in.` / `Assign a rider before handing PKG-… over.`), records the box's arrival (stage `dropoff`) or departure (`pickup`) and, when every box of the leg is in (or the rule is off), scans the leg in / hands it over; the answer carries `checklist` and `completed`.
+A box of a transfer run only ticks the run's manifest. `logistics:markParcel { taskId, code, stage, reason }`: a supervisor, a manager or a desk admin marks a box scanned by hand for a damaged label (reason of 3 or more characters, audited as `parcel.marked_by_hand`, stored `manual` with its `reason`); operators and riders cannot
+(`Only a supervisor or a manager can mark a parcel by hand.`). `logistics:legParcels { taskId }` is the desk's checklist.
+
+**Not done / limits.** Replacement and exchange units are not labelled. Notices are not sent for scans. A return that spans several sellers carries one parcel and each `return_to_seller` leg scans it.
