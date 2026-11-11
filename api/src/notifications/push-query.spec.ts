@@ -61,4 +61,13 @@ describe('PushService device query', () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].tokens.sort()).toEqual(['A1-phone', 'A1-web']);
   });
+
+  it('lists the most recently seen devices first', async () => {
+    const tokens = ds.getRepository(DeviceToken);
+    await tokens.update({ token: 'A1-web' }, { updatedAt: new Date('2026-01-01T00:00:00Z') });
+    await tokens.update({ token: 'A1-phone' }, { updatedAt: new Date('2026-06-01T00:00:00Z') });
+    await svc.sendToUser('a1', en);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].tokens).toEqual(['A1-phone', 'A1-web']);
+  });
 });

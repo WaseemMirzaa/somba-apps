@@ -1,15 +1,24 @@
 import { PushService } from './push.service';
 
-type Row = { token: string; userId: string; role: string; platform: string; app: string };
+type Row = { token: string; userId: string; role: string; platform: string; app: string; updatedAt?: Date };
 
 function make() {
   const rows: Row[] = [];
+  let clock = 0; // a deterministic "now": each write moves it on by one
   const repo = {
     findOne: async ({ where }: { where: Partial<Row> }) => rows.find((r) => r.token === where.token) ?? null,
-    find: async ({ where }: { where: Partial<Row> }) =>
-      rows.filter((r) => Object.entries(where).every(([k, v]) => (r as never)[k] === v)),
+    find: async ({ where, order }: { where: Partial<Row>; order?: { updatedAt?: 'ASC' | 'DESC' } }) => {
+      const found = rows.filter((r) => Object.entries(where).every(([k, v]) => (r as never)[k] === v));
+      if (order?.updatedAt) found.sort((a, b) => (a.updatedAt!.getTime() - b.updatedAt!.getTime()) * (order.updatedAt === 'ASC' ? 1 : -1));
+      return found;
+    },
     create: (x: Partial<Row>) => ({ ...x }) as Row,
-    save: async (r: Row) => { if (!rows.includes(r)) rows.push(r); return r; },
+    // Like TypeORM: a new row is stamped, a saved row that is already there is only re-stamped by an UPDATE (see `update`).
+    save: async (r: Row) => { if (!rows.includes(r)) { r.updatedAt = new Date(++clock); rows.push(r); } return r; },
+    update: async (w: { token: string }, p: Partial<Row>) => {
+      const r = rows.find((x) => x.token === w.token);
+      if (r) Object.assign(r, p, { updatedAt: new Date(++clock) });
+    },
     createQueryBuilder: () => {
       const params: { userIds?: string[]; role?: string } = {};
       const qb = {
@@ -18,6 +27,7 @@ function make() {
         addSelect: () => qb,
         where: (_sql: string, p: typeof params) => (Object.assign(params, p), qb),
         andWhere: () => qb,
+        orderBy: () => qb,
         getRawMany: async () =>
           rows
             .filter((r) => (!params.userIds || params.userIds.includes(r.userId)) && (!params.role || r.role === params.role))
@@ -77,5 +87,28 @@ describe('PushService', () => {
       sendEachForMulticast: async () => { throw new Error('boom'); },
     };
     expect(await svc.sendToUser('u1', { title: 't', body: 'b' })).toBe(0);
+  });
+
+  it('a device that registers again is stamped as seen now, so the registry forgets the stalest one, not the active one', async () => {
+    const { svc, rows } = make();
+    for (let i = 1; i <= 10; i++) await svc.register({ id: 'u1', role: 'customer' }, { token: `D${i}` });
+    await svc.register({ id: 'u1', role: 'customer' }, { token: 'D1' }); // the oldest device is used again
+    await svc.register({ id: 'u1', role: 'customer' }, { token: 'D11' }); // an eleventh device signs in
+    const tokens = rows.map((r) => r.token);
+    expect(tokens).toHaveLength(10);
+    expect(tokens).toContain('D1');
+    expect(tokens).not.toContain('D2');
+  });
+
+  it('pushes every device of a user in one go', async () => {
+    const { svc } = make();
+    for (const t of ['A', 'B', 'C']) await svc.register({ id: 'u1', role: 'customer' }, { token: t });
+    const sent: string[][] = [];
+    (svc as never as { messaging: unknown }).messaging = {
+      sendEachForMulticast: async (m: { tokens: string[] }) => { sent.push(m.tokens); return { successCount: m.tokens.length, responses: m.tokens.map(() => ({ success: true })) }; },
+    };
+    expect(await svc.sendToUser('u1', { title: 't', body: 'b' })).toBe(3);
+    expect(sent).toHaveLength(1);
+    expect([...sent[0]].sort()).toEqual(['A', 'B', 'C']);
   });
 });
