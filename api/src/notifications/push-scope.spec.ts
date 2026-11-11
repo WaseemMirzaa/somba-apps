@@ -12,6 +12,7 @@ function deviceQuery(rows: Row[]) {
       addSelect: () => qb,
       where: (_sql: string, p: typeof params) => (Object.assign(params, p), qb),
       andWhere: (_sql: string, p: typeof params) => (Object.assign(params, p), qb),
+      orderBy: () => qb,
       getRawMany: async () =>
         rows
           .filter(

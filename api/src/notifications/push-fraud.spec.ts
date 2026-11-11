@@ -11,6 +11,7 @@ describe('PushService.register feeds the device signal', () => {
       if (!rows.includes(r)) rows.push(r);
       return r;
     },
+    update: async () => undefined,
     delete: async () => undefined,
   };
   const noted: [string, string][] = [];
