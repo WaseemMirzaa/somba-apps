@@ -9,13 +9,20 @@ import {
   Category,
   CmsBlock,
   ConversationMessage,
+  Dispute,
+  DisputeMessage,
+  Exchange,
   FlashSale,
   Product,
   ProductQuestion,
+  Replacement,
   Review,
   Seller,
+  SupportMessage,
+  SupportTicket,
   Translation,
   TranslationJob,
+  User,
 } from '../database/entities';
 import type { TranslationEntityType } from '../database/entities';
 import { storedVariantGroups } from '../common/variants/variants';
@@ -79,14 +86,36 @@ const BASE_ENTITIES = {
 export const JOB_TYPES = Object.keys(BASE_ENTITIES) as (keyof typeof BASE_ENTITIES)[];
 const isJobType = (t: string): t is keyof typeof BASE_ENTITIES => t in BASE_ENTITIES;
 
-/** What `translate:text` accepts, and where the stored text lives. Only ids of these records ever reach a translator (C-I5). */
+/**
+ * What `translate:text` accepts, and where the stored text lives. Only ids of these records ever reach a translator (C-I5).
+ * `private: true`: the text is read by named people only (a conversation, a ticket, a request); `translateStored` refuses
+ * it unless the OWNING service already checked who is asking and passed `{ private: true }`.
+ */
 export const STORED_KINDS = {
   review: { entity: Review, column: 'text', field: 'text' },
   review_reply: { entity: Review, column: 'sellerReply', field: 'reply' },
   question: { entity: ProductQuestion, column: 'question', field: 'text' },
   answer: { entity: ProductQuestion, column: 'answer', field: 'text' },
-  /** A chat message: private to the two sides of its conversation, so only `ChatService.translate` may ask for it (`private: true`). */
-  chat_message: { entity: ConversationMessage, column: 'text', field: 'text' },
+  /** A chat message: private to the two sides of its conversation, so only `ChatService.translate` may ask for it. */
+  chat_message: { entity: ConversationMessage, column: 'text', field: 'text', private: true },
+  /** A support ticket's subject (entityId = the ticket id). Private to the ticket's owner and the support agents (`SupportService.translate`). */
+  support_ticket: { entity: SupportTicket, column: 'subject', field: 'subject', private: true },
+  /** A message of a support ticket (entityId = the message id). Same readers as the ticket. */
+  support_message: { entity: SupportMessage, column: 'text', field: 'text', private: true },
+  /** A message in a dispute or return thread. Private to the customer, the seller(s) on the order and the returns/disputes desk (`DisputesService.translate`). */
+  dispute_message: { entity: DisputeMessage, column: 'text', field: 'text', private: true },
+  /** What the customer wrote when opening a dispute or return (entityId = the dispute id). */
+  dispute_reason: { entity: Dispute, column: 'reason', field: 'reason', private: true },
+  /** The seller's reason when they accepted or rejected a return (`sellerReason`). */
+  dispute_reply: { entity: Dispute, column: 'sellerReason', field: 'reply', private: true },
+  /** How the request was closed, when the words are an agent's own (stock phrases have their own French). */
+  dispute_resolution: { entity: Dispute, column: 'resolution', field: 'resolution', private: true },
+  /** An exchange's customer reason / seller reason (`ExchangesService.translate`). */
+  exchange_reason: { entity: Exchange, column: 'reason', field: 'reason', private: true },
+  exchange_reply: { entity: Exchange, column: 'sellerReason', field: 'reply', private: true },
+  /** A replacement's customer reason / seller reason (`ReplacementsService.translate`). */
+  replacement_reason: { entity: Replacement, column: 'reason', field: 'reason', private: true },
+  replacement_reply: { entity: Replacement, column: 'sellerReason', field: 'reply', private: true },
 } as const;
 export type StoredKind = keyof typeof STORED_KINDS;
 export const isStoredKind = (k: unknown): k is StoredKind => typeof k === 'string' && k in STORED_KINDS;
@@ -112,6 +141,23 @@ const isDuplicate = (e: unknown) => e instanceof QueryFailedError && /duplicate|
 const utcDay = (d = new Date()) => d.toISOString().slice(0, 10);
 const nextUtcMidnight = (d = new Date()) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
 
+/** One running job. `dirty`: a save arrived meanwhile (run once more). `hold`: an inline save is waiting for it and publishes the record itself. */
+interface Flight {
+  dirty: boolean;
+  done: Promise<boolean>;
+  hold: boolean;
+  /** The job wrote translations while `hold` was set: its republish was left to the waiting save. */
+  held: boolean;
+  /** An earlier pass of this run wrote rows (its republish waits for the final pass). */
+  wrote: boolean;
+}
+
+/** `TRANSLATE_SAVE_TIMEOUT_MS` (default 4000), read on every call: the longest a save waits for a translator. */
+export const saveTimeoutMs = (): number => {
+  const raw = Number(process.env.TRANSLATE_SAVE_TIMEOUT_MS ?? 4000);
+  return Number.isFinite(raw) && raw > 0 ? raw : 4000;
+};
+
 class BudgetExceeded extends Error {
   constructor() {
     super('Daily translation budget used up.');
@@ -128,7 +174,7 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('Translation');
   private sweeper: ReturnType<typeof setInterval> | null = null;
   private readonly republishers = new Map<string, (id: string) => Promise<void>>();
-  private readonly inflight = new Map<string, { dirty: boolean }>();
+  private readonly inflight = new Map<string, Flight>();
   /** Strings already translated in this process ("Black", "XL"…): one call each. */
   private readonly terms = new Map<string, string>();
   private usage = { day: '', chars: 0 };
@@ -321,8 +367,16 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
 
   // ── Queue ───────────────────────────────────────────────────────────────────────────────
 
-  /** Queue a record for translation and run it at once; the 60 s sweeper retries on failure. No-op when translation is off. */
-  async enqueue(type: TranslationEntityType, id: string): Promise<void> {
+  /**
+   * Queue a record for translation and run it NOW, waiting for it (bounded): a save of authored platform content (product,
+   * category, store, campaign, flash sale, CMS block) calls this before it publishes, so the first `product:created` /
+   * `…:updated` already carries both languages. With `autoRun` on and translation enabled, the job runs inline and the call
+   * returns when it finishes or after `TRANSLATE_SAVE_TIMEOUT_MS` (default 4000, read now), whichever is first. On timeout
+   * the job keeps running in the background (and republishes the record when it finishes); a failure stays queued for the
+   * 60 s sweeper. Never throws because of a translator. `wait: false`: only queue it (run a moment later, setImmediate).
+   * No-op when translation is off. With `autoRun` off (tests) the job is only queued.
+   */
+  async enqueue(type: TranslationEntityType, id: string, opts: { wait?: boolean } = {}): Promise<void> {
     if (!this.enabled || !isJobType(type)) return;
     const existing = await this.jobs.findOne({ where: { entityType: type, entityId: id } });
     if (existing) {
@@ -335,17 +389,57 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
         await this.jobs.update({ entityType: type, entityId: id }, { status: 'pending', attempts: 0, nextAttemptAt: new Date(), lastError: null });
       }
     }
-    this.kick(type, id);
+    await this.kick(type, id, opts.wait !== false);
   }
 
-  private kick(type: TranslationEntityType, id: string): void {
+  private async kick(type: TranslationEntityType, id: string, wait: boolean): Promise<void> {
     if (!this.autoRun) return;
     const flight = this.inflight.get(`${type}:${id}`);
     if (flight) {
       flight.dirty = true; // text changed while a run is in progress: run once more when it finishes
+      if (wait) await this.waitFor(type, id, flight);
       return;
     }
-    setImmediate(() => void this.runJob(type, id).catch((e) => this.logger.warn(`job ${type}:${id} crashed: ${(e as Error).message}`)));
+    if (!wait) {
+      setImmediate(() => void this.runJob(type, id).catch((e) => this.logger.warn(`job ${type}:${id} crashed: ${(e as Error).message}`)));
+      return;
+    }
+    const running = this.runJob(type, id);
+    running.catch((e) => this.logger.warn(`job ${type}:${id} crashed: ${(e as Error).message}`));
+    const started = this.inflight.get(`${type}:${id}`);
+    if (started) await this.waitFor(type, id, started);
+  }
+
+  /** Wait for a running job, at most {@link saveTimeoutMs}. While waiting, the job does not republish: the waiting save publishes. */
+  private async waitFor(type: TranslationEntityType, id: string, flight: Flight): Promise<void> {
+    flight.hold = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    try {
+      await Promise.race([
+        flight.done.catch(() => undefined),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(() => {
+            timedOut = true;
+            resolve();
+          }, saveTimeoutMs());
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!timedOut) return;
+    // Too slow: the save goes ahead without the other language; the job carries on and republishes when it is done.
+    flight.hold = false;
+    if (flight.held) {
+      flight.held = false;
+      await this.republishNow(type, id);
+    }
+  }
+
+  private async republishNow(type: TranslationEntityType, id: string): Promise<void> {
+    const fn = this.republishers.get(type);
+    if (fn) await fn(id).catch((e) => this.logger.warn(`republish ${type}:${id} failed: ${(e as Error).message}`));
   }
 
   /** Retry due jobs (pending, backoff elapsed). Called every 60 s. */
@@ -386,22 +480,26 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
   /** Process one record. Returns true when the job finished (done), false when it was deferred, failed or already running. */
   async runJob(type: TranslationEntityType, id: string): Promise<boolean> {
     const key = `${type}:${id}`;
-    if (this.inflight.has(key)) {
-      this.inflight.get(key)!.dirty = true;
+    const running = this.inflight.get(key);
+    if (running) {
+      running.dirty = true;
       return false;
     }
-    const flight = { dirty: false };
+    const flight: Flight = { dirty: false, done: Promise.resolve(false), hold: false, held: false, wrote: false };
     this.inflight.set(key, flight);
-    try {
-      let finished = false;
-      do {
-        flight.dirty = false;
-        finished = await this.runOnce(type, id);
-      } while (flight.dirty && finished);
-      return finished;
-    } finally {
-      this.inflight.delete(key);
-    }
+    flight.done = (async () => {
+      try {
+        let finished = false;
+        do {
+          flight.dirty = false;
+          finished = await this.runOnce(type, id);
+        } while (flight.dirty && finished);
+        return finished;
+      } finally {
+        this.inflight.delete(key);
+      }
+    })();
+    return flight.done;
   }
 
   private async runOnce(type: TranslationEntityType, id: string): Promise<boolean> {
@@ -415,16 +513,24 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
         return true;
       }
       const wrote = await this.translateRecord(type, entity);
-      // A save that arrives while this runs sets `dirty` (see runJob), which runs the record once more.
+      // A save that arrives while this runs sets `dirty` (see runJob): the job stays pending (not claimed) and runs once more
+      // on the new text, so the translation that is kept is never the one of the text before the edit.
+      const again = this.inflight.get(`${type}:${id}`);
+      if (again?.dirty) {
+        again.wrote ||= wrote;
+        return true;
+      }
       const claim = await this.jobs
         .createQueryBuilder()
         .update(TranslationJob)
         .set({ status: 'done', lastError: null, nextAttemptAt: null })
         .where("id = :id AND status = 'pending'", { id: job.id })
         .execute();
-      if (wrote && this.republish) {
-        const fn = this.republishers.get(type);
-        if (fn) await fn(id).catch((e) => this.logger.warn(`republish ${type}:${id} failed: ${(e as Error).message}`));
+      if ((wrote || this.inflight.get(`${type}:${id}`)?.wrote) && this.republish) {
+        const flight = this.inflight.get(`${type}:${id}`);
+        // A save is waiting for this job and publishes the record itself (with both languages): no second event.
+        if (flight?.hold) flight.held = true;
+        else await this.republishNow(type, id);
       }
       return !!claim.affected;
     } catch (e) {
@@ -541,8 +647,7 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
       if (!this.enabled) return null;
       const t = String(text ?? '').trim();
       if (!shouldTranslate(t)) return null;
-      const raw = Number(process.env.TRANSLATE_SAVE_TIMEOUT_MS ?? 4000);
-      const timeoutMs = Number.isFinite(raw) && raw > 0 ? raw : 4000;
+      const timeoutMs = saveTimeoutMs();
       const work = this.detectAndTranslate(t, hint);
       work.catch(() => undefined); // a slow provider that fails after the timeout must not become an unhandled rejection
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -635,6 +740,28 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
     return out;
   }
 
+  /**
+   * {@link translateForSave} with the sender's language as the hint: the account's `users.locale` (one primary-key read,
+   * made only when translation is on). A person writing in their own language then costs one provider call. Never throws.
+   */
+  async translateForSender(text: string | null | undefined, userId?: string | null): Promise<SaveTranslation | null> {
+    if (!this.enabled) return null;
+    let hint: string | undefined;
+    if (userId) {
+      try {
+        hint = (await this.ds.getRepository(User).findOne({ where: { id: userId }, select: { id: true, locale: true } }))?.locale ?? undefined;
+      } catch {
+        hint = undefined;
+      }
+    }
+    return this.translateForSave(text, hint);
+  }
+
+  /** {@link i18nFor} for a single record: its both-language view, or undefined. */
+  async i18nOne(kind: StoredKind, id: string, text: string | null | undefined): Promise<TextI18n | undefined> {
+    return (await this.i18nFor(kind, [{ id, text }])).get(id);
+  }
+
   // ── Budget ──────────────────────────────────────────────────────────────────────────────
 
   /** Characters sent to the translator today (UTC): this process's count, seeded from today's machine rows after a restart. */
@@ -701,7 +828,8 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
   ): Promise<{ text: string; sourceLang: string; same: boolean }> {
     const nothing = 'Nothing to translate.';
     if (!isStoredKind(kind) || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error(nothing); // C-I5
-    if (kind === 'chat_message' && !opts.private) throw new Error(nothing); // private text: the chat service checks who may read it
+    // Private text: the owning service (chat, support, disputes, exchanges, replacements) checks who may read it first.
+    if ((STORED_KINDS[kind] as { private?: boolean }).private && !opts.private) throw new Error(nothing);
     if (!isLocale(target)) throw new Error('Choose English or French.');
     const spec = STORED_KINDS[kind];
     const rec = (await this.ds.getRepository(spec.entity as never).findOne({ where: { id } as never })) as unknown as Record<string, unknown> | null;
@@ -773,11 +901,11 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
       const type = String(input.entityType ?? '');
       const id = String(input.entityId ?? '');
       if (!isJobType(type) || !id) throw new Error('Choose a record to retry.');
-      await this.enqueue(type, id);
+      await this.enqueue(type, id, { wait: false });
       return { queued: 1 };
     }
     const failed = await this.jobs.find({ where: { status: 'failed' }, take: 500 });
-    for (const j of failed) await this.enqueue(j.entityType as TranslationEntityType, j.entityId);
+    for (const j of failed) await this.enqueue(j.entityType as TranslationEntityType, j.entityId, { wait: false });
     return { queued: failed.length };
   }
 

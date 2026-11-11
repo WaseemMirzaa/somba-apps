@@ -37,6 +37,9 @@ import { ProductsService } from '../products/products.service';
 import { linesBySeller, sellerUserId } from '../orders/order-sellers';
 import { sellerKeys } from '../flows/after-sale';
 import { resolutionFr } from '../notifications/localize';
+import { quotedNotice } from '../notifications/quote';
+import { TranslationService } from '../translation/translation.service';
+import type { SaveTranslation, StoredKind, TextI18n } from '../translation/translation.service';
 import { pushOrderToOps } from '../logistics/hub-scope';
 import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
@@ -67,6 +70,12 @@ export type DisputeView = Omit<Dispute, 'attachments'> & {
   attachments: string[];
   /** `resolution` in French: stock phrases translated, an agent's own words unchanged. */
   resolutionFr: string | null;
+  /** The customer's `reason` in both languages (docs/contracts/stored-text-i18n.md); absent when no translation is known. */
+  reasonI18n?: TextI18n;
+  /** The seller's `sellerReason` in both languages. */
+  sellerReasonI18n?: TextI18n;
+  /** `resolution` in both languages when it is an agent's own words (stock phrases have `resolutionFr` instead). */
+  resolutionI18n?: TextI18n;
   items: DisputeItemView[];
   siblings?: string[];
   canEscalate: boolean;
@@ -82,6 +91,8 @@ export interface DisputeMessageView {
   authorName: string;
   role: string;
   text: string;
+  /** Both languages of `text`; absent when no translation is known (use `translate:text`). */
+  textI18n?: TextI18n;
   attachments: string[];
   createdAt: Date;
 }
@@ -123,7 +134,30 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     private readonly emitter: RealtimeEmitter,
     private readonly logistics: LogisticsBridge,
     private readonly replacements: ReplacementsService,
+    private readonly translations?: TranslationService,
   ) {}
+
+  // ── Translate first, then store ────────────────────────────────────────────
+
+  /** Both languages of what a person wrote, before it is stored (null: stored untranslated, as before). Their account language is the hint. */
+  private translateFor(text: string, userId?: string): Promise<SaveTranslation | null> {
+    if (!text || !this.translations) return Promise.resolve(null);
+    return userId ? this.translations.translateForSender(text, userId) : this.translations.translateForSave(text);
+  }
+
+  /** {@link translateFor} for a resolution: a stock phrase ("Refunded to wallet") already has its own French and costs nothing. */
+  private translateResolution(text: string, userId?: string): Promise<SaveTranslation | null> {
+    return DisputesService.ownWords(text.trim()) ? this.translateFor(text.trim(), userId) : Promise.resolve(null);
+  }
+
+  private keep(kind: StoredKind, id: string, saved: SaveTranslation | null): Promise<void> {
+    return this.translations?.saveTranslated(kind, id, saved) ?? Promise.resolve();
+  }
+
+  /** An agent's own words, as opposed to a stock phrase the server writes ("Refunded to wallet": it has its own French). */
+  private static ownWords(resolution: string | null | undefined): boolean {
+    return !!resolution && resolutionFr(resolution) === resolution;
+  }
 
   onModuleInit(): void {
     const every = sweepMs();
@@ -228,10 +262,22 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   /** Rows as clients receive them (items + photos decoded + what the customer may do next). */
   async present(rows: Dispute[]): Promise<DisputeView[]> {
     const items = await this.itemsOf(rows.map((r) => r.id));
+    // Both languages of every written note: one batched lookup per kind for the whole list (no N+1).
+    const t = this.translations;
+    const [reasons, replies, resolutions] = t
+      ? await Promise.all([
+          t.i18nFor('dispute_reason', rows.map((r) => ({ id: r.id, text: r.reason }))),
+          t.i18nFor('dispute_reply', rows.map((r) => ({ id: r.id, text: r.sellerReason }))),
+          t.i18nFor('dispute_resolution', rows.map((r) => ({ id: r.id, text: r.resolution }))),
+        ])
+      : [new Map<string, TextI18n>(), new Map<string, TextI18n>(), new Map<string, TextI18n>()];
     return rows.map((d) => ({
       ...d,
       attachments: parseAttachments(d.attachments),
       resolutionFr: resolutionFr(d.resolution),
+      ...(reasons.has(d.id) ? { reasonI18n: reasons.get(d.id) } : {}),
+      ...(replies.has(d.id) ? { sellerReasonI18n: replies.get(d.id) } : {}),
+      ...(resolutions.has(d.id) ? { resolutionI18n: resolutions.get(d.id) } : {}),
       items: items.get(d.id) ?? [],
       canEscalate: d.status === 'open' && (d.stage === 'seller_rejected' || d.stage === 'seller_timeout'),
       canCancel: d.status === 'open' && UNDECIDED.includes(d.stage),
@@ -250,7 +296,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
 
   private async messageViews(disputeId: string): Promise<DisputeMessageView[]> {
     const rows = await this.messagesRepo.find({ where: { disputeId }, order: { createdAt: 'ASC' } });
-    return rows.map((m) => ({ ...m, attachments: parseAttachments(m.attachments) }));
+    const i18n = await this.translations?.i18nFor('dispute_message', rows.map((m) => ({ id: m.id, text: m.text })));
+    return rows.map((m) => ({ ...m, attachments: parseAttachments(m.attachments), ...(i18n?.has(m.id) ? { textI18n: i18n.get(m.id) } : {}) }));
   }
 
   // ── Who is who ─────────────────────────────────────────────────────────────
@@ -355,6 +402,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const dueAt = new Date(Date.now() + (await this.sellerResponseHours()) * HOUR_MS);
 
     const groups = type === 'return' ? await this.returnGroups(order, input.items) : await this.disputeGroups(order, customer.id, input.items);
+    // Translate first, then store: the reason is written in both languages together (one call for all the requests it opens).
+    const reasonTr = await this.translateFor(reason.slice(0, 2000), customer.id);
     const created: Dispute[] = [];
     for (const group of groups) {
       const dispute = await this.disputes.manager.transaction(async (m) => {
@@ -394,6 +443,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
         }
         return d;
       });
+      await this.keep('dispute_reason', dispute.id, reasonTr);
       created.push(dispute);
     }
 
@@ -408,11 +458,17 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
         entityId: d.id,
       });
       // Sellers learn about a problem on their own items as soon as it is raised.
-      await this.tellSellers(
-        d,
+      await this.notifications.toUsers(
         sellerIds,
-        type === 'return' ? 'Return requested on your order' : 'Dispute opened on your order',
-        `${d.reference} · ${order.reference}: ${d.reason.slice(0, 140)}`,
+        quotedNotice({
+          title: type === 'return' ? 'Return requested on your order' : 'Dispute opened on your order',
+          body: (q) => `${d.reference} · ${order.reference}: ${q}`,
+          text: d.reason,
+          i18n: reasonTr,
+          max: 140,
+          type: d.type,
+          entityId: d.id,
+        }),
       );
     }
     const [first, ...rest] = views;
@@ -560,6 +616,23 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return { ...view, messages, messageCount: messages.length };
   }
 
+  /**
+   * `translate:text` for the dispute kinds (`dispute_message`: id = the message; `dispute_reason` / `dispute_reply` /
+   * `dispute_resolution`: id = the dispute). PRIVATE: only people who may read the request may translate it (the same
+   * rule as `get`: the customer, the seller(s) on the order, the returns/disputes desk, the warehouse of a return).
+   * Anyone else, and a made-up id, gets "Nothing to translate.".
+   */
+  async translate(user: Viewer, kind: unknown, id: unknown, target: unknown) {
+    if (!this.translations) throw new Error('Translation is not available right now. Try again later.');
+    const nothing = 'Nothing to translate.';
+    const kinds = ['dispute_message', 'dispute_reason', 'dispute_reply', 'dispute_resolution'];
+    if (typeof kind !== 'string' || !kinds.includes(kind) || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error(nothing);
+    const disputeId = kind === 'dispute_message' ? (await this.messagesRepo.findOne({ where: { id } }))?.disputeId : id;
+    const d = disputeId ? await this.disputes.findOne({ where: { id: disputeId } }) : null;
+    if (!d || !(await this.canSee(user, d))) throw new Error(nothing);
+    return this.translations.translateStored(kind, id, target, { private: true });
+  }
+
   // ── The thread ─────────────────────────────────────────────────────────────
 
   /** A message from the customer, the seller or KOMORIKO staff. */
@@ -571,6 +644,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (body.length < 2 && !photos.length) throw new BadRequestException('Write a message first.');
     if (d.status !== 'open') throw new BadRequestException('This request is closed.');
     const mine = d.customerId === user.id;
+    // Translate first, then store (no text, no call).
+    const bodyTr = await this.translateFor(body, user.id);
     const row = await this.messagesRepo.save(
       this.messagesRepo.create({
         disputeId: d.id,
@@ -581,7 +656,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
         attachments: storeAttachments(photos),
       }),
     );
-    const msg: DisputeMessageView = { ...row, attachments: photos };
+    await this.keep('dispute_message', row.id, bodyTr);
+    const textI18n = body ? await this.translations?.i18nOne('dispute_message', row.id, body) : undefined;
+    const msg: DisputeMessageView = { ...row, attachments: photos, ...(textI18n ? { textI18n } : {}) };
     let nextStage: DisputeStage | null = null;
     if (user.role === 'seller' && d.type === 'dispute' && d.stage === 'awaiting_seller') nextStage = 'seller_replied';
     if (nextStage) {
@@ -597,15 +674,20 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     for (const sid of sellerIds) {
       this.emitter.toUser(sid, 'dispute:message', sid === user.id ? payload : { disputeId: d.id, message: DisputesService.messageForSeller(msg) });
     }
-    // And a notice to the others.
+    // And a notice to the others: the words are quoted in each recipient's language (a photo-only message has nothing to translate).
     const what = d.type === 'return' ? 'Return' : 'Dispute';
-    const preview = `${d.reference}: ${(body || '📷').slice(0, 140)}`;
+    const quote = { text: body || '📷', i18n: body ? bodyTr : null, max: 140 };
     if (!mine) {
-      await this.notifications.toUser(d.customerId, { title: `${what} reply`, body: preview, type: d.type, entityId: d.id });
+      await this.notifications.toUser(d.customerId, quotedNotice({ title: `${what} reply`, body: (q) => `${d.reference}: ${q}`, type: d.type, entityId: d.id, ...quote }));
     }
-    if (user.role !== 'seller') await this.tellSellers(d, sellerIds.filter((s) => s !== user.id), `${what} reply`, preview);
+    if (user.role !== 'seller') {
+      await this.notifications.toUsers(
+        sellerIds.filter((s) => s !== user.id),
+        quotedNotice({ title: `${what} reply`, body: (q) => `${d.reference}: ${q}`, type: d.type, entityId: d.id, ...quote }),
+      );
+    }
     if (!user.role.startsWith('admin')) {
-      await this.notifications.toRole('admin_support', { title: `${what} reply`, body: preview, type: d.type, entityId: d.id });
+      await this.notifications.toRole('admin_support', quotedNotice({ title: `${what} reply`, body: (q) => `${d.reference}: ${q}`, type: d.type, entityId: d.id, ...quote }));
     }
     void view;
     return msg;
@@ -637,19 +719,20 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     }
     const reason = text(rawReason, 1000);
     if (!accept && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this return.');
+    // Translate first, then store: the seller's reason is saved in both languages together.
+    const reasonTr = await this.translateFor(reason, user.id);
     const saved = await this.advance(d.id, ['awaiting_seller'], {
       stage: accept ? 'approved' : 'seller_rejected',
       sellerRespondedAt: new Date(),
       sellerReason: reason || null,
     });
+    await this.keep('dispute_reply', saved.id, reasonTr);
     if (accept) return this.afterApproval(saved, 'Return accepted');
     const view = await this.publish(saved, 'dispute:updated');
-    await this.notifications.toUser(saved.customerId, {
-      title: 'Return rejected',
-      body: `${saved.reference} · ${saved.orderReference}: ${reason}`,
-      type: 'return',
-      entityId: saved.id,
-    });
+    await this.notifications.toUser(
+      saved.customerId,
+      quotedNotice({ title: 'Return rejected', body: (q) => `${saved.reference} · ${saved.orderReference}: ${q}`, text: reason, i18n: reasonTr, max: 1000, type: 'return', entityId: saved.id }),
+    );
     return view;
   }
 
@@ -663,15 +746,17 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (d.status !== 'open' || !UNDECIDED.includes(d.stage)) throw new BadRequestException(STALE);
     const reason = text(rawReason, 1000);
     if (!approve && reason.length < 5) throw new BadRequestException('Give the customer a reason for refusing the return.');
+    // Translate first, then store (a refusal's reason is the request's resolution; an approval's note only goes in the notices).
+    const reasonTr = await this.translateFor(reason, admin.id);
     if (approve) {
       const saved = await this.advance(d.id, UNDECIDED, { stage: 'approved' });
-      return this.afterApproval(saved, 'Return approved', reason);
+      return this.afterApproval(saved, 'Return approved', reason, reasonTr);
     }
-    return this.close(d, 'rejected', 'reject', reason, UNDECIDED);
+    return this.close(d, 'rejected', 'reject', reason, UNDECIDED, undefined, 0, reasonTr);
   }
 
   /** The return was said yes to: ask logistics to collect the goods, and tell everyone. */
-  private async afterApproval(d: Dispute, kind: 'Return accepted' | 'Return approved', note = ''): Promise<DisputeView> {
+  private async afterApproval(d: Dispute, kind: 'Return accepted' | 'Return approved', note = '', noteTr: SaveTranslation | null = null): Promise<DisputeView> {
     const items = await this.itemsRepo.find({ where: { disputeId: d.id } });
     const task = await this.logistics.returnPickup({
       disputeId: d.id,
@@ -684,14 +769,13 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
     }
     const view = await this.publish(saved, 'dispute:updated');
-    await this.notifications.toUser(saved.customerId, {
-      title: kind,
-      body: `${saved.reference} · ${saved.orderReference}${note ? `: ${note}` : ''}`,
-      type: 'return',
-      entityId: saved.id,
-    });
+    const lead = (q: string) => `${saved.reference} · ${saved.orderReference}${note ? `: ${q}` : ''}`;
+    await this.notifications.toUser(saved.customerId, quotedNotice({ title: kind, body: lead, text: note, i18n: noteTr, max: 1000, type: 'return', entityId: saved.id }));
     if (kind === 'Return approved') {
-      await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Return approved', `${saved.reference} · ${saved.orderReference}${note ? `: ${note}` : ''}`);
+      await this.notifications.toUsers(
+        await this.sellerUsersOf(saved),
+        quotedNotice({ title: 'Return approved', body: lead, text: note, i18n: noteTr, max: 1000, type: 'return', entityId: saved.id }),
+      );
     }
     if (!task) {
       // No pickup task (logistics not available): the warehouse collects by hand.
@@ -709,17 +793,19 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (d.status !== 'open' || !(d.stage === 'seller_rejected' || d.stage === 'seller_timeout')) {
       throw new BadRequestException(d.stage === 'awaiting_seller' ? 'Wait for the seller to answer, or for the response time to pass.' : STALE);
     }
-    const saved = await this.advance(d.id, ['seller_rejected', 'seller_timeout'], { stage: 'escalated', escalatedAt: new Date() });
     const note = text(rawNote, 1000);
+    const noteTr = await this.translateFor(note, customer.id);
+    const saved = await this.advance(d.id, ['seller_rejected', 'seller_timeout'], { stage: 'escalated', escalatedAt: new Date() });
     if (note) {
-      await this.messagesRepo.save(
+      const row = await this.messagesRepo.save(
         this.messagesRepo.create({ disputeId: d.id, authorId: customer.id, authorName: firstName(d.customerName), role: 'customer', text: note, attachments: null }),
       );
+      await this.keep('dispute_message', row.id, noteTr);
     }
     const view = await this.publish(saved, 'dispute:updated');
-    const body = `${saved.reference} · ${saved.orderReference}${note ? `: ${note.slice(0, 140)}` : ''}`;
-    await this.notifications.toRole('admin_support', { title: 'Return escalated', body, type: 'return', entityId: saved.id });
-    await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Return escalated', body);
+    const escalated = () => quotedNotice({ title: 'Return escalated', body: (q) => `${saved.reference} · ${saved.orderReference}${note ? `: ${q}` : ''}`, text: note, i18n: noteTr, max: 140, type: 'return', entityId: saved.id });
+    await this.notifications.toRole('admin_support', escalated());
+    await this.notifications.toUsers(await this.sellerUsersOf(saved), escalated());
     return view;
   }
 
@@ -749,6 +835,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (!DECIDE_OUTCOMES.includes(outcome)) throw new BadRequestException(`Outcome must be one of: ${DECIDE_OUTCOMES.join(', ')}.`);
     const reason = text(input.reason, 1000);
     if (outcome === 'reject' && reason.length < 5) throw new BadRequestException('Give the customer a reason for refusing.');
+    // The reason is the agent's own words: translate it before anything is written or paid (stock phrases keep their own French).
+    const resolutionTr = await this.translateResolution(reason, admin.id);
     if ((outcome === 'refund_full' || outcome === 'refund_partial') && !canRefund) {
       throw new BadRequestException('Only admin or finance can issue a refund.');
     }
@@ -776,7 +864,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const resolution =
       reason ||
       (outcome === 'refund_full' ? 'Refunded to wallet' : outcome === 'refund_partial' ? 'Partially refunded' : outcome === 'replacement' ? 'Replacement approved' : 'Rejected');
-    const closed = await this.close(d, outcome === 'reject' ? 'rejected' : 'resolved', outcome, resolution, ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'], undefined, refundUsd);
+    const closed = await this.close(d, outcome === 'reject' ? 'rejected' : 'resolved', outcome, resolution, ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'], undefined, refundUsd, resolutionTr);
     void replacementNote;
     return closed;
   }
@@ -790,6 +878,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     from: DisputeStage[],
     byCustomer?: string,
     refundUsd = 0,
+    /** The resolution in both languages when it is an agent's own words (translated before this call). */
+    resolutionTr: SaveTranslation | null = null,
   ): Promise<DisputeView> {
     const res = await this.disputes
       .createQueryBuilder()
@@ -799,22 +889,17 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       .execute();
     if (!res.affected) throw new BadRequestException('This request was already handled.');
     const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
+    if (DisputesService.ownWords(saved.resolution)) await this.keep('dispute_resolution', saved.id, resolutionTr);
     const view = await this.publish(saved, 'dispute:updated');
     const what = saved.type === 'return' ? 'Return' : 'Dispute';
     const sellerIds = await this.sellerUsersOf(saved);
+    const words = { text: saved.resolution ?? '', i18n: DisputesService.ownWords(saved.resolution) ? resolutionTr : null, max: 1000, type: saved.type, entityId: saved.id };
     if (!byCustomer) {
-      await this.notifications.toUser(saved.customerId, {
-        title: status === 'resolved' ? `${what} resolved` : `${what} closed`,
-        body: `${saved.reference}: ${saved.resolution}`,
-        type: saved.type,
-        entityId: saved.id,
-      });
+      await this.notifications.toUser(saved.customerId, quotedNotice({ title: status === 'resolved' ? `${what} resolved` : `${what} closed`, body: (q) => `${saved.reference}: ${q}`, ...words }));
     }
-    await this.tellSellers(
-      saved,
+    await this.notifications.toUsers(
       sellerIds,
-      status === 'resolved' ? `${what} resolved` : `${what} closed`,
-      `${saved.reference} · ${saved.orderReference}: ${saved.resolution}`,
+      quotedNotice({ title: status === 'resolved' ? `${what} resolved` : `${what} closed`, body: (q) => `${saved.reference} · ${saved.orderReference}: ${q}`, ...words }),
     );
     return view;
   }
@@ -838,6 +923,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (opts.refund && dispute.type === 'return' && !dispute.receivedAt && !opts.force) {
       throw new BadRequestException('Mark the returned goods as received at the warehouse before refunding.');
     }
+    // The agent's own words are translated before anything is paid or written.
+    const typed = opts.resolution === undefined || opts.resolution === null ? '' : String(opts.resolution).slice(0, 1000);
+    const resolutionTr = await this.translateResolution(typed);
     let refundUsd = 0;
     if (opts.refund) {
       if (dispute.type === 'return') refundUsd = (await this.refundReturnedItems(dispute)).refundedUsd;
@@ -854,18 +942,24 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'],
       undefined,
       refundUsd,
+      resolutionTr,
     );
   }
 
   async reject(disputeId: string, resolution?: string): Promise<DisputeView> {
     const dispute = await this.disputes.findOne({ where: { id: disputeId } });
     if (!dispute) throw new NotFoundException('Dispute not found.');
+    const typed = resolution === undefined || resolution === null ? '' : String(resolution).slice(0, 1000);
+    const resolutionTr = await this.translateResolution(typed);
     return this.close(
       dispute,
       'rejected',
       'reject',
       String(resolution ?? 'Rejected'),
       ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'],
+      undefined,
+      0,
+      resolutionTr,
     );
   }
 
@@ -949,7 +1043,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     // Anything not named is graded the same as resellable only if the desk says so; leave it ungraded otherwise.
     const noteText = text(note, 500);
     if (noteText) {
-      await this.messagesRepo.save(this.messagesRepo.create({ disputeId: d.id, authorId: user.id, authorName: user.name ?? 'Warehouse', role: user.role, text: noteText, attachments: null }));
+      const noteTr = await this.translateFor(noteText, user.id);
+      const row = await this.messagesRepo.save(this.messagesRepo.create({ disputeId: d.id, authorId: user.id, authorName: user.name ?? 'Warehouse', role: user.role, text: noteText, attachments: null }));
+      await this.keep('dispute_message', row.id, noteTr);
     }
     const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
     const view = await this.publish(saved, 'dispute:updated');

@@ -317,7 +317,7 @@ export class ProductImportService {
         continue;
       }
       try {
-        const product = await this.products.create(clean, { status: 'pending', sellerId: seller.id, stockReason: 'import', actorId: user.id });
+        const product = await this.products.create(clean, { status: 'pending', sellerId: seller.id, stockReason: 'import', actorId: user.id, translateInBackground: true });
         report.productId = product.id;
         room--;
         ok.push(report);

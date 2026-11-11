@@ -36,11 +36,10 @@ describe('the job queue', () => {
     expect(rows[0].sourceLang).toBe('en');
   });
 
-  it('runs the job at once after the save (setImmediate), without anyone waiting for it', async () => {
+  it('with autoRun on, enqueue runs the job inline and returns when it is done (see save-wait.spec.ts)', async () => {
     svc.autoRun = true;
     const p = await addProduct(ds, { name: 'Wireless Earbuds' });
     await svc.enqueue('product', p.id);
-    await new Promise((r) => setTimeout(r, 400));
     expect((await rowsOf(p.id)).length).toBe(1);
     expect((await jobOf(p.id))?.status).toBe('done');
   });

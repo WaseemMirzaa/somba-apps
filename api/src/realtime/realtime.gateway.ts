@@ -23,6 +23,7 @@ import { TranslationService } from '../translation/translation.service';
 import { accountBlockedFields } from '../auth/account-deletion.service';
 import { SellerPlatformKit } from '../sellers/seller-kit';
 import { touchesStorefront } from '../sellers/storefront.service';
+import { sellerContext } from '../sellers/seller-context';
 import type { SellerContext } from '../sellers/seller-context';
 import { Server, Socket } from 'socket.io';
 import { AuthService } from '../auth/auth.service';
@@ -692,6 +693,23 @@ export class RealtimeGateway
   }
 
   /**
+   * The caller as the after-sale services see them: a seller account acts as its store (a team member with the orders
+   * permission too), warehouse staff carry their warehouse; everyone else as themselves. A seller without a store is
+   * still a customer of their own purchases.
+   */
+  private async afterSaleViewer(user: SocketUser): Promise<SocketUser & { hubId?: string | null }> {
+    if (user.role === 'seller') {
+      try {
+        return (await sellerContext(user, 'orders', { write: false })).actor as SocketUser;
+      } catch {
+        return user;
+      }
+    }
+    if (user.role === 'warehouse_staff') return { ...user, hubId: (await this.users.findById(user.id))?.hubId ?? null };
+    return user;
+  }
+
+  /**
    * A stored review / seller reply / question / answer in the other language. Takes a record id ONLY (never free
    * text, so a leaked client key cannot run up the translation bill); open to everyone who can read the text. // C-I5
    */
@@ -701,8 +719,14 @@ export class RealtimeGateway
     @MessageBody() body: { kind?: string; id?: string; target?: string },
   ) {
     try {
-      // A chat message is private to the two sides of its conversation: the chat service checks who is asking.
-      if (body?.kind === 'chat_message') return ok(await this.kit.chat.translate(this.requireUser(client), body.id, body.target));
+      // Private text (chat, support tickets, dispute / return / exchange / replacement notes) is only translated for people
+      // who may read it: the service that owns the record checks who is asking (anyone else gets "Nothing to translate.").
+      const kind = String(body?.kind ?? '');
+      if (kind === 'chat_message') return ok(await this.kit.chat.translate(this.requireUser(client), body.id, body.target));
+      if (kind.startsWith('support_')) return ok(await this.support.translate(this.requireUser(client), kind, body.id, body.target));
+      if (kind.startsWith('dispute_')) return ok(await this.disputes.translate(await this.afterSaleViewer(this.requireUser(client)), kind, body.id, body.target));
+      if (kind.startsWith('exchange_')) return ok(await this.exchanges.translate(await this.afterSaleViewer(this.requireUser(client)), kind, body.id, body.target));
+      if (kind.startsWith('replacement_')) return ok(await this.replacements.translate(await this.afterSaleViewer(this.requireUser(client)), kind, body.id, body.target));
       const staff = this.can(client.data.user?.role ?? 'guest', 'moderate');
       return ok(await this.translations.translateStored(body?.kind, body?.id, body?.target, { staff }));
     } catch (e) {

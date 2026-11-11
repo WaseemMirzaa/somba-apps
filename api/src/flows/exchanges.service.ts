@@ -14,6 +14,9 @@ import { cleanAttachments, parseAttachments, redactForSeller, storeAttachments }
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { EXCHANGE_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
+import { quotedNotice } from '../notifications/quote';
+import { TranslationService } from '../translation/translation.service';
+import type { SaveTranslation, StoredKind, TextI18n } from '../translation/translation.service';
 
 /** Who follows exchanges live and reads them all: the admin roles that decide them (group `exchangeDecide`) and warehouse staff. */
 const OPS_ROLES = [...ROLE_GROUPS.exchangeDecide, 'warehouse_staff'];
@@ -32,9 +35,17 @@ export const canMoveExchange = (role: string): boolean => inRoleGroup(role, 'exc
 
 /**
  * An exchange as clients receive it: the stored fields plus the two items' names in French (null when it cannot be
- * told, e.g. `toName` is what the customer typed). `reason` is the customer's own words and is never translated.
+ * told, e.g. `toName` is what the customer typed). `reason` and `sellerReason` are people's own words: each is translated
+ * before it is stored and served in both languages next to it (`reasonI18n`, `sellerReasonI18n`; absent when no translation
+ * is known, then `translate:text` is the fallback).
  */
-export type ExchangeView = Omit<Exchange, 'attachments'> & { fromNameFr: string | null; toNameFr: string | null; attachments: string[] };
+export type ExchangeView = Omit<Exchange, 'attachments'> & {
+  fromNameFr: string | null;
+  toNameFr: string | null;
+  attachments: string[];
+  reasonI18n?: TextI18n;
+  sellerReasonI18n?: TextI18n;
+};
 
 /** Exchange one purchased item for another variant/product. */
 @Injectable()
@@ -50,9 +61,20 @@ export class ExchangesService {
     private readonly wallet: WalletService,
     private readonly settings: SettingsService,
     private readonly logistics: LogisticsBridge,
+    private readonly translations?: TranslationService,
   ) {}
 
-  /** Rows with the French names of their items, looked up for all of them at once. */
+  /** Translate first, then store (null: stored untranslated, as before). The writer's account language is the hint. */
+  private translateFor(text: string, userId?: string): Promise<SaveTranslation | null> {
+    if (!text || !this.translations) return Promise.resolve(null);
+    return userId ? this.translations.translateForSender(text, userId) : this.translations.translateForSave(text);
+  }
+
+  private keep(kind: StoredKind, id: string, saved: SaveTranslation | null): Promise<void> {
+    return this.translations?.saveTranslated(kind, id, saved) ?? Promise.resolve();
+  }
+
+  /** Rows with the French names of their items and both languages of their notes, looked up for all of them at once. */
   private async serve(rows: Exchange[]): Promise<ExchangeView[]> {
     const fr = await this.names.frenchNames(
       rows.flatMap((x) => [
@@ -60,7 +82,21 @@ export class ExchangesService {
         { orderId: x.orderId, sku: x.toSku, name: x.toName },
       ]),
     );
-    return rows.map((x, i) => ({ ...x, attachments: parseAttachments(x.attachments), fromNameFr: fr[2 * i], toNameFr: fr[2 * i + 1] }));
+    const t = this.translations;
+    const [reasons, replies] = t
+      ? await Promise.all([
+          t.i18nFor('exchange_reason', rows.map((x) => ({ id: x.id, text: x.reason }))),
+          t.i18nFor('exchange_reply', rows.map((x) => ({ id: x.id, text: x.sellerReason }))),
+        ])
+      : [new Map<string, TextI18n>(), new Map<string, TextI18n>()];
+    return rows.map((x, i) => ({
+      ...x,
+      attachments: parseAttachments(x.attachments),
+      fromNameFr: fr[2 * i],
+      toNameFr: fr[2 * i + 1],
+      ...(reasons.has(x.id) ? { reasonI18n: reasons.get(x.id) } : {}),
+      ...(replies.has(x.id) ? { sellerReasonI18n: replies.get(x.id) } : {}),
+    }));
   }
 
   async list(user: { id: string; role: string }, paging?: { limit?: number; offset?: number; status?: string }): Promise<ExchangeView[]> {
@@ -183,6 +219,9 @@ export class ExchangesService {
 
     const seller = await sellerForItem(order, fromSku, this.products, this.sellers);
     const hours = Number(await this.settings.get('sellerResponseHours'));
+    // Translate first, then store: the reason is saved in both languages together.
+    const reasonText = input.reason ? String(input.reason).slice(0, 1000) : '';
+    const reasonTr = await this.translateFor(reasonText.trim(), actor.id);
     const saved = await this.exchanges.manager.transaction(async (m) => {
       const ex = await m.save(
         m.create(Exchange, {
@@ -202,7 +241,7 @@ export class ExchangesService {
           toVariant,
           priceDiffUsd: diff,
           heldUsd: !ops && diff > 0 ? diff : 0,
-          reason: input.reason ? String(input.reason).slice(0, 1000) : null,
+          reason: reasonText || null,
           sellerDueAt: new Date(Date.now() + (Number.isFinite(hours) && hours > 0 ? hours : 48) * HOUR_MS),
           status: 'requested',
         }),
@@ -221,6 +260,7 @@ export class ExchangesService {
       }
       return ex;
     });
+    await this.keep('exchange_reason', saved.id, reasonTr);
     const [ex] = await this.serve([saved]);
     await this.publish(ex);
     if (seller) {
@@ -247,7 +287,8 @@ export class ExchangesService {
     if (approve && !mine && ex.priceDiffUsd < 0 && !inRoleGroup(actor.role, 'exchangeDesk')) throw new BadRequestException(DESK_REFUND_APPROVE);
     const reason = String(rawReason ?? '').trim().slice(0, 1000);
     if (!approve && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this exchange.');
-    return this.move(ex, approve ? 'approved' : 'rejected', reason);
+    // Translate first, then store: the seller's reason is saved in both languages together.
+    return this.move(ex, approve ? 'approved' : 'rejected', reason, await this.translateFor(reason, actor.id));
   }
 
   /** A desk step. C-X4 (A-03): only the exchange desk and the warehouse move an exchange (delivery credits the wallet). */
@@ -259,7 +300,7 @@ export class ExchangesService {
     return this.move(ex, status, '');
   }
 
-  private async move(ex: Exchange, status: ExchangeStatus, reason: string): Promise<ExchangeView> {
+  private async move(ex: Exchange, status: ExchangeStatus, reason: string, reasonTr: SaveTranslation | null = null): Promise<ExchangeView> {
     assertStep(EXCHANGE_NEXT, ex.status, status);
     const patch: Partial<Exchange> = { status };
     if (status === 'delivered') patch.deliveredAt = new Date();
@@ -283,9 +324,11 @@ export class ExchangesService {
     }
     if (status === 'rejected') await this.giveBack(ex);
     if (status === 'delivered') await this.settleDifference(ex);
+    // The seller's reason is stored now (and was not rolled back above): its translation goes with it.
+    if (reason && (status === 'approved' || status === 'rejected')) await this.keep('exchange_reply', ex.id, reasonTr);
     const [saved] = await this.serve([(await this.exchanges.findOne({ where: { id: ex.id } }))!]);
     await this.publish(saved);
-    await this.tell(saved, status, reason);
+    await this.tell(saved, status, reason, reasonTr);
     return saved;
   }
 
@@ -321,7 +364,7 @@ export class ExchangesService {
     }
   }
 
-  private async tell(ex: ExchangeView, status: ExchangeStatus, reason: string): Promise<void> {
+  private async tell(ex: ExchangeView, status: ExchangeStatus, reason: string, reasonTr: SaveTranslation | null = null): Promise<void> {
     const sellerUser = await this.sellerUserOf(ex);
     if (sellerUser) {
       await this.notifications.toUser(sellerUser, {
@@ -332,12 +375,18 @@ export class ExchangesService {
       });
     }
     if (ex.customerId) {
-      await this.notifications.toUser(ex.customerId, {
-        title: `Exchange ${status}`,
-        body: `${ex.reference}: ${ex.fromName} → ${ex.toName}${reason ? ` — ${reason}` : ''}`,
-        type: 'exchange',
-        entityId: ex.id,
-      });
+      await this.notifications.toUser(
+        ex.customerId,
+        quotedNotice({
+          title: `Exchange ${status}`,
+          body: (q) => `${ex.reference}: ${ex.fromName} → ${ex.toName}${reason ? ` — ${q}` : ''}`,
+          text: reason,
+          i18n: reasonTr,
+          max: 1000,
+          type: 'exchange',
+          entityId: ex.id,
+        }),
+      );
     }
     if (status === 'approved') {
       await this.notifications.toRole('warehouse_staff', {
@@ -372,5 +421,20 @@ export class ExchangesService {
       await this.tell(saved, status, '');
     }
     return saved;
+  }
+
+  /**
+   * `translate:text` for `exchange_reason` / `exchange_reply` (id = the exchange). PRIVATE: only people who may read the
+   * exchange (`get`: the desk and warehouse, its customer, the seller whose item it is) may translate its notes. Anyone
+   * else, and a made-up id, gets "Nothing to translate.".
+   */
+  async translate(user: { id: string; role: string }, kind: unknown, id: unknown, target: unknown) {
+    if (!this.translations) throw new Error('Translation is not available right now. Try again later.');
+    const nothing = 'Nothing to translate.';
+    if ((kind !== 'exchange_reason' && kind !== 'exchange_reply') || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error(nothing);
+    const ex = await this.exchanges.findOne({ where: { id } });
+    const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
+    if (!ex || !(OPS_ROLES.includes(user.role) || ex.customerId === user.id || (!!ex.sellerId && keys.includes(ex.sellerId)))) throw new Error(nothing);
+    return this.translations.translateStored(kind, id, target, { private: true });
   }
 }

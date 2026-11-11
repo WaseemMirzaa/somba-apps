@@ -769,7 +769,11 @@ export class ProductsService {
    * Only the English given -> sourceLang en; only the French -> fr. The other language, if typed, is an author
    * row; if not, a machine fills it in the background.
    */
-  async create(clean: CleanListing, meta: { sellerId: string | null; status: ProductStatus; stockReason?: StockReason; actorId?: string | null }): Promise<ServedProduct> {
+  async create(
+    clean: CleanListing,
+    /** `translateInBackground`: a bulk import queues the translation instead of waiting for it, row after row. */
+    meta: { sellerId: string | null; status: ProductStatus; stockReason?: StockReason; actorId?: string | null; translateInBackground?: boolean },
+  ): Promise<ServedProduct> {
     const categoryId = await this.categories.resolveRef(clean.category ?? {});
     const t = clean.text;
     // C-I1 (data layer): planWrite refuses a listing with no title in either language.
@@ -807,7 +811,8 @@ export class ProductsService {
     if (saved.stock > 0) {
       await this.log({ productId: saved.id, sellerId: saved.sellerId, variant: null, delta: saved.stock, stockAfter: saved.stock, reason: meta.stockReason ?? 'initial', orderId: null, actorId: meta.actorId ?? null, note: null });
     }
-    await this.translations.enqueue('product', saved.id);
+    // Saved first, translated before it is published: the save waits (bounded) for the other language.
+    await this.translations.enqueue('product', saved.id, { wait: !meta.translateInBackground });
     this.corpus = null;
     const product = (await this.get(saved.id))!;
     // Shoppers only hear about listings that are live; staff see every new one

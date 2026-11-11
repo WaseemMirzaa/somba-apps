@@ -92,7 +92,8 @@ const settled = async (sock, id) => until(async () => {
 
   // ---- 1. English in, French out ---------------------------------------------------------------------
   section('A seller writes in English: French appears');
-  const fresh = new Promise((res) => { sellerU.sock.on('product:updated', (p) => { if (p.name === `Wireless Earbuds ${tag}` && p.translationStatus === 'done') res(p); }); setTimeout(() => res(null), 9000); });
+  // The save waits (bounded) for the translation, so the FIRST publish (product:created) already carries both languages.
+  const fresh = new Promise((res) => { for (const ev of ['product:created', 'product:updated']) sellerU.sock.on(ev, (p) => { if (p.name === `Wireless Earbuds ${tag}` && p.translationStatus === 'done') res(p); }); setTimeout(() => res(null), 9000); });
   let a = await req(sellerU.sock, 'products:create', {
     name: `Wireless Earbuds ${tag}`, description: 'Noise reduction and 24 hours of battery.', price: 40, stock: 20, categoryId: electronics.id,
     variants: [{ name: 'Colour', options: ['Black', 'White'] }, { name: 'Size', options: ['XL', 'M'] }],
@@ -104,7 +105,8 @@ const settled = async (sock, id) => until(async () => {
   ok(typeof en1.variants === 'string' && JSON.parse(en1.variants)[0].name === 'Colour', 'variants stay the canonical option groups (JSON text)');
   ok(en1.variantLabels && typeof en1.variantLabels === 'object' && Array.isArray(en1.variantLabels.fr), 'variantLabels is a real object { en, fr }');
   const pushed = await fresh;
-  ok(!!pushed, 'the finished machine translation is pushed to the seller as product:updated');
+  ok(!!pushed && pushed.nameFr === `[fr] Wireless Earbuds ${tag}`, 'the first publish (product:created, or product:updated when it was slow) already carries the French title');
+  ok(en1.translationStatus === 'done' && en1.nameFr === `[fr] Wireless Earbuds ${tag}`, 'and so does the create response: the save waits for the translation', JSON.stringify(en1.nameFr));
   const en = await settled(sellerU.sock, en1.id);
   ok(en && en.nameFr === `[fr] Wireless Earbuds ${tag}`, 'the French title appears after the job', en?.nameFr);
   ok(en.descriptionFr === '[fr] Noise reduction and 24 hours of battery.' && en.description === 'Noise reduction and 24 hours of battery.', 'the French description appears, the English one is untouched');
@@ -462,6 +464,22 @@ const settled = async (sock, id) => until(async () => {
   ok(a.ok && a.data.status === 'approved' && a.data.fromNameFr === prod.nameFr, 'a status change returns them too');
   const exList = (await req(admin.sock, 'exchanges:list')).data.find((x) => x.id === exId);
   ok(exList && exList.fromNameFr === prod.nameFr && 'toNameFr' in exList, 'exchanges:list carries fromNameFr and toNameFr', JSON.stringify(exList));
+
+  section('Support tickets and return notes are translated before they are stored, and private to their readers');
+  const t1 = await req(demo.sock, 'support:open', { subject: `Livraison très lente ${tag}`, message: 'Ma commande est en retard pour la livraison, merci' });
+  ok(t1.ok && t1.data.subjectI18n?.en === `[en] Livraison très lente ${tag}` && t1.data.subjectI18n?.sourceLang === 'fr', 'support:open returns subjectI18n', JSON.stringify(t1));
+  const m1 = JSON.parse(t1.data.messages)[0];
+  ok(m1.textI18n?.en === '[en] Ma commande est en retard pour la livraison, merci', 'and textI18n on the first message', JSON.stringify(m1));
+  const agentSees = (await req(admin.sock, 'support:get', { id: t1.data.id })).data;
+  ok(agentSees?.subjectI18n?.en === t1.data.subjectI18n.en && JSON.parse(agentSees.messages)[0].textI18n?.en === m1.textI18n.en, 'the agent reads both languages too (support:get)');
+  a = await req(demo.sock, 'translate:text', { kind: 'support_message', id: m1.id, target: 'en' });
+  ok(a.ok && a.data.text === m1.textI18n.en, 'the ticket owner may translate:text a message of it', JSON.stringify(a));
+  a = await req(admin.sock, 'translate:text', { kind: 'support_message', id: m1.id, target: 'en' });
+  ok(a.ok && a.data.text === m1.textI18n.en, 'a support agent may too', JSON.stringify(a));
+  a = await req(sellerU.sock, 'translate:text', { kind: 'support_message', id: m1.id, target: 'en' });
+  ok(!a.ok && a.error === 'Nothing to translate.', "another account cannot read a ticket's messages through translate:text", JSON.stringify(a));
+  a = await req(guest.sock, 'translate:text', { kind: 'support_ticket', id: t1.data.id, target: 'en' });
+  ok(!a.ok, 'a guest cannot either', JSON.stringify(a));
 
   console.log(`\n${fails.length ? '❌' : '🎉'} ${pass} passed, ${fails.length} failed`);
   if (fails.length) { console.log(fails.map((f) => `   - ${f}`).join('\n')); process.exit(1); }

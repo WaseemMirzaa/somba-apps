@@ -4,19 +4,16 @@ import { In, LessThan, Repository } from 'typeorm';
 import { Conversation, ConversationMessage, Order, OrderItem, Product, Seller, User } from '../database/entities';
 import type { ChatSide, TeamRole } from '../database/entities';
 import { NotificationsService } from '../notifications/notifications.service';
+import { quotedNotice } from '../notifications/quote';
 import { isUploadUrl } from '../common/attachments';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { SellerContextService } from '../sellers/seller-context';
 import { TeamDirectory } from '../sellers/team-directory';
 import { roleAllows } from '../sellers/seller-permissions';
 import { TranslationService } from '../translation/translation.service';
-import type { TextI18n } from '../translation/translation.service';
+import type { SaveTranslation, TextI18n } from '../translation/translation.service';
 import { pageOf } from '../common/paging';
 import { RateWindow } from '../common/rate-window';
-
-/** French titles of the two chat notices (the English ones are in notifications/localize.ts too). */
-const FR_FROM_SELLER = 'Nouveau message du vendeur';
-const FR_FROM_CUSTOMER = 'Nouveau message client';
 
 export const MAX_TEXT = 2000;
 export const MAX_ATTACHMENTS = 4;
@@ -318,7 +315,7 @@ export class ChatService {
     const message = ChatService.message(saved, text ? (await this.translations?.i18nFor('chat_message', [{ id: saved.id, text }]))?.get(saved.id) : undefined);
 
     await this.fanout(fresh, message);
-    if (!wasWaiting) await this.notify(fresh, side, user, seller);
+    if (!wasWaiting) await this.notify(fresh, side, user, seller, text, attachments.length, translated);
     return message;
   }
 
@@ -342,29 +339,23 @@ export class ChatService {
     for (const id of new Set(staff)) this.emitter.toUser(id, 'chat:message', { conversation: sellerView, message });
   }
 
-  private async notify(conv: Conversation, from: ChatSide, user: ChatCaller, seller: Seller | null): Promise<void> {
+  /**
+   * The notice for whoever was not already waiting. The message is quoted in each recipient's language: the English body
+   * quotes the English version of the text, `fr` the French one (both are in hand: translated before the insert), so the
+   * bell, the push and the web push follow the receiver's `users.locale`. A photo-only message quotes 📷.
+   */
+  private async notify(conv: Conversation, from: ChatSide, user: ChatCaller, seller: Seller | null, text: string, photos: number, translated: SaveTranslation | null | undefined): Promise<void> {
     try {
-      const snippet = conv.lastMessagePreview;
+      const quote = { text: text.trim() ? text : photos ? '📷' : '', i18n: text.trim() ? translated : null, max: 140, collapse: true };
       if (from === 'seller') {
-        const body = `${seller?.name ?? 'Store'}: ${snippet}`;
-        // The body is what a person typed: authored French = the same text, so no pattern ever "translates" it.
-        await this.notifications.toUser(conv.buyerId, {
-          title: 'New message from the seller',
-          body,
-          type: 'chat',
-          entityId: conv.id,
-          fr: { title: FR_FROM_SELLER, body },
-        });
+        await this.notifications.toUser(
+          conv.buyerId,
+          quotedNotice({ title: 'New message from the seller', body: (q) => `${seller?.name ?? 'Store'}: ${q}`, type: 'chat', entityId: conv.id, ...quote }),
+        );
         return;
       }
       const { ownerId, memberIds } = await this.sellerSide(conv.sellerId);
-      const notice = {
-        title: 'New customer message',
-        body: `${user.name}: ${snippet}`,
-        type: 'chat',
-        entityId: conv.id,
-        fr: { title: FR_FROM_CUSTOMER, body: `${user.name}: ${snippet}` },
-      };
+      const notice = quotedNotice({ title: 'New customer message', body: (q) => `${user.name}: ${q}`, type: 'chat', entityId: conv.id, ...quote });
       // The owner's notice already reaches managers and support (NotificationsService fans it out); orders staff are told here.
       if (ownerId) await this.notifications.toUser(ownerId, notice);
       for (const m of memberIds.filter((x) => x.role === 'orders' && !roleAllows(x.role, 'support'))) await this.notifications.toUser(m.userId, notice);

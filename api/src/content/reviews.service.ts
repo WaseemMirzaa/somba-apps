@@ -11,6 +11,7 @@ import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { ProductsService } from '../products/products.service';
 import { cleanAttachments } from '../common/attachments';
 import { TranslationService } from '../translation/translation.service';
+import { quotedNotice } from '../notifications/quote';
 import type { TextI18n } from '../translation/translation.service';
 
 /** Photos a customer may attach to one review. */
@@ -75,6 +76,18 @@ export class ReviewsService {
     @InjectRepository(ReviewHelpful) private readonly helpfulVotes: Repository<ReviewHelpful>,
     @Optional() private readonly translations?: TranslationService,
   ) {}
+
+  /** A product's name in each notice language (the listing's French title when it has one); the plain name when it cannot be looked up. */
+  private async labelsOf(product: Product | null): Promise<{ en: string; fr: string }> {
+    const en = product?.name ?? '';
+    if (!product) return { en, fr: en };
+    try {
+      const n = (await this.productsSvc.names([product.id])).get(product.id);
+      return { en: n?.name || en, fr: n?.nameFr || n?.name || en };
+    } catch {
+      return { en, fr: en };
+    }
+  }
 
   /** Add `textI18n` / `replyI18n` to reviews, in place: two batched lookups for the whole list. A review with nothing known gets no key. */
   private async withReviewI18n<T extends Review>(rows: T[]): Promise<(T & { textI18n?: TextI18n; replyI18n?: TextI18n })[]> {
@@ -242,12 +255,20 @@ export class ReviewsService {
     const sellerUser = await this.sellerUserOfProduct(product);
     if (sellerUser) {
       this.emitter.toUser(sellerUser, 'review:created', review);
-      await this.notifications.toUser(sellerUser, {
-        title: 'New review on your product',
-        body: `${product?.name ?? ''}: ${review.rating}★ ${review.text.slice(0, 120)}`,
-        type: 'review',
-        entityId: review.id,
-      });
+      // The review's words are quoted in each recipient's language (both versions are in hand: translated before the insert).
+      const name = await this.labelsOf(product);
+      await this.notifications.toUser(
+        sellerUser,
+        quotedNotice({
+          title: 'New review on your product',
+          body: (q, lang) => `${name[lang]}: ${review.rating}★ ${q}`,
+          text: review.text,
+          i18n: translated,
+          max: 120,
+          type: 'review',
+          entityId: review.id,
+        }),
+      );
     }
     return review;
   }
@@ -385,12 +406,19 @@ export class ReviewsService {
       if (store?.userId) this.emitter.toUser(store.userId, 'review:updated', saved);
     }
     if (saved.userId !== 'seed') {
-      await this.notifications.toUser(saved.userId, {
-        title: 'The seller replied to your review',
-        body: `${product?.name ?? 'Your review'}: ${text.slice(0, 140)}`,
-        type: 'review',
-        entityId: saved.id,
-      });
+      const name = await this.labelsOf(product);
+      await this.notifications.toUser(
+        saved.userId,
+        quotedNotice({
+          title: 'The seller replied to your review',
+          body: (q, lang) => `${name[lang] || 'Your review'}: ${q}`,
+          text,
+          i18n: translated,
+          max: 140,
+          type: 'review',
+          entityId: saved.id,
+        }),
+      );
     }
     return saved;
   }
@@ -465,21 +493,18 @@ export class ReviewsService {
     this.emitter.toRoles(['customer'], 'question:created', publicQuestion(q));
     this.emitter.toRoles(MODERATORS, 'question:created', q);
     const sellerUser = await this.sellerUserOfProduct(product);
+    const name = await this.labelsOf(product);
     if (sellerUser) {
       this.emitter.toUser(sellerUser, 'question:created', q);
-      await this.notifications.toUser(sellerUser, {
-        title: 'New question on your product',
-        body: `${product?.name ?? ''}: ${q.question.slice(0, 140)}`,
-        type: 'question',
-        entityId: q.id,
-      });
+      await this.notifications.toUser(
+        sellerUser,
+        quotedNotice({ title: 'New question on your product', body: (x, lang) => `${name[lang]}: ${x}`, text: q.question, i18n: translated, max: 140, type: 'question', entityId: q.id }),
+      );
     }
-    await this.notifications.toRole('admin_moderation', {
-      title: 'New product question',
-      body: `${product?.name ?? ''}: ${q.question.slice(0, 140)}`,
-      type: 'question',
-      entityId: q.id,
-    });
+    await this.notifications.toRole(
+      'admin_moderation',
+      quotedNotice({ title: 'New product question', body: (x, lang) => `${name[lang]}: ${x}`, text: q.question, i18n: translated, max: 140, type: 'question', entityId: q.id }),
+    );
     return q;
   }
 
@@ -524,12 +549,11 @@ export class ReviewsService {
     if (q.askerId) {
       // The asker hears about it even if they are not looking at the product.
       this.emitter.toUser(q.askerId, 'question:updated', publicQuestion(q));
-      await this.notifications.toUser(q.askerId, {
-        title: 'Your question was answered',
-        body: `${product?.name ?? ''}: ${answer.slice(0, 140)}`,
-        type: 'question',
-        entityId: q.productId,
-      });
+      const name = await this.labelsOf(product);
+      await this.notifications.toUser(
+        q.askerId,
+        quotedNotice({ title: 'Your question was answered', body: (x, lang) => `${name[lang]}: ${x}`, text: answer, i18n: translated, max: 140, type: 'question', entityId: q.productId }),
+      );
     }
     return q;
   }
