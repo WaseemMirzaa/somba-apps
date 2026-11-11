@@ -478,12 +478,12 @@ export default function ShopProductDetailPage() {
               {questions.map((q) => (
                 <div key={q.id} className="rounded-lg border border-[var(--border)] p-4">
                   <div className="font-medium text-slate-900">
-                    <TranslatableText kind="question" id={q.id} text={q.question} />
+                    <TranslatableText kind="question" id={q.id} auto text={q.question} />
                   </div>
                   <div className="mt-1 text-sm text-slate-600">
                     {q.answer ? (
                       <>
-                        <TranslatableText kind="answer" id={q.id} text={q.answer} />
+                        <TranslatableText kind="answer" id={q.id} auto text={q.answer} />
                         {q.answeredBy && <p className="text-slate-400">— {q.answeredBy}</p>}
                       </>
                     ) : (
