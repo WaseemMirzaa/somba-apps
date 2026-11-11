@@ -945,6 +945,10 @@ class RealtimeStore extends ChangeNotifier {
 
   final Map<String, TextTranslation> _translations = {};
 
+  /// Tests start each case with no translations remembered from an earlier one.
+  @visibleForTesting
+  void debugClearTranslations() => _translations.clear();
+
   /// A review, a seller reply, a question or an answer in language [target] (`translate:text`). The server takes a
   /// stored id only (never free text) and caches what it translates; the phone keeps the answer for the session.
   /// [kind] is `review` | `review_reply` | `question` | `answer`; [text] only keys the cache (an edited text asks again).

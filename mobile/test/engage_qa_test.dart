@@ -10,6 +10,7 @@ import 'package:lipcart/screens/product_detail_screen.dart';
 import 'package:lipcart/services/auth_service.dart' show ApiException;
 import 'package:lipcart/services/engage_store.dart';
 import 'package:lipcart/services/realtime_store.dart';
+import 'package:lipcart/widgets/translatable_text.dart' show MachineNote;
 
 import 'button_rules.dart';
 import 'engage_helpers.dart';
@@ -72,6 +73,7 @@ void main() {
   });
   tearDown(() {
     RealtimeStore.instance.debugTranslateRequest = null;
+    RealtimeStore.instance.debugClearTranslations();
     engageTearDown();
   });
 
@@ -221,6 +223,102 @@ void main() {
       await _section(tester, [_waiting]);
       expect(find.byKey(const ValueKey('tt-link-question-q2')), findsOneWidget);
       expect(find.byKey(const ValueKey('tt-link-answer-q2')), findsNothing, reason: 'nothing to translate before the answer exists');
+    });
+  });
+
+  group('automatic translation (follows the app language)', () {
+    // The server's answer for a stored record in the language asked for; every request is recorded.
+    final asked = <String>[];
+    Future<dynamic> Function(String, [Map<String, dynamic>?]) translator() => (event, [body]) async {
+          asked.add('${body!['kind']}:${body['target']}');
+          final fr = body['target'] == 'fr';
+          return {
+            'text': body['kind'] == 'answer' ? (fr ? 'Oui, la pointe est large.' : 'Yes, the front is wide.') : (fr ? 'La 42 va-t-elle à un pied large ?' : 'Does the 42 suit a wide foot?'),
+            'sourceLang': fr ? 'en' : 'fr',
+            'same': false,
+          };
+        };
+    Widget section(String lang) => gapAppScaled(Scaffold(body: ListView(padding: const EdgeInsets.all(16), children: [QaSection(product: productOf('p1'))])), lang: lang);
+    Future<void> settle(WidgetTester tester) async {
+      for (var i = 0; i < 4; i++) {
+        await tester.pump();
+      }
+    }
+
+    setUp(asked.clear);
+
+    testWidgets('a question and its answer are shown translated by themselves, with the note and a way back', (tester) async {
+      RealtimeStore.instance.debugTranslateRequest = translator();
+      await _section(tester, [_answered]);
+      await settle(tester);
+      expect(find.text('Does the 42 suit a wide foot?'), findsOneWidget);
+      expect(find.text('Yes, the front is wide.'), findsOneWidget);
+      expect(find.text('Does the 42 fit a wide foot?'), findsNothing, reason: 'the written text is replaced, not shown twice');
+      expect(find.text('See original'), findsNWidgets(2));
+      expect(asked, containsAll(['question:en', 'answer:en']));
+    });
+
+    testWidgets('switching the app language switches the translation by itself, in both directions', (tester) async {
+      RealtimeStore.instance.debugTranslateRequest = translator();
+      await _section(tester, [_answered]);
+      await settle(tester);
+      expect(find.text('Yes, the front is wide.'), findsOneWidget);
+
+      await tester.pumpWidget(section('fr'));
+      await settle(tester);
+      expect(find.text('Oui, la pointe est large.'), findsOneWidget);
+      expect(find.text('La 42 va-t-elle à un pied large ?'), findsOneWidget);
+      expect(find.text('Yes, the front is wide.'), findsNothing);
+      expect(find.text('Voir l’original'), findsNWidgets(2));
+
+      await tester.pumpWidget(section('en'));
+      await settle(tester);
+      expect(find.text('Yes, the front is wide.'), findsOneWidget);
+      expect(find.text('Oui, la pointe est large.'), findsNothing);
+      expect(asked.where((a) => a.endsWith(':fr')), hasLength(2), reason: 'one request per record for French');
+    });
+
+    testWidgets('"See original" shows the written text and it stays until the language changes', (tester) async {
+      RealtimeStore.instance.debugTranslateRequest = translator();
+      await _section(tester, [_answered]);
+      await settle(tester);
+      await tester.tap(find.byKey(const ValueKey('tt-link-answer-q1')));
+      await settle(tester);
+      expect(find.text('Yes, the toe box is wide.'), findsOneWidget);
+      expect(find.text('See translation'), findsWidgets);
+      final before = asked.length;
+      await settle(tester);
+      expect(asked, hasLength(before), reason: 'no new request by itself');
+
+      await tester.pumpWidget(section('fr'));
+      await settle(tester);
+      expect(find.text('Oui, la pointe est large.'), findsOneWidget, reason: 'a new language translates again');
+    });
+
+    testWidgets('when the translation fails nothing is announced, the written text stays and the link can retry', (tester) async {
+      var fail = true;
+      RealtimeStore.instance.debugTranslateRequest = (event, [body]) async {
+        if (fail) throw ApiException('Translation is not available right now. Try again later.');
+        return {'text': 'Yes, the front is wide.', 'sourceLang': 'fr', 'same': false};
+      };
+      await _section(tester, [_answered]);
+      await settle(tester);
+      expect(find.text('Yes, the toe box is wide.'), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing, reason: 'nobody asked: stay quiet');
+      expect(find.byKey(const ValueKey('tt-link-answer-q1')), findsOneWidget);
+      fail = false;
+      await tester.tap(find.byKey(const ValueKey('tt-link-answer-q1')));
+      await settle(tester);
+      expect(find.text('Yes, the front is wide.'), findsOneWidget);
+    });
+
+    testWidgets('text already in the app language is left alone (no link, no note)', (tester) async {
+      RealtimeStore.instance.debugTranslateRequest = (event, [body]) async => {'text': '', 'sourceLang': 'en', 'same': true};
+      await _section(tester, [_answered]);
+      await settle(tester);
+      expect(find.text('Yes, the toe box is wide.'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tt-link-answer-q1')), findsNothing);
+      expect(find.byType(MachineNote), findsNothing);
     });
   });
 

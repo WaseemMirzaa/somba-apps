@@ -64,7 +64,7 @@ function AnswerBox({ q, fr, onSaved }: { q: EngageQuestion; fr: boolean; onSaved
           </button>
         </div>
         <div className="mt-1.5">
-          <TranslatableText kind="answer" id={q.id} text={q.answer} className="whitespace-pre-line break-words text-sm text-slate-700" />
+          <TranslatableText kind="answer" id={q.id} auto text={q.answer} className="whitespace-pre-line break-words text-sm text-slate-700" />
         </div>
       </div>
     );
@@ -181,7 +181,7 @@ function QuestionsInbox() {
                     {q.askedBy} · {agoText(q.createdAt, fr)}
                   </p>
                   <div className="mt-2">
-                    <TranslatableText kind="question" id={q.id} text={q.question} className="whitespace-pre-line break-words text-sm text-slate-800" />
+                    <TranslatableText kind="question" id={q.id} auto text={q.question} className="whitespace-pre-line break-words text-sm text-slate-800" />
                   </div>
                   <AnswerBox key={`${q.id}-${q.answer ?? ""}`} q={q} fr={fr} onSaved={() => void list.reload()} />
                 </div>
