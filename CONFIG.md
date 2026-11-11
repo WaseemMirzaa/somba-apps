@@ -10,7 +10,7 @@ All questionnaire answers applied to the prototype.
 | Market | France + Global |
 | Languages | EN + FR together (toggle on all portals) |
 | Currency | USD (mock) |
-| Legal entity | KOMORIKO Commerce SAS — Paris (Flipkart-style footer & `/legal/*`) |
+| Legal entity | KOMORIKO — Paris (Flipkart-style footer & `/legal/*`) |
 
 ## 2. Business Model
 

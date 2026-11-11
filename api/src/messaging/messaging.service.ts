@@ -76,7 +76,7 @@ export class MessagingService {
     if (!mailer) return this.undelivered('email', to, text);
     try {
       await mailer.sendMail({
-        from: process.env.MAIL_FROM ?? 'KOMORIKO <no-reply@somba.app>',
+        from: process.env.MAIL_FROM ?? 'KOMORIKO <no-reply@komoriko.com>',
         to,
         subject,
         text,

@@ -133,8 +133,8 @@ export function SellerStoreGate({ children }: { children: React.ReactNode }) {
             >
               {fr ? "Contacter le support" : "Contact support"}
             </Link>
-            <a href="mailto:support@somba.com" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">
-              support@somba.com
+            <a href="mailto:support@komoriko.com" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700">
+              support@komoriko.com
             </a>
           </div>
         </div>

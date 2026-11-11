@@ -5,11 +5,11 @@ export const BRAND = {
   partner: "Teka",
   fullName: "KOMORIKO",
   tagline: "Shop smarter. Deliver faster.",
-  legalEntity: "KOMORIKO Commerce SAS",
+  legalEntity: "KOMORIKO",
   legalAddress: "8 Rue de la Paix, 75002 Paris, France",
-  supportEmail: "support@somba.com",
-  copyright: "© 2026 KOMORIKO Commerce SAS. All rights reserved.",
-  copyrightFr: "© 2026 KOMORIKO Commerce SAS. Tous droits réservés.",
+  supportEmail: "support@komoriko.com",
+  copyright: "© 2026 KOMORIKO. All rights reserved.",
+  copyrightFr: "© 2026 KOMORIKO. Tous droits réservés.",
 } as const;
 
 export const MARKET = {

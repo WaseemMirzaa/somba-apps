@@ -233,7 +233,7 @@ export default function SellOnlinePage() {
                     </ul>
                     {contact ? (
                       <a
-                        href="mailto:sales@somba.com?subject=KOMORIKO%20seller%20plan"
+                        href="mailto:sales@komoriko.com?subject=KOMORIKO%20seller%20plan"
                         className="mt-8 flex items-center justify-center gap-2 rounded-xl border border-slate-200 py-3 text-sm font-semibold hover:bg-slate-50"
                       >
                         {fr ? "Contacter les ventes" : "Contact sales"}

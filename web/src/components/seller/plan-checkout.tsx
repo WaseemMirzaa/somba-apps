@@ -18,7 +18,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 const MOBILE_METHODS = ["airtel_money", "orange_money", "vodacom_mpesa"] as const;
 type Method = "wallet" | (typeof MOBILE_METHODS)[number];
 
-const SALES_MAIL = "mailto:sales@somba.com?subject=KOMORIKO%20seller%20plan";
+const SALES_MAIL = "mailto:sales@komoriko.com?subject=KOMORIKO%20seller%20plan";
 
 /** Plans that can be bought online (a price above zero). */
 const buyable = (p: SellerPlanInfo) => p.priceUsd !== null && p.priceUsd > 0;

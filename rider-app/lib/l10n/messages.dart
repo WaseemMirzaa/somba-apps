@@ -34,7 +34,7 @@ const Map<String, (String, String)> kMessages = {
   'splash_subtitle': ('Rider partner', 'Partenaire livreur'),
   'welcome_back': ('Welcome back', 'Bon retour'),
   'signin_subtitle': ('Sign in to start your shift', 'Connectez-vous pour commencer votre service'),
-  'email_hint': ('you@somba.app', 'vous@somba.app'),
+  'email_hint': ('you@komoriko.com', 'vous@komoriko.com'),
   'password_hint': ('Enter your password', 'Saisissez votre mot de passe'),
   'login_missing': ('Enter your email and password', 'Saisissez votre e-mail et votre mot de passe'),
   'forgot_password': ('Forgot password?', 'Mot de passe oublié ?'),
