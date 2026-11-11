@@ -15,6 +15,8 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Portrait only: iOS reads this call, Android is locked in the manifest (android:screenOrientation).
+  await SystemChrome.setPreferredOrientations(const [DeviceOrientation.portraitUp]);
   // The saved language, else the phone's (French → French, anything else → English).
   await Strings.restore();
   await MapsConfig.probeNativeKey(); // the route map is offered only when the native Maps SDK has its key too

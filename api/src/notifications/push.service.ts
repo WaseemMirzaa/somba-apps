@@ -126,6 +126,13 @@ export class PushService {
     row.platform = input.platform ?? row.platform ?? 'android';
     row.app = input.app ?? row.app ?? 'customer';
     const saved = await this.tokens.save(row);
+    // A save writes nothing when no column changed, so a device that signs in again (or just opens the app) would keep its old
+    // "last seen". Stamp it: recency decides which devices a full registry forgets first and which are pushed first.
+    if (existing) {
+      const seen = new Date();
+      await this.tokens.update({ token }, { updatedAt: seen });
+      saved.updatedAt = seen;
+    }
     if (user.role === 'customer') await this.fraudSignals?.noteDevice(user.id, token);
     return saved;
   }
@@ -171,6 +178,8 @@ export class PushService {
     if ('role' in audience) qb.where('d.role = :role', { role: audience.role });
     else qb.where('d.userId IN (:...userIds)', { userIds: audience.userIds });
     if (scope.apps?.length) qb.andWhere('d.app IN (:...apps)', { apps: scope.apps });
+    // Every device of the audience is pushed; the most recently seen ones go first (so they are in the first FCM batch).
+    qb.orderBy('d.updatedAt', 'DESC');
     return qb.getRawMany<Device>();
   }
 

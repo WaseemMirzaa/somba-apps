@@ -161,6 +161,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          # Pinned like the app-build workflows (customer-app-apk.yml / rider-app-apk.yml): an unpinned "stable" moved to 3.50,
+          # whose deprecation infos (material.dart -> material_ui) fail `flutter analyze` on every PR.
+          flutter-version: '3.47.7'
           channel: stable
           cache: true
       - run: flutter pub get

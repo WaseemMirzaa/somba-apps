@@ -19,7 +19,7 @@ describe('push sound', () => {
   it('sends a visible alert with a sound on every platform', async () => {
     const rows = [{ token: 'T1', userId: 'u1', locale: null }];
     const qb: Record<string, unknown> = {};
-    for (const k of ['leftJoin', 'select', 'addSelect', 'where', 'andWhere']) qb[k] = () => qb;
+    for (const k of ['leftJoin', 'select', 'addSelect', 'where', 'andWhere', 'orderBy']) qb[k] = () => qb;
     qb.getRawMany = async () => rows;
     const svc = new PushService({ createQueryBuilder: () => qb, delete: async () => undefined } as never);
     const sent: Record<string, any>[] = [];
