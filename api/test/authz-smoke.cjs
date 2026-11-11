@@ -574,6 +574,8 @@ const register = async (label, role = 'customer') => {
   const supervisor = await login('warehouse.limete@somba.app');
   const manager = warehouse; // warehouse@somba.app is the Kinshasa manager
   const tierRefusal = /supervisors and managers|managers can/;
+  // A real, harmless settings write: the audit-log check near the end of this suite looks for a `settings.set` entry.
+  ok((await req(admin.sock, 'settings:set', { key: 'localDeliveryDays', value: '1' })).ok, 'the admin saves a setting');
   const supervisorEvents = ['warehouse:aged', 'exceptions:list', 'replacements:list', 'exchanges:list'];
   for (const ev of supervisorEvents) {
     a = await req(operator.sock, ev, {});
