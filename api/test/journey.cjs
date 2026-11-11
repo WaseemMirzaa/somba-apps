@@ -2,7 +2,8 @@
  * seller --pickup--> hub --(transfer)--> hub --delivery--> customer, and riders never accept tasks themselves,
  * so a smoke lets an admin assign and scan the legs and hand the delivery to its rider. */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const req = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+const rawReq = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+let req = rawReq; // wrapped with the box scans below, once `withScans` exists
 
 /** Id of a demo warehouse by name (the seed's Entrepôt Kinshasa covers the whole province, holds the demo rider and serves every plain Kinshasa address). */
 async function hubId(admin, name = 'Entrepôt Kinshasa') {
@@ -70,4 +71,56 @@ async function receiveAtHub(admin, orderId, rider) {
   throw new Error(`no delivery leg appeared for order ${orderId}`);
 }
 
-module.exports = { hubId, tasksOf, toDelivery, receiveAtHub };
+/**
+ * Parcel scanning (`requireParcelScan`, on by default): a smoke that is not ABOUT scanning wraps its `req` with this, so each move
+ * that needs the boxes scanned first gets them, the way the people do it.
+ *   - a rider's `delivery:updateStatus` picked_up / delivered: the rider scans every box (pickup / dropoff stage) on that socket first;
+ *   - the desk's `logistics:scanIn` / `dispatchTransfer` / `scanOut` by `taskId`: staff scan each box BY CODE (the last one completes the leg);
+ *   - `logistics:dispatchRun` / `receiveRun`: the boxes of every parcel of the run are scanned out / marked in first (`opts.admin` marks
+ *     the arrival by hand with a reason, as a desk admin may).
+ * Legs without parcels (nothing was marked ready through the seller) pass straight through. Scanning itself is tested in parcel-scan-smoke.cjs.
+ */
+function withScans(raw, opts = {}) {
+  const riderScanAll = async (sock, taskId, stage) => {
+    const l = await raw(sock, 'rider:legParcels', { taskId });
+    if (!l?.ok) return;
+    for (const p of l.data.parcels) {
+      if (stage === 'pickup' ? p.pickupScannedAt : p.dropoffScannedAt) continue;
+      await raw(sock, 'rider:scanParcel', { taskId, code: p.code, stage });
+    }
+  };
+  const staffScanAll = async (sock, taskId, mode) => {
+    const l = await raw(sock, 'logistics:legParcels', { taskId });
+    if (!l?.ok) return null;
+    let last = null;
+    for (const p of l.data.parcels.filter((x) => (mode === 'in' ? !x.dropoffScannedAt : !x.pickupScannedAt))) {
+      last = await raw(sock, mode === 'in' ? 'logistics:scanIn' : 'logistics:dispatchTransfer', { code: p.code });
+    }
+    return last;
+  };
+  const runTasks = async (sock, runId) => (((await raw(sock, 'logistics:runs', {}))?.data ?? []).find((r) => r.id === runId)?.taskIds ?? []);
+  return async (sock, ev, b = {}) => {
+    if (ev === 'delivery:updateStatus' && (b.status === 'picked_up' || b.status === 'delivered')) await riderScanAll(sock, b.taskId, b.status === 'picked_up' ? 'pickup' : 'dropoff');
+    if ((ev === 'logistics:scanIn' || ev === 'warehouse:receive') && b.taskId && !b.code) {
+      const r = await staffScanAll(sock, b.taskId, 'in');
+      // `warehouse:receive` (the old name) answers the task itself, `logistics:scanIn` { task, next }.
+      if (r?.ok && r.data?.completed) return ev === 'warehouse:receive' ? { ok: true, data: r.data.task } : r;
+    }
+    if ((ev === 'logistics:dispatchTransfer' || ev === 'logistics:scanOut') && b.taskId && !b.code) {
+      const r = await staffScanAll(sock, b.taskId, 'out');
+      if (r?.ok && r.data?.completed) return r;
+    }
+    if (ev === 'logistics:dispatchRun' && b.runId) for (const id of await runTasks(sock, b.runId)) await staffScanAll(sock, id, 'out');
+    if (ev === 'logistics:receiveRun' && b.runId && opts.admin) {
+      for (const id of Array.isArray(b.taskIds) && b.taskIds.length ? b.taskIds : await runTasks(sock, b.runId)) {
+        const l = await raw(opts.admin.sock, 'logistics:legParcels', { taskId: id });
+        for (const p of l?.data?.parcels ?? []) if (!p.dropoffScannedAt) await raw(opts.admin.sock, 'logistics:markParcel', { taskId: id, code: p.code, stage: 'dropoff', reason: 'smoke: run arrived' });
+      }
+    }
+    return raw(sock, ev, b);
+  };
+}
+
+req = withScans(rawReq);
+
+module.exports = { hubId, tasksOf, toDelivery, receiveAtHub, withScans };

@@ -27,6 +27,8 @@ import {
   NotificationRead,
   Order,
   OrderItem,
+  Parcel,
+  ParcelScan,
   Payment,
   PaymentRefund,
   Payout,
@@ -105,6 +107,8 @@ interface Ids {
   orders: string[];
   items: string[];
   tasks: string[];
+  /** Parcel labels of demo orders and demo returns (their scans go with them). */
+  parcels: string[];
   disputes: string[];
   exchanges: string[];
   replacements: string[];
@@ -208,6 +212,10 @@ async function collect(ds: DataSource): Promise<Ids> {
     ['disputeId', ids.disputes],
     ['exchangeId', ids.exchanges],
     ['replacementId', ids.replacements],
+  ]);
+  ids.parcels = await col(Parcel, 'id', [
+    ['orderId', ids.orders],
+    ['returnId', ids.disputes],
   ]);
   // Batches of the demo warehouse or of a demo rider: the demo's only when every parcel in them is a demo parcel.
   const batchTerms = where([
@@ -506,6 +514,15 @@ function steps(i: Ids): Step[] {
       entity: WarehouseBatch,
       terms: [['id', i.batches]],
     },
+    {
+      label: 'parcel_scans',
+      entity: ParcelScan,
+      terms: [
+        ['taskId', i.tasks],
+        ['parcelId', i.parcels],
+      ],
+    },
+    { label: 'parcels', entity: Parcel, terms: [['id', i.parcels]] },
     { label: 'delivery_tasks', entity: DeliveryTask, terms: [['id', i.tasks]] },
     {
       label: 'transfer_runs',

@@ -3,6 +3,7 @@ import { DeliveryTask, Order, Seller, User } from '../entities';
 import { LogisticsService } from '../../logistics/logistics.service';
 import type { Actor } from '../../logistics/logistics.service';
 import { DeliveryService } from '../../delivery/delivery.service';
+import { ParcelsService } from '../../logistics/parcels.service';
 import { OrdersService } from '../../orders/orders.service';
 import { isHubBound } from '../../logistics/leg-rules';
 import type { DemoCtx } from './demo-ctx';
@@ -45,12 +46,16 @@ export class Driver {
   private readonly logistics: LogisticsService;
   private readonly delivery: DeliveryService;
   private readonly orders: OrdersService;
+  private readonly parcels: ParcelsService;
   private readonly ds: DataSource;
+  /** Every third package the demo seller packs goes in two boxes (so the labels, the checklist and the "2 of 2" rule can be tried). */
+  private packed = 0;
 
   constructor(private readonly ctx: DemoCtx) {
     this.logistics = ctx.app.get(LogisticsService);
     this.delivery = ctx.app.get(DeliveryService);
     this.orders = ctx.app.get(OrdersService);
+    this.parcels = ctx.app.get(ParcelsService);
     this.ds = ctx.ds;
   }
 
@@ -103,7 +108,30 @@ export class Driver {
           .findOne({ where: { id: seller.userId } })
       : null;
     if (!owner) return;
-    await this.orders.sellerReady({ id: owner.id }, task.orderId);
+    this.packed += 1;
+    await this.orders.sellerReady({ id: owner.id }, task.orderId, this.packed % 3 === 0 ? 2 : 1);
+  }
+
+  /** The rider scans every box of the leg on a stage, one by one, with the real rule (the leg's own rider, a camera read). */
+  private async scanBoxes(task: DeliveryTask, stage: 'pickup' | 'dropoff'): Promise<void> {
+    const riderId = task.riderId;
+    if (!riderId) return;
+    const list = await this.parcels.checklist(task);
+    for (const p of list.parcels) {
+      if (stage === 'pickup' ? p.pickupScannedAt : p.dropoffScannedAt) continue;
+      await this.parcels.riderScan(riderId, { taskId: task.id, code: p.code, stage });
+    }
+  }
+
+  /** Scan the boxes on the way out, then the rider collects. */
+  private async pickUp(task: DeliveryTask, riderId: string): Promise<void> {
+    await this.scanBoxes(task, 'pickup');
+    await this.delivery.updateStatus(task.id, 'picked_up', riderId);
+  }
+
+  /** The boxes arrive: the rider scans them at the door before the staff scan in / before the customer's code. */
+  private async arrive(task: DeliveryTask): Promise<void> {
+    await this.scanBoxes(task, 'dropoff');
   }
 
   /** Move one leg as far as the stage allows. Returns false when the walk must stop here. */
@@ -127,12 +155,13 @@ export class Driver {
       await this.ready(task);
       let t = await fresh();
       if (t.status === 'assigned')
-        await this.delivery.updateStatus(t.id, 'picked_up', rider.id);
+        await this.pickUp(t, rider.id);
       t = await fresh();
       if (t.status === 'picked_up')
         await this.delivery.updateStatus(t.id, 'in_transit', rider.id);
       if (s === at('picked')) return false;
       t = await fresh();
+      await this.arrive(t);
       await this.logistics.onScanIn(
         t.id,
         t.toHubId as string,
@@ -146,12 +175,13 @@ export class Driver {
         await this.logistics.assign(task.id, rider.id, actor);
       let t = await fresh();
       if (t.status === 'assigned')
-        await this.delivery.updateStatus(t.id, 'picked_up', rider.id);
+        await this.pickUp(t, rider.id);
       t = await fresh();
       if (t.status === 'picked_up')
         await this.delivery.updateStatus(t.id, 'in_transit', rider.id);
       if (s === at('transfer_road')) return false;
       t = await fresh();
+      await this.arrive(t);
       await this.logistics.onScanIn(
         t.id,
         t.toHubId as string,
@@ -166,12 +196,13 @@ export class Driver {
       if (s === at('at_hub')) return false;
       let t = await fresh();
       if (t.status === 'assigned')
-        await this.delivery.updateStatus(t.id, 'picked_up', rider.id);
+        await this.pickUp(t, rider.id);
       t = await fresh();
       if (t.status === 'picked_up')
         await this.delivery.updateStatus(t.id, 'in_transit', rider.id);
       if (s === at('out')) return false;
       t = await fresh();
+      await this.arrive(t);
       const code = await this.delivery.getProofCode(t.id);
       await this.delivery.updateStatus(
         t.id,
@@ -193,12 +224,13 @@ export class Driver {
       t = await fresh();
       if (s < at('out')) return false;
       if (t.status === 'assigned')
-        await this.delivery.updateStatus(t.id, 'picked_up', rider.id);
+        await this.pickUp(t, rider.id);
       t = await fresh();
       if (t.status === 'picked_up')
         await this.delivery.updateStatus(t.id, 'in_transit', rider.id);
       if (s === at('out')) return false;
       t = await fresh();
+      await this.arrive(t);
       const code = await this.delivery.getProofCode(t.id);
       await this.delivery.updateStatus(
         t.id,
@@ -255,12 +287,13 @@ export class Driver {
       if (upTo === 'assigned') return;
       let t = (await repo.findOne({ where: { id: task.id } }))!;
       if (t.status === 'assigned')
-        await this.delivery.updateStatus(t.id, 'picked_up', rider.id);
+        await this.pickUp(t, rider.id);
       t = (await repo.findOne({ where: { id: task.id } }))!;
       if (t.status === 'picked_up')
         await this.delivery.updateStatus(t.id, 'in_transit', rider.id);
       if (upTo === 'road') return;
       t = (await repo.findOne({ where: { id: task.id } }))!;
+      await this.arrive(t);
       if (isHubBound(t.kind))
         await this.logistics.onScanIn(
           t.id,
@@ -382,6 +415,13 @@ export async function backdateOrder(
     await q(
       ds,
       `UPDATE delivery_tasks SET ${shift(['createdAt', 'updatedAt', 'readyAt', 'receivedAt', 'pickedUpAt', 'deliveredAt'])} WHERE id IN (${taskIds.map(() => '?').join(',')})`,
+      taskIds,
+    );
+  await q(ds, `UPDATE parcels SET ${shift(['createdAt', 'voidedAt'])} WHERE orderId = ?`, [orderId]);
+  if (taskIds.length)
+    await q(
+      ds,
+      `UPDATE parcel_scans SET ${shift(['`at`'])} WHERE taskId IN (${taskIds.map(() => '?').join(',')})`,
       taskIds,
     );
   await q(
@@ -642,6 +682,12 @@ export async function stampTask(
     ...params,
     taskId,
   ]);
+  // The scans follow the leg: boxes were scanned out when the rider collected, and in when the leg ended.
+  if (m.pickedUpAt)
+    await q(ds, "UPDATE parcel_scans SET `at` = ? WHERE taskId = ? AND stage = 'pickup'", [m.pickedUpAt, taskId]);
+  const end = m.deliveredAt ?? m.receivedAt;
+  if (end)
+    await q(ds, "UPDATE parcel_scans SET `at` = ? WHERE taskId = ? AND stage = 'dropoff'", [end, taskId]);
 }
 
 /** Set the moments of one seller's lines of an order (ready, at the warehouse, with the customer). */
@@ -664,6 +710,8 @@ export async function stampLines(
     `UPDATE order_items SET ${set.join(', ')} WHERE orderId = ? AND sellerId = ?`,
     [...params, orderId, sellerId],
   );
+  // The labels were printed when the package was marked ready.
+  if (m.readyAt) await q(ds, 'UPDATE parcels SET createdAt = ? WHERE orderId = ? AND sellerId = ?', [m.readyAt, orderId, sellerId]);
 }
 
 /**

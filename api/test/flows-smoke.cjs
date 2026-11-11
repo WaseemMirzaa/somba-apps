@@ -41,7 +41,7 @@ const connect = (token) => new Promise((resolve, reject) => {
 });
 // Ask the API over the socket. The API allows 40 events a second per connection; a test that runs faster than
 // that waits a second and asks again, as a well-behaved client would.
-const req = async (s, ev, b = {}) => {
+const rawReq = async (s, ev, b = {}) => {
   for (let attempt = 0; ; attempt++) {
     const res = await new Promise((r) => s.emit(ev, b, r));
     if (res?.ok === false && /Too many requests/.test(res.error ?? '') && attempt < 5) {
@@ -51,6 +51,9 @@ const req = async (s, ev, b = {}) => {
     return res;
   }
 };
+// Parcel scanning is on by default: each move that needs the boxes scanned first gets them (journey.cjs `withScans`); parcel-scan-smoke.cjs tests the scanning itself.
+const scanOpts = {};
+const req = require('./journey.cjs').withScans(rawReq, scanOpts);
 const until = async (fn, ms = 6000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
 const login = async (email, pw = PW) => {
   const r = await rest('/api/v1/auth/login', { email, password: pw });
@@ -65,6 +68,7 @@ const register = async (label, role = 'customer') => {
 
 (async () => {
   const admin = await login('admin@somba.app');
+  scanOpts.admin = admin; // desk admin: marks a run's boxes in by hand when a run is received
   const finance = await login('finance@somba.app');
   const warehouse = await login('warehouse@somba.app');
   const rider = await login('rider@somba.app');
