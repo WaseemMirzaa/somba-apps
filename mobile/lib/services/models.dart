@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../util/delivery_estimate.dart';
 import '../util/freshness.dart';
+import '../util/variant_words.dart';
 import '../util/variants.dart';
 import 'geo_models.dart';
 // Lightweight DTOs mirroring the API payloads (api/src/database/entities).
@@ -535,7 +536,7 @@ class OrderItemDto {
   bool get hasVariant => variant.isNotEmpty && variant != defaultVariant;
 
   /// The option choice in [lang] (French snapshot when present, else the canonical text).
-  String displayVariant(String lang) => lang == 'fr' && variantFr.trim().isNotEmpty ? variantFr.trim() : variant;
+  String displayVariant(String lang) => lang != 'fr' ? variant : variantInFrench(variant, variantFr);
 
   static DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
 

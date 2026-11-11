@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/catalog_live.dart';
+import '../../l10n/notice_rules.dart';
 import '../../l10n/strings.dart';
 import '../../services/hub_directory.dart';
 import '../../services/models.dart';
@@ -388,7 +389,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           if (cancelled) ...[
             const SizedBox(height: 4),
             Text(
-              (i.cancelReason ?? '').trim().isEmpty ? s.lineCancelledPlain : s.lineCancelledReason(i.cancelReason!.trim()),
+              (i.cancelReason ?? '').trim().isEmpty ? s.lineCancelledPlain : s.lineCancelledReason(s.isFr ? translateReasonText(i.cancelReason!.trim()) : i.cancelReason!.trim()),
               key: ValueKey('cancel-reason-${i.productId}'),
               style: const TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600),
             ),

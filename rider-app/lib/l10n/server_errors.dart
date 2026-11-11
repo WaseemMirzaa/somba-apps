@@ -25,6 +25,17 @@ Iterable<String> get knownServerErrors => _exactFr.keys;
 
 final Map<String, String> _exactFr = {
   ...kShiftServerErrorsFr,
+  // sign-in codes and account (shared with the customer app)
+  'Incorrect or expired code.': 'Code incorrect ou expiré.',
+  'Too many wrong codes. Try again in a few minutes.': 'Trop de codes erronés. Réessayez dans quelques minutes.',
+  'This sign-in expired. Enter your password again.': 'Cette connexion a expiré. Saisissez de nouveau votre mot de passe.',
+  'Two-factor sign-in is not available.': 'La connexion à deux facteurs n’est pas disponible.',
+  'Sessions are not available.': 'Les sessions ne sont pas disponibles.',
+  'Invalid or missing token.': 'Session invalide ou absente. Reconnectez-vous.',
+  // parcel scanning and proof of delivery
+  'Parcel scanning is not available.': 'Le scan des colis n’est pas disponible.',
+  'This parcel was just updated. Refresh and try again.': 'Ce colis vient d’être mis à jour. Actualisez et réessayez.',
+  'File not found.': 'Fichier introuvable.',
   ...kParcelServerErrorsFr,
   // forced password change (api/src/auth/password-change.ts, me:changePassword)
   'You must set a new password before you can continue.': 'Vous devez définir un nouveau mot de passe avant de continuer.',
@@ -207,6 +218,10 @@ final Map<String, String> _exactFr = {
 };
 
 final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
+  (RegExp(r'^The (photo|signature) is too large \(([\d.]+) MB at most\)\.$'),
+      (m) => '${m[1] == 'photo' ? 'La photo' : 'La signature'} est trop volumineuse (${m[2]!.replaceAll('.', ',')} Mo au maximum).'),
+  (RegExp(r'^The (photo|signature) must be a (PNG|JPEG or PNG) image\.$'),
+      (m) => '${m[1] == 'photo' ? 'La photo' : 'La signature'} doit être une image ${m[2] == 'PNG' ? 'PNG' : 'JPEG ou PNG'}.'),
   // parcel scanning (rider:scanParcel and the status changes it guards)
   (RegExp(r'^Scan every parcel first: (\d+) of (\d+) scanned\.$'), (m) => 'Scannez d’abord chaque colis : ${m[1]} sur ${m[2]} scannés.'),
   (RegExp(r'^(PKG-[A-Z0-9]+) is not part of this (.+)\.$'), (m) => '${m[1]} ne fait pas partie de ${_scanLeg(m[2]!)}.'),

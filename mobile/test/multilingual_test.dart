@@ -154,7 +154,8 @@ void main() {
       expect(d.translationStatus, 'off');
       final p = productFromDto(d);
       expect(p.displayDescription('fr'), 'Only English here.', reason: 'no French yet: the English text');
-      expect(p.variantOptionLabel(1, 0, 'fr'), 'Black', reason: 'no labels: the canonical option');
+      expect(p.variantOptionLabel(1, 0, 'fr'), 'Noir', reason: 'no labels: the phone words a well-known colour itself');
+      expect(p.variantOptionLabel(1, 0, 'en'), 'Black');
       expect(ProductDto.fromJson({'id': 'x', 'name': 'x', 'price': 5, 'stock': 1}).displayDescription('fr'), '');
     });
 
@@ -384,11 +385,11 @@ void main() {
       expect(find.text('Translated automatically'), findsNothing);
     });
 
-    testWidgets('an older server (no French description, no labels) shows the English text and canonical options', (tester) async {
+    testWidgets('an older server (no French description, no labels) shows the English text and the phone\'s own French for well-known options', (tester) async {
       await open(tester, 'old', 'fr');
       expect(tester.widget<Text>(find.byKey(const ValueKey('pd-description'))).data, 'Only English here.');
-      expect(find.text('Size'), findsOneWidget);
-      expect(find.text('Black'), findsOneWidget);
+      expect(find.text('Taille'), findsOneWidget);
+      expect(find.text('Noir'), findsOneWidget);
       expect(find.text('Traduit automatiquement'), findsNothing);
     });
 

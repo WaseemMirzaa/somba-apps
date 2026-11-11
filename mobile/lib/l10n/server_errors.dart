@@ -1,6 +1,7 @@
 import 'server_errors_account.dart';
 import 'server_errors_areas.dart';
 import 'server_errors_features.dart';
+import 'server_errors_more.dart';
 import 'server_errors_r2f.dart';
 import 'strings.dart';
 
@@ -30,6 +31,7 @@ final Map<String, String> _exactFr = {
   ...kServerErrorsEngage,
   ...kServerErrorsR2f,
   ...kServerErrorsAreas,
+  ...kServerErrorsMore,
   // areas contract, second pass (docs/contracts/areas.md, "Errors"): validation, warehouse directory and desk sentences the first list omitted
   "Flatten must be 'commune'.": 'Le paramètre « flatten » doit être « commune ».',
   'Aliases must be a list of names.': 'Les alias doivent être une liste de noms.',
@@ -213,6 +215,7 @@ final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
   ...kServerPatternsSocial,
   ...kServerPatternsEngage,
   ...kServerPatternsAreas,
+  ...kServerPatternsMore,
   (RegExp(r'^"(.+)" just sold out or has too little stock left\.$'), (m) => '« ${m[1]} » est épuisé ou n’a plus assez de stock.'),
   (RegExp(r'^"(.+)" is not available\.$'), (m) => '« ${m[1]} » n’est pas disponible.'),
   (RegExp(r'^That is more than what is left to refund on this order \(\$([\d.,]+)\)\.$'), (m) => 'C’est plus que ce qu’il reste à rembourser sur cette commande (${m[1]} \$).'),

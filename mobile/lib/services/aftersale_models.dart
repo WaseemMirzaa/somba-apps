@@ -1,3 +1,4 @@
+import '../util/variant_words.dart';
 import 'models.dart' show pickLang;
 
 /// Models for returns, disputes, replacements and exchanges (`docs/contracts/after-sale.md` §2 and §3).
@@ -56,7 +57,7 @@ class DisputeItemView {
 
   String displayName(String lang) => pickLang(lang, productName, productNameFr);
   bool get hasVariant => variant.isNotEmpty && variant != 'Default';
-  String displayVariant(String lang) => lang == 'fr' && variantFr.trim().isNotEmpty ? variantFr.trim() : variant;
+  String displayVariant(String lang) => lang != 'fr' ? variant : variantInFrench(variant, variantFr);
 
   /// What this line is worth if refunded in full (the price paid times the units).
   double get valueUsd => unitPriceUsd * qty;

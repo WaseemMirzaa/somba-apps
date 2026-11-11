@@ -156,7 +156,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'KOMORIKO Rider',
+      onGenerateTitle: (context) => Strings.of(context).t('app_title'),
       scaffoldMessengerKey: _messenger,
       navigatorKey: _navigator,
       debugShowCheckedModeBanner: false,

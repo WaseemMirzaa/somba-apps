@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'i18n_audit.dart';
+
 class LayoutConfig {
   final Size size;
   final String lang;
@@ -31,6 +33,7 @@ TransitionBuilder scaleText(LayoutConfig config) =>
 /// FlutterError.onError is restored before returning, so callers can expect() on the result.
 Future<Set<String>> layoutProblems(WidgetTester tester, LayoutConfig config, Widget app, {Future<void> Function()? interact}) async {
   final problems = <String>{};
+  final shown = <String>{}; // every text the screen showed (for the English/French comparison)
   tester.view.physicalSize = config.size * 3;
   tester.view.devicePixelRatio = 3;
   final previous = FlutterError.onError;
@@ -39,14 +42,15 @@ Future<Set<String>> layoutProblems(WidgetTester tester, LayoutConfig config, Wid
     await tester.pumpWidget(KeyedSubtree(key: UniqueKey(), child: app));
     await tester.pump(const Duration(milliseconds: 600));
     if (interact != null) await interact();
-    _inspect(tester, problems);
+    _inspect(tester, problems, shown);
     for (var i = 0; i < 20; i++) {
       final pos = _mainScroll(tester);
       if (pos == null || pos.pixels >= pos.maxScrollExtent - 1) break;
       pos.jumpTo(math.min(pos.maxScrollExtent, pos.pixels + pos.viewportDimension * 0.6));
       await tester.pump(const Duration(milliseconds: 100));
-      _inspect(tester, problems);
+      _inspect(tester, problems, shown);
     }
+    if (config.scale == 1.0) problems.addAll(i18nCompare(tester, config.lang, config.size.width, shown));
   } finally {
     FlutterError.onError = previous;
   }
@@ -55,7 +59,7 @@ Future<Set<String>> layoutProblems(WidgetTester tester, LayoutConfig config, Wid
 
 final _money = RegExp(r'\d\s?FC\b|\$\s?\d|\d\s?\$');
 
-void _inspect(WidgetTester tester, Set<String> problems) {
+void _inspect(WidgetTester tester, Set<String> problems, Set<String> shown) {
   final screen = Offset.zero & (tester.view.physicalSize / tester.view.devicePixelRatio);
   final texts = <RenderParagraph, Rect>{};
   for (final e in find.byType(RichText).evaluate()) {
@@ -65,6 +69,10 @@ void _inspect(WidgetTester tester, Set<String> problems) {
     final rect = _visible(r, screen);
     if (rect != null && _plain(r).trim().isNotEmpty) texts[r] = rect;
   }
+  for (final t in texts.keys) {
+    shown.add(_plain(t).trim());
+  }
+  shown.addAll(extraVisibleStrings(tester));
 
   for (final b in find.byWidgetPredicate((w) => w is ButtonStyleButton).evaluate()) {
     final box = b.renderObject;

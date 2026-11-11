@@ -1,18 +1,21 @@
+import 'notice_rules.dart';
 import 'strings.dart';
 
 /// The server writes notifications (and wallet history lines) in English.
 /// The common ones are shown in French; anything else is shown as received.
 (String, String) localizeNotification(Strings s, String title, String body) {
   if (!s.isFr) return (title, body);
-  final t = _titles[title] ?? _titlePattern(title) ?? title;
+  final t = _titles[title] ?? kNoticeTitlesFr[title] ?? noticeTitlePattern(title) ?? _titlePattern(title) ?? title;
   var b = body;
-  for (final p in _bodies) {
+  for (final p in [..._bodies, ...kNoticeBodiesFr]) {
     final m = p.$1.firstMatch(body);
     if (m != null) {
       b = p.$2(m);
       break;
     }
   }
+  // A failed payment's body is the reason alone ("Declined by subscriber.").
+  if (b == body && title == 'Payment failed') b = translateReasonText(body);
   return (t, b);
 }
 
@@ -21,7 +24,13 @@ import 'strings.dart';
 (String, String) displayNotice(Strings s, {required String title, required String body, String? titleFr, String? bodyFr}) {
   if (!s.isFr) return (title, body);
   final fallback = localizeNotification(s, title, body);
-  return (_nonBlank(titleFr) ?? fallback.$1, _nonBlank(bodyFr) ?? fallback.$2);
+  // A "French" text that is only a copy of the English was never translated: the phone's own wording is better.
+  String pick(String? served, String english, String phone) {
+    final f = _nonBlank(served);
+    return f != null && f != english.trim() ? f : phone;
+  }
+
+  return (pick(titleFr, title, fallback.$1), pick(bodyFr, body, fallback.$2));
 }
 
 String? _nonBlank(String? v) => v == null || v.trim().isEmpty ? null : v.trim();
@@ -33,6 +42,12 @@ String localizeWalletDescription(Strings s, String text, {String? descriptionFr}
   for (final p in _walletLines) {
     final m = p.$1.firstMatch(text);
     if (m != null) return p.$2(s, m);
+  }
+  if (s.isFr) {
+    for (final p in kWalletLinesFr) {
+      final m = p.$1.firstMatch(text);
+      if (m != null) return p.$2(m);
+    }
   }
   return text;
 }
@@ -131,16 +146,8 @@ final List<(RegExp, String Function(RegExpMatch))> _bodies = [
   (RegExp(r'^(\S+): we received your goods\. Your request is being reviewed\.$'), (m) => '${m[1]} : nous avons reçu vos articles. Votre demande est en cours d’examen.'),
 ];
 
-/// Reasons the server attaches to a failed payment or delivery.
-String translateReason(String r) => const {
-      'payment was not completed': 'le paiement n’a pas abouti',
-      'Payment was not approved.': 'Le paiement n’a pas été validé.',
-      'Declined by subscriber.': 'Refusé par l’abonné.',
-      'Declined by finance.': 'Refusé par la comptabilité.',
-      'Timed out waiting for approval.': 'Délai de validation dépassé.',
-      'Cancelled by customer.': 'Annulé par le client.',
-    }[r] ??
-    r;
+/// Reasons the server attaches to a failed payment, a cancelled item or a failed delivery.
+String translateReason(String r) => translateReasonText(r);
 
 final List<(RegExp, String Function(Strings, RegExpMatch))> _walletLines = [
   (RegExp(r'^Order (\S+)$'), (s, m) => s.wtxOrder(m[1])),

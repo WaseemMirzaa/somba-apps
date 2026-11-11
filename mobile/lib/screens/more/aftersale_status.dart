@@ -3,6 +3,7 @@ import '../../data/catalog_live.dart';
 import '../../l10n/strings.dart';
 import '../../services/aftersale_models.dart';
 import '../../services/aftersale_store.dart';
+import '../../util/variant_words.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
@@ -30,7 +31,7 @@ String transferStatusLabel(Strings s, String status) => switch (status) {
 String optionText(Strings s, String sku, String? canonical) {
   final c = canonical ?? '';
   if (c.isEmpty || c == 'Default') return '';
-  return productByUuid(sku)?.displayVariant(c, s.lang) ?? c;
+  return productByUuid(sku)?.displayVariant(c, s.lang) ?? (s.isFr ? frenchVariantText(c) : c);
 }
 
 /// "Size: 40 → Size: 42" for an exchange row (the product names when there are no options).
