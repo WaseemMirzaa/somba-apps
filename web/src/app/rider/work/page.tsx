@@ -1,27 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, Banknote, CheckCircle, Info, Percent, XCircle } from "lucide-react";
+import { Activity, CheckCircle, Info, Percent, XCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatCard } from "@/components/ui/stat-card";
 import { useLocale } from "@/context/locale-context";
 import { LEG_KIND, pickL } from "@/lib/logistics";
-import { useCodEnabled, useRiderCash, useRiderData } from "@/lib/rider";
-import { showCashSummary, showTaskCash } from "@/lib/rider-cod";
-import { formatCurrency } from "@/lib/utils";
+import { useRiderData } from "@/lib/rider";
 
 /**
- * "My work": the rider's workload, computed by the server (`rider:workStats`). Riders are salaried, so the only money on
- * this page is the COD cash they hold for the company.
+ * "My work": the rider's workload, computed by the server (`rider:workStats`). Riders are salaried, so there is no money
+ * on this page.
  */
 export default function RiderWorkPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { stats, mine, loading, error } = useRiderData();
-  const { cash } = useRiderCash();
-  const codEnabled = useCodEnabled();
-  const cashShown = showCashSummary(codEnabled);
   const delivered = mine.filter((x) => x.status === "delivered");
 
   return (
@@ -68,43 +63,6 @@ export default function RiderWorkPage() {
               ? "Vous êtes salarié de KOMORIKO. Ces chiffres montrent votre travail, pas votre paie."
               : "You are paid a salary by KOMORIKO. These numbers show your work, not your pay."}
           </p>
-          {cashShown && (
-            <>
-            <StatCard title={fr ? "Espèces à remettre" : "Cash to hand over"} value={formatCurrency(cash?.heldUsd ?? 0, locale)} icon={Banknote} />
-            <p className="text-xs text-slate-500">
-              {fr
-                ? "Remettez les espèces COD encaissées à votre entrepôt : un superviseur enregistre la remise et votre solde diminue d'autant."
-                : "Hand the COD cash you collected to your warehouse: a supervisor records the hand-over and your balance goes down by that amount."}
-            </p>
-            {cash && (
-              <Card>
-                <CardContent className="p-4">
-                  <h2 className="mb-1 font-semibold text-slate-900">{fr ? "Espèces COD" : "COD cash"}</h2>
-                  <p data-testid="cash-summary" className="mb-3 text-xs text-slate-500">
-                    {fr
-                      ? `Encaissé ${formatCurrency(cash.collectedUsd, locale)} · remis ${formatCurrency(cash.handedOverUsd, locale)} · reste ${formatCurrency(cash.heldUsd, locale)}`
-                      : `Collected ${formatCurrency(cash.collectedUsd, locale)} · handed in ${formatCurrency(cash.handedOverUsd, locale)} · still held ${formatCurrency(cash.heldUsd, locale)}`}
-                  </p>
-                  {cash.handovers.length === 0 ? (
-                    <p className="text-sm text-slate-500">{fr ? "Aucune remise enregistrée pour l'instant." : "No hand-over recorded yet."}</p>
-                  ) : (
-                    <ul className="divide-y divide-[var(--border)] text-sm">
-                      {cash.handovers.map((h) => (
-                        <li key={h.id} className="py-2">
-                          <span className="font-semibold text-emerald-700">{formatCurrency(h.amountUsd, locale)}</span>{" "}
-                          {fr ? `reçus par ${h.receivedByName}` : `received by ${h.receivedByName}`}
-                          <span className="block text-xs text-slate-500">
-                            {new Date(h.createdAt).toLocaleString(locale)} · {fr ? `reste ${formatCurrency(h.heldAfterUsd, locale)}` : `${formatCurrency(h.heldAfterUsd, locale)} left to hand over`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-            </>
-          )}
         </>
       )}
 
@@ -122,7 +80,6 @@ export default function RiderWorkPage() {
                       <span className="font-medium text-slate-900">{d.orderId}</span>
                       <span className="block text-xs text-slate-500">{d.customer}</span>
                     </span>
-                    {cashShown && showTaskCash(codEnabled, d) && <span className="text-right text-xs text-slate-500">COD {formatCurrency(d.codAmount, locale)}</span>}
                   </Link>
                 </li>
               ))}

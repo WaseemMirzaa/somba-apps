@@ -35,7 +35,7 @@ export interface OrderDetail {
   discount: number;
   /** Campaign discount already deducted from the subtotal. */
   campaignDiscount: number;
-  /** Raw payment method id (`cod`, `wallet`, `airtel_money`...). */
+  /** Raw payment method id (`wallet`, `airtel_money`, `stripe_card`...). */
   paymentMethodId: string;
   paymentMethod: string;
   /** From the order's payment record: paid, refunded, failed or pending. */

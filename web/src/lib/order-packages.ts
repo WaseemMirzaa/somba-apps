@@ -26,7 +26,7 @@ export function derivePackageStatus(order: PackageOrderInfo, lines: Pick<OrderIt
   const live = lines.filter((l) => lineFulfilment(l) !== "cancelled");
   if (lines.length > 0 && live.length === 0) return "cancelled";
   if (order.status === "cancelled") return "cancelled";
-  if (order.status === "pending" && order.paymentMethod !== "cod" && !order.paid) return "pending";
+  if (order.status === "pending" && !order.paid) return "pending";
   if (live.length > 0 && live.every((l) => lineFulfilment(l) === "received")) {
     return SHIPPED_STATES.includes(order.status) ? (order.status as PackageStatus) : "at_hub";
   }

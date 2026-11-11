@@ -31,8 +31,6 @@ export function useSocketEvent<T = unknown>(event: string, handler: (payload: T)
 
 export interface PublicSettings {
   loaded: boolean;
-  codEnabled: boolean;
-  codCapUsd: number;
   fxRate: number | null;
   requireDeliveryCode: boolean;
   /** Orders and wallet top-ups need a verified phone or email. */
@@ -60,8 +58,6 @@ export interface PublicSettings {
 
 const EMPTY_SETTINGS: PublicSettings = {
   loaded: false,
-  codEnabled: false,
-  codCapUsd: 0,
   fxRate: null,
   requireDeliveryCode: false,
   requireVerifiedForCheckout: false,
@@ -87,8 +83,6 @@ const num = (v: string | undefined, d: number) => {
 function parseSettings(raw: Record<string, string>): PublicSettings {
   return {
     loaded: true,
-    codEnabled: raw.codEnabled === "true",
-    codCapUsd: Number(raw.codCapUsd) || 0,
     fxRate: raw.fxRate ? Number(raw.fxRate) : null,
     requireDeliveryCode: raw.requireDeliveryCode === "true",
     requireVerifiedForCheckout: raw.requireVerifiedForCheckout === "true",
@@ -140,7 +134,7 @@ export function useTranslationEnabled(): boolean {
   return on;
 }
 
-/** Public platform settings (COD flag, return window, delivery fee rules...) — live via `settings:updated`. */
+/** Public platform settings (return window, delivery fee rules...) — live via `settings:updated`. */
 export function usePublicSettings(): PublicSettings {
   const rt = useRealtime();
   const [settings, setSettings] = useState<PublicSettings>(EMPTY_SETTINGS);
@@ -165,8 +159,6 @@ export function usePublicSettings(): PublicSettings {
     setSettings((cur) => {
       const str = (k: keyof PublicSettings) => String(cur[k] ?? "");
       return parseSettings({
-        codEnabled: raw.codEnabled ?? str("codEnabled"),
-        codCapUsd: raw.codCapUsd ?? str("codCapUsd"),
         fxRate: raw.fxRate ?? (cur.fxRate ? String(cur.fxRate) : ""),
         requireDeliveryCode: raw.requireDeliveryCode ?? str("requireDeliveryCode"),
         requireVerifiedForCheckout: raw.requireVerifiedForCheckout ?? str("requireVerifiedForCheckout"),

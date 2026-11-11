@@ -1,7 +1,7 @@
 /**
  * What a rider can do with a task on the web portal, as pure rules: which button comes next, what is asked before
- * "delivered", what a failure report says, and what is sent to the server. (The delivered form's code and cash checks stay in
- * the component: cash on delivery is handled elsewhere.) The web twin of the
+ * "delivered", what a failure report says, and what is sent to the server. (The delivered form's code check stays in
+ * the component.) The web twin of the
  * Flutter rider app (`nextStatusFor` in `deliveries_screen.dart`). The portal components (`rider-task-actions.tsx`) call these;
  * they only draw. The server checks every move again (only the assigned rider, only the next status).
  *
@@ -59,13 +59,13 @@ const CUSTOMER_LEG_KINDS = ["delivery", "express"];
 
 /**
  * What the rider is reminded of before they set off, as short lines: an express run goes seller -> customer with no
- * warehouse in between, the customer's code is asked at the door, cash is taken, a partial delivery carries only
+ * warehouse in between, the customer's code is asked at the door, a partial delivery carries only
  * some of the order. Empty for legs that end at a warehouse.
  */
 export function riderBrief(
-  task: { kind: string; needsCode?: boolean; codAmount?: number; partial?: boolean },
+  task: { kind: string; needsCode?: boolean; partial?: boolean },
   fr: boolean,
-  opts: { requireCode?: boolean; cash?: string } = {},
+  opts: { requireCode?: boolean } = {},
 ): string[] {
   const out: string[] = [];
   if (task.kind === "express") {
@@ -78,7 +78,6 @@ export function riderBrief(
   if (CUSTOMER_LEG_KINDS.includes(task.kind)) {
     out.push(fr ? "Vous remettez le colis au client en main propre." : "You hand the parcel to the customer in person.");
     if (task.needsCode && opts.requireCode !== false) out.push(fr ? "Demandez le code à 4 chiffres du client." : "Ask the customer for their 4-digit code.");
-    if ((task.codAmount ?? 0) > 0) out.push(fr ? `Encaissez ${opts.cash ?? ""} en espèces.`.replace("  ", " ") : `Collect ${opts.cash ?? ""} in cash.`.replace("  ", " "));
     if (task.partial) out.push(fr ? "Livraison partielle : seuls ces articles sont à remettre, le reste suit." : "Partial delivery: hand over only these items, the rest follows.");
   }
   return out;

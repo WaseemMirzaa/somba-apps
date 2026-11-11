@@ -23,7 +23,6 @@ import {
   addressToShipping,
   isMobileMoneyMethod,
   isVerificationError,
-  usePublicSettings,
   useVerificationStatus,
 } from "@/lib/shop-live";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
@@ -44,7 +43,6 @@ function PaymentContent() {
   const { promoCode, promoDiscount, clearCart, addToCart } = useShop();
   const { lines, subtotal, hasUnavailable, savings } = useCartLines();
   const verification = useVerificationStatus();
-  const settings = usePublicSettings();
 
   const addressId = params.get("address");
   const openBox = params.get("openBox") === "true";
@@ -79,8 +77,7 @@ function PaymentContent() {
   const submitting = useRef(false);
 
   // Default method: wallet when it covers the total, otherwise Airtel Money.
-  // A cash-on-delivery pick falls back to the default once COD is no longer offered (the setting can change while the page is open).
-  const chosen = (method === "cod" && !settings.codEnabled ? "" : method) || (walletEnough ? "wallet" : "airtel_money");
+  const chosen = method || (walletEnough ? "wallet" : "airtel_money");
   const mobile = isMobileMoneyMethod(chosen);
 
   const methods = useMemo(() => {
@@ -93,11 +90,8 @@ function PaymentContent() {
       },
       ...MOBILE_MONEY_METHODS.map((m) => ({ id: m.id, label: m.label })),
     ];
-    if (settings.codEnabled) {
-      list.push({ id: "cod", label: fr ? "Paiement à la livraison" : "Cash on delivery" });
-    }
     return list;
-  }, [fr, locale, balance, walletEnough, settings.codEnabled]);
+  }, [fr, locale, balance, walletEnough]);
 
   const handleConfirmed = useCallback(
     (order: Order) => {
@@ -282,11 +276,6 @@ function PaymentContent() {
               {fr ? "Vous recevrez une demande à approuver sur ce téléphone." : "You will get a request to approve on this phone."}
             </p>
           </div>
-        )}
-        {chosen === "cod" && (
-          <p className="mt-4 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
-            {fr ? "Vous payez en espèces au livreur à la réception." : "You pay the rider in cash when the parcel arrives."}
-          </p>
         )}
 
         <p className="mt-4 text-lg font-bold">Total: <DualCurrency amount={total} /></p>

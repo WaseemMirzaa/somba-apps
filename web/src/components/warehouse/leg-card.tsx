@@ -8,7 +8,6 @@ import { useLocale } from "@/context/locale-context";
 import { codeLockLabel } from "@/lib/code-lock";
 import { useOpsPath } from "@/lib/ops-path";
 import { useNow } from "@/lib/use-now";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import {
   LEG_KIND,
   LEG_STATUS,
@@ -25,7 +24,6 @@ import {
 } from "@/lib/logistics";
 import { legAgeHours, parcelCode, riderLabel, isOpenLeg, type DeskTask } from "@/lib/warehouse";
 import { runBadgeText } from "@/lib/warehouse-runs";
-import { formatCurrency } from "@/lib/utils";
 
 function EndpointIcon({ e }: { e: Endpoint | null }) {
   const cls = "h-3.5 w-3.5 shrink-0";
@@ -50,7 +48,6 @@ export function LegRoute({ task }: { task: Pick<TaskView, "from" | "to"> }) {
 }
 
 export function LegBadges({ task }: { task: TaskView }) {
-  const codOffered = useCodOffered();
   const { locale } = useLocale();
   const fr = locale === "fr";
   const now = useNow(task.codeLockedUntil);
@@ -61,7 +58,6 @@ export function LegBadges({ task }: { task: TaskView }) {
       {isCustomerLeg(task.kind) && task.completesOrder === false && <Badge variant="info">{fr ? "Partie de la commande" : "Part of the order"}</Badge>}
       <Badge variant={legStatusVariant(task.status)}>{pickL(LEG_STATUS[task.status], fr)}</Badge>
       {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
-      {codOffered && task.codAmountUsd > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmountUsd, fr ? "fr" : "en")}</Badge>}
       {lockText && <Badge variant="danger" className="max-w-full whitespace-normal text-left">{lockText}</Badge>}
       {task.collectOld && <Badge variant="info">{fr ? "Reprise de l'ancien article" : "Collect the old unit"}</Badge>}
       {runBadgeText(task, fr) && <Badge variant="purple">{runBadgeText(task, fr)}</Badge>}

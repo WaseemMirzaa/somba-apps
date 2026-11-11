@@ -12,9 +12,7 @@ import { LEG_KIND, LEG_STATUS, endpointName, legStatusVariant, pickL } from "@/l
 import { isOpenLeg, parcelCode, useDeskQueue, useWarehouseData } from "@/lib/warehouse";
 import { BATCH_STATUS, batchTaskIds, pick, useOpsQuery, type BatchRow } from "@/lib/warehouse-live";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
-import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import { RiderAttendanceCard } from "@/components/warehouse/rider-attendance-card";
 import { RiderComplianceSection } from "@/components/warehouse/rider-compliance";
 
@@ -24,7 +22,6 @@ export default function WarehouseRiderDetailPage() {
   const fr = locale === "fr";
   const ops = useOpsPath();
   const base = useOpsBase();
-  const codOffered = useCodOffered();
   const { riders, ridersLoading } = useWarehouseData();
   const parcels = useDeskQueue({ status: "all" }).tasks;
   const batchesQ = useOpsQuery<BatchRow[]>("warehouse:batches", { initial: [] as BatchRow[], push: ["batch:updated"] });
@@ -42,7 +39,6 @@ export default function WarehouseRiderDetailPage() {
   const active = mine.filter(isOpenLeg);
   const delivered = mine.filter((p) => p.status === "delivered");
   const failed = mine.filter((p) => p.status === "failed");
-  const cod = delivered.reduce((s, p) => s + p.codAmountUsd, 0);
   const batches = batchesQ.data.filter((b) => b.riderId === rider.id);
   const listHref = ops("/riders");
 
@@ -80,10 +76,9 @@ export default function WarehouseRiderDetailPage() {
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Performance (liste en direct)" : "Performance (live list)"}>
-          <InfoGrid columns={3} items={[
+          <InfoGrid columns={2} items={[
             { label: fr ? "Livrées" : "Delivered", value: delivered.length },
             { label: fr ? "Échouées" : "Failed", value: failed.length },
-            ...(codOffered ? [{ label: fr ? "COD encaissé" : "COD collected", value: formatCurrency(cod, locale) }] : []),
           ]} />
         </DetailGridSection>
 

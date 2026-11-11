@@ -6,7 +6,6 @@ import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { PageHeader } from "@/components/ui/page-header";
 import { HubScopeBar } from "@/components/warehouse/hub-scope";
 import { HubOpsSettingsCard } from "@/components/warehouse/hub-ops-settings";
-import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -62,15 +61,8 @@ export default function WarehouseSettingsPage() {
       <HubOpsSettingsCard />
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
-      <DetailSection title={fr ? "Livraison et paiement" : "Delivery and payment"}>
+      <DetailSection title={fr ? "Livraison" : "Delivery"}>
         <InfoGrid items={[
-          // Cash on delivery is shown only while it is offered (`codEnabled`); when it is off nothing about it appears.
-          ...(settings?.codEnabled === "true"
-            ? [
-                { label: fr ? "Paiement à la livraison (COD)" : "Cash on delivery (COD)", value: <Badge variant="success">{fr ? "Activé" : "Enabled"}</Badge> },
-                { label: fr ? "Plafond COD" : "COD cap", value: settings?.codCapUsd ? formatCurrency(Number(settings.codCapUsd), locale) : "—" },
-              ]
-            : []),
           { label: fr ? "Code de remise obligatoire" : "Delivery code required", value: settings ? (settings.requireDeliveryCode === "true" ? yes : no) : "…" },
           ...(settings?.hubAddress ? [{ label: fr ? "Adresse du hub" : "Hub address", value: settings.hubAddress, full: true }] : []),
         ]} />

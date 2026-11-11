@@ -11,7 +11,6 @@ import {
   PackageX,
   Bike,
   Layers,
-  Banknote,
   Clock,
   Percent,
   Boxes,
@@ -27,11 +26,8 @@ import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
 import { HubScopeBar } from "@/components/warehouse/hub-scope";
-import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { canWarehouseAccess } from "@/lib/warehouse-access";
-import { withoutCodWhenOff } from "@/lib/cod-visibility";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import { useOpsPath } from "@/lib/ops-path";
 import { LEG_KIND_SHORT, pickL, type LegKind } from "@/lib/logistics";
 import { isOpenLeg, legAgeHours, parcelCode, useDeskQueue, useHubScope, useWarehouseData } from "@/lib/warehouse";
@@ -54,7 +50,6 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
   const fr = locale === "fr";
   const ops = useOpsPath();
   const { hubId, isAdmin, tier, canAssign, canManage } = useHubScope();
-  const codOffered = useCodOffered();
   const queue = useDeskQueue({ status: "all" });
   const { riders } = useWarehouseData();
   // The incident list and the warehouse analytics are supervisor / manager data on the server too: an operator does not ask.
@@ -87,9 +82,8 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
     { path: "/aged", label: fr ? "Colis vieillis" : "Aged Parcels", count: aged24, icon: PackageX },
     { path: "/batch-builder", label: fr ? "Préparation des lots" : "Batch builder", count: activeBatches, icon: Send },
     { path: "/riders", label: fr ? "Livreurs" : "Riders", count: riders.length, icon: Bike },
-    { path: "/reconcile", label: fr ? "Espèces COD" : "COD cash", count: null as number | null, icon: Banknote, cod: true },
   ];
-  const visibleQuickLinks = withoutCodWhenOff(quickLinks, codOffered).filter((link) => isAdmin || canWarehouseAccess(gatedTier, `/warehouse${link.path}`));
+  const visibleQuickLinks = quickLinks.filter((link) => isAdmin || canWarehouseAccess(gatedTier, `/warehouse${link.path}`));
 
   const alerts = [
     ...failed.slice(0, 4).map((p) => ({
@@ -163,13 +157,6 @@ export function WarehouseDashboardView({ hubName }: { hubName?: string }) {
               value={an ? (an.failureRatePct == null ? "—" : `${an.failureRatePct}%`) : "…"}
               icon={Percent}
             />
-            {codOffered && (
-              <StatCard
-                title={fr ? "COD à encaisser" : "COD to collect"}
-                value={an ? formatCurrency(an.codToCollect, locale) : "…"}
-                icon={Banknote}
-              />
-            )}
           </>
         )}
       </div>

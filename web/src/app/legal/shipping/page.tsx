@@ -41,15 +41,7 @@ export default function ShippingPolicyPage() {
       <p>{fr
         ? "Si la livraison échoue (client absent, adresse introuvable), une nouvelle tentative est programmée par l'entrepôt. Après 3 tentatives échouées, la commande est annulée et remboursée."
         : "If a delivery fails (customer absent, address not found), the warehouse schedules another attempt. After 3 failed attempts the order is cancelled and refunded."}</p>
-      {s.codEnabled && (
-        <>
-          <h2>{fr ? "7. Paiement à la livraison" : "7. Cash on delivery"}</h2>
-          <p>{fr
-            ? "Lorsqu'il est proposé à la caisse, vous payez le livreur en espèces à la réception."
-            : "Where offered at checkout, you pay the rider in cash when the parcel arrives."}</p>
-        </>
-      )}
-      <h2>{fr ? `${s.codEnabled ? 8 : 7}. Besoin d'aide ?` : `${s.codEnabled ? 8 : 7}. Need help?`}</h2>
+      <h2>{fr ? "7. Besoin d'aide ?" : "7. Need help?"}</h2>
       <p>{BRAND.supportEmail}</p>
       <nav className="mt-12 flex flex-wrap gap-4 text-sm">
         {LEGAL_LINKS.map((l) => <Link key={l.href} href={l.href} className="text-[var(--primary)] hover:underline">{fr ? l.labelFr : l.label}</Link>)}

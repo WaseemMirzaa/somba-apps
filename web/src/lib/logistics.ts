@@ -71,11 +71,6 @@ export interface TaskView {
   replacementId: string | null;
   exchangeId: string | null;
   attempts: number;
-  codAmountUsd: number;
-  /** The cash record: what the rider confirmed taking, when, and how much of it the warehouse has received. */
-  codCollectedUsd?: number | null;
-  codCollectedAt?: string | null;
-  codHandedOverUsd?: number;
   address: string | null;
   pickupAddress: string | null;
   lat: number | null;

@@ -19,15 +19,12 @@ import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { LEG_KIND, LEG_STATUS, endpointName, fmtDateTime, legItemsText, legStatusVariant, mapsLink, pickL, isHubBound, isCustomerLeg } from "@/lib/logistics";
 import { addressText, findLeg, isOpenLeg, legAgeHours, parcelCode, riderLabel, useDeskQueue } from "@/lib/warehouse";
 import { EXCEPTION_STATUS, EXCEPTION_TYPE, pick, useOpsQuery, type ExceptionRow } from "@/lib/warehouse-live";
-import { formatCurrency } from "@/lib/utils";
-import { useCodOffered } from "@/lib/use-cod-offered";
 
 /** One leg of a journey: where from, where to, who carries it, its history, the other legs of the same order. */
 export default function WarehouseLegDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const codOffered = useCodOffered();
   const ops = useOpsPath();
   const base = useOpsBase();
   const isAdmin = base.startsWith("/admin");
@@ -150,13 +147,6 @@ export default function WarehouseLegDetailPage() {
                   }]
                 : []),
               { label: fr ? "Adresse enregistrée" : "Recorded address", value: addressText(task.address), full: true },
-              ...(codOffered && task.codAmountUsd > 0 ? [{ label: fr ? "COD à encaisser" : "COD to collect", value: formatCurrency(task.codAmountUsd, locale) }] : []),
-              ...(codOffered && task.codCollectedAt
-                ? [{
-                    label: fr ? "Espèces encaissées" : "Cash collected",
-                    value: `${formatCurrency(task.codCollectedUsd ?? 0, locale)} · ${new Date(task.codCollectedAt).toLocaleString(locale)} · ${fr ? "remis à l'entrepôt" : "handed in"} ${formatCurrency(task.codHandedOverUsd ?? 0, locale)}`,
-                  }]
-                : []),
               { label: fr ? "Tentatives" : "Attempts", value: task.attempts },
               { label: fr ? "Âge" : "Age", value: isOpenLeg(task) ? (age < 48 ? `${Math.round(age)} h` : `${Math.floor(age / 24)} ${fr ? "j" : "d"}`) : "—" },
             ]}

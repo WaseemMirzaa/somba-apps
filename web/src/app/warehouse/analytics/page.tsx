@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { Package, Send, RotateCcw, AlertTriangle, Clock, Truck, Percent, Banknote, ArrowUpRight } from "lucide-react";
+import { Package, Send, RotateCcw, AlertTriangle, Clock, Truck, Percent, ArrowUpRight } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
@@ -11,7 +11,6 @@ import { NavLinkButton } from "@/components/ui/nav-link-button";
 import { StatCard } from "@/components/ui/stat-card";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { DailyGroupedBars, OpsError } from "@/components/warehouse/ops-state";
-import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { HubScopeBar } from "@/components/warehouse/hub-scope";
 import { OpsPerformance } from "@/components/warehouse/ops-performance";
@@ -19,7 +18,6 @@ import { LEG_KIND, LEG_KINDS, LEG_STATUS, pickL } from "@/lib/logistics";
 import { isOpenLeg, useDeskQueue, useHubScope } from "@/lib/warehouse";
 import { useReturns } from "@/lib/warehouse-returns";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import {
   BATCH_STATUS,
   EXCEPTION_TYPE,
@@ -34,7 +32,6 @@ import {
 } from "@/lib/warehouse-live";
 
 export default function WarehouseAnalyticsPage() {
-  const codOffered = useCodOffered();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const ops = useOpsPath();
@@ -111,7 +108,6 @@ export default function WarehouseAnalyticsPage() {
           icon={Percent}
         />
         <StatCard title={fr ? "Colis ouverts > 24 h" : "Open parcels > 24 h"} value={an ? num(an.agedOver24h) : "…"} icon={AlertTriangle} />
-        {codOffered && <StatCard title={fr ? "COD à encaisser" : "COD to collect"} value={an ? formatCurrency(an.codToCollect, locale) : "…"} icon={Banknote} />}
       </div>
       {an && (
         <p className="-mt-3 text-xs text-slate-500">

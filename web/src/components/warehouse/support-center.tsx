@@ -20,7 +20,7 @@ type Audience = "rider" | "warehouse";
 const CATEGORIES: Record<Audience, { id: string; en: string; fr: string }[]> = {
   rider: [
     { id: "delivery", en: "A delivery", fr: "Une livraison" },
-    { id: "payment", en: "Earnings / cash", fr: "Gains / espèces" },
+    { id: "payment", en: "Earnings / payments", fr: "Gains / paiements" },
     { id: "account", en: "My account", fr: "Mon compte" },
     { id: "general", en: "Something else", fr: "Autre chose" },
   ],

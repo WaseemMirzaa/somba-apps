@@ -46,7 +46,6 @@ import { useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { dayLabel } from "@/lib/delivery-estimate";
 import { useLocale } from "@/context/locale-context";
-import { useCodOffered } from "@/lib/use-cod-offered";
 import { localized, variantDisplay } from "@/lib/i18n-fields";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useAuth } from "@/context/auth-context";
@@ -76,7 +75,6 @@ export default function AdminOrderDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const rt = useRealtime();
-  const codOffered = useCodOffered();
   const { toast } = useToast();
   const role = useRole();
   const { persona } = useAuth();
@@ -200,8 +198,8 @@ export default function AdminOrderDetailPage() {
     : confirm.kind === "status"
       ? confirm.status === "delivered"
         ? fr
-          ? `Marquer la commande comme « Livrée » ? Le flux livreur est ignoré${codOffered ? " ; le paiement à la livraison est enregistré comme encaissé" : ""}. Le client est notifié.`
-          : `Mark this order as "Delivered"? The rider flow is skipped${codOffered ? "; cash on delivery is recorded as collected" : ""}. The customer is notified.`
+          ? `Marquer la commande comme « Livrée » ? Le flux livreur est ignoré. Le client est notifié.`
+          : `Mark this order as "Delivered"? The rider flow is skipped. The customer is notified.`
         : fr
           ? `Passer la commande à « ${liveStatusLabel(confirm.status, true)} » ? Le client est notifié.`
           : `Move this order to "${liveStatusLabel(confirm.status, false)}"? The customer is notified.`
@@ -358,13 +356,6 @@ export default function AdminOrderDetailPage() {
           <InfoGrid items={[
             { label: customerTasks.length > 1 ? (fr ? `Livraisons (${customerTasks.length})` : `Deliveries (${customerTasks.length})`) : task?.kind === "express" ? (fr ? "Livraison express" : "Express delivery") : fr ? "Livraison" : "Delivery task", value: task ? pickL(LEG_STATUS[task.status], fr, task.status.replace(/_/g, " ")) : "—" },
             { label: fr ? "Livreur assigné" : "Rider assigned", value: live.riderId ? (fr ? "Oui" : "Yes") : "—" },
-            ...(codOffered ? [{ label: fr ? "COD à encaisser" : "COD to collect", value: task && task.codAmountUsd > 0 ? formatCurrency(task.codAmountUsd, locale) : "—" }] : []),
-            ...(codOffered && task?.codCollectedAt
-              ? [{
-                  label: fr ? "Espèces encaissées" : "Cash collected",
-                  value: `${formatCurrency(task.codCollectedUsd ?? 0, locale)} · ${new Date(task.codCollectedAt).toLocaleString(locale)} · ${fr ? "remis à l'entrepôt" : "handed in"} ${formatCurrency(task.codHandedOverUsd ?? 0, locale)}`,
-                }]
-              : []),
           ]} />
         </DetailGridSection>
         )}

@@ -13,7 +13,6 @@ import { PlansEditor } from "@/components/admin/plans-editor";
 import { TranslationsStatusPanel } from "@/components/admin/translations-status-panel";
 import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { codOffered } from "@/lib/cod-visibility";
 import { errMessage } from "@/lib/seller-labels";
 import { DELIVERY_MODEL_FIELDS, DELIVERY_MODEL_TITLE, rangeProblem } from "@/lib/delivery-settings";
 
@@ -82,8 +81,6 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     title: "Checkout and delivery",
     titleFr: "Paiement et livraison",
     fields: [
-      { key: "codEnabled", kind: "toggle", label: "Cash on delivery", labelFr: "Paiement à la livraison", hint: "When off, shoppers cannot choose COD.", hintFr: "Désactivé : le paiement à la livraison n'est plus proposé." },
-      { key: "codCapUsd", kind: "text", label: "COD cap (USD)", labelFr: "Plafond COD (USD)", hint: "COD orders above this amount raise a fraud alert.", hintFr: "Les commandes COD au-dessus de ce montant déclenchent une alerte fraude.", inputMode: "decimal" },
       { key: "requireDeliveryCode", kind: "toggle", label: "Require customer delivery code", labelFr: "Exiger le code de livraison client", hint: "Riders must enter the customer's 4-digit code to complete a delivery.", hintFr: "Les livreurs doivent saisir le code à 4 chiffres du client." },
       { key: "requireVerifiedForCheckout", kind: "toggle", label: "Require a verified phone or email to check out", labelFr: "Exiger un téléphone ou e-mail vérifié pour commander", hint: "On: orders and wallet top-ups need a verified phone or email. Turn it off until SMTP or SMS verification is configured, or customers cannot verify and cannot check out.", hintFr: "Activé : commandes et recharges exigent un téléphone ou e-mail vérifié. Désactivez tant que l'e-mail (SMTP) ou le SMS n'est pas configuré, sinon les clients ne peuvent ni vérifier ni commander." },
       { key: "hubAddress", kind: "text", label: "Hub address", labelFr: "Adresse du hub", hint: "Where parcels are brought (shown to sellers/riders).", hintFr: "Où les colis sont déposés (affiché aux vendeurs/livreurs).", inputMode: "text" },
@@ -236,8 +233,6 @@ export default function AdminSettingsPage() {
   }
 
   const anyDirty = GROUPS.some((g) => g.fields.some((f) => dirty(f.key)));
-  // Cash on delivery is not offered unless the server value is "true": then the toggle gives way to a read-only line and the cap is hidden.
-  const codOff = !codOffered(saved.codEnabled);
   // Express fees, days and distance only matter while express delivery is on.
   const expressOn = String(saved.expressDeliveryEnabled ?? "") === "true";
 
@@ -258,18 +253,9 @@ export default function AdminSettingsPage() {
             <div key={g.title} className="card-premium space-y-4 p-6">
               <h3 className="font-semibold">{fr ? g.titleFr : g.title}</h3>
               <div className="grid gap-5 lg:grid-cols-2">
-                {g.fields.filter((f) => !(codOff && f.key === "codCapUsd")).filter((f) => !((f as { express?: boolean }).express && !expressOn)).map((f) => {
+                {g.fields.filter((f) => !((f as { express?: boolean }).express && !expressOn)).map((f) => {
                   const err = errors[f.key];
                   const busy = savingKey === f.key;
-                  if (codOff && f.key === "codEnabled") {
-                    return (
-                      <div key={f.key} className="space-y-1.5">
-                        <label className="text-sm font-medium text-slate-800">{fr ? f.labelFr : f.label}</label>
-                        <p className="text-sm text-slate-600" data-testid="cod-not-offered">{fr ? "Non proposé" : "Not offered"}</p>
-                        <p className="text-xs text-slate-400">{fr ? "Le paiement à la livraison n'est pas proposé sur cette plateforme." : "Cash on delivery is not offered on this platform."}</p>
-                      </div>
-                    );
-                  }
                   return (
                     <div key={f.key} className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-800">{fr ? f.labelFr : f.label}</label>

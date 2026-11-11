@@ -21,9 +21,8 @@ test("cancelled order -> cancelled", () => {
   assert.equal(derivePackageStatus(paid("cancelled"), [line("ready")]), "cancelled");
 });
 
-test("unpaid pending non-COD -> pending; COD or paid is not", () => {
+test("unpaid pending -> pending; paid is not", () => {
   assert.equal(derivePackageStatus({ status: "pending", paymentMethod: "stripe_card" }, [line("open")]), "pending");
-  assert.equal(derivePackageStatus({ status: "pending", paymentMethod: "cod" }, [line("open")]), "to_pack");
   assert.equal(derivePackageStatus(paid("pending"), [line("open")]), "to_pack");
 });
 

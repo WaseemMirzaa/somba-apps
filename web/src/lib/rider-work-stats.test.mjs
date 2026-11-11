@@ -5,13 +5,13 @@ import { readFileSync, readdirSync } from "node:fs";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 
-test("the rider data layer asks for rider:workStats and carries no money but the COD cash", () => {
+test("the rider data layer asks for rider:workStats and carries no money at all", () => {
   const src = read("./rider.ts");
   assert.match(src, /"rider:workStats"/);
   assert.doesNotMatch(src, /"rider:earnings"|earningsUsd|perTaskUsd|earningsToday/);
   const iface = src.slice(src.indexOf("export interface RiderWorkStats"), src.indexOf("export type RiderTaskStatus"));
   const usdFields = [...iface.matchAll(/(\w*Usd)\??:/g)].map((m) => m[1]);
-  assert.deepEqual(usdFields, ["codCollectedUsd"]);
+  assert.deepEqual(usdFields, []);
 });
 
 test("the My work page shows no pay, and the old /rider/earnings URL only redirects to /rider/work", () => {

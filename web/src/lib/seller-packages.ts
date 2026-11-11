@@ -150,7 +150,7 @@ interface LooseOrder {
 }
 
 /** Fallback only for a server that has not sent `packageStatus` (offline mirror): mirrors the server rules. */
-export function derivePackageStatus(o: Pick<LooseOrder, "status" | "paymentMethod" | "items">): PackageStatus {
+export function derivePackageStatus(o: Pick<LooseOrder, "status" | "items">): PackageStatus {
   const items = o.items ?? [];
   if (items.length > 0 && items.every((it) => it.fulfilment === "cancelled")) return "cancelled";
   switch (o.status) {
@@ -159,9 +159,7 @@ export function derivePackageStatus(o: Pick<LooseOrder, "status" | "paymentMetho
     case "delivered": return "delivered";
     case "out_for_delivery": return "out_for_delivery";
     case "shipped": return "shipped";
-    case "pending":
-      if (o.paymentMethod !== "cod") return "pending";
-      break;
+    case "pending": return "pending";
     default: break;
   }
   const live = liveLines(items);
@@ -181,8 +179,8 @@ export function normalizeOrder<T extends LooseOrder>(o: T): T & { packageStatus:
 
 // ─── What counts ─────────────────────────────────────────────────────────────
 /**
- * A sale is a package that is paid for (or COD in transit) and not cancelled/returned.
- * An unpaid non-COD `pending` order is not a sale and not work for the seller yet (B14).
+ * A sale is a package that is paid for and not cancelled/returned.
+ * An unpaid `pending` order is not a sale and not work for the seller yet (B14).
  */
 export function countsAsSale(o: Pick<SellerOrderView, "status" | "packageStatus">): boolean {
   if (o.status === "cancelled" || o.status === "returned" || o.status === "pending") return false;
