@@ -16,6 +16,7 @@ import {
   fmtDateTime,
   legItemsText,
   isCustomerLeg,
+  isWaitingForSeller,
   legStatusVariant,
   mapsLink,
   pickL,
@@ -57,7 +58,7 @@ export function LegBadges({ task }: { task: TaskView }) {
   return (
     <>
       <Badge variant={task.kind === "express" ? "purple" : "primary"}>{pickL(LEG_KIND[task.kind], fr)}</Badge>
-      {isCustomerLeg(task.kind) && task.completesOrder === false && <Badge variant="info">{fr ? "Livraison partielle" : "Partial delivery"}</Badge>}
+      {isCustomerLeg(task.kind) && task.completesOrder === false && <Badge variant="info">{fr ? "Partie de la commande" : "Part of the order"}</Badge>}
       <Badge variant={legStatusVariant(task.status)}>{pickL(LEG_STATUS[task.status], fr)}</Badge>
       {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
       {codOffered && task.codAmountUsd > 0 && <Badge variant="purple">COD {formatCurrency(task.codAmountUsd, fr ? "fr" : "en")}</Badge>}
@@ -65,6 +66,23 @@ export function LegBadges({ task }: { task: TaskView }) {
       {task.collectOld && <Badge variant="info">{fr ? "Reprise de l'ancien article" : "Collect the old unit"}</Badge>}
       {runBadgeText(task, fr) && <Badge variant="purple">{runBadgeText(task, fr)}</Badge>}
     </>
+  );
+}
+
+/** "Waiting for the seller to pack": an express leg is on the desk before the parcel is ready. */
+export function WaitingForSellerNote({ task }: { task: Pick<TaskView, "kind" | "readyAt" | "status"> }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
+  if (!isWaitingForSeller(task)) return null;
+  return (
+    <p data-testid="waiting-for-seller" className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
+      <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>
+        {fr
+          ? "En attente que le vendeur emballe le colis. Vous pouvez déjà assigner un livreur, mais il n'y a encore rien à collecter."
+          : "Waiting for the seller to pack. You can assign a rider now, but there is nothing to collect yet."}
+      </span>
+    </p>
   );
 }
 
@@ -87,6 +105,7 @@ export function LegCard({ task, onChanged }: { task: DeskTask; onChanged?: (res?
             <LegBadges task={task} />
           </div>
           <LegRoute task={task} />
+          <WaitingForSellerNote task={task} />
           <p className="flex items-start gap-1.5 text-xs text-slate-500">
             <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="break-words">{legItemsText(task.items, fr)}</span>

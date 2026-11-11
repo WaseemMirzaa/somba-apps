@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { DeliveryProofCard } from "@/components/warehouse/delivery-proof-card";
 import { ExceptionForm } from "@/components/warehouse/exception-form";
 import { LegActions } from "@/components/warehouse/leg-actions";
-import { LegBadges, LegRoute } from "@/components/warehouse/leg-card";
+import { LegBadges, LegRoute, WaitingForSellerNote } from "@/components/warehouse/leg-card";
 import { OpsLoading } from "@/components/warehouse/ops-state";
 import { useLocale } from "@/context/locale-context";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
@@ -93,6 +93,7 @@ export default function WarehouseLegDetailPage() {
             : "Express delivery: the rider goes from the seller straight to the customer. The parcel does not pass through the warehouse; your warehouse oversees the run."}
         </div>
       )}
+      <WaitingForSellerNote task={task} />
       {isCustomerLeg(task.kind) && task.completesOrder === false && (
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900" data-testid="partial-note">
           <p className="font-semibold">{fr ? "Livraison partielle" : "Partial delivery"}</p>

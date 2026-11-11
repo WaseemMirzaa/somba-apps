@@ -50,7 +50,7 @@ export function RiderTaskCard({
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-slate-900">{task.orderId}</span>
           <Badge variant={task.kind === "express" ? "purple" : "primary"}>{pickL(LEG_KIND[task.kind], fr)}</Badge>
-          {task.partial && <Badge variant="info">{fr ? "Livraison partielle" : "Partial delivery"}</Badge>}
+          {task.partial && <Badge variant="info">{fr ? "Partie de la commande" : "Part of the order"}</Badge>}
           <Badge variant={riderStatusVariant(task.status)}>{fr ? label.fr : label.en}</Badge>
           {task.attempts > 1 && <Badge variant="warning">{fr ? `Tentative ${task.attempts}` : `Attempt ${task.attempts}`}</Badge>}
           {showTaskCash(codEnabled, task) && <Badge variant="purple">COD {formatCurrency(task.codAmount, locale)}</Badge>}

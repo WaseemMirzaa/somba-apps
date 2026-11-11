@@ -19,7 +19,7 @@ export interface CancellableLine {
 
 /**
  * "Cancel items" — orders:sellerCancel for the seller's own open / ready lines only.
- * Mount it only while open (`{open && <CancelItemsDialog … />}`) so every opening starts with all lines ticked.
+ * Mount it only while open (`{open && <CancelItemsDialog … />}`) so every opening starts with nothing ticked (one click never cancels the whole order).
  */
 export function CancelItemsDialog({
   orderId,
@@ -34,7 +34,7 @@ export function CancelItemsDialog({
   const fr = locale === "fr";
   const { toast } = useToast();
   const { sellerCancel } = useSellerData();
-  const [selected, setSelected] = useState<Set<string>>(() => new Set(lines.map((l) => l.itemId)));
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [reasonKey, setReasonKey] = useState<CancelReasonKey | "">("");
   const [other, setOther] = useState("");
   const [busy, setBusy] = useState(false);
@@ -95,6 +95,7 @@ export function CancelItemsDialog({
     >
       <fieldset className="space-y-2">
         <legend className="mb-1 font-medium text-slate-900">{fr ? "Articles à annuler" : "Items to cancel"}</legend>
+        {chosen.length === 0 && <p className="text-xs text-slate-500" data-testid="cancel-pick-hint">{fr ? "Cochez les articles à annuler." : "Tick the items to cancel."}</p>}
         {lines.map((l) => (
           <label key={l.itemId} className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-200 p-2">
             <input type="checkbox" className="mt-1" checked={selected.has(l.itemId)} disabled={busy} onChange={() => toggle(l.itemId)} />

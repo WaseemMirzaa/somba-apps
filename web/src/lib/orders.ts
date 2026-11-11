@@ -1,5 +1,6 @@
 "use client";
 
+import { hasDeliveryCodeStage } from "@/lib/delivery-code";
 import { isExpressOrder, isPartiallyDelivered } from "@/lib/split-delivery";
 import { useEffect, useMemo, useState } from "react";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -223,13 +224,14 @@ export function canCancelOrder(status: string): boolean {
   return status === "pending" || status === "confirmed";
 }
 
-/** Statuses in which a 4-digit handover code may exist for the rider. */
-export function hasDeliveryCodeStage(status: string): boolean {
-  return status === "processing" || status === "shipped" || status === "out_for_delivery";
-}
+export { hasDeliveryCodeStage };
 
-/** The customer's 4-digit handover code, only while the parcel is on its way (`orders:deliveryCode`). */
-export function useDeliveryCode(orderUuid: string | undefined, status: string | undefined): string | null {
+/**
+ * The customer's 4-digit handover code, as the server gives it (`orders:deliveryCode`: only while a customer leg is open).
+ * Asked again whenever `refreshKey` changes (`codeRefreshKey(order)`: status, legs updated or delivered), so a delivered
+ * part's code goes and the next attempt's code shows without a reload.
+ */
+export function useDeliveryCode(orderUuid: string | undefined, status: string | undefined, refreshKey = ""): string | null {
   const rt = useRealtime();
   const [code, setCode] = useState<{ orderId: string; value: string } | null>(null);
   useEffect(() => {
@@ -246,6 +248,6 @@ export function useDeliveryCode(orderUuid: string | undefined, status: string | 
     return () => {
       alive = false;
     };
-  }, [orderUuid, status, rt.status]);
+  }, [orderUuid, status, refreshKey, rt.status]);
   return code && code.orderId === orderUuid && status && hasDeliveryCodeStage(status) ? code.value : null;
 }

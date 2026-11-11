@@ -64,5 +64,9 @@ const Map<String, (String, String)> kMessagesLogistics = {
   'delivery_leg_assigned': ('Rider assigned', 'Livreur assigné'),
   'delivery_leg_onway': ('On its way', 'En route'),
   'delivery_leg_delivered': ('Delivered', 'Livrée'),
+  'delivery_express_row': ('Express delivery (straight from the store)', 'Livraison express (directement depuis la boutique)'),
+  'attempt_failed': ('Delivery attempt {n} failed', 'Tentative de livraison {n} échouée'),
+  'attempt_retry': ('The rider will try again.', 'Le livreur va réessayer.'),
+  'attempt_contact': ('We will be in touch.', 'Nous vous contactons.'),
   'delivery_leg_failed': ('Not delivered, we will try again', 'Non livrée, nous allons réessayer'),
 };

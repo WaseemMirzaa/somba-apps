@@ -118,6 +118,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ]),
               ),
               DeliveryCodeCard.forOrder(o),
+              FailedAttemptBanner(order: o),
               PartialDeliveryBanner(order: o),
               if (showsDeliveryLegs(o)) ...[
                 const SizedBox(height: 14),
@@ -139,7 +140,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
                     ),
                   const SizedBox(height: 8),
-                  _row(s.delivery, o.deliveryFeeUsd == 0 ? s.free : money(o.deliveryFeeUsd)),
+                  _row(o.isExpress ? s.deliveryExpressRow : s.delivery, o.deliveryFeeUsd == 0 ? s.free : money(o.deliveryFeeUsd), key: o.isExpress ? const ValueKey('order-delivery-express-row') : null),
                   if (dayLabel(o.estimatedDeliveryDate, s.lang) != null) ...[
                     const SizedBox(height: 6),
                     _row(s.estimatedDelivery, dayLabel(o.estimatedDeliveryDate, s.lang)!, key: const ValueKey('order-estimate-row')),
@@ -501,6 +502,7 @@ class OrderTrackingScreen extends StatelessWidget {
               ]),
             ),
             DeliveryCodeCard.forOrder(o),
+            FailedAttemptBanner(order: o),
             PartialDeliveryBanner(order: o),
             if (showsDeliveryLegs(o)) ...[
               const SizedBox(height: 14),
@@ -655,6 +657,11 @@ class DeliveryCodeCard extends StatefulWidget {
 
   const DeliveryCodeCard({super.key, required this.orderId, required this.status, this.legsKey = '', this.openLeg = false});
 
+  /// Whether the order is not over, so a code may exist: any status but unpaid (`pending`), cancelled, returned or delivered.
+  /// A failed attempt puts the order back to `confirmed` and the retry has a new code, so the card asks then too; the server
+  /// answers `required: false` / no code when no customer leg is open.
+  static bool asksFor(String status) => !const {'pending', 'cancelled', 'returned', 'delivered'}.contains(status);
+
   /// The card of [o], refreshed per leg.
   factory DeliveryCodeCard.forOrder(OrderDto o) => DeliveryCodeCard(
         key: ValueKey('code-${o.id}'),
@@ -676,8 +683,6 @@ class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
   String? _code;
   int _seq = 0; // a late answer for an earlier leg never replaces the code of the current one
 
-  static const _statuses = {'processing', 'shipped', 'out_for_delivery'};
-
   @override
   void initState() {
     super.initState();
@@ -692,7 +697,7 @@ class _DeliveryCodeCardState extends State<DeliveryCodeCard> {
 
   Future<void> _load() async {
     final seq = ++_seq;
-    if (!_statuses.contains(widget.status) && !widget.openLeg) {
+    if (!DeliveryCodeCard.asksFor(widget.status) && !widget.openLeg) {
       if (_code != null) setState(() => _code = null);
       return;
     }

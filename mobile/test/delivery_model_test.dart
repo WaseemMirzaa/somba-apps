@@ -15,6 +15,7 @@ import 'package:lipcart/screens/checkout_screen.dart';
 import 'package:lipcart/screens/more/order_screens.dart';
 import 'package:lipcart/services/delivery_quote.dart';
 import 'package:lipcart/services/models.dart';
+import 'package:lipcart/widgets/delivery_legs.dart';
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/util/delivery_estimate.dart';
 import 'package:lipcart/util/format.dart';
@@ -521,6 +522,52 @@ void main() {
       expect(translateServerError('Part of this order was already delivered. Contact support to stop the rest.', fr), startsWith('Une partie de cette commande'));
       expect(translateServerError('An express parcel is still with the seller. Cancel the order instead.', fr), startsWith('Un colis express'));
       expect(translateServerError('An express delivery that is delivered cannot become failed.', const Strings('en')), 'An express delivery that is delivered cannot become failed.');
+    });
+  });
+  group('a failed delivery attempt and the retry code', () {
+    Map<String, dynamic> failedLeg({String reason = 'Customer not reachable', String kind = 'delivery'}) =>
+        {..._leg(kind, 'failed'), 'id': 'f1', 'attempts': 1, 'failureReason': reason};
+
+    test('the code is asked for whenever the order is not over, a failed attempt (confirmed) included', () {
+      for (final st in ['confirmed', 'processing', 'shipped', 'out_for_delivery']) {
+        expect(DeliveryCodeCard.asksFor(st), isTrue, reason: st);
+      }
+      for (final st in ['pending', 'cancelled', 'returned', 'delivered']) {
+        expect(DeliveryCodeCard.asksFor(st), isFalse, reason: st);
+      }
+    });
+
+    test('the failed attempt is read from the legs: its number, its reason, and whether the rider comes back', () {
+      final o = _order(status: 'confirmed', legs: [failedLeg(), {..._leg('delivery', 'unassigned'), 'id': 'n2', 'attempts': 2}]);
+      expect(o.failedAttempt, (attempt: 1, reason: 'Customer not reachable', retry: true));
+      const en = Strings('en');
+      expect(en.deliveryAttemptFailed(1, 'Customer not reachable', true), 'Delivery attempt 1 failed: Customer not reachable. The rider will try again.');
+      expect(const Strings('fr').deliveryAttemptFailed(1, 'Client injoignable', true), 'Tentative de livraison 1 échouée: Client injoignable. Le livreur va réessayer.');
+      expect(en.deliveryAttemptFailed(1, null, false), 'Delivery attempt 1 failed. We will be in touch.');
+      expect(en.deliveryAttemptFailed(2, 'Nobody opened the door.', true), 'Delivery attempt 2 failed: Nobody opened the door. The rider will try again.');
+    });
+
+    test('nothing to say for a clean order, a finished one, a pickup, or a leg that went back to the seller', () {
+      expect(_order(status: 'processing', legs: [_leg('delivery', 'in_transit')]).failedAttempt, isNull);
+      expect(_order(status: 'delivered', legs: [failedLeg()]).failedAttempt, isNull);
+      expect(_order(status: 'confirmed', legs: [failedLeg(kind: 'pickup')]).failedAttempt, isNull);
+      expect(_order(status: 'confirmed', legs: [failedLeg(reason: 'Returned to seller')]).failedAttempt, isNull);
+    });
+
+    testWidgets('the order page shows the failed attempt banner', (tester) async {
+      final o = _order(status: 'confirmed', legs: [failedLeg(), {..._leg('delivery', 'unassigned'), 'id': 'n2', 'attempts': 2}]);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: FailedAttemptBanner(order: o))));
+      expect(find.byKey(const ValueKey('failed-attempt')), findsOneWidget);
+      expect(find.textContaining('Delivery attempt 1 failed: Customer not reachable'), findsOneWidget);
+      await tester.pumpWidget(MaterialApp(home: Scaffold(body: FailedAttemptBanner(order: _order(status: 'processing')))));
+      expect(find.byKey(const ValueKey('failed-attempt')), findsNothing);
+    });
+  });
+
+  group('an express order is not a warehouse delivery', () {
+    test('the delivery row says express and straight from the store (EN / FR)', () {
+      expect(const Strings('en').deliveryExpressRow, 'Express delivery (straight from the store)');
+      expect(const Strings('fr').deliveryExpressRow, 'Livraison express (directement depuis la boutique)');
     });
   });
 }

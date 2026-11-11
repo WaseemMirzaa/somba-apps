@@ -701,6 +701,23 @@ class OrderDto {
   /// The legs that carry parcels to the customer (`delivery`, and `express` straight from the store), oldest first.
   List<OrderLeg> get customerLegs => legs.where((l) => l.isCustomerLeg).toList();
 
+  /// The order is not over: not unpaid (`pending`), cancelled, returned or delivered. A handover code may exist only then
+  /// (a failed attempt sends the order back to `confirmed` and re-opens the leg with a new code).
+  bool get isLive => !const {'pending', 'cancelled', 'returned', 'delivered'}.contains(status) || (status == 'pending' && isCod);
+
+  /// The latest failed delivery attempt on a live order, for "Delivery attempt 1 failed: ... We will try again" (null when
+  /// none, or when the leg closed because the parcel went back to the seller or the order was refunded).
+  ({int attempt, String? reason, bool retry})? get failedAttempt {
+    if (!isLive) return null;
+    final legs = customerLegs;
+    const notAttempts = {'returned to seller', 'refunded'};
+    final failed = legs.where((l) => l.status == 'failed' && !notAttempts.contains((l.failureReason ?? '').trim().toLowerCase())).toList();
+    if (failed.isEmpty) return null;
+    final last = failed.last;
+    final later = legs.sublist(legs.lastIndexOf(last) + 1);
+    return (attempt: last.attempts, reason: last.failureReason, retry: later.any((l) => l.status != 'failed'));
+  }
+
   /// Cash on delivery: the server keeps the order `pending` until the rider collects the money, but it is already
   /// being prepared (nothing to approve on a phone), so the app treats it like a confirmed order.
   bool get isCod => paymentMethod == 'cod';
@@ -819,10 +836,16 @@ class OrderLeg {
     this.sellerIds,
     this.items = const [],
     this.completesOrder,
+    this.attempts = 1,
+    this.failureReason,
   });
 
   final String kind;
   final String status;
+
+  /// Which attempt this leg is (a failed leg is re-opened as a new one with `attempts + 1`) and why it failed.
+  final int attempts;
+  final String? failureReason;
 
   /// On a customer leg: the sellers whose parcels it carries (null = every seller, or an older server), what it carries
   /// and whether delivering it finishes the order (null on older servers, where the one delivery leg always does).
@@ -878,6 +901,8 @@ class OrderLeg {
         sellerIds: j['sellerIds'] is List ? [for (final e in j['sellerIds'] as List) e is String && e.isNotEmpty ? e : null] : null,
         items: j['items'] is List ? [for (final e in j['items'] as List) if (e is Map) LegItem.fromJson(e.map((k, v) => MapEntry(k.toString(), v)))] : const [],
         completesOrder: j['completesOrder'] is bool ? j['completesOrder'] as bool : null,
+        attempts: j['attempts'] is num ? (j['attempts'] as num).toInt() : 1,
+        failureReason: textOrNull(j['failureReason']),
       );
 
   /// The flat `fromHubId` / `fromHubName` / `toHubId` / `toHubName` are what the server sends; a warehouse sent only as an

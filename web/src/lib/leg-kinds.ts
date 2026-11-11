@@ -50,6 +50,13 @@ export const RIDER_FINISHED: LegKind[] = ["delivery", "express", "replacement_de
 /** The legs that carry an order to its customer: the warehouse's delivery, or an express run straight from the seller. */
 export const CUSTOMER_KINDS: LegKind[] = ["delivery", "express"];
 export const isCustomerLeg = (k: LegKind | string) => (CUSTOMER_KINDS as string[]).includes(k);
+/** An express leg the seller has not packed yet (`readyAt` empty): a rider can still be assigned by hand, but there is nothing to collect. */
+export const isWaitingForSeller = (t: { kind: LegKind | string; readyAt?: string | null; status?: string }) =>
+  t.kind === "express" && !t.readyAt && (t.status === undefined || t.status === "unassigned" || t.status === "assigned");
+/** "Part of the order" is a statement about a customer leg only: seller pickups, transfers and returns never carry it. */
+export const isPartialLeg = (kind: LegKind | string, completesOrder?: boolean | null, orderPartial?: boolean | null) =>
+  isCustomerLeg(kind) && (orderPartial === true || completesOrder === false);
+export const PARTIAL_LABEL: L = { en: "Part of the order", fr: "Partie de la commande" };
 
 export const isHubBound = (k: LegKind | string) => (HUB_BOUND as string[]).includes(k);
 

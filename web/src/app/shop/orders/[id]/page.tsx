@@ -13,15 +13,17 @@ import { ContactSeller } from "@/components/shop/contact-seller";
 import { customerJourney } from "@/lib/order-journey";
 import { useHubDirectory } from "@/lib/shop-engage";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
-import { useMyOrder, orderStatusLabel, canCancelOrder, hasDeliveryCodeStage, useDeliveryCode } from "@/lib/orders";
+import { useMyOrder, orderStatusLabel, canCancelOrder, useDeliveryCode } from "@/lib/orders";
+import { hasDeliveryCodeStage, codeRefreshKey } from "@/lib/delivery-code";
 import { formatCurrency, formatPaymentMethod } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useShop } from "@/context/shop-context";
 import { isMobileMoneyMethod } from "@/lib/shop-live";
 import { refundedTotal } from "@/lib/shop-packages";
+import { deliveryLineLabel } from "@/lib/quote-text";
 import { dayLabel } from "@/lib/delivery-estimate";
-import { ExpressBadge, PartialDelivery, panelLines } from "@/components/shop/partial-delivery";
+import { ExpressBadge, FailedAttemptNotice, PartialDelivery, panelLines } from "@/components/shop/partial-delivery";
 import { openCustomerLeg } from "@/lib/split-delivery";
 
 function OrderDetail() {
@@ -35,7 +37,9 @@ function OrderDetail() {
   const [cancelling, setCancelling] = useState(false);
   const order = useMyOrder(id);
   const hubs = useHubDirectory();
-  const code = useDeliveryCode(order?.id, order?.status);
+  // The raw order carries the per-line seller state and the legs the detail view model leaves out.
+  const raw = order ? rt.orders.find((o) => o.id === order.id) : undefined;
+  const code = useDeliveryCode(order?.id, order?.status, codeRefreshKey(raw));
 
   const paymentStatusLabel = (status: string) => {
     const map: Record<string, { en: string; fr: string }> = {
@@ -48,8 +52,6 @@ function OrderDetail() {
     return m ? (fr ? m.fr : m.en) : status;
   };
 
-  // The raw order carries the per-line seller state the detail view model leaves out.
-  const raw = order ? rt.orders.find((o) => o.id === order.id) : undefined;
   const rawItems = raw?.items ?? [];
 
   function reorder() {
@@ -148,6 +150,8 @@ function OrderDetail() {
         </div>
       )}
 
+      {raw && <FailedAttemptNotice order={raw} fr={fr} />}
+
       {raw && <PartialDelivery order={raw} lines={panelLines(raw.items, fr)} legs={raw.tracking?.legs} fr={fr} audience="customer" />}
 
       {waitingApproval && (
@@ -212,7 +216,7 @@ function OrderDetail() {
             {order.discount > 0 && (
               <div className="flex justify-between text-emerald-700"><dt>{fr ? "Code promo" : "Promo code"}</dt><dd>-{formatCurrency(order.discount, locale)}</dd></div>
             )}
-            <div className="flex justify-between"><dt>{fr ? "Livraison" : "Delivery"}{destHub ? ` (${destHub.name})` : ""}</dt><dd>{order.deliveryFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.deliveryFee, locale)}</dd></div>
+            <div className="flex justify-between"><dt>{deliveryLineLabel(order.deliveryMode, destHub?.name, fr)}</dt><dd>{order.deliveryFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.deliveryFee, locale)}</dd></div>
             <div className="flex justify-between border-t border-[var(--border)] pt-1 font-semibold"><dt>Total</dt><dd>{formatCurrency(order.amount, locale)}</dd></div>
             {refunded > 0 && (
               <div className="flex justify-between text-emerald-700"><dt>{fr ? "Remboursé" : "Refunded"}</dt><dd>-{formatCurrency(refunded, locale)}</dd></div>

@@ -19,7 +19,7 @@ import type { LegKind, L } from "@/lib/leg-kinds";
 export { formatTransit };
 export type { DeliveryMode };
 export type { LegKind, L } from "@/lib/leg-kinds";
-export { pickL, LEG_KIND, LEG_KIND_SHORT, LEG_KINDS, HUB_BOUND, RIDER_FINISHED, CUSTOMER_KINDS, isHubBound, isCustomerLeg, meetsCustomer } from "@/lib/leg-kinds";
+export { pickL, LEG_KIND, LEG_KIND_SHORT, LEG_KINDS, HUB_BOUND, RIDER_FINISHED, CUSTOMER_KINDS, isHubBound, isCustomerLeg, isPartialLeg, isWaitingForSeller, PARTIAL_LABEL, meetsCustomer } from "@/lib/leg-kinds";
 
 
 export type LegStatus = "unassigned" | "assigned" | "picked_up" | "in_transit" | "delivered" | "failed";

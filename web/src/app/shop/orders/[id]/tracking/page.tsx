@@ -10,13 +10,14 @@ import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { StepList } from "@/components/shop/step-list";
 import { ContactSeller } from "@/components/shop/contact-seller";
 import { useMyOrder, orderStatusLabel, useDeliveryCode } from "@/lib/orders";
+import { codeRefreshKey } from "@/lib/delivery-code";
 import { customerJourney } from "@/lib/order-journey";
 import { useHubDirectory } from "@/lib/shop-engage";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useSocketEvent } from "@/lib/shop-live";
 import { dayLabel } from "@/lib/delivery-estimate";
-import { PartialDelivery, ExpressBadge, panelLines } from "@/components/shop/partial-delivery";
+import { PartialDelivery, ExpressBadge, FailedAttemptNotice, panelLines } from "@/components/shop/partial-delivery";
 import { openCustomerLeg } from "@/lib/split-delivery";
 import type { RiderLocation } from "@/lib/realtime/types";
 
@@ -28,7 +29,8 @@ function Tracking() {
   const hubs = useHubDirectory();
   const fr = locale === "fr";
   const [seenAt, setSeenAt] = useState<{ orderId: string; at: Date } | null>(null);
-  const code = useDeliveryCode(order?.id, order?.status);
+  const rawOrder = order ? rt.orders.find((o) => o.id === order.id) : undefined;
+  const code = useDeliveryCode(order?.id, order?.status, codeRefreshKey(rawOrder));
 
   // Remember WHEN the last live position reached this page (the push carries no timestamp).
   useSocketEvent<RiderLocation>("delivery:location", (loc) => {
@@ -51,6 +53,8 @@ function Tracking() {
   return (
     <div className="space-y-6">
       <PageHeader title={fr ? "Suivi de livraison" : "Delivery tracking"} subtitle={`${order.reference} · ${orderStatusLabel(order.status, fr)}`} backHref={`/shop/orders/${order.id}`} />
+
+      <FailedAttemptNotice order={raw} fr={fr} />
 
       {code && (
         <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 text-center" data-testid="delivery-code">
@@ -130,7 +134,9 @@ function Tracking() {
       <DetailSection title={fr ? "Colis" : "Parcel"}>
         <InfoGrid items={[
           { label: fr ? "Référence" : "Reference", value: order.reference },
-          { label: fr ? "Entrepôt de livraison" : "Delivery warehouse", value: destHub ? `${destHub.name} · ${destHub.city}` : "—" },
+          order.deliveryMode === "express"
+            ? { label: fr ? "Livraison" : "Delivery", value: fr ? "Express (directement depuis la boutique)" : "Express (straight from the store)" }
+            : { label: fr ? "Entrepôt de livraison" : "Delivery warehouse", value: destHub ? `${destHub.name} · ${destHub.city}` : "—" },
           { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
         ]} />
         {sellers.length > 0 && (
