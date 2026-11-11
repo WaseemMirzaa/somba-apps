@@ -21,7 +21,7 @@ export const APP_LINKS = {
   riderApp: envUrl(process.env.NEXT_PUBLIC_RIDER_APP_URL),
   sellerSignup: "/login",
   sellOnline: "/sell-online",
-  contactSupport: `mailto:${BRAND.supportEmail}?subject=Somba%26Teka%20Support`,
+  contactSupport: `mailto:${BRAND.supportEmail}?subject=KOMORIKO%20Support`,
 } as const;
 
 export const PORTAL_IMAGES = {
@@ -35,8 +35,8 @@ export const PORTAL_IMAGES = {
 export const PORTAL_SECTION = {
   title: "One marketplace, every role",
   titleFr: "Une marketplace, chaque rôle",
-  subtitle: "Whether you're shopping or selling — Somba&Teka connects every part of the journey.",
-  subtitleFr: "Que vous achetiez ou vendiez — Somba&Teka connecte chaque étape.",
+  subtitle: "Whether you're shopping or selling — KOMORIKO connects every part of the journey.",
+  subtitleFr: "Que vous achetiez ou vendiez — KOMORIKO connecte chaque étape.",
   publicLabel: "For shoppers & sellers",
   publicLabelFr: "Pour acheteurs et vendeurs",
   opsLabel: "For our operations team",
@@ -107,8 +107,8 @@ export const PORTALS = [
     taglineFr: "Lister, vendre, grandir, être payé",
     name: "Seller Portal",
     nameFr: "Portail Vendeur",
-    desc: "Open your store on Somba&Teka — manage catalog, orders, promotions, and payouts from one dashboard.",
-    descFr: "Ouvrez votre boutique sur Somba&Teka — catalogue, commandes, promotions et paiements en un seul tableau de bord.",
+    desc: "Open your store on KOMORIKO — manage catalog, orders, promotions, and payouts from one dashboard.",
+    descFr: "Ouvrez votre boutique sur KOMORIKO — catalogue, commandes, promotions et paiements en un seul tableau de bord.",
     icon: "Store",
     image: PORTAL_IMAGES.seller,
     loginHref: "/sell-online",
@@ -343,8 +343,8 @@ export const PLATFORM_MODULES = [
     id: "payments",
     name: "Secure Payments",
     nameFr: "Paiements sécurisés",
-    desc: "Mobile money or your Somba wallet — pay at checkout, with refunds handled through returns and disputes.",
-    descFr: "Mobile money ou portefeuille Somba — payez à la caisse, remboursements gérés via retours et litiges.",
+    desc: "Mobile money or your KOMORIKO wallet — pay at checkout, with refunds handled through returns and disputes.",
+    descFr: "Mobile money ou portefeuille KOMORIKO — payez à la caisse, remboursements gérés via retours et litiges.",
     highlight: "Mobile money + wallet",
     highlightFr: "Mobile money + portefeuille",
     cta: "See payment options",
@@ -381,8 +381,8 @@ export const PLATFORM_MODULES = [
   },
   {
     id: "subscription",
-    name: "Sell on Somba&Teka",
-    nameFr: "Vendre sur Somba&Teka",
+    name: "Sell on KOMORIKO",
+    nameFr: "Vendre sur KOMORIKO",
     desc: "Open your store — list products, run promotions and request payouts from one seller dashboard.",
     descFr: "Ouvrez votre boutique — listez vos produits, lancez des promotions et demandez vos paiements depuis un seul tableau de bord.",
     highlight: "Seller plans",
@@ -437,8 +437,8 @@ export const PRODUCT_HERO = {
   titleFr: `Achetez malin. Livré vite.`,
   subtitle: `${BRAND.fullName} is your online marketplace — shop products from verified sellers, pay with mobile money or your wallet, and follow your delivery live.`,
   subtitleFr: `${BRAND.fullName} est votre marketplace en ligne — des produits de vendeurs vérifiés, paiement par mobile money ou portefeuille et suivi de livraison en direct.`,
-  intro: `Whether you're shopping for electronics, fashion, or everyday essentials — browse, add to cart, and get it delivered. Want to grow your business? Open a seller store on Somba&Teka and reach customers nationwide.`,
-  introFr: `Que vous cherchiez de l'électronique, de la mode ou l'essentiel du quotidien — parcourez, ajoutez au panier et recevez chez vous. Vous voulez développer votre activité ? Ouvrez une boutique vendeur sur Somba&Teka.`,
+  intro: `Whether you're shopping for electronics, fashion, or everyday essentials — browse, add to cart, and get it delivered. Want to grow your business? Open a seller store on KOMORIKO and reach customers nationwide.`,
+  introFr: `Que vous cherchiez de l'électronique, de la mode ou l'essentiel du quotidien — parcourez, ajoutez au panier et recevez chez vous. Vous voulez développer votre activité ? Ouvrez une boutique vendeur sur KOMORIKO.`,
   bullets: [
     "Products from verified sellers",
     "Live delivery tracking",
@@ -471,8 +471,8 @@ export const CONVERSION_PATHS = [
     id: "seller",
     badge: "For businesses",
     badgeFr: "Pour les entreprises",
-    title: "I want to sell on Somba&Teka",
-    titleFr: "Je veux vendre sur Somba&Teka",
+    title: "I want to sell on KOMORIKO",
+    titleFr: "Je veux vendre sur KOMORIKO",
     desc: "Open your store, list products, manage orders, and get paid — choose a seller plan that fits your business.",
     descFr: "Ouvrez votre boutique, listez vos produits, gérez les commandes et soyez payé — choisissez un plan vendeur.",
     cta: "Sell online",
@@ -484,8 +484,8 @@ export const CONVERSION_PATHS = [
     id: "staff",
     badge: "Team access",
     badgeFr: "Accès équipe",
-    title: "I'm on the Somba&Teka team",
-    titleFr: "Je fais partie de l'équipe Somba&Teka",
+    title: "I'm on the KOMORIKO team",
+    titleFr: "Je fais partie de l'équipe KOMORIKO",
     desc: "Staff and partners — sign in to your portal: admin, warehouse, rider, or seller dashboard.",
     descFr: "Équipe et partenaires — connectez-vous à votre portail : admin, entrepôt, livreur ou vendeur.",
     cta: "Staff login",
@@ -497,7 +497,7 @@ export const CONVERSION_PATHS = [
 
 export const HOW_IT_WORKS = [
   { step: "01", title: "Browse & discover", titleFr: "Parcourir et découvrir", desc: "Search by category, compare prices and reviews, and add favourites to your cart or wishlist.", descFr: "Cherchez par catégorie, comparez prix et avis, ajoutez au panier ou à la liste de souhaits." },
-  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with mobile money or your Somba wallet — an account is needed to order.", descFr: "Payez par mobile money ou avec votre portefeuille Somba — un compte est nécessaire pour commander." },
+  { step: "02", title: "Checkout securely", titleFr: "Payer en sécurité", desc: "Pay with mobile money or your KOMORIKO wallet — an account is needed to order.", descFr: "Payez par mobile money ou avec votre portefeuille KOMORIKO — un compte est nécessaire pour commander." },
   { step: "03", title: "Track your order", titleFr: "Suivre votre commande", desc: "Real-time updates from warehouse dispatch to rider delivery — know exactly when it arrives.", descFr: "Mises à jour en temps réel de l'expédition à la livraison — sachez quand ça arrive." },
   { step: "04", title: "Returns made easy", titleFr: "Retours simplifiés", desc: "Not happy? Start a return from your account — refund, replacement, or exchange in a few clicks.", descFr: "Pas satisfait ? Lancez un retour depuis votre compte — remboursement, remplacement ou échange." },
 ] as const;
@@ -512,16 +512,16 @@ export const TESTIMONIALS = [
     initials: "MD",
   },
   {
-    quote: "We listed 200 SKUs in our first week on Somba&Teka. Orders, payouts, and promotions are all in one seller dashboard — our revenue is up 40%.",
-    quoteFr: "200 références en une semaine sur Somba&Teka. Commandes, paiements et promos dans un seul tableau de bord — +40 % de revenus.",
+    quote: "We listed 200 SKUs in our first week on KOMORIKO. Orders, payouts, and promotions are all in one seller dashboard — our revenue is up 40%.",
+    quoteFr: "200 références en une semaine sur KOMORIKO. Commandes, paiements et promos dans un seul tableau de bord — +40 % de revenus.",
     name: "Ahmed Benali",
     role: "Owner, TechZone Store",
     roleFr: "Propriétaire, TechZone Store",
     initials: "AB",
   },
   {
-    quote: "Returns used to be a headache. On Somba&Teka I requested a replacement from my order page and had a new item within three days.",
-    quoteFr: "Les retours étaient compliqués. Sur Somba&Teka j'ai demandé un remplacement depuis ma commande et reçu en trois jours.",
+    quote: "Returns used to be a headache. On KOMORIKO I requested a replacement from my order page and had a new item within three days.",
+    quoteFr: "Les retours étaient compliqués. Sur KOMORIKO j'ai demandé un remplacement depuis ma commande et reçu en trois jours.",
     name: "Sophie Laurent",
     role: "Customer, Paris",
     roleFr: "Cliente, Paris",
@@ -531,8 +531,8 @@ export const TESTIMONIALS = [
 
 export const FAQ_ITEMS = [
   {
-    q: "What is Somba&Teka?",
-    qFr: "Qu'est-ce que Somba&Teka ?",
+    q: "What is KOMORIKO?",
+    qFr: "Qu'est-ce que KOMORIKO ?",
     a: `${BRAND.fullName} is an online marketplace where you can shop from verified sellers across electronics, fashion, home, beauty, and more — with fast delivery and secure payments.`,
     aFr: `${BRAND.fullName} est une marketplace en ligne où vous achetez auprès de vendeurs vérifiés — électronique, mode, maison, beauté et plus — avec livraison rapide.`,
   },
@@ -545,8 +545,8 @@ export const FAQ_ITEMS = [
   {
     q: "What payment methods are accepted?",
     qFr: "Quels moyens de paiement sont acceptés ?",
-    a: "We accept mobile money (Airtel, Orange, M-Pesa) and your Somba wallet. An account is required to place an order.",
-    aFr: "Mobile money (Airtel, Orange, M-Pesa) et portefeuille Somba. Un compte est nécessaire pour commander.",
+    a: "We accept mobile money (Airtel, Orange, M-Pesa) and your KOMORIKO wallet. An account is required to place an order.",
+    aFr: "Mobile money (Airtel, Orange, M-Pesa) et portefeuille KOMORIKO. Un compte est nécessaire pour commander.",
   },
   {
     q: "How long does delivery take?",
@@ -564,8 +564,8 @@ export const FAQ_ITEMS = [
 
 /** Flipkart-style sell-online landing — /sell-online */
 export const SELL_ONLINE_HERO = {
-  title: "Grow your business — sell online on Somba&Teka",
-  titleFr: "Développez votre activité — vendez en ligne sur Somba&Teka",
+  title: "Grow your business — sell online on KOMORIKO",
+  titleFr: "Développez votre activité — vendez en ligne sur KOMORIKO",
   subtitle: "Reach millions of shoppers, get fulfillment support, and get paid on time. List your products and start selling in as little as 24 hours.",
   subtitleFr: "Touchez des millions d'acheteurs, bénéficiez du fulfillment et soyez payé à temps. Listez vos produits et vendez en 24 h.",
   cta: "Start selling",
@@ -583,7 +583,7 @@ export const SELL_ONLINE_STATS = [
 
 export const SELL_ONLINE_WHY = [
   { icon: "Users", title: "Huge customer base", titleFr: "Large base clients", desc: "Access shoppers across France and beyond — no need to build your own traffic.", descFr: "Accédez aux acheteurs en France et au-delà — sans créer votre propre trafic." },
-  { icon: "Truck", title: "Fulfillment support", titleFr: "Support fulfillment", desc: "Warehouse sorting, dispatch, and last-mile delivery handled by Somba&Teka logistics.", descFr: "Tri entrepôt, expédition et dernier kilomètre gérés par la logistique Somba&Teka." },
+  { icon: "Truck", title: "Fulfillment support", titleFr: "Support fulfillment", desc: "Warehouse sorting, dispatch, and last-mile delivery handled by KOMORIKO logistics.", descFr: "Tri entrepôt, expédition et dernier kilomètre gérés par la logistique KOMORIKO." },
   { icon: "Wallet", title: "Timely payouts", titleFr: "Paiements à temps", desc: "Transparent commission, weekly payouts, and a full finance dashboard in your seller portal.", descFr: "Commission transparente, paiements hebdomadaires et tableau de bord finance complet." },
   { icon: "TrendingUp", title: "Growth tools", titleFr: "Outils de croissance", desc: "Promotions, flash sales, analytics, and review management to scale your store.", descFr: "Promotions, flash sales, analytics et gestion des avis pour faire grandir votre boutique." },
   { icon: "ShieldCheck", title: "Trusted marketplace", titleFr: "Marketplace de confiance", desc: "Sell on a verified platform where buyers already shop electronics, fashion, and more.", descFr: "Vendez sur une plateforme vérifiée où les acheteurs achètent déjà électronique, mode et plus." },
@@ -593,7 +593,7 @@ export const SELL_ONLINE_WHY = [
 export const SELL_ONLINE_STEPS = [
   { step: "1", title: "Create your seller account", titleFr: "Créez votre compte vendeur", desc: "Sign up at /login, complete your business profile, and choose a seller plan.", descFr: "Inscrivez-vous sur /login, complétez votre profil et choisissez un plan vendeur." },
   { step: "2", title: "List your products", titleFr: "Listez vos produits", desc: "Use the product wizard to add SKUs, images, pricing, and inventory — go live in hours.", descFr: "Utilisez l'assistant produit pour ajouter références, images, prix et stock — en ligne en quelques heures." },
-  { step: "3", title: "Receive orders", titleFr: "Recevez les commandes", desc: "Orders flow into your seller dashboard — pack, ship, or hand off to Somba&Teka fulfillment.", descFr: "Les commandes arrivent dans votre tableau de bord — emballez, expédiez ou confiez au fulfillment Somba&Teka." },
+  { step: "3", title: "Receive orders", titleFr: "Recevez les commandes", desc: "Orders flow into your seller dashboard — pack, ship, or hand off to KOMORIKO fulfillment.", descFr: "Les commandes arrivent dans votre tableau de bord — emballez, expédiez ou confiez au fulfillment KOMORIKO." },
   { step: "4", title: "Get paid", titleFr: "Soyez payé", desc: "Track earnings, request payouts, and grow with promotions and analytics.", descFr: "Suivez vos revenus, demandez des paiements et grandissez avec promos et analytics." },
 ] as const;
 
@@ -607,9 +607,9 @@ export const SELL_ONLINE_TOOLS = [
 ] as const;
 
 export const SELL_ONLINE_FAQ = [
-  { q: "Who can sell on Somba&Teka?", qFr: "Qui peut vendre sur Somba&Teka ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
+  { q: "Who can sell on KOMORIKO?", qFr: "Qui peut vendre sur KOMORIKO ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
   { q: "What are the seller fees?", qFr: "Quels sont les frais vendeur ?", a: "Monthly plans start at $49/mo (Starter). Platform commission applies per category (typically 8–15%). No hidden listing fees on Pro and Enterprise.", aFr: "Plans mensuels à partir de 49 $/mois (Starter). Commission par catégorie (8–15 % en général). Pas de frais de listing cachés sur Pro et Entreprise." },
-  { q: "How does fulfillment work?", qFr: "Comment fonctionne le fulfillment ?", a: "You can self-ship or use Somba&Teka's hybrid fulfillment — warehouse receives, sorts, and dispatches to riders for last-mile delivery.", aFr: "Expédition autonome ou fulfillment hybride Somba&Teka — entrepôt, tri et livraison dernier kilomètre." },
+  { q: "How does fulfillment work?", qFr: "Comment fonctionne le fulfillment ?", a: "You can self-ship or use KOMORIKO's hybrid fulfillment — warehouse receives, sorts, and dispatches to riders for last-mile delivery.", aFr: "Expédition autonome ou fulfillment hybride KOMORIKO — entrepôt, tri et livraison dernier kilomètre." },
   { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Payouts are processed weekly after order delivery and return window. Request payouts from your seller finance dashboard.", aFr: "Demandes de paiementmadaires après livraison et délai de retour. Demandez depuis le tableau de bord finance vendeur." },
   { q: "How fast can I go live?", qFr: "Quel délai pour être en ligne ?", a: "Most sellers list their first products within 24 hours of subscribing. Our onboarding team can help with catalog setup.", aFr: "La plupart des vendeurs listent leurs premiers produits sous 24 h après abonnement. Notre équipe aide à la mise en place du catalogue." },
 ] as const;

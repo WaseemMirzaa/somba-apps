@@ -122,7 +122,7 @@ export function toShopProduct(p: Product): ShopProduct {
     category: p.category,
     categoryFr: pickText(true, p.category, p.categoryFr),
     categoryId: p.categoryId ?? null,
-    seller: p.sellerName ?? "Somba&Teka",
+    seller: p.sellerName ?? "KOMORIKO",
     sellerId: p.sellerId,
     stock: p.stock ?? 0,
     deliveryDays: p.deliveryDays ?? 3,

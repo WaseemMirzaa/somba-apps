@@ -51,7 +51,7 @@ export default function GetAppPage() {
           </span>
 
           <h1 className="mt-5 font-[family-name:var(--font-display)] text-4xl font-extrabold leading-[1.05] tracking-tight text-balance sm:text-5xl">
-            {fr ? "Téléchargez l'app Somba&Teka" : "Get the Somba&Teka app"}
+            {fr ? "Téléchargez l'app KOMORIKO" : "Get the KOMORIKO app"}
           </h1>
 
           <p className="mt-5 max-w-xl text-lg leading-relaxed text-white/80">

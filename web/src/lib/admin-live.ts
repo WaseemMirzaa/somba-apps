@@ -389,7 +389,7 @@ export const DISPUTE_STAGE_LABEL: Record<string, L2> = {
   seller_replied: { en: "Seller replied", fr: "Le vendeur a répondu" },
   seller_rejected: { en: "Seller said no", fr: "Refusé par le vendeur" },
   seller_timeout: { en: "Seller did not answer", fr: "Le vendeur n'a pas répondu" },
-  escalated: { en: "With Somba support", fr: "Chez le support Somba" },
+  escalated: { en: "With KOMORIKO support", fr: "Chez le support KOMORIKO" },
   approved: { en: "Approved, pickup being planned", fr: "Approuvé, collecte en préparation" },
   pickup: { en: "Pickup on its way", fr: "Collecte en cours" },
   received: { en: "Goods at the warehouse", fr: "Marchandise à l'entrepôt" },
@@ -428,7 +428,7 @@ export const ITEM_CONDITION_LABEL: Record<string, L2> = {
   damaged: { en: "Damaged", fr: "Endommagé" },
   unsellable: { en: "Unsellable", fr: "Invendable" },
 };
-/** Stages in which nobody has decided a return yet (Somba support may approve or refuse). */
+/** Stages in which nobody has decided a return yet (KOMORIKO support may approve or refuse). */
 export const RETURN_UNDECIDED = ["awaiting_seller", "seller_rejected", "seller_timeout", "escalated"];
 export const lab = (m: Record<string, L2>, key: string | null | undefined, fr: boolean) => {
   const l = key ? m[key] : undefined;

@@ -1,5 +1,5 @@
-<title>Somba&amp;Teka Architecture</title>
-<meta name="description" content="Architecture, ERD, data dictionary, flows, API catalogue, client apps and gap analysis of the Somba&amp;Teka marketplace.">
+<title>KOMORIKO Architecture</title>
+<meta name="description" content="Architecture, ERD, data dictionary, flows, API catalogue, client apps and gap analysis of the KOMORIKO marketplace.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
@@ -101,7 +101,7 @@ main li { margin-block: 0.2rem; }
 
 <div class="shell">
   <aside class="rail">
-    <div class="brand">Somba&amp;Teka</div>
+    <div class="brand">KOMORIKO</div>
     <div class="sub">System architecture · Oct 2026</div>
     <details id="toc" open>
       <summary>Contents</summary>
@@ -109,7 +109,7 @@ main li { margin-block: 0.2rem; }
     </details>
   </aside>
   <main>
-<h1 id="sombateka--system-architecture">Somba&amp;Teka — System Architecture</h1>
+<h1 id="sombateka--system-architecture">KOMORIKO — System Architecture</h1>
 <div class="table-wrap"><table><tbody><tr>
 <td><strong>Document</strong></td>
 <td>Architecture, data model (ERD), flows, API, client apps, gap analysis and recommendations</td>
@@ -138,7 +138,7 @@ main li { margin-block: 0.2rem; }
 </ul>
 </blockquote>
 <h2 id="1-executive-summary"><a class="anchor" href="#1-executive-summary" aria-hidden="true">#</a>1. Executive summary</h2>
-<p>Somba&amp;Teka is a multi-vendor marketplace for Kinshasa / DRC (and Paris), with a customer app, a rider app, and web portals for customers, sellers, warehouse staff, riders and administrators. Everything talks to <strong>one NestJS backend</strong> that is <strong>WebSocket-first</strong>: after a one-shot REST login, every read, write and live update goes through a single authenticated Socket.IO connection. REST is kept only for authentication, image upload, the payment webhook and the health check.</p>
+<p>KOMORIKO is a multi-vendor marketplace for Kinshasa / DRC (and Paris), with a customer app, a rider app, and web portals for customers, sellers, warehouse staff, riders and administrators. Everything talks to <strong>one NestJS backend</strong> that is <strong>WebSocket-first</strong>: after a one-shot REST login, every read, write and live update goes through a single authenticated Socket.IO connection. REST is kept only for authentication, image upload, the payment webhook and the health check.</p>
 <h3 id="11-the-system-in-numbers"><a class="anchor" href="#11-the-system-in-numbers" aria-hidden="true">#</a>1.1 The system in numbers</h3>
 <div class="table-wrap"><table><thead><tr>
 <th>Item</th>

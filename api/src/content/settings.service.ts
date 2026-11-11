@@ -14,7 +14,7 @@ import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config'
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
 export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'] as const;
 /**
- * How shoppers reach Somba from Help (support phone, e-mail and a WhatsApp number). Blank = not offered. Public like
+ * How shoppers reach KOMORIKO from Help (support phone, e-mail and a WhatsApp number). Blank = not offered. Public like
  * the rest of the shopper settings; written by admins only (see `WRITABLE`).
  */
 export const CONTACT_SETTINGS = ['supportPhone', 'supportEmail', 'supportWhatsapp'] as const;

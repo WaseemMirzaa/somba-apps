@@ -31,12 +31,12 @@ and builds the API and the web (a few minutes), restarts both under pm2, the API
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/waseemmirzaa/somba-apps/main/deploy/droplet-deploy.sh -o deploy.sh
-DOMAIN=107.170.116.169 ADMIN_EMAIL=you@example.com SSL=0 bash deploy.sh
+DOMAIN=komoriko.com ADMIN_EMAIL=you@example.com bash deploy.sh
 ```
 
 | Variable | Meaning |
 |---|---|
-| `DOMAIN` (required) | the droplet IP, or a hostname pointing at it |
+| `DOMAIN` (required) | the hostname pointing at the droplet (`komoriko.com`), or the droplet IP |
 | `ADMIN_EMAIL` (required) | login of the first super-admin (an existing admin is left unchanged) |
 | `SSL` | `1` = Let's Encrypt certificate (hostname only). Default `0` for an IP, `1` for a hostname. An IP with `SSL=1` is refused |
 | `BRANCH` | branch to deploy (default `main`). Use it to test a branch: `BRANCH=my-branch DOMAIN=... bash deploy.sh` |
@@ -53,7 +53,7 @@ Use `set-secret.sh` (section 6) instead for API keys: it needs no redeploy.
 ## 2. Check that it works
 
 ```bash
-curl -fsS http://107.170.116.169/api/v1/health          # anywhere; expect {"status":"ok","db":"mysql",...}
+curl -fsS https://komoriko.com/api/v1/health          # anywhere; expect {"status":"ok","db":"mysql",...}
 sudo -u somba pm2 status                                 # root: somba-api and somba-web must both be "online"
 sudo -u somba pm2 logs somba-api --lines 100             # root: Ctrl+C to stop following
 sudo -u somba pm2 logs somba-web --lines 100
@@ -94,7 +94,7 @@ Express delivery is off too, so the express demo orders of store C are skipped. 
 The two flags can be given together.
 
 **While the demo is installed, real visitors can see it** (stores, products, notices to real admins), and
-`admin.super@demo.sombateka.test` can do everything. Remove it before real customers arrive (section 5).
+`admin.super@demo.komoriko.test` can do everything. Remove it before real customers arrive (section 5).
 
 ## 4. Credentials
 
@@ -102,11 +102,11 @@ The two flags can be given together.
 |---|---|
 | Your real admin login | the `ADMIN_EMAIL` you passed. Password: `ADMIN_PASSWORD` in `/etc/somba/secrets.env`; read it with `grep '^ADMIN_PASSWORD=' /etc/somba/secrets.env` (root). It was also printed once by the first deploy. If you changed it in the app, the file is stale |
 | Demo accounts, passwords, two-factor keys | `cat /etc/somba/demo-credentials.txt` (root, mode 600, never in git or on screen by itself) |
-| Two-factor code of a **demo** account (admins and store owners A, B, D, E, F, G, H) | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.sombateka.test` (root; replace the e-mail; the code lasts about 30 seconds). Or add that account's `totp_key` as a setup key in an authenticator app. Each `recovery_codes` entry works once instead of a code |
+| Two-factor code of a **demo** account (admins and store owners A, B, D, E, F, G, H) | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.komoriko.test` (root; replace the e-mail; the code lasts about 30 seconds). Or add that account's `totp_key` as a setup key in an authenticator app. Each `recovery_codes` entry works once instead of a code |
 | Two-factor code of your **real** admin | not available from any script: use the authenticator app you enrolled (the script only reads demo accounts) |
 | List, rename or remove admin accounts | `cd /opt/somba/api && sudo -u somba npm run manage:admin:prod -- list` (root). See `docs/DEPLOYMENT.md` step 6 for `update-email` and `remove` |
 
-Sign in at `http://107.170.116.169/login` (stores, admins, warehouse and riders use the web portal; customers use the app or `/shop`).
+Sign in at `https://komoriko.com/login` (stores, admins, warehouse and riders use the web portal; customers use the app or `/shop`).
 
 ## 5. Reset or remove the demo
 
@@ -119,7 +119,7 @@ bash /opt/somba/deploy/seed-demo.sh remove --yes         # removes it (and /etc/
 ```
 
 To refresh the dates (the "delivered 2 days ago" order ages), run `remove --yes`, then seed again. Removal finds the demo only through
-accounts ending in `@demo.sombateka.test`; it refuses, and deletes nothing, while a real order still contains a demo product or
+accounts ending in `@demo.komoriko.test`; it refuses, and deletes nothing, while a real order still contains a demo product or
 uses the demo warehouse or a demo rider.
 
 ## 6. Keys: what each one turns on and where it goes
@@ -150,7 +150,7 @@ table below are copied into the build.
 | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` | address map and pin on the web | optional (without it, manual address entry) | Web: `set-secret.sh --web NAME`, then redeploy | Maps JavaScript + Places + Geocoding APIs; restrict the key by HTTP referrer to the site's address |
 | `GOOGLE_MAPS_API_KEY` (secret) | map, place search and pin in the customer and rider **apps** | optional (without it, "Use my current position") | GitHub **secret** `GOOGLE_MAPS_API_KEY` | Maps SDK for Android/iOS, Places API (New), Geocoding API. The native SDK also needs it in `android/local.properties` for local builds, see `mobile/README.md` |
 | `FIREBASE_API_KEY` `FIREBASE_PROJECT_ID` `FIREBASE_SENDER_ID` `FIREBASE_ANDROID_APP_ID` `FIREBASE_IOS_APP_ID` `FIREBASE_IOS_BUNDLE_ID` (secrets) | push in the customer and rider apps | optional | GitHub **secrets** with the same names | Firebase console > Project settings > your Android/iOS app. **APNs (iPhones):** Apple Developer > Keys > new key with Apple Push Notifications service, download the `.p8`, then Firebase console > Project settings > Cloud Messaging > Apple app configuration > upload it with the Key ID and Team ID. Details: `docs/MOBILE-PUSH.md` |
-| `LIVE_API_URL` (variable) | the server address baked into both APKs (`API_URL` and `SOCKET_URL`) | required for an APK that reaches this server | GitHub **variable** `LIVE_API_URL`, e.g. `http://107.170.116.169` | Plain HTTP is allowed by the apps only for this IP (`network_security_config.xml`); any other host needs HTTPS. Without the variable the workflows default to `http://107.170.116.169` |
+| `LIVE_API_URL` (variable) | the server address baked into both APKs (`API_URL` and `SOCKET_URL`) | required for an APK that reaches this server | GitHub **variable** `LIVE_API_URL`, e.g. `https://komoriko.com` | Plain HTTP is allowed by the apps only for this IP (`network_security_config.xml`); any other host needs HTTPS. Without the variable the workflows default to `https://komoriko.com` |
 | `MM_PROVIDER` | which mobile-money adapter: `none` (default), `manual`, `pawapay`. `sandbox` is refused in production | optional; without it only the wallet works | API: `set-secret.sh MM_PROVIDER` | see section 7 |
 | `PAWAPAY_API_TOKEN` `PAWAPAY_BASE_URL` `PAWAPAY_CURRENCY` `PAWAPAY_FX_RATE` `PAWAPAY_VERIFY_SIGNATURES` | mobile-money collections, refunds and payouts through pawaPay | needed when `MM_PROVIDER=pawapay` (no token = mobile money stays off) | API: `set-secret.sh NAME` | pawaPay dashboard: API token; set the **deposit, refund and payout callback URL** to `https://<your-host>/api/v1/payments/webhook/pawapay`; turn on *Signed callbacks* before `PAWAPAY_VERIFY_SIGNATURES=true`. Base URL `https://api.sandbox.pawapay.io` (default) or `https://api.pawapay.io` (live). `docs/PAYMENTS-PAWAPAY.md` |
 | `MM_WEBHOOK_SECRET` | signature secret for a **non-pawaPay** aggregator webhook | optional | API: `set-secret.sh MM_WEBHOOK_SECRET` | give the aggregator `https://<your-host>/api/v1/payments/webhook/mobile-money` |
@@ -159,9 +159,9 @@ table below are copied into the build.
 | `PAYOUT_CLEARANCE_HOURS` | hours a delivered sale ages before a seller can be paid (default 48 in production) | optional | API: `set-secret.sh PAYOUT_CLEARANCE_HOURS` | the admin Settings value "Clearance hours" overrides it |
 | `REDIS_URL` | shares realtime rooms between several API processes | optional; not needed with one `somba-api` process, and Redis is not installed by the deploy | API: `set-secret.sh REDIS_URL` | `redis://host:6379` |
 
-Card and webhook endpoints need a public HTTPS address. This server is on plain HTTP at an IP (`SSL=0`), so before real
-payments point a hostname at the droplet and deploy with `SSL=1` (section 1); then update `LIVE_API_URL` and rebuild the APKs.
-(Stripe's rules on HTTP endpoints in test mode were not checked here.)
+Card and webhook endpoints need a public HTTPS address. `komoriko.com` points at the droplet, so the deploy in section 1 gets a
+Let's Encrypt certificate and redirects HTTP to HTTPS (the DNS A record must already point at the droplet when you run it). The
+APK workflows default to `https://komoriko.com`.
 
 ## 7. Switching on cash on delivery and mobile money
 
@@ -204,10 +204,10 @@ existing ones sit in the same page under **Checkout and delivery** (`deliveryBas
 
 ## 9. Install the test APKs
 
-1. On GitHub: **Releases** > the latest `customer-apk-v...` (customer) or the rider release > download `somba-customer.apk`
+1. On GitHub: **Releases** > the latest `customer-apk-v...` (customer) or the rider release > download `komoriko-customer.apk`
    (universal) or the rider APK.
 2. On the Android phone open the file and allow "install unknown apps" for the browser or file manager when asked.
-3. Sign in with a demo customer from `/etc/somba/demo-credentials.txt` (for example `customer.full@demo.sombateka.test`).
+3. Sign in with a demo customer from `/etc/somba/demo-credentials.txt` (for example `customer.full@demo.komoriko.test`).
 4. Remove a debug-signed build before installing a release-signed one (different signatures do not update over each other).
 
 More: `mobile/README.md` (CI/CD section), `docs/ANDROID-RELEASE-SIGNING.md`. iPhones need TestFlight with the owner's Apple account
@@ -217,13 +217,13 @@ More: `mobile/README.md` (CI/CD section), `docs/ANDROID-RELEASE-SIGNING.md`. iPh
 
 | Symptom | What to do (root) |
 |---|---|
-| Deploy stops with "Run as root" / "targets Ubuntu" / "SSL=1 needs a hostname" | use `sudo -i`; Ubuntu only; add `SSL=0` for an IP |
+| Deploy stops with "Run as root" / "targets Ubuntu" / "SSL=1 needs a hostname" | use `sudo -i`; Ubuntu only; add `SSL=0` for an IP; with a hostname, check its DNS A record points at the droplet (certbot needs it) |
 | Deploy ends "API did not become healthy" | `sudo -u somba pm2 logs somba-api --lines 200`. "Refusing to start" lists the exact unsafe setting (for example `TRANSLATE_PROVIDER=fake` or `MM_PROVIDER=sandbox` in `/etc/somba/api.extra.env`): fix it with `set-secret.sh` or by editing that file, then deploy again |
 | `set-secret.sh` says `/etc/somba/api.extra.env does not exist` | run the deploy (section 1) first |
 | `set-secret.sh` says "could not reload the API" | `sudo -u somba -H pm2 reload somba-api --update-env` |
 | A web key change has no effect | `NEXT_PUBLIC_*` is baked at build time: run the deploy again (section 1) |
 | `seed-demo.sh` says "not found: deploy first" or the seed command is missing | run section 1 so `/opt/somba/api/dist` is built from a `main` that has the seed |
-| Nothing at `http://107.170.116.169` | `sudo -u somba pm2 status`, `nginx -t`, `ufw status`, then the log commands in section 2 |
+| Nothing at `https://komoriko.com` | `sudo -u somba pm2 status`, `nginx -t`, `ufw status`, then the log commands in section 2 |
 | Seed or remove refuses | read its message: it names the real orders or settings in the way |
 | "Phone code not sent" for a demo customer | SMS needs the Twilio keys and a real number on the account; e-mail needs SMTP (section 6) |
 | Login fails for everyone | run the deploy again (section 1): its `bootstrap:prod` step creates the admin when none exists. To change or replace an admin, see `docs/DEPLOYMENT.md` step 6 (`manage:admin:prod`) |

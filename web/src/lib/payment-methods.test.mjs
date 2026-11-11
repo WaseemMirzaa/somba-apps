@@ -19,9 +19,9 @@ test("every method the API can carry has a label in both languages", () => {
   }
 });
 
-test("the French order page names the wallet 'Portefeuille Somba' (bug 3)", () => {
-  assert.equal(paymentMethodLabel("wallet", true), "Portefeuille Somba");
-  assert.equal(paymentMethodLabel("wallet", false), "Somba wallet");
+test("the French order page names the wallet 'Portefeuille KOMORIKO' (bug 3)", () => {
+  assert.equal(paymentMethodLabel("wallet", true), "Portefeuille KOMORIKO");
+  assert.equal(paymentMethodLabel("wallet", false), "KOMORIKO wallet");
 });
 
 test("each method is translated, not only cash on delivery and card", () => {
@@ -39,7 +39,7 @@ test("older display names read as the method they stand for", () => {
   assert.equal(paymentMethodId("COD"), "cod");
   assert.equal(paymentMethodId("Card"), "stripe_card");
   assert.equal(paymentMethodId("Wallet"), "wallet");
-  assert.equal(paymentMethodLabel("Wallet", true), "Portefeuille Somba");
+  assert.equal(paymentMethodLabel("Wallet", true), "Portefeuille KOMORIKO");
   assert.equal(paymentMethodLabel("Card", true), "Carte");
 });
 

@@ -1,5 +1,5 @@
-<title>Somba&amp;Teka User Flows</title>
-<meta name="description" content="Every user, app, screen, option and flow of the Somba&amp;Teka marketplace, with flowcharts.">
+<title>KOMORIKO User Flows</title>
+<meta name="description" content="Every user, app, screen, option and flow of the KOMORIKO marketplace, with flowcharts.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&amp;family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
@@ -101,7 +101,7 @@ main li { margin-block: 0.2rem; }
 
 <div class="shell">
   <aside class="rail">
-    <div class="brand">Somba&amp;Teka</div>
+    <div class="brand">KOMORIKO</div>
     <div class="sub">Users, apps &amp; flows · Oct 2026</div>
     <details id="toc" open>
       <summary>Contents</summary>
@@ -109,7 +109,7 @@ main li { margin-block: 0.2rem; }
     </details>
   </aside>
   <main>
-<h1 id="sombateka--users-apps-and-flows">Somba&amp;Teka — Users, Apps and Flows</h1>
+<h1 id="sombateka--users-apps-and-flows">KOMORIKO — Users, Apps and Flows</h1>
 <div class="table-wrap"><table><tbody><tr>
 <td><strong>Document</strong></td>
 <td>Every user type, every app and portal, every screen and the options on it, and a flowchart for every major and minor flow</td>
@@ -203,7 +203,7 @@ main li { margin-block: 0.2rem; }
     WP["🌐 Warehouse portal - /warehouse"]
     AP["🌐 Admin portal - /admin"]
   end
-  API[("Somba&amp;Teka API&lt;br/&gt;one live connection per signed-in user")]
+  API[("KOMORIKO API&lt;br/&gt;one live connection per signed-in user")]
   G --&gt; CM &amp; WS
   C --&gt; CM &amp; WS
   S --&gt; SP &amp; WS
@@ -1004,7 +1004,7 @@ main li { margin-block: 0.2rem; }
 </thead><tbody><tr>
 <td><code>/</code> home</td>
 <td>Demo products and categories</td>
-<td>Search, Browse products, Sell on Somba&amp;Teka, Shop now (→ app stores), FAQ, seller plans</td>
+<td>Search, Browse products, Sell on KOMORIKO, Shop now (→ app stores), FAQ, seller plans</td>
 <td>MOCK</td>
 </tr>
 <tr>
@@ -2357,7 +2357,7 @@ main li { margin-block: 0.2rem; }
   RR -- yes --&gt; CN[Live connection → ready → load tasks, work stats, notifications] --&gt; D([Deliveries])
   RR -- "401/403 or other role" --&gt; L
   L --&gt; LP["POST /auth/login"] --&gt; LR{Result}
-  LR -- "not a rider" --&gt; LE[This app is for Somba&amp;Teka riders] --&gt; L
+  LR -- "not a rider" --&gt; LE[This app is for KOMORIKO riders] --&gt; L
   LR -- "wrong password / 429 / offline" --&gt; LE2[Message under the form] --&gt; L
   LR -- ok --&gt; CN
   D -.-&gt; SE{{Suspended or role changed by admin}} -.-&gt; L</pre></div>

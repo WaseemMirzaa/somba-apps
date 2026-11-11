@@ -42,7 +42,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: const Icon(Icons.two_wheeler_rounded, color: AppColors.primary, size: 52),
             ),
             const SizedBox(height: 22),
-            const Text('Somba&Teka',
+            const Text('KOMORIKO',
                 style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w800, fontFamily: 'PlusJakartaSans', letterSpacing: -0.6)),
             const SizedBox(height: 6),
             Text(Strings.of(context).splashSubtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600)),

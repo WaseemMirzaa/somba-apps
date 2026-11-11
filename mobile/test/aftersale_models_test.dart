@@ -187,8 +187,8 @@ void main() {
           expect(stageLabel(lang, d), isNotEmpty);
         }
       }
-      expect(stageBanner(en, DisputeView.fromJson(disputeJson(stage: 'escalated'))).title, 'With Somba support');
-      expect(stageBanner(fr, DisputeView.fromJson(disputeJson(stage: 'escalated'))).title, 'Chez le support Somba');
+      expect(stageBanner(en, DisputeView.fromJson(disputeJson(stage: 'escalated'))).title, 'With KOMORIKO support');
+      expect(stageBanner(fr, DisputeView.fromJson(disputeJson(stage: 'escalated'))).title, 'Chez le support KOMORIKO');
     });
 
     test('the seller deadline is shown, and a passed one says so', () {
@@ -269,11 +269,11 @@ void main() {
       'Choose how many of each item to return.',
       'An item appears twice in the request.',
       'One of the items is not on this order.',
-      'The response time has passed; Somba support decides now.',
+      'The response time has passed; KOMORIKO support decides now.',
       'This request was already handled.',
       'This request was just updated by someone else. Refresh and try again.',
       'Wait for the seller to answer, or for the response time to pass.',
-      'Only returns can be escalated; a dispute is already with Somba support.',
+      'Only returns can be escalated; a dispute is already with KOMORIKO support.',
       'It is too late to cancel: the return is already on its way.',
       'This request is closed.',
       'Write a message first.',

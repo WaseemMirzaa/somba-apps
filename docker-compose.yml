@@ -1,4 +1,4 @@
-# Somba&Teka — full local stack (MySQL + API + Web).
+# KOMORIKO — full local stack (MySQL + API + Web).
 #
 #   docker compose up --build
 #   docker compose exec -e I_UNDERSTAND_THIS_WIPES_EVERYTHING=1 api npm run seed   # first run: create demo data

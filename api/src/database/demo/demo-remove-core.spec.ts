@@ -133,12 +133,12 @@ describe('demo removal', () => {
     );
 
     const dCust = await user(
-      'customer.full@demo.sombateka.test',
+      'customer.full@demo.komoriko.test',
       'customer',
       'Demo Customer',
     );
     const dOwner = await user(
-      'seller.a@demo.sombateka.test',
+      'seller.a@demo.komoriko.test',
       'seller',
       'Demo Owner',
     );
@@ -400,6 +400,34 @@ describe('demo removal', () => {
     });
   });
 
+  it('also removes an account still on the legacy demo domain (seeded before the rename to KOMORIKO)', async () => {
+    await user('boss@company.com', 'admin', 'Boss');
+    const old = await user(
+      'customer.full@demo.sombateka.test',
+      'customer',
+      'Old Demo Customer',
+    );
+    await ds.getRepository(WalletTransaction).save(
+      ds.getRepository(WalletTransaction).create({
+        userId: old.id,
+        type: 'topup',
+        amount: 5,
+        balance: 5,
+        description: 'demo',
+      }),
+    );
+    const plan = await planRemoval(ds);
+    expect(plan.userIds).toEqual([old.id]);
+    const res = await removeDemo(ds, {
+      yes: true,
+      uploadDir: dirs.up,
+      privateDir: dirs.priv,
+    });
+    expect(res.blockers).toEqual([]);
+    expect(await ds.getRepository(User).count()).toBe(1); // only the real admin is left
+    expect(await ds.getRepository(WalletTransaction).count()).toBe(0);
+  });
+
   it('says there is nothing to do on a database without demo data', async () => {
     await user('boss@company.com', 'admin', 'Boss');
     const res = await removeDemo(ds, {
@@ -415,7 +443,7 @@ describe('demo removal', () => {
     it('refuses, and deletes nothing, when a real order has a delivery assigned to a demo rider', async () => {
       const w = await world();
       const rider = await user(
-        'rider@demo.sombateka.test',
+        'rider@demo.komoriko.test',
         'rider',
         'Demo Rider',
       );
@@ -443,7 +471,7 @@ describe('demo removal', () => {
     it('refuses when a batch of a demo rider holds a parcel of a real order', async () => {
       const w = await world();
       const rider = await user(
-        'rider@demo.sombateka.test',
+        'rider@demo.komoriko.test',
         'rider',
         'Demo Rider',
       );
@@ -474,7 +502,7 @@ describe('demo removal', () => {
     it('removes a batch of a demo rider that holds only demo parcels', async () => {
       const w = await world();
       const rider = await user(
-        'rider@demo.sombateka.test',
+        'rider@demo.komoriko.test',
         'rider',
         'Demo Rider',
       );

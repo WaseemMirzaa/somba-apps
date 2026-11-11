@@ -10,7 +10,7 @@ import 'aftersale_request.dart';
 import 'aftersale_widgets.dart';
 
 /// Report a problem with an order (a dispute, not a return): missing, damaged or wrong item, or not received.
-/// The seller answers first; Somba support decides if needed. One open dispute per order (the server says so).
+/// The seller answers first; KOMORIKO support decides if needed. One open dispute per order (the server says so).
 class DisputeFormScreen extends StatefulWidget {
   final Locale locale;
   final OrderDto order;

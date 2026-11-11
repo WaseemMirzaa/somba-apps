@@ -32,6 +32,7 @@ import { sellerContext } from '../sellers/seller-context';
 import { newRecoveryCodes, hashRecovery, newTotpSecret } from '../auth/totp';
 import {
   CredentialEntry,
+  DEMO_DOMAIN,
   DEMO_HUB_NAME,
   demoEmail,
   log,
@@ -44,6 +45,7 @@ import type { DemoAccount } from './demo/demo-accounts';
 import { DEMO_PRODUCTS, DEMO_STORES } from './demo/demo-catalog';
 import type { DemoStore } from './demo/demo-catalog';
 import { DemoImages } from './demo/demo-images';
+import { renameLegacyDemoEmails } from './demo/demo-legacy';
 import { seedCommerce } from './demo/demo-commerce';
 import { seedEngagement } from './demo/demo-engagement';
 import { seedAdminQueues } from './demo/demo-admin';
@@ -137,6 +139,15 @@ async function main(app: INestApplicationContext) {
   const supplied = process.env.DEMO_PASSWORD;
   if (supplied !== undefined && supplied.length < 12)
     throw new Error('DEMO_PASSWORD must be at least 12 characters.');
+
+  // A server seeded before the rename to KOMORIKO keeps one set of accounts: move them to the new demo domain first.
+  const moved = await renameLegacyDemoEmails(ds);
+  if (moved.renamed || moved.invitations)
+    log(
+      `• renamed ${moved.renamed} demo account(s) and ${moved.invitations} team invitation(s) to @${DEMO_DOMAIN}`,
+    );
+  for (const e of moved.skipped)
+    log(`! ${e} was not renamed: the new address already exists.`);
 
   const withCod =
     process.env.DEMO_WITH_COD === '1' || process.argv.includes('--with-cod');
@@ -395,9 +406,9 @@ async function main(app: INestApplicationContext) {
     credFile,
     [...credentials.values()],
     [
-      'Somba&Teka DEMO credentials. Treat this file as a secret (it is root-only on a server).',
+      'KOMORIKO DEMO credentials. Treat this file as a secret (it is root-only on a server).',
       'Customers and store owners share one password; staff (admins, warehouse, riders) share another. Hand out only the first kind.',
-      `Written ${new Date().toISOString()}. Every demo account uses the e-mail domain @${'demo.sombateka.test'}.`,
+      `Written ${new Date().toISOString()}. Every demo account uses the e-mail domain @${DEMO_DOMAIN}.`,
       'totp_key = the key to add to an authenticator app (Google Authenticator, 1Password...): "Enter a setup key", time based, 6 digits.',
       'recovery_codes = one-time codes that work instead of an app code.',
       'A password shown as (unknown) belongs to an account created in an earlier run whose file was lost: re-run with DEMO_RESET_PASSWORDS=1.',
@@ -634,7 +645,7 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
       returnsPolicyFr:
         'Les retours sont acceptés dans les 7 jours suivant la livraison pour les articles non utilisés dans leur emballage d’origine. Les produits alimentaires et de beauté doivent être non ouverts.',
       shippingPolicy:
-        'We pack every order within one working day and hand it to the Somba&Teka warehouse in Gombe.',
+        'We pack every order within one working day and hand it to the KOMORIKO warehouse in Gombe.',
     } as never);
     await storefront.setGoals(A, { revenueUsd: 2000, orders: 60, rating: 4.5 });
     await storefront.setPayoutAccount(A, {

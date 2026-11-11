@@ -258,7 +258,7 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
       user.id,
       'cashback',
       Math.round(amount * 0.3),
-      'Welcome credit from Somba&Teka (demo)',
+      'Welcome credit from KOMORIKO (demo)',
     );
     await ds.query(
       'UPDATE wallet_transactions SET createdAt = ? WHERE id = ?',

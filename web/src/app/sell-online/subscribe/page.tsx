@@ -29,8 +29,8 @@ function SubscribeContent() {
           </h1>
           <p className="mt-2 text-slate-600">
             {fr
-              ? "Payez avec votre portefeuille Somba (activation immédiate) ou en Mobile Money (vous approuvez sur votre téléphone)."
-              : "Pay with your Somba wallet (active immediately) or with Mobile Money (you approve on your phone)."}
+              ? "Payez avec votre portefeuille KOMORIKO (activation immédiate) ou en Mobile Money (vous approuvez sur votre téléphone)."
+              : "Pay with your KOMORIKO wallet (active immediately) or with Mobile Money (you approve on your phone)."}
           </p>
         </div>
         <PlanCheckout preselect={preselect} />

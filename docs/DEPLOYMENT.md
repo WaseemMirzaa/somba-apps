@@ -1,4 +1,4 @@
-# Somba&Teka — DigitalOcean Deployment (from scratch)
+# KOMORIKO — DigitalOcean Deployment (from scratch)
 
 End-to-end guide to run the **API (NestJS + MySQL + Socket.IO)** and the
 **Web portal (Next.js — customer, seller, admin, warehouse, rider)** on a single
@@ -502,7 +502,7 @@ numbers you have verified in the console and adds a "trial" prefix). Sending cos
 Twilio. To try it with your own phone, give the account your own number first.
 
 **Sender for the DRC: you do not need to buy a number.** Twilio's own [guidelines for the DRC](https://www.twilio.com/guidelines/cd/sms)
-recommend an alphanumeric sender name (for example `Somba`; avoid generic names such as INFO, Verify or Notify), say that
+recommend an alphanumeric sender name (for example `KOMORIKO`; avoid generic names such as INFO, Verify or Notify), say that
 messages from a numeric sender are not delivered to Airtel subscribers, and say two-way SMS is not supported there (one-way codes
 do not need it). Put the name in `TWILIO_FROM`; no Messaging Service is required. Twilio's page lists no registration for sender
 names, but another source says Vodacom wants one: ask Twilio support to confirm, then send a test code to a Vodacom and an Airtel
@@ -526,7 +526,7 @@ The API sends e-mail over SMTP (nodemailer), so SendGrid works through its SMTP 
 | `SMTP_PORT` | `587` (also accepted: 465, 2525, 25; the API uses TLS directly only on 465 and STARTTLS otherwise) |
 | `SMTP_USER` | the word `apikey`, exactly |
 | `SMTP_PASS` | the API key (`SG.…`) |
-| `MAIL_FROM` | the verified address, as `no-reply@yourdomain.com` or `Somba&Teka <no-reply@yourdomain.com>` |
+| `MAIL_FROM` | the verified address, as `no-reply@yourdomain.com` or `KOMORIKO <no-reply@yourdomain.com>` |
 
 Set them on the server, as root. The same tool as for Twilio checks each value, writes both env files, reloads the API and shows only
 the last four characters of the password. It warns, without refusing, when a SendGrid host is used with a user other than `apikey`

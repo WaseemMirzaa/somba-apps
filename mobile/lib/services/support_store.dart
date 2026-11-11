@@ -18,7 +18,7 @@ class TicketMessage {
   final String from;
   final String fromId;
 
-  /// The sender's role: `customer`, or an `admin…` role for Somba support staff.
+  /// The sender's role: `customer`, or an `admin…` role for KOMORIKO support staff.
   final String role;
   final String text;
   final DateTime? at;

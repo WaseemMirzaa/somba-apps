@@ -58,7 +58,7 @@ Project **SOMBA ET TEKA** (`somba-et-teka`, number 30958127282) has five apps re
 | Customer · iOS `com.somba.sombaCustomer` | `1:30958127282:ios:99c4b98305ef690e7ae1ab` | `mobile/ios/Runner/GoogleService-Info.plist` |
 | Rider · Android `com.somba.somba_rider` | `1:30958127282:android:a46529d15e1d7a407ae1ab` | `rider-app/android/app/google-services.json` |
 | Rider · iOS `com.somba.sombaRider` | `1:30958127282:ios:6a83654c548d49777ae1ab` | `rider-app/ios/Runner/GoogleService-Info.plist` |
-| Web portals ("Somba portals") | `1:30958127282:web:a9cd90ad8b03dd297ae1ab` | `web/.env.local` (`NEXT_PUBLIC_FIREBASE_*`) |
+| Web portals ("KOMORIKO portals") | `1:30958127282:web:a9cd90ad8b03dd297ae1ab` | `web/.env.local` (`NEXT_PUBLIC_FIREBASE_*`) |
 
 To download the files again on another machine (after `firebase login`): `firebase apps:sdkconfig ANDROID <app id> --project somba-et-teka -o <path>` (or `IOS`, `WEB`).
 

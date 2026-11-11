@@ -11,7 +11,7 @@ void main() {
   testWidgets('boots through the splash to a real sign-in (no demo credentials)', (tester) async {
     await tester.pumpWidget(const SombaRiderApp());
     await tester.pump();
-    expect(find.text('Somba&Teka'), findsOneWidget);
+    expect(find.text('KOMORIKO'), findsOneWidget);
 
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();

@@ -374,7 +374,7 @@ export const DEMO_PRODUCTS: DemoProduct[] = [
     pictures: 4,
     weightGrams: 230,
     prepDays: 1,
-    brand: 'Somba Tech',
+    brand: 'KOMORIKO Tech',
     look: 'A generic modern smartphone (no visible brand logo or readable brand), front/back/angled/in hand. Four different photos.',
     variants: [{ name: 'Colour', options: ['Black', 'Blue'] }],
     variantStock: { 'Colour: Black': 5, 'Colour: Blue': 3 },
@@ -951,7 +951,7 @@ export const PINS = {
 export const DEMO_STORES: DemoStore[] = [
   {
     key: 'A',
-    email: 'seller.a@demo.sombateka.test',
+    email: 'seller.a@demo.komoriko.test',
     ownerName: 'Odette Kalala',
     phone: '+243 900 000 201',
     storeName: 'Maison Kinshasa',
@@ -973,7 +973,7 @@ export const DEMO_STORES: DemoStore[] = [
   },
   {
     key: 'B',
-    email: 'seller.b@demo.sombateka.test',
+    email: 'seller.b@demo.komoriko.test',
     ownerName: 'Jacques Mwamba',
     phone: '+243 900 000 202',
     storeName: 'Limete Grossiste',
@@ -994,7 +994,7 @@ export const DEMO_STORES: DemoStore[] = [
   },
   {
     key: 'C',
-    email: 'seller.c@demo.sombateka.test',
+    email: 'seller.c@demo.komoriko.test',
     ownerName: 'Prisca Lunda',
     phone: '+243 900 000 203',
     storeName: 'Ndolo Électro',
@@ -1013,7 +1013,7 @@ export const DEMO_STORES: DemoStore[] = [
   },
   {
     key: 'D',
-    email: 'seller.d@demo.sombateka.test',
+    email: 'seller.d@demo.komoriko.test',
     ownerName: 'Fiston Mbala',
     phone: '+243 900 000 204',
     storeName: 'Bandal Textiles',
@@ -1028,7 +1028,7 @@ export const DEMO_STORES: DemoStore[] = [
   },
   {
     key: 'E',
-    email: 'seller.e@demo.sombateka.test',
+    email: 'seller.e@demo.komoriko.test',
     ownerName: 'Sylvie Nsimba',
     phone: '+243 900 000 205',
     storeName: 'Kintambo Cosmétiques',
@@ -1043,7 +1043,7 @@ export const DEMO_STORES: DemoStore[] = [
   },
   {
     key: 'F',
-    email: 'seller.f@demo.sombateka.test',
+    email: 'seller.f@demo.komoriko.test',
     ownerName: 'Pascal Ngoy',
     phone: '+243 900 000 206',
     storeName: 'Gombe Gadgets',
@@ -1062,7 +1062,7 @@ export const DEMO_STORES: DemoStore[] = [
   },
   {
     key: 'G',
-    email: 'seller.g@demo.sombateka.test',
+    email: 'seller.g@demo.komoriko.test',
     ownerName: 'Aimé Kabeya',
     phone: '+243 900 000 207',
     storeName: 'Kasa-Vubu Artisanat',
@@ -1081,7 +1081,7 @@ export const DEMO_STORES: DemoStore[] = [
   },
   {
     key: 'H',
-    email: 'seller.h@demo.sombateka.test',
+    email: 'seller.h@demo.komoriko.test',
     ownerName: 'Noël Tshimanga',
     phone: '+243 900 000 208',
     storeName: 'Ngaliema Fournitures',

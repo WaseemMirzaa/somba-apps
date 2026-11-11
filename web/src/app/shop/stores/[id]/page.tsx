@@ -34,7 +34,7 @@ const BADGE: Record<string, { en: string; fr: string }> = {
   gold: { en: "Gold", fr: "Or" },
   silver: { en: "Silver", fr: "Argent" },
   bronze: { en: "Bronze", fr: "Bronze" },
-  somba_assured: { en: "Somba Assured", fr: "Somba Assuré" },
+  somba_assured: { en: "KOMORIKO Assured", fr: "KOMORIKO Assuré" },
 };
 
 export default function ShopStoreDetailPage() {
@@ -172,11 +172,11 @@ export default function ShopStoreDetailPage() {
             <div>
               <p className="font-medium text-slate-800">{fr ? "Expédition" : "Shipping"}</p>
               <p className="whitespace-pre-line" data-testid="store-shipping-policy">
-                {shippingPolicy || (fr ? "Livraison depuis l'entrepôt Somba de votre zone." : "Delivered from the Somba warehouse that serves your area.")}
+                {shippingPolicy || (fr ? "Livraison depuis l'entrepôt KOMORIKO de votre zone." : "Delivered from the KOMORIKO warehouse that serves your area.")}
               </p>
             </div>
             <p>
-              <Link href="/legal/returns" className="text-[var(--primary)] hover:underline">{fr ? "Politique de retour Somba" : "Somba return policy"}</Link>
+              <Link href="/legal/returns" className="text-[var(--primary)] hover:underline">{fr ? "Politique de retour KOMORIKO" : "KOMORIKO return policy"}</Link>
               {" · "}
               <Link href="/legal/shipping" className="text-[var(--primary)] hover:underline">{fr ? "Livraison" : "Shipping"}</Link>
             </p>

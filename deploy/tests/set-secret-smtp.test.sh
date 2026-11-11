@@ -20,12 +20,12 @@ out="$(run "SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
 SMTP_PASS=$KEY
-MAIL_FROM=Somba&Teka <no-reply@somba.example>")"
+MAIL_FROM=KOMORIKO <no-reply@somba.example>")"
 [[ "$out" == *"SMTP_PASS set (…GHIJ)"* ]] && ok "password is masked to its last 4" || bad "password mask: $out"
 [[ "$out" != *"$KEY"* ]] && ok "the password is not in the output" || bad "the password was printed"
 for f in "$SOMBA_EXTRA_ENV" "$SOMBA_API_ENV"; do
   grep -q "^SMTP_HOST=smtp.sendgrid.net$" "$f" && grep -q "^SMTP_PORT=587$" "$f" && grep -q "^SMTP_USER=apikey$" "$f" \
-    && grep -q "^SMTP_PASS=$KEY$" "$f" && grep -q "^MAIL_FROM=Somba&Teka <no-reply@somba.example>$" "$f" && grep -q "^KEEP=1$" "$f" \
+    && grep -q "^SMTP_PASS=$KEY$" "$f" && grep -q "^MAIL_FROM=KOMORIKO <no-reply@somba.example>$" "$f" && grep -q "^KEEP=1$" "$f" \
     && ok "values written, other lines kept ($(basename "$f"))" || bad "values missing in $f"
   [[ "$(stat -f '%Lp' "$f" 2>/dev/null || stat -c '%a' "$f")" == "600" ]] && ok "mode 600 kept ($(basename "$f"))" || bad "mode changed on $f"
 done
@@ -50,9 +50,9 @@ refuse "password with a quote" "SMTP_PASS=SG.abc\"defghijklmnop"
 refuse "password with a #" "SMTP_PASS=SG.abc#defghijklmnop"
 refuse "password with a \$" "SMTP_PASS=SG.abc\$defghijklmnop"
 refuse "password too short" "SMTP_PASS=SG.abc"
-refuse "from without an address" "MAIL_FROM=Somba"
-refuse "from with a #" "MAIL_FROM=Somba#1 <no-reply@somba.example>"
-refuse "from with a bad address" "MAIL_FROM=Somba <no-reply>"
+refuse "from without an address" "MAIL_FROM=KOMORIKO"
+refuse "from with a #" "MAIL_FROM=KOMORIKO#1 <no-reply@somba.example>"
+refuse "from with a bad address" "MAIL_FROM=KOMORIKO <no-reply>"
 refuse "one bad line among good ones" "SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=80"
 

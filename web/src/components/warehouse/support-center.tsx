@@ -118,7 +118,7 @@ export function SupportList({ audience, basePath }: { audience: Audience; basePa
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Assistance" : "Support"}
-        subtitle={fr ? "Écrivez à l'équipe support Somba ; vous êtes prévenu dès qu'elle répond." : "Write to the Somba support team; you are notified when they answer."}
+        subtitle={fr ? "Écrivez à l'équipe support KOMORIKO ; vous êtes prévenu dès qu'elle répond." : "Write to the KOMORIKO support team; you are notified when they answer."}
       />
       <form onSubmit={submit} className="card-premium space-y-3 p-4">
         <h2 className="font-semibold text-slate-900">{fr ? "Nouveau ticket" : "New ticket"}</h2>

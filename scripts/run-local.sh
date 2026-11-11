@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the whole Somba&Teka stack on your own machine (API + web) with demo data.
+# Run the whole KOMORIKO stack on your own machine (API + web) with demo data.
 #   bash scripts/run-local.sh          # first run installs, seeds and starts
 #   RESET=1 bash scripts/run-local.sh  # wipe the local database and re-seed
 #   DEMO_MODE=true bash scripts/run-local.sh  # also show the one-click demo role picker on /login (off by default)
@@ -32,7 +32,7 @@ until curl -sf "http://localhost:$API_PORT/api/v1/health" >/dev/null; do sleep 1
 
 cat <<MSG
 
-  Somba&Teka is starting
+  KOMORIKO is starting
   Web   http://localhost:$WEB_PORT      (first page load compiles, give it ~20 s)
   API   http://localhost:$API_PORT
 

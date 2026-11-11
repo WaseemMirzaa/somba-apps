@@ -24,8 +24,8 @@ export default function SellerAgreementPage() {
         : "Your listings must describe the product, its price and its stock truthfully. New listings may be moderated before they go live. Prohibited or counterfeit products are removed."}</p>
       <h2>{fr ? "3. Commandes et préparation" : "3. Orders and fulfilment"}</h2>
       <p>{fr
-        ? "Vous préparez chaque commande et la marquez « prête » pour l'enlèvement. Un livreur Somba&Teka collecte le colis à votre adresse d'enlèvement ou il est déposé à notre entrepôt, puis livré au client."
-        : "You pack each order and mark it “ready” for pickup. A Somba&Teka rider collects the parcel from your pickup address (or it is dropped at our warehouse) and delivers it to the customer."}</p>
+        ? "Vous préparez chaque commande et la marquez « prête » pour l'enlèvement. Un livreur KOMORIKO collecte le colis à votre adresse d'enlèvement ou il est déposé à notre entrepôt, puis livré au client."
+        : "You pack each order and mark it “ready” for pickup. A KOMORIKO rider collects the parcel from your pickup address (or it is dropped at our warehouse) and delivers it to the customer."}</p>
       <h2>{fr ? "4. Commission et paiements" : "4. Commission and payouts"}</h2>
       <p>{fr
         ? "Une commission est prélevée sur chaque vente ; son taux est affiché dans votre tableau de bord vendeur. Vos gains deviennent disponibles après la période de validation (livraison et délai de retour). Vous demandez un paiement depuis votre tableau de bord ; il est versé par virement bancaire ou mobile money après approbation."

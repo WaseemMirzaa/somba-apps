@@ -64,8 +64,8 @@ class CustomerSettingsScreen extends StatelessWidget {
               _nav(Icons.lock_reset_rounded, s.settingsChangePw, () => _changePassword(context)),
               _nav(Icons.info_outline_rounded, s.settingsAbout, () => showAboutDialog(
                     context: context,
-                    applicationName: 'Somba&Teka',
-                    applicationLegalese: '© 2026 Somba&Teka',
+                    applicationName: 'KOMORIKO',
+                    applicationLegalese: '© 2026 KOMORIKO',
                   )),
               _nav(Icons.delete_outline_rounded, s.delaccTitle,
                   () => Navigator.push(context, MaterialPageRoute(builder: (_) => AccountDeleteScreen(onDeleted: onAccountDeleted)))),

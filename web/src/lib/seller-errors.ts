@@ -161,11 +161,11 @@ add("An item appears twice in the request", "Un article apparaît deux fois dans
 add("One of the items is not on this order", "Un des articles ne figure pas sur cette commande.");
 add("Only returns need an accept or reject; reply to the customer instead", "Seuls les retours demandent une acceptation ou un refus ; répondez plutôt au client.");
 add("Tell the customer why you are rejecting this return", "Indiquez au client pourquoi vous refusez ce retour.");
-add("The response time has passed; Somba support decides now", "Le délai de réponse est dépassé ; le support Somba décide désormais.");
+add("The response time has passed; KOMORIKO support decides now", "Le délai de réponse est dépassé ; le support KOMORIKO décide désormais.");
 add("This request was already handled", "Cette demande a déjà été traitée.");
 add("This request was just updated by someone else. Refresh and try again", "Cette demande vient d'être modifiée par quelqu'un d'autre. Actualisez et réessayez.");
 add("Wait for the seller to answer, or for the response time to pass", "Attendez la réponse du vendeur ou la fin du délai de réponse.");
-add("Only returns can be escalated; a dispute is already with Somba support", "Seuls les retours peuvent être escaladés ; un litige est déjà chez le support Somba.");
+add("Only returns can be escalated; a dispute is already with KOMORIKO support", "Seuls les retours peuvent être escaladés ; un litige est déjà chez le support KOMORIKO.");
 add("It is too late to cancel: the return is already on its way", "Il est trop tard pour annuler : le retour est déjà en route.");
 add("Give the customer a reason for refusing the return", "Donnez au client la raison du refus du retour.");
 add("Give the customer a reason for refusing", "Donnez au client la raison du refus.");

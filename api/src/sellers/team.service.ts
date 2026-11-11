@@ -204,8 +204,8 @@ export class TeamService implements OnModuleInit {
     const link = `${this.webUrl}/seller/team/accept?token=${token}`;
     const sent = await this.messaging.sendEmail(
       email,
-      `${ctx.seller.name} invited you to join their team on Somba&Teka / ${ctx.seller.name} vous invite à rejoindre son équipe sur Somba&Teka`,
-      `Hello${saved.name ? ` ${saved.name}` : ''},\n\n${ctx.seller.name} invited you to help run their store on Somba&Teka as "${role}".\nCreate your seller account with this e-mail address (or sign in), then open:\n${link}\n\nThe invitation expires in 7 days.\n\n---\n\nBonjour${saved.name ? ` ${saved.name}` : ''},\n\n${ctx.seller.name} vous invite à gérer sa boutique sur Somba&Teka avec le rôle « ${role} ».\nCréez votre compte vendeur avec cette adresse e-mail (ou connectez-vous), puis ouvrez :\n${link}\n\nL’invitation expire dans 7 jours.`,
+      `${ctx.seller.name} invited you to join their team on KOMORIKO / ${ctx.seller.name} vous invite à rejoindre son équipe sur KOMORIKO`,
+      `Hello${saved.name ? ` ${saved.name}` : ''},\n\n${ctx.seller.name} invited you to help run their store on KOMORIKO as "${role}".\nCreate your seller account with this e-mail address (or sign in), then open:\n${link}\n\nThe invitation expires in 7 days.\n\n---\n\nBonjour${saved.name ? ` ${saved.name}` : ''},\n\n${ctx.seller.name} vous invite à gérer sa boutique sur KOMORIKO avec le rôle « ${role} ».\nCréez votre compte vendeur avec cette adresse e-mail (ou connectez-vous), puis ouvrez :\n${link}\n\nL’invitation expire dans 7 jours.`,
     );
     if (account) {
       await this.notifications.toUser(account.id, {

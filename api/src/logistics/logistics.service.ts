@@ -527,7 +527,7 @@ export class LogisticsService {
 
   private async hubAddressText(hubId: string | null): Promise<string> {
     const h = hubId ? await this.hubs.findOne({ where: { id: hubId } }) : null;
-    return h ? [h.name, h.address ?? h.city].filter(Boolean).join(' — ') : 'Somba&Teka hub';
+    return h ? [h.name, h.address ?? h.city].filter(Boolean).join(' — ') : 'KOMORIKO hub';
   }
 
   /** The cash to collect at the door (0 for prepaid; follows partial refunds that lowered the payment). */
@@ -1690,7 +1690,7 @@ export class LogisticsService {
     pushOrderToOps(this.emitter, 'order:updated', saved);
     if (opts.notice === 'warehouse') {
       await this.notifications
-        .toUser(saved.customerId, { title: 'Parcel at our warehouse', body: `${saved.reference} reached the Somba&Teka warehouse and will be on its way soon.`, type: 'delivery', entityId: saved.id })
+        .toUser(saved.customerId, { title: 'Parcel at our warehouse', body: `${saved.reference} reached the KOMORIKO warehouse and will be on its way soon.`, type: 'delivery', entityId: saved.id })
         .catch(() => undefined);
     } else if (opts.notice === 'update') {
       await this.notifications

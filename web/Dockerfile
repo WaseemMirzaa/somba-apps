@@ -1,4 +1,4 @@
-# Somba&Teka web (Next.js). NEXT_PUBLIC_* must be present at BUILD time — they
+# KOMORIKO web (Next.js). NEXT_PUBLIC_* must be present at BUILD time — they
 # are baked into the client bundle — so they arrive as build args.
 FROM node:22
 

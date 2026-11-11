@@ -262,7 +262,7 @@ export default function SellerPayoutRequestPage() {
 
         {!needsAccount && (
           <p className="text-xs text-slate-500">
-            {fr ? "Le montant est crédité sur votre portefeuille Somba dès que la finance valide le versement." : "The amount is credited to your Somba wallet as soon as finance pays the payout."}
+            {fr ? "Le montant est crédité sur votre portefeuille KOMORIKO dès que la finance valide le versement." : "The amount is credited to your KOMORIKO wallet as soon as finance pays the payout."}
           </p>
         )}
 

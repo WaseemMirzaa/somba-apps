@@ -28,7 +28,7 @@ tap key:menu-messages 2
 say "My messages: every conversation with a seller||Mes messages : toutes les conversations avec les vendeurs" 3
 back 1
 tap key:menu-support 2
-say "Support: tickets to the Somba&Teka team||Support : des tickets pour l'équipe Somba&Teka" 3
+say "Support: tickets to the KOMORIKO team||Support : des tickets pour l'équipe KOMORIKO" 3
 tap msg:ticket_new 2
 tap key:ticket-cat-payment 0.8
 type key:ticket-subject "Wallet top-up not showing||Recharge du portefeuille absente" 30
@@ -39,7 +39,7 @@ tap key:photo-library 2.4
 say "A new ticket: category, subject, message and a photo||Un nouveau ticket : catégorie, objet, message et une photo" 3.4
 tap msg:support_create 2.8
 say "The ticket is open with the photo attached||Le ticket est ouvert avec la photo jointe" 3
-cap "Somba support answers from the admin console||Le support Somba répond depuis la console d'administration" 3
+cap "KOMORIKO support answers from the admin console||Le support KOMORIKO répond depuis la console d'administration" 3
 act supportReply "text=Thanks Marie, we checked: your wallet was credited correctly.||text=Merci Marie, nous avons vérifié : votre portefeuille a bien été crédité."
 wait 3
 say "The ticket shows In progress with an unread badge||Le ticket passe à En cours avec un badge non lu" 2.8

@@ -43,8 +43,8 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   ),
   'as_st_awaiting_return': ('The seller will accept or decline your return soon.', 'Le vendeur va bientôt accepter ou refuser votre retour.'),
   'as_st_awaiting_late': (
-    'The seller’s time to answer has passed. You will soon be able to ask Somba support to decide.',
-    'Le délai de réponse du vendeur est dépassé. Vous pourrez bientôt demander au support Somba de trancher.'
+    'The seller’s time to answer has passed. You will soon be able to ask KOMORIKO support to decide.',
+    'Le délai de réponse du vendeur est dépassé. Vous pourrez bientôt demander au support KOMORIKO de trancher.'
   ),
   'as_st_awaiting_dispute': (
     'The seller can reply to your report. Add details or photos below if you like.',
@@ -52,16 +52,16 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   ),
   'as_st_replied_title': ('The seller replied', 'Le vendeur a répondu'),
   'as_st_replied': (
-    'Somba support will review the conversation and decide. You can keep adding details below.',
-    'Le support Somba examinera l’échange et tranchera. Vous pouvez continuer à ajouter des détails ci-dessous.'
+    'KOMORIKO support will review the conversation and decide. You can keep adding details below.',
+    'Le support KOMORIKO examinera l’échange et tranchera. Vous pouvez continuer à ajouter des détails ci-dessous.'
   ),
   'as_st_rejected_title': ('The seller declined your return', 'Le vendeur a refusé votre retour'),
   'as_st_timeout_title': ('The seller did not answer in time', 'Le vendeur n’a pas répondu à temps'),
   'as_st_next_steps': (
-    'You can ask Somba support to decide, or cancel your request.',
-    'Vous pouvez demander au support Somba de trancher, ou annuler votre demande.'
+    'You can ask KOMORIKO support to decide, or cancel your request.',
+    'Vous pouvez demander au support KOMORIKO de trancher, ou annuler votre demande.'
   ),
-  'as_st_escalated_title': ('With Somba support', 'Chez le support Somba'),
+  'as_st_escalated_title': ('With KOMORIKO support', 'Chez le support KOMORIKO'),
   'as_st_escalated': ('Our team is reviewing your request and will decide soon.', 'Notre équipe examine votre demande et tranchera bientôt.'),
   'as_st_approved_title': ('Return accepted', 'Retour accepté'),
   'as_st_approved': (
@@ -78,8 +78,8 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_st_refund_title': ('Refund issued', 'Remboursement effectué'),
   'as_st_replacement_title': ('Replacement approved', 'Remplacement accepté'),
   'as_st_replacement': (
-    'Somba support decided to replace your item. Follow it in the Replacements tab.',
-    'Le support Somba a décidé de remplacer votre article. Suivez-le dans l’onglet Remplacements.'
+    'KOMORIKO support decided to replace your item. Follow it in the Replacements tab.',
+    'Le support KOMORIKO a décidé de remplacer votre article. Suivez-le dans l’onglet Remplacements.'
   ),
   'as_st_cancelled_title': ('Request cancelled', 'Demande annulée'),
   'as_st_cancelled': ('You cancelled this request.', 'Vous avez annulé cette demande.'),
@@ -109,8 +109,8 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_thread_empty': ('No messages yet. Write the first one below.', 'Aucun message pour le moment. Écrivez le premier ci-dessous.'),
   'as_thread_you': ('You', 'Vous'),
   'as_thread_seller': ('{name} · seller', '{name} · vendeur'),
-  'as_thread_support': ('Somba support', 'Support Somba'),
-  'as_thread_team': ('Somba team', 'Équipe Somba'),
+  'as_thread_support': ('KOMORIKO support', 'Support KOMORIKO'),
+  'as_thread_team': ('KOMORIKO team', 'Équipe KOMORIKO'),
   'as_reply_hint': ('Write a message…', 'Écrivez un message…'),
   'as_reply_sent': ('Message sent.', 'Message envoyé.'),
   'as_reply_empty': ('Write a message first.', 'Écrivez d’abord un message.'),
@@ -126,15 +126,15 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_pk_collect_sub': ('A warehouse rider will collect it.', 'Un livreur de l’entrepôt viendra le récupérer.'),
   'as_pk_received': ('Received at the warehouse', 'Reçu à l’entrepôt'),
   'as_pk_refund': ('Refund issued', 'Remboursement effectué'),
-  'as_escalate': ('Ask Somba support to decide', 'Demander au support Somba de trancher'),
-  'as_escalate_title': ('Ask Somba support to decide?', 'Demander au support Somba de trancher ?'),
+  'as_escalate': ('Ask KOMORIKO support to decide', 'Demander au support KOMORIKO de trancher'),
+  'as_escalate_title': ('Ask KOMORIKO support to decide?', 'Demander au support KOMORIKO de trancher ?'),
   'as_escalate_body': (
-    'Somba support will look at this return and make the final decision.',
-    'Le support Somba examinera ce retour et prendra la décision finale.'
+    'KOMORIKO support will look at this return and make the final decision.',
+    'Le support KOMORIKO examinera ce retour et prendra la décision finale.'
   ),
   'as_escalate_note': ('Add a note (optional)', 'Ajouter une note (facultatif)'),
   'as_escalate_confirm': ('Send to support', 'Envoyer au support'),
-  'as_escalate_done': ('Sent to Somba support.', 'Transmis au support Somba.'),
+  'as_escalate_done': ('Sent to KOMORIKO support.', 'Transmis au support KOMORIKO.'),
   'as_cancel_request': ('Cancel this request', 'Annuler cette demande'),
   'as_cancel_title': ('Cancel this request?', 'Annuler cette demande ?'),
   'as_cancel_body': (
@@ -183,7 +183,7 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_reason_short': ('Describe the problem in at least 5 characters.', 'Décrivez le problème en 5 caractères au moins.'),
   'as_photos_label': ('Photos (optional)', 'Photos (facultatif)'),
   'as_refund_to': ('Refund to', 'Rembourser sur'),
-  'as_refund_to_wallet': ('My Somba&Teka wallet', 'Mon portefeuille Somba&Teka'),
+  'as_refund_to_wallet': ('My KOMORIKO wallet', 'Mon portefeuille KOMORIKO'),
   'as_refund_to_phone': ('My mobile-money number', 'Mon numéro mobile money'),
   'as_refund_to_note': (
     'If the payment cannot go back to your phone, the refund goes to your wallet.',
@@ -194,8 +194,8 @@ const Map<String, (String, String)> kMessagesAfterSale = {
 
   // ---- dispute form ----
   'as_dp_intro': (
-    'Tell us what went wrong with order {ref}. The seller replies first; Somba support steps in if needed.',
-    'Dites-nous ce qui s’est mal passé avec la commande {ref}. Le vendeur répond d’abord ; le support Somba intervient si besoin.'
+    'Tell us what went wrong with order {ref}. The seller replies first; KOMORIKO support steps in if needed.',
+    'Dites-nous ce qui s’est mal passé avec la commande {ref}. Le vendeur répond d’abord ; le support KOMORIKO intervient si besoin.'
   ),
   'as_dp_category': ('What happened?', 'Que s’est-il passé ?'),
   'as_dp_items': ('Which items? (optional)', 'Quels articles ? (facultatif)'),

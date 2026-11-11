@@ -706,7 +706,7 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
     a = await req(cust.sock, 'orders:sellerList');
     ok(!a.ok, 'a customer cannot use the seller list', a.error ?? 'was allowed');
     const view = (await req(shop1.sock, 'orders:sellerList', { q: fo.reference })).data.items[0];
-    ok(view.tracking && view.tracking.carrier === 'Somba&Teka' && Array.isArray(view.tracking.legs) && view.tracking.legs.length >= 1, 'a delivered order carries its tracking (legs from the delivery tasks)', JSON.stringify(view.tracking));
+    ok(view.tracking && view.tracking.carrier === 'KOMORIKO' && Array.isArray(view.tracking.legs) && view.tracking.legs.length >= 1, 'a delivered order carries its tracking (legs from the delivery tasks)', JSON.stringify(view.tracking));
     ok(view.tracking.legs.every((l) => 'kind' in l && 'status' in l && !('address' in l) && !('proofCode' in l)), 'with no address or code in it');
     const live2 = (await order([{ productId: fin.id, qty: 1 }])).data;
     const fresh = await waitFor(shop1, 'order:created', (o) => o.id === live2.id, 0, 4000);

@@ -83,7 +83,7 @@ describe('localizeNotice', () => {
   // Every regex of the customer app's notification_text.dart, with the French it produces.
   describe('bodies from the customer app', () => {
     it.each([
-      ['SOM-1 reached the Somba&Teka warehouse and will be on its way soon.', 'SOM-1 est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'],
+      ['SOM-1 reached the KOMORIKO warehouse and will be on its way soon.', 'SOM-1 est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'],
       ['Approve the airtel money request on your phone to confirm SOM-1.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer SOM-1.'],
       ['Approve the vodacom_mpesa request on your phone to confirm SOM-1.', 'Validez la demande Vodacom M-Pesa sur votre téléphone pour confirmer SOM-1.'],
       ["We received SOM-1. You'll get updates here in real time.", 'Nous avons reçu SOM-1. Vous recevrez les mises à jour ici en temps réel.'],
@@ -129,15 +129,15 @@ describe('localizeNotice', () => {
 
   describe('bodies the app did not cover', () => {
     it.each([
-      ['Order cancelled', 'SOM-1 was cancelled by Somba&Teka support: fraud check.', 'SOM-1 a été annulée par l’assistance Somba&Teka : fraud check.'],
+      ['Order cancelled', 'SOM-1 was cancelled by KOMORIKO support: fraud check.', 'SOM-1 a été annulée par l’assistance KOMORIKO : fraud check.'],
       [
         'Order cancelled',
-        'SOM-1 was cancelled by Somba&Teka support: no stock. Sorry. $12.00 was refunded to your wallet.',
-        'SOM-1 a été annulée par l’assistance Somba&Teka : no stock. Sorry. 12,00\u00A0$ ont été remboursés sur votre portefeuille.',
+        'SOM-1 was cancelled by KOMORIKO support: no stock. Sorry. $12.00 was refunded to your wallet.',
+        'SOM-1 a été annulée par l’assistance KOMORIKO : no stock. Sorry. 12,00\u00A0$ ont été remboursés sur votre portefeuille.',
       ],
       ['Order cancelled', 'SOM-1 was cancelled (Customer refused). Do not pack it.', 'SOM-1 a été annulée (Le client a refusé). Ne la préparez pas.'],
       ['Order cancelled', 'SOM-1 was cancelled by the customer. Do not pack it.', 'SOM-1 a été annulée par le client. Ne la préparez pas.'],
-      ['Order cancelled', 'SOM-1 was cancelled by Somba&Teka. Do not pack it.', 'SOM-1 a été annulée par Somba&Teka. Ne la préparez pas.'],
+      ['Order cancelled', 'SOM-1 was cancelled by KOMORIKO. Do not pack it.', 'SOM-1 a été annulée par KOMORIKO. Ne la préparez pas.'],
       ['Delivery update', 'SOM-1 is now in your deliveries.', 'SOM-1 est maintenant dans vos livraisons.'],
       ['New order', 'SOM-1 · $40.00 from Jean Mukendi', 'SOM-1 · 40,00\u00A0$ de Jean Mukendi'],
       ['New order', 'SOM-1: 3 item(s) to pack — $40.00', 'SOM-1 : 3 article(s) à préparer — 40,00\u00A0$'],

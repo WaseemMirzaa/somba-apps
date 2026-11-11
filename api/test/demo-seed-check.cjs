@@ -33,7 +33,7 @@ const accounts = {};
     if (cur && kv) cur[kv[1]] = kv[2];
   }
 })();
-const acct = (local) => accounts[`${local}@demo.sombateka.test`];
+const acct = (local) => accounts[`${local}@demo.komoriko.test`];
 
 // ── TOTP (RFC 6238, as an authenticator app does it) ──
 const b32 = (s) => { const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = 0, v = 0; const out = []; for (const c of s.replace(/[\s=-]/g, '').toUpperCase()) { v = (v << 5) | A.indexOf(c); bits += 5; if (bits >= 8) { out.push((v >>> (bits - 8)) & 255); bits -= 8; } } return Buffer.from(out); };

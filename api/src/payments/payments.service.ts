@@ -78,7 +78,7 @@ export interface CardSheet {
 /** Stripe definitively refused a card refund (not "no answer"): nothing was refunded. */
 export class CardRefundRefusedError extends Error {}
 
-export const CARD_MERCHANT_NAME = 'Somba & Teka';
+export const CARD_MERCHANT_NAME = 'KOMORIKO';
 /** Prefix of Stripe refund ids. Until we hold one, a card refund is known by the idempotency key we generated. */
 const STRIPE_REFUND_ID = /^re_/;
 /** Stripe forgets an idempotency key after 24 hours: an unanswered refund is only retried with its key well inside that. */
@@ -473,7 +473,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       const pi = await this.stripe!.createPaymentIntent({
         amountCents: Math.round(payment.amountUsd * 100),
         currency: 'usd',
-        description: `Somba & Teka order ${order.reference}`,
+        description: `KOMORIKO order ${order.reference}`,
         metadata: {
           reference: payment.reference,
           orderReference: payment.orderReference ?? '',

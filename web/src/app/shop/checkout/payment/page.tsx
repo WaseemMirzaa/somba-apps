@@ -87,7 +87,7 @@ function PaymentContent() {
     const list: { id: string; label: string; hint?: string; disabled?: boolean }[] = [
       {
         id: "wallet",
-        label: fr ? "Portefeuille Somba" : "Somba wallet",
+        label: fr ? "Portefeuille KOMORIKO" : "KOMORIKO wallet",
         hint: `${fr ? "Solde" : "Balance"}: ${formatCurrency(balance, locale)}${walletEnough ? "" : fr ? " — insuffisant" : " — not enough"}`,
         disabled: !walletEnough,
       },

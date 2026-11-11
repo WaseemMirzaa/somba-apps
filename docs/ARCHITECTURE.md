@@ -1,4 +1,4 @@
-# Somba&Teka — System Architecture
+# KOMORIKO — System Architecture
 
 | | |
 |---|---|
@@ -35,7 +35,7 @@
 
 ## 1. Executive summary
 
-Somba&Teka is a multi-vendor marketplace for Kinshasa / DRC (and Paris), with a customer app, a rider app, and web portals for customers, sellers, warehouse staff, riders and administrators. Everything talks to **one NestJS backend** that is **WebSocket-first**: after a one-shot REST login, every read, write and live update goes through a single authenticated Socket.IO connection. REST is kept only for authentication, image upload, the payment webhook and the health check.
+KOMORIKO is a multi-vendor marketplace for Kinshasa / DRC (and Paris), with a customer app, a rider app, and web portals for customers, sellers, warehouse staff, riders and administrators. Everything talks to **one NestJS backend** that is **WebSocket-first**: after a one-shot REST login, every read, write and live update goes through a single authenticated Socket.IO connection. REST is kept only for authentication, image upload, the payment webhook and the health check.
 
 ### 1.1 The system in numbers
 

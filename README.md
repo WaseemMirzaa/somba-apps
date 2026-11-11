@@ -1,4 +1,4 @@
-# Somba&Teka — Marketplace Prototype
+# KOMORIKO — Marketplace Prototype
 
 Flipkart-style mocked marketplace across **Customer (CF)**, **Seller (SF)**, **Admin (AF)**, **Warehouse (WF)**, and **Rider (RF)** portals. Mock data only — no real backend, payments, or push notifications.
 

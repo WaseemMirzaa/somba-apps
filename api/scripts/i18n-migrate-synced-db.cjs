@@ -67,7 +67,7 @@ const DDL = [
   try {
     console.log(`Database: ${process.env.DB_HOST ?? 'localhost'} / ${target}${dryRun ? '   (dry run: nothing is written)' : ''}`);
     for (const t of ['products', 'categories', 'campaigns']) {
-      if (!tables.has(t)) throw new Error(`Table \`${t}\` not found: is ${target} a Somba database?`);
+      if (!tables.has(t)) throw new Error(`Table \`${t}\` not found: is ${target} a KOMORIKO database?`);
     }
     if (tables.has('migrations')) {
       const done = await q.query("SELECT 1 FROM `migrations` WHERE `name` LIKE 'Translations%' LIMIT 1");

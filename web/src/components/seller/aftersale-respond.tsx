@@ -159,8 +159,8 @@ export function AftersaleRespond({
         )}
         <p className="text-xs text-slate-500">
           {fr
-            ? "Après un refus (ou sans réponse dans le délai), le client peut escalader la demande au support Somba, qui tranche."
-            : "After a rejection (or no answer in time) the customer can escalate to Somba support, who decides."}
+            ? "Après un refus (ou sans réponse dans le délai), le client peut escalader la demande au support KOMORIKO, qui tranche."
+            : "After a rejection (or no answer in time) the customer can escalate to KOMORIKO support, who decides."}
         </p>
         <ErrorNote message={error} />
       </Modal>

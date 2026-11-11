@@ -149,7 +149,7 @@ describe('tracking from the delivery tasks', () => {
     await task(o.id, { kind: 'pickup', sellerId: shop.id, status: 'delivered', riderId: 'r1', pickedUpAt: picked, receivedAt: new Date('2026-10-24T10:00:00Z'), readyAt: new Date('2026-10-24T08:00:00Z'), address: 'secret address', proofCode: '1234' } as never);
     await task(o.id, { kind: 'delivery', status: 'assigned', riderId: 'r1' } as never);
     const view = (await svc.page(owner, shop.id)).items[0] as Record<string, any>;
-    expect(view.tracking).toMatchObject({ carrier: 'Somba&Teka', currentLeg: 'delivery', riderFirstName: 'Patrick' });
+    expect(view.tracking).toMatchObject({ carrier: 'KOMORIKO', currentLeg: 'delivery', riderFirstName: 'Patrick' });
     expect(view.tracking.legs.map((l: any) => [l.kind, l.status, l.riderFirstName])).toEqual([['pickup', 'delivered', 'Patrick'], ['delivery', 'assigned', 'Patrick']]);
     expect(new Date(view.tracking.legs[0].pickedUpAt)).toEqual(picked);
     expect(JSON.stringify(view)).not.toMatch(/Ilunga|\+2439|secret address|1234|proofCode/);

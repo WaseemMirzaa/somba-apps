@@ -276,7 +276,7 @@ export function DisputeCase({ id, kind }: { id: string; kind: "dispute" | "retur
                   <span className="font-semibold text-slate-700">
                     {m.authorName}{" "}
                     <Badge variant={m.role === "customer" ? "default" : m.role === "seller" ? "warning" : "info"}>
-                      {m.role === "customer" ? (fr ? "Client" : "Customer") : m.role === "seller" ? (fr ? "Vendeur" : "Seller") : "Somba"}
+                      {m.role === "customer" ? (fr ? "Client" : "Customer") : m.role === "seller" ? (fr ? "Vendeur" : "Seller") : "KOMORIKO"}
                     </Badge>
                   </span>
                   <span>{localDateTime(m.createdAt)}</span>

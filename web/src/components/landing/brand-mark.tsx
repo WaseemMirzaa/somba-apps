@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-export const BRAND_LOGO_ALT = "S&T Marketplace";
+export const BRAND_LOGO_ALT = "KOMORIKO";
 
 type BrandMarkProps = {
   /** Adds a white tile behind raster logos on dark backgrounds. */
@@ -62,7 +62,7 @@ function HorizontalLockup({
 }
 
 /**
- * S&T Marketplace brand lockups — hexagon mark and shopping-bag horizontal lockup.
+ * KOMORIKO brand lockups — hexagon mark and shopping-bag horizontal lockup.
  */
 export function BrandMark({
   tone = "dark",

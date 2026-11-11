@@ -687,8 +687,8 @@ function buildSellerData(input: BuildInput) {
       orderRealId: order.orderId,
       status: order.shippingStatus,
       createdDate: order.date,
-      carrier: "Somba&Teka Logistics",
-      carrierFr: "Somba&Teka Logistique",
+      carrier: "KOMORIKO Logistics",
+      carrierFr: "KOMORIKO Logistique",
       trackingNumber: order.id,
       riderAssigned: order.hasRider,
       readyAt: order.readyAt,
@@ -893,7 +893,7 @@ function buildSellerData(input: BuildInput) {
     pickupAddress: seller?.pickupAddress ?? "",
     badge:
       seller?.badge === "somba_assured"
-        ? "Somba Assured"
+        ? "KOMORIKO Assured"
         : seller?.badge
           ? seller.badge.charAt(0).toUpperCase() + seller.badge.slice(1)
           : "Bronze",

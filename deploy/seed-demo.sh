@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Somba&Teka: demo data on a server. ADDITIVE and REMOVABLE: it never wipes, never changes a setting, a real
+# KOMORIKO: demo data on a server. ADDITIVE and REMOVABLE: it never wipes, never changes a setting, a real
 # warehouse or the geography. Run ON the server, as root, after the normal deploy (which ran the bootstrap).
 #
 #   bash /opt/somba/deploy/seed-demo.sh              add the demo (a second run adds nothing)
@@ -54,8 +54,8 @@ case "$cmd" in
     email="${2:?usage: seed-demo.sh code EMAIL}"
     [[ -f "$CRED" ]] || die "$CRED not found: run the seed first."
     EMAIL="$email" CRED="$CRED" node -e '
-      const fs=require("fs"),c=require("crypto");let cur="",key=null;
-      for(const l of fs.readFileSync(process.env.CRED,"utf8").split("\n")){const h=/^\[(.+)\]$/.exec(l.trim());if(h){cur=h[1].toLowerCase();continue}const k=/^totp_key\s*=\s*(\S+)/.exec(l.trim());if(k&&cur===process.env.EMAIL.toLowerCase())key=k[1]}
+      const fs=require("fs"),c=require("crypto");let cur="",key=null;const norm=s=>s.toLowerCase().replace(/@demo\.sombateka\.test$/,"@demo.komoriko.test");
+      for(const l of fs.readFileSync(process.env.CRED,"utf8").split("\n")){const h=/^\[(.+)\]$/.exec(l.trim());if(h){cur=norm(h[1]);continue}const k=/^totp_key\s*=\s*(\S+)/.exec(l.trim());if(k&&cur===norm(process.env.EMAIL))key=k[1]}
       if(!key){console.error("no two-factor key for that account");process.exit(1)}
       const A="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";let b=0,v=0;const o=[];for(const ch of key.replace(/[\s=-]/g,"").toUpperCase()){v=(v<<5)|A.indexOf(ch);b+=5;if(b>=8){o.push((v>>>(b-8))&255);b-=8}}
       const step=Math.floor(Date.now()/30000),m=Buffer.alloc(8);m.writeBigUInt64BE(BigInt(step));const h=c.createHmac("sha1",Buffer.from(o)).update(m).digest();const f=h[h.length-1]&15;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Somba&Teka nightly backup: MySQL dump + uploads, kept for $KEEP_DAYS days.
+# KOMORIKO nightly backup: MySQL dump + uploads, kept for $KEEP_DAYS days.
 # Installed by droplet-deploy.sh as /etc/cron.d/somba-backup (03:15 daily).
 # Restore:  gunzip -c db-YYYYMMDD.sql.gz | mysql somba      tar -xzf uploads-YYYYMMDD.tgz -C /
 # Copy the folder off the droplet too (rsync / rclone / DigitalOcean Spaces): a backup on the same disk is not a backup.

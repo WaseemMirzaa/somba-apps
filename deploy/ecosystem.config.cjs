@@ -1,4 +1,4 @@
-// PM2 process definitions for Somba&Teka.
+// PM2 process definitions for KOMORIKO.
 // Run from the repo root:  pm2 start deploy/ecosystem.config.cjs
 //
 // The API reads api/.env; the web app bakes NEXT_PUBLIC_* at BUILD time, so

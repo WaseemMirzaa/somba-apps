@@ -3,7 +3,7 @@
  *
  *   API_URL=http://localhost:3063 DEMO_CREDENTIALS_FILE=... GUIDE_PASSWORD='any 10+ characters' node test/demo-signup-check.cjs
  *
- * It creates two accounts on the demo domain (guide.customer / guide.seller @demo.sombateka.test): the removal takes them out.
+ * It creates two accounts on the demo domain (guide.customer / guide.seller @demo.komoriko.test): the removal takes them out.
  * It needs the demo admin (credentials file) for the approval step.
  */
 const { io } = require('socket.io-client');
@@ -26,7 +26,7 @@ const totp = (k) => { const m = Buffer.alloc(8); m.writeBigUInt64BE(BigInt(Math.
 
 (async () => {
   console.log('— New customer sign-up');
-  const c = await post('/api/v1/auth/register', { email: 'guide.customer@demo.sombateka.test', password: PW, name: 'Guide Customer', phone: '+243 900 000 901', locale: 'en' });
+  const c = await post('/api/v1/auth/register', { email: 'guide.customer@demo.komoriko.test', password: PW, name: 'Guide Customer', phone: '+243 900 000 901', locale: 'en' });
   ok(c.status === 201, 'customer registers', JSON.stringify(c.json));
   const cs = await connect(c.json.accessToken);
   ok((await req(cs, 'me:get')).data?.role === 'customer', 'customer is signed in over the socket');
@@ -35,7 +35,7 @@ const totp = (k) => { const m = Buffer.alloc(8); m.writeBigUInt64BE(BigInt(Math.
   cs.close();
 
   console.log('\n— New seller registration with the sample documents');
-  const u = await post('/api/v1/auth/register', { email: 'guide.seller@demo.sombateka.test', password: PW, name: 'Guide Owner', phone: '+243 900 000 902', role: 'seller' });
+  const u = await post('/api/v1/auth/register', { email: 'guide.seller@demo.komoriko.test', password: PW, name: 'Guide Owner', phone: '+243 900 000 902', role: 'seller' });
   ok(u.status === 201, 'store owner account registers', JSON.stringify(u.json));
   const token = u.json.accessToken;
   const urls = [];
@@ -51,7 +51,7 @@ const totp = (k) => { const m = Buffer.alloc(8); m.writeBigUInt64BE(BigInt(Math.
   ok(refused.ok === false, 'listing is refused while the application is pending', JSON.stringify(refused).slice(0, 100));
 
   console.log('\n— Admin approves');
-  const adminEmail = 'admin.super@demo.sombateka.test';
+  const adminEmail = 'admin.super@demo.komoriko.test';
   const l = await post('/api/v1/auth/login', { email: adminEmail, password: field(adminEmail, 'password') });
   await sleep(1200);
   const t = await post('/api/v1/auth/login/2fa', { challenge: l.json.challenge, code: totp(field(adminEmail, 'totp_key')) });

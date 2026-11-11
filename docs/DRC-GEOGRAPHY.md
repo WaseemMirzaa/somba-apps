@@ -1,6 +1,6 @@
 # DRC geographic hierarchy: provinces, villes, Kinshasa districts and communes
 
-Compiled 2026-10-26 for the Somba warehouse-by-area routing. Machine-readable twin of this file: `api/src/database/geo/drc.json` (both are generated from the same data, so they cannot disagree).
+Compiled 2026-10-26 for the KOMORIKO warehouse-by-area routing. Machine-readable twin of this file: `api/src/database/geo/drc.json` (both are generated from the same data, so they cannot disagree).
 
 Rule followed throughout: accuracy over completeness. Anything that could not be confirmed is flagged, never filled in. Where two sources disagree the disagreement is written down in section 8.
 

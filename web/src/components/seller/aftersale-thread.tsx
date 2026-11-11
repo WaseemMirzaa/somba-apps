@@ -11,7 +11,7 @@ import { threadRoleLabel, type CaseMessage } from "@/lib/seller-aftersale";
 import { cn } from "@/lib/utils";
 
 /**
- * The conversation on a return or dispute: customer, you and Somba support, with photos. The reply box is open while
+ * The conversation on a return or dispute: customer, you and KOMORIKO support, with photos. The reply box is open while
  * the request is (the server refuses a reply on a closed one).
  */
 export function CaseThread({
@@ -94,7 +94,7 @@ export function CaseThread({
             disabled={busy}
             onChange={(e) => setText(e.target.value)}
             className="input-premium w-full px-3 py-2 text-sm"
-            placeholder={fr ? "Écrivez au client et au support Somba…" : "Write to the customer and Somba support…"}
+            placeholder={fr ? "Écrivez au client et au support KOMORIKO…" : "Write to the customer and KOMORIKO support…"}
           />
           <AttachmentPicker value={files} onChange={setFiles} max={6} disabled={busy} />
           <button

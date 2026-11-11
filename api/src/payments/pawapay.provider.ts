@@ -154,7 +154,7 @@ export class PawapayClient {
       currency: this.currency,
       payer: { type: 'MMO', accountDetails: { phoneNumber: PawapayClient.msisdn(input.phone), provider: input.provider } },
       clientReferenceId: input.reference,
-      customerMessage: 'Somba Teka',
+      customerMessage: 'KOMORIKO',
     });
   }
 
@@ -175,7 +175,7 @@ export class PawapayClient {
       currency: this.currency,
       recipient: { type: 'MMO', accountDetails: { phoneNumber: PawapayClient.msisdn(input.phone), provider: input.provider } },
       clientReferenceId: input.reference,
-      customerMessage: 'Somba Teka payout',
+      customerMessage: 'KOMORIKO payout',
     });
   }
 

@@ -131,9 +131,9 @@ export function senderRoleLabel(role: string | null | undefined, fr: boolean): s
   if (r === "customer") return fr ? "Client" : "Customer";
   if (r === "rider") return fr ? "Livreur" : "Rider";
   if (r === "warehouse_staff") return fr ? "Entrepôt" : "Warehouse";
-  if (r === "admin_support" || r === "admin") return fr ? "Support Somba" : "Somba support";
-  if (r.startsWith("admin")) return fr ? "Équipe Somba" : "Somba team";
-  return r ? r.replace(/_/g, " ") : fr ? "Support Somba" : "Somba support";
+  if (r === "admin_support" || r === "admin") return fr ? "Support KOMORIKO" : "KOMORIKO support";
+  if (r.startsWith("admin")) return fr ? "Équipe KOMORIKO" : "KOMORIKO team";
+  return r ? r.replace(/_/g, " ") : fr ? "Support KOMORIKO" : "KOMORIKO support";
 }
 
 /** A seller order as `orders:sellerList` returns it (only what the support pages need). */

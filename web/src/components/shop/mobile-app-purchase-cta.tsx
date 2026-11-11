@@ -22,8 +22,8 @@ export function MobileAppPurchaseCta() {
           </h3>
           <p className="mt-1 text-sm text-slate-600">
             {fr
-              ? "Commandez aussi depuis l'application Somba&Teka : même compte, suivi en direct."
-              : "You can also order from the Somba&Teka app: same account, same orders, live tracking."}
+              ? "Commandez aussi depuis l'application KOMORIKO : même compte, suivi en direct."
+              : "You can also order from the KOMORIKO app: same account, same orders, live tracking."}
           </p>
         </div>
       </div>

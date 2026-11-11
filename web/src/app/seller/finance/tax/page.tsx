@@ -56,7 +56,7 @@ export default function SellerTaxPage() {
     <div className="space-y-6">
       <PageHeader
         title={fr ? "Documents fiscaux" : "Tax documents"}
-        subtitle={fr ? "Factures de commission mensuelles émises par Somba (PDF)" : "Monthly commission invoices issued by Somba (PDF)"}
+        subtitle={fr ? "Factures de commission mensuelles émises par KOMORIKO (PDF)" : "Monthly commission invoices issued by KOMORIKO (PDF)"}
         backHref="/seller/finance"
         actions={
           <label className="flex items-center gap-2 text-sm text-slate-600">

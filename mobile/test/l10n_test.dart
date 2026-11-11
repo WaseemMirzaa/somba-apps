@@ -102,7 +102,7 @@ void main() {
       // Text('Literal'), hintText: 'Literal', labelText: …, tooltip: … must go through Strings.
       final pattern = RegExp(
           r"""(?:(?:Text|SelectableText)\(\s*(?:const\s+)?|(?:hintText|labelText|helperText|errorText|tooltip|semanticLabel|applicationName):\s*)'((?:[^'\\]|\\.)*)'""");
-      const brand = {'Somba&Teka', 'EN', 'FR', 'FC'};
+      const brand = {'KOMORIKO', 'EN', 'FR', 'FC'};
       final offenders = <String>[];
       for (final f in Directory('lib').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'))) {
         if (f.path.contains('/l10n/')) continue;
@@ -170,8 +170,8 @@ void main() {
           ('Remboursement envoyé', '20,00\u00a0\$ pour SOM-3 ont été envoyés sur votre numéro mobile money.'));
       expect(localizeNotification(fr, 'Refund issued', r'$20.00 for SOM-3 is on its way back to your mobile-money number.').$2,
           '20,00\u00a0\$ pour SOM-3 reviennent sur votre numéro mobile money.');
-      expect(localizeNotification(fr, 'Parcel at our warehouse', 'SOM-5 reached the Somba&Teka warehouse and will be on its way soon.'),
-          ('Colis à notre entrepôt', 'SOM-5 est arrivé à l’entrepôt Somba&Teka et sera bientôt en route.'));
+      expect(localizeNotification(fr, 'Parcel at our warehouse', 'SOM-5 reached the KOMORIKO warehouse and will be on its way soon.'),
+          ('Colis à notre entrepôt', 'SOM-5 est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'));
       expect(localizeNotification(const Strings('en'), 'Order placed', 'x'), ('Order placed', 'x'));
       expect(localizeWalletDescription(fr, 'Wallet top-up via airtel_money'), 'Recharge du portefeuille via Airtel Money');
       expect(localizeWalletDescription(fr, 'Refund for SOM-9'), 'Remboursement de SOM-9');

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Somba Customer</string>
+	<string>KOMORIKO</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>somba_customer</string>
+	<string>KOMORIKO</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -69,11 +69,11 @@
 	<key>GMSApiKey</key>
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Somba&amp;Teka uses your location to place the pin on your delivery address when you open the map. It is not tracked or shared.</string>
+	<string>KOMORIKO uses your location to place the pin on your delivery address when you open the map. It is not tracked or shared.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Somba&amp;Teka lets you attach photos from your library to a return, a support request or a message to a seller.</string>
+	<string>KOMORIKO lets you attach photos from your library to a return, a support request or a message to a seller.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Somba&amp;Teka uses the camera so you can take a photo of an item for a return, a support request or a message to a seller.</string>
+	<string>KOMORIKO uses the camera so you can take a photo of an item for a return, a support request or a message to a seller.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

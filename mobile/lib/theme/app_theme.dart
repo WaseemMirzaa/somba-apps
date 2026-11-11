@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Central design system for the Somba customer app.
+/// Central design system for the KOMORIKO customer app.
 ///
 /// A single source of truth for colour, type, radius, spacing and elevation so
 /// every screen shares the same polished, top-tier look.
 class AppColors {
   AppColors._();
 
-  // Brand palette matches the Somba&Teka web app (Teka red).
+  // Brand palette matches the KOMORIKO web app (Teka red).
   static const Color primary = Color(0xFFE11428); // Teka red
   static const Color primaryDark = Color(0xFFC00E20); // primary hover
   static const Color primaryDeep = Color(0xFF8A0A18); // primary dark

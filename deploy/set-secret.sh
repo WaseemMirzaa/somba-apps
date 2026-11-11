@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Somba&Teka — set a payment key on the server without it ever touching history,
+# KOMORIKO — set a payment key on the server without it ever touching history,
 # argv (`ps`), logs or screen output.
 #
 # Run ON the droplet, as root:
@@ -155,7 +155,7 @@ why_invalid() {
     SMTP_PORT) echo "must be 587 (recommended), 465, 2525 or 25" ;;
     SMTP_USER) echo "must be the SMTP user name (for SendGrid: the word apikey), letters, digits and . _ @ + - only" ;;
     SMTP_PASS) echo "must be 8 to 255 characters with no spaces, quotes, backslash, \$, backtick or # (for SendGrid: the API key that starts with SG.)" ;;
-    MAIL_FROM) echo "must be an address like no-reply@yourdomain.com, or a name and address like Somba&Teka <no-reply@yourdomain.com>" ;;
+    MAIL_FROM) echo "must be an address like no-reply@yourdomain.com, or a name and address like KOMORIKO <no-reply@yourdomain.com>" ;;
     MM_WEBHOOK_SECRET) echo "must be the shared secret of the aggregator webhook (16+ characters: letters, digits and . _ ~ + / = -)" ;;
     MM_PENDING_TTL_MIN) echo "must be a whole number of minutes, 1 to 99999 (default 15; 1440 with MM_PROVIDER=manual)" ;;
     PAYOUT_CLEARANCE_HOURS) echo "must be a whole number of hours, 0 to 720 (the admin Settings value 'Clearance hours' overrides it)" ;;

@@ -36,7 +36,7 @@ export function customerJourney(
     const key = it.sellerId ?? "none";
     let s = sellers.find((x) => x.id === key);
     if (!s) {
-      s = { id: key, name: it.sellerName ?? "Somba&Teka", lines: [] };
+      s = { id: key, name: it.sellerName ?? "KOMORIKO", lines: [] };
       sellers.push(s);
     }
     s.lines.push(it);
@@ -124,7 +124,7 @@ function expressSteps(
 ): Step[] {
   const { t, ended, rank, status, sellers } = ctx;
   const live = sellers.flatMap((s) => s.lines).filter((l) => l.fulfilment !== "cancelled");
-  const name = sellers[0]?.name ?? "Somba&Teka";
+  const name = sellers[0]?.name ?? "KOMORIKO";
   const ready = live.some((l) => l.fulfilment === "ready" || l.fulfilment === "received") || rank >= 2;
   const collected = live.length > 0 && live.every((l) => l.fulfilment === "received") || rank >= 3;
   steps.push({

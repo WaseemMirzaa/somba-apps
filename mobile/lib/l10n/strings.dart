@@ -66,7 +66,7 @@ class Strings {
 
   bool get isFr => lang == 'fr';
   Locale get locale => Locale(lang);
-  String get brand => 'Somba&Teka';
+  String get brand => 'KOMORIKO';
 
   /// Looks a text up; `{name}` placeholders are replaced from [args].
   String t(String key, [Map<String, Object?>? args]) {

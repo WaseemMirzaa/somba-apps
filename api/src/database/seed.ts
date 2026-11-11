@@ -254,10 +254,10 @@ async function run() {
   ]);
   const cmsRepo = ds.getRepository(CmsBlock);
   const blocks = await cmsRepo.save([
-    cmsRepo.create({ key: 'home-hero', title: 'Somba&Teka — shop everything', body: 'Fast delivery across Kinshasa.', type: 'banner', active: true }),
+    cmsRepo.create({ key: 'home-hero', title: 'KOMORIKO — shop everything', body: 'Fast delivery across Kinshasa.', type: 'banner', active: true }),
     cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'strip', active: true }),
   ]);
-  await authorFr('cms_block', blocks[0].id, 'title', blocks[0].title, 'Somba&Teka — achetez tout');
+  await authorFr('cms_block', blocks[0].id, 'title', blocks[0].title, 'KOMORIKO — achetez tout');
   await authorFr('cms_block', blocks[0].id, 'body', blocks[0].body, 'Livraison rapide à Kinshasa.');
   await authorFr('cms_block', blocks[1].id, 'title', blocks[1].title, 'Livraison gratuite dès 50\u00A0$');
   await authorFr('cms_block', blocks[1].id, 'body', blocks[1].body, 'Utilisez SOMBA10 pour 10 % de réduction.');
@@ -309,7 +309,7 @@ async function run() {
     setRepo.create({ key: 'returnWindowDays', value: '7' }),
     setRepo.create({ key: 'sellerResponseHours', value: '48' }),
     setRepo.create({ key: 'sellerPlans', value: JSON.stringify(DEFAULT_SELLER_PLANS) }),
-    setRepo.create({ key: 'hubAddress', value: 'Somba&Teka hub, Gombe, Kinshasa' }),
+    setRepo.create({ key: 'hubAddress', value: 'KOMORIKO hub, Gombe, Kinshasa' }),
   ]);
   // Every rider and staff member belongs to one warehouse; staff have a tier (operator < supervisor < manager).
   for (const [email, hubId, tier] of [

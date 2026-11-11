@@ -80,7 +80,7 @@ class RealtimeStore extends ChangeNotifier {
   /// (`codCapUsd` is not read: the server only raises a fraud alert above the cap, it never refuses the order.)
   bool codEnabled = false;
 
-  /// Public settings `supportPhone`, `supportEmail`, `supportWhatsapp`: how Help offers to reach Somba. Blank = not offered.
+  /// Public settings `supportPhone`, `supportEmail`, `supportWhatsapp`: how Help offers to reach KOMORIKO. Blank = not offered.
   String supportPhone = '';
   String supportEmail = '';
   String supportWhatsapp = '';

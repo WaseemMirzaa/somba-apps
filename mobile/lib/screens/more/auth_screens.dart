@@ -53,7 +53,7 @@ class _CustomerSplashScreenState extends State<CustomerSplashScreen>
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 const BrandLogo(size: 116, radius: 30),
                 const SizedBox(height: 24),
-                const Text('Somba&Teka',
+                const Text('KOMORIKO',
                     style: TextStyle(
                         color: Colors.white,
                         fontSize: 30,

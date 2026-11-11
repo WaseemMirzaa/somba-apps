@@ -27,7 +27,7 @@ Code: `api/src/payments/stripe.config.ts` (the configuration rule), `stripe.prov
 
 ### Recommended: a restricted key
 
-A restricted key can only do what we give it, so a leak is far less harmful than with a full `sk_` key. In the dashboard: **Developers → API keys → Create restricted key**. Name it `Somba API`. Give it exactly:
+A restricted key can only do what we give it, so a leak is far less harmful than with a full `sk_` key. In the dashboard: **Developers → API keys → Create restricted key**. Name it `KOMORIKO API`. Give it exactly:
 
 | Resource | Permission | Why |
 |---|---|---|
@@ -57,7 +57,7 @@ The API verifies the signature over the raw body with a 5-minute tolerance (a ba
 ## How a card payment works
 
 1. `orders:create` with `paymentMethod: "stripe_card"` creates the order `pending` and a payment `pending`. The API creates a PaymentIntent: **amount = the order total in cents (USD), computed by the server**, `card` only, metadata `{ reference, orderReference, purpose, userId }`, idempotency key `pi-<payment reference>`. The PaymentIntent id is stored as the payment's `providerRef`. The client secret is **never stored** and never logged. The customer is told "Complete the card payment to confirm <ref>."
-2. The app asks `payments:card-sheet` with `{ orderId }` or `{ reference }` and gets `{ reference, clientSecret, publishableKey, amountUsd, currency: "usd", merchantName: "Somba & Teka" }` for its **own** pending card payment only. Errors: `Payment not found.` (unknown or not yours), `This payment is not waiting for a card.`, `Card payments are not available.`
+2. The app asks `payments:card-sheet` with `{ orderId }` or `{ reference }` and gets `{ reference, clientSecret, publishableKey, amountUsd, currency: "usd", merchantName: "KOMORIKO" }` for its **own** pending card payment only. Errors: `Payment not found.` (unknown or not yours), `This payment is not waiting for a card.`, `Card payments are not available.`
 3. The customer pays in the sheet. Stripe calls the webhook:
    * `payment_intent.succeeded` → the payment is `succeeded` and the order is confirmed and goes to fulfilment. The amount Stripe **received** must equal what we asked for, in USD; otherwise the payment is never marked paid and finance gets a "Payment amount mismatch" alert.
    * `payment_intent.payment_failed` → **not final**: the customer can try another card in the same sheet. Only the reason is recorded (`failureReason` on the pending payment).

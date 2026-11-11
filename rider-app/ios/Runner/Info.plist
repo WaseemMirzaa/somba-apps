@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Somba&amp;Teka Rider</string>
+	<string>KOMORIKO Rider</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>somba_rider</string>
+	<string>KOMORIKO Rider</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -74,13 +74,13 @@
 	<key>GMSApiKey</key>
 	<string>$(GOOGLE_MAPS_API_KEY)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Somba&amp;Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.</string>
+	<string>KOMORIKO Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Somba&amp;Teka Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.</string>
+	<string>KOMORIKO Rider shares your position with the customer while a delivery is on its way, even when the screen is off. Sharing stops when the delivery ends.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Somba&amp;Teka Rider lets you choose photos from your library to attach to a support ticket (for example a damaged parcel) or to send a document such as your driver licence or vehicle insurance.</string>
+	<string>KOMORIKO Rider lets you choose photos from your library to attach to a support ticket (for example a damaged parcel) or to send a document such as your driver licence or vehicle insurance.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Somba&amp;Teka Rider uses the camera to take a photo of a parcel at the door as proof of delivery, a photo you attach to a support ticket (for example a damaged parcel), or a document such as your driver licence or vehicle insurance.</string>
+	<string>KOMORIKO Rider uses the camera to take a photo of a parcel at the door as proof of delivery, a photo you attach to a support ticket (for example a damaged parcel), or a document such as your driver licence or vehicle insurance.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>comgooglemaps</string>

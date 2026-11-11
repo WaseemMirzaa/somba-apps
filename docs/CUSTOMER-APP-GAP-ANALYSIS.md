@@ -34,7 +34,7 @@ Priority: **P0** blocks or breaks a core flow today · **P1** expected by shoppe
 
 ## 1. Cart
 
-| Feature | Jumia | Amazon | Flipkart | **Somba** | Priority |
+| Feature | Jumia | Amazon | Flipkart | **KOMORIKO** | Priority |
 |---|---|---|---|---|---|
 | Cart saved to the account (same cart on web, app, other phone) | ✓ | ✓ | ✓ | ✗ device only, cleared on sign-out | **P1** |
 | Product variants (size / colour) chosen before adding | ✓ | ✓ | ✓ | ✗ always "Default", no picker | **P0** for fashion |
@@ -51,7 +51,7 @@ Priority: **P0** blocks or breaks a core flow today · **P1** expected by shoppe
 
 ## 2. Checkout & payment
 
-| Feature | Jumia | Amazon | Flipkart | **Somba** | Priority |
+| Feature | Jumia | Amazon | Flipkart | **KOMORIKO** | Priority |
 |---|---|---|---|---|---|
 | One-page checkout with clear step errors next to the button | ✓ | ✓ | ✓ | ✗ see B1/B2 | **P0** |
 | Delivery zone/fee chosen **automatically** from the address | ✓ | ✓ | ✓ | ✗ manual zone radio list | **P0** |
@@ -68,7 +68,7 @@ Priority: **P0** blocks or breaks a core flow today · **P1** expected by shoppe
 
 ## 3. Orders after purchase
 
-| Feature | Jumia | Amazon | Flipkart | **Somba** | Priority |
+| Feature | Jumia | Amazon | Flipkart | **KOMORIKO** | Priority |
 |---|---|---|---|---|---|
 | Order list with filters, order detail, status timeline | ✓ | ✓ | ✓ | ✓ | — |
 | **Live rider tracking on a map** with ETA | partial | ✓ | ✓ | ✗ lat/lng text + "Open in Maps" | **P1** |
@@ -87,7 +87,7 @@ Priority: **P0** blocks or breaks a core flow today · **P1** expected by shoppe
 
 ## 4. Location & addresses
 
-| Feature | Jumia | Amazon | Flipkart | **Somba** | Priority |
+| Feature | Jumia | Amazon | Flipkart | **KOMORIKO** | Priority |
 |---|---|---|---|---|---|
 | Map pin / place search / "use my location" | ✓ | ✓ | ✓ | ✓ (needs Maps key) | — |
 | **Edit an address** | ✓ | ✓ | ✓ | ✗ add/delete only | **P0** |

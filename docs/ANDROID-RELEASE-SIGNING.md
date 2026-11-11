@@ -103,7 +103,7 @@ this if you want that separation. The command is the same with `-alias somba-rid
    Release cannot silently fall back to the debug key. Pull-request builds are not given the key: they stay debug-signed
    (they publish nothing). Without `ANDROID_KEYSTORE_BASE64` the workflows behave exactly as before.
 
-4. Check a published APK (Android SDK build-tools): `apksigner verify --print-certs somba-customer.apk`. The certificate
+4. Check a published APK (Android SDK build-tools): `apksigner verify --print-certs komoriko-customer.apk`. The certificate
    must be yours, not "Android Debug".
 
 To build a signed APK on your own machine instead, create `android/key.properties` as shown above (it is git-ignored,

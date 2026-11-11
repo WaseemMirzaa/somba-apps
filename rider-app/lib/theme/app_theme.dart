@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Design system for the Somba rider app — an energetic emerald/teal identity
+/// Design system for the KOMORIKO rider app — an energetic emerald/teal identity
 /// that reads as "on the move / on duty".
 class AppColors {
   AppColors._();
 
-  // Royal-blue brand, matching the Somba&Teka logo tile (web --logo-primary).
+  // Royal-blue brand, matching the KOMORIKO logo tile (web --logo-primary).
   static const Color primary = Color(0xFF1A3AA8); // logo royal blue
   static const Color primaryDark = Color(0xFF0E1F5C); // logo dark
   static const Color teal = Color(0xFF2A52CF); // mid royal blue
@@ -17,7 +17,7 @@ class AppColors {
   static const Color danger = Color(0xFFEF4444); // failed / return
   static const Color violet = Color(0xFF7C3AED); // pickup
 
-  // Neutrals aligned with the Somba&Teka web app.
+  // Neutrals aligned with the KOMORIKO web app.
   static const Color ink = Color(0xFF0B1020); // web foreground
   static const Color inkSoft = Color(0xFF334155);
   static const Color muted = Color(0xFF64748B);

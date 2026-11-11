@@ -1,4 +1,4 @@
-# Payment Terminology Inventory — Somba&Teka Web App
+# Payment Terminology Inventory — KOMORIKO Web App
 
 Every payment-related sentence, label, and word across the web app (English + French).
 Generated from a full sweep of `web/src`. Grouped by area; "Sentences" = UI/marketing copy,
@@ -11,7 +11,7 @@ Generated from a full sweep of `web/src`. Grouped by area; "Sentences" = UI/mark
 | Concept | English | French |
 |---|---|---|
 | Card (Stripe) | "Stripe — Card", "Card", "Card payment" | "Stripe — Carte", "Carte", "Paiement par carte" |
-| Wallet | "Somba&Teka Wallet", "wallet balance", "store credit" | "Portefeuille Somba&Teka", "solde", "crédit en boutique" |
+| Wallet | "KOMORIKO Wallet", "wallet balance", "store credit" | "Portefeuille KOMORIKO", "solde", "crédit en boutique" |
 | Mobile money | "Airtel Money", "Orange Money", "Vodacom M-Pesa", "mobile money" | same (+ "mobile money") |
 | Bank transfer (payouts) | "Bank Transfer" | "Virement bancaire" |
 | Refund target | "Original Payment" | "Paiement d'origine" |
@@ -25,20 +25,20 @@ Config (`lib/config.ts`): `PAYMENTS.methods = [stripe_card, airtel_money, orange
 
 ### Checkout & payment (`app/shop/checkout`, `…/checkout/payment`)
 **Sentences:** "Continue to Payment" / "Continuer vers le paiement" · "Payment Method" / "Mode de paiement" · "Payment failed" / "Échec du paiement" · "Retry payment" / "Réessayer" · "Payment failed — retry" / "Paiement échoué — réessayez" · "Your reservation is held for 15 min." / "Votre réservation est maintenue 15 min." · "Pay" / "Payer" · breadcrumb "Checkout" / "Caisse"
-**Methods/labels:** "Stripe — Card" · "Somba&Teka Wallet ($142.50)" · "Airtel Money" · "[Stripe Card Element — mock]" · "Total"
+**Methods/labels:** "Stripe — Card" · "KOMORIKO Wallet ($142.50)" · "Airtel Money" · "[Stripe Card Element — mock]" · "Total"
 
 ### Cart (`app/shop/cart`)
 "Promo code" / "Code promo" · "Apply" / "Appliquer" · "…applied" / "…appliqué" · "Subtotal" / "Sous-total" · "Discount" / "Réduction" · "Delivery (zone)" / "Livraison (zone)" · "FREE" / "GRATUIT" · "Total" · "Continue to Checkout" / "Passer à la caisse"
 
 ### Wallet (`app/shop/wallet`)
-**Sentences:** "Somba&Teka Wallet" / "Portefeuille Somba&Teka" · "Store credit · Top-up via mobile money · Cashback" / "Crédit en boutique · Recharge via mobile money · Cashback" · "Available Balance" / "Solde disponible" · "Top Up via Airtel" / "Recharger via Airtel" · "Withdraw" / "Retirer" · "Withdrawal request submitted" / "Demande de retrait soumise" · "Top Up Wallet" / "Recharger le portefeuille" · "Amount (USD)" / "Montant (USD)" · "Airtel Money number" / "Numéro Airtel Money" · "Confirm Top-up" / "Confirmer la recharge" · "Wallet topped up +$50" / "Portefeuille rechargé +$50" · "Transaction History" / "Historique des transactions"
+**Sentences:** "KOMORIKO Wallet" / "Portefeuille KOMORIKO" · "Store credit · Top-up via mobile money · Cashback" / "Crédit en boutique · Recharge via mobile money · Cashback" · "Available Balance" / "Solde disponible" · "Top Up via Airtel" / "Recharger via Airtel" · "Withdraw" / "Retirer" · "Withdrawal request submitted" / "Demande de retrait soumise" · "Top Up Wallet" / "Recharger le portefeuille" · "Amount (USD)" / "Montant (USD)" · "Airtel Money number" / "Numéro Airtel Money" · "Confirm Top-up" / "Confirmer la recharge" · "Wallet topped up +$50" / "Portefeuille rechargé +$50" · "Transaction History" / "Historique des transactions"
 **Transaction descriptions:** "…cashback" / "Cashback commande…" · "Checkout payment" / "Paiement à la commande" · "Airtel Money top-up" / "Recharge Airtel Money" · "Return … refund to wallet" / "Remboursement retour … vers le portefeuille"
 
 ### Orders & refunds (`app/shop/orders`, `…/[id]`, `…/[id]/return`, `…/returns/[id]`)
 "Payment" column / "Paiement" · payment status: paid→"Payé", refunded→"Remboursé", pending→"En attente" · detail labels "Method"/"Moyen", "Transaction", "Status"/"Statut", "Amount"/"Montant" · "Refund method: Original payment (Card/Airtel Money)" / "Mode de remboursement : Paiement d'origine (Carte/Airtel Money)" · "Refunded" / "Remboursé" · "Refund" / "Remboursement"
 
 ### Referral / account / support / product
-"earn wallet credit on their first order" / "gagnez du crédit portefeuille…" · "Give $10, Get $10" · "$10 wallet credit" · account menu "Payment methods → Somba&Teka Wallet · Airtel top-up" · support placeholder "Order issue, return, payment…" / "…retour, paiement…" · product "Wallet cashback" / "Remboursement portefeuille" · purchase CTA "…add to cart, checkout, and track…" / "…ajouter au panier, payer…"
+"earn wallet credit on their first order" / "gagnez du crédit portefeuille…" · "Give $10, Get $10" · "$10 wallet credit" · account menu "Payment methods → KOMORIKO Wallet · Airtel top-up" · support placeholder "Order issue, return, payment…" / "…retour, paiement…" · product "Wallet cashback" / "Remboursement portefeuille" · purchase CTA "…add to cart, checkout, and track…" / "…ajouter au panier, payer…"
 
 ---
 
@@ -103,19 +103,19 @@ Settings: "Commission (Δ4)", "Default commission %"/"Commission par défaut %",
 **Payment types:** Prepaid/Prépayé · Card/Carte · Cash/Espèces · Mobile money
 **Issues:** rider fail reason "Payment issue"/"Problème de paiement" · "Payment mismatch"/"Écart de paiement" (warehouse exception) · "Payment mismatch — BAT-039 · $240 variance"/"Écart paiement — BAT-039 · Écart 240 $"
 **COD reconciliation** (`warehouse-entities.ts`): expected / collected / difference / variance fields; shift-reconciliation variance notes ("Rider reported customer on ORD-2024-006 paid $439 instead of $499…" / "Le livreur signale que le client … a payé 439 $ au lieu de 499 $…")
-**Refund methods** (warehouse returns): "Somba&Teka Wallet"/"Portefeuille Somba&Teka", "Original Payment"/"Paiement d'origine"
+**Refund methods** (warehouse returns): "KOMORIKO Wallet"/"Portefeuille KOMORIKO", "Original Payment"/"Paiement d'origine"
 
 ---
 
 ## 5. Marketing / landing / legal
 
-**Landing & product-landing.ts:** marquee "Card · Mobile money · Wallet"/"Carte · Mobile money · Portefeuille" · MODULES_SECTION "From checkout to doorstep — payments, delivery, returns…"/"De la commande à la livraison — paiements…" · Secure Payments module "Card or Somba&Teka wallet — fraud-checked checkout with buyer protection on every order."/"Carte ou portefeuille Somba&Teka — paiement vérifié…", highlight "Card + wallet"/"Carte + portefeuille", CTA "See payment options"/"Voir les paiements", "Encrypted checkout"/"Paiement chiffré" · PAYMENT_OPTIONS "Card & Wallet — Pay securely at checkout with saved cards or your Somba&Teka wallet balance."/"Payez en toute sécurité par carte ou portefeuille…" · WHY_CHOOSE "Secure payments — Card and wallet options with buyer protection on every order."/"Carte et portefeuille avec protection acheteur…" · PRODUCT_HERO bullet "Card and wallet"/"Carte et portefeuille", guarantee "Guest checkout"/"Paiement invité" · TRUST_SIGNALS "Secure checkout"/"Paiement sécurisé" · HOW_IT_WORKS "Checkout securely — Pay with card or Somba&Teka wallet…"/"Payer en sécurité — Payez par carte ou portefeuille…" · FAQ "What payment methods are accepted? — We accept credit/debit cards and Somba&Teka wallet balance…"/"Quels moyens de paiement sont acceptés ? — Cartes bancaires et portefeuille Somba&Teka…"
+**Landing & product-landing.ts:** marquee "Card · Mobile money · Wallet"/"Carte · Mobile money · Portefeuille" · MODULES_SECTION "From checkout to doorstep — payments, delivery, returns…"/"De la commande à la livraison — paiements…" · Secure Payments module "Card or KOMORIKO wallet — fraud-checked checkout with buyer protection on every order."/"Carte ou portefeuille KOMORIKO — paiement vérifié…", highlight "Card + wallet"/"Carte + portefeuille", CTA "See payment options"/"Voir les paiements", "Encrypted checkout"/"Paiement chiffré" · PAYMENT_OPTIONS "Card & Wallet — Pay securely at checkout with saved cards or your KOMORIKO wallet balance."/"Payez en toute sécurité par carte ou portefeuille…" · WHY_CHOOSE "Secure payments — Card and wallet options with buyer protection on every order."/"Carte et portefeuille avec protection acheteur…" · PRODUCT_HERO bullet "Card and wallet"/"Carte et portefeuille", guarantee "Guest checkout"/"Paiement invité" · TRUST_SIGNALS "Secure checkout"/"Paiement sécurisé" · HOW_IT_WORKS "Checkout securely — Pay with card or KOMORIKO wallet…"/"Payer en sécurité — Payez par carte ou portefeuille…" · FAQ "What payment methods are accepted? — We accept credit/debit cards and KOMORIKO wallet balance…"/"Quels moyens de paiement sont acceptés ? — Cartes bancaires et portefeuille KOMORIKO…"
 
 **Seller marketing:** "From $49/mo"/"Dès 49 $/mois" · "Timely payouts — Transparent commission, weekly payouts, and a full finance dashboard…"/"Paiements à temps — Commission transparente, paiements hebdomadaires…" · "Get paid — Track earnings, request payouts…"/"Soyez payé — Suivez vos revenus, demandez des paiements…" · SELL_ONLINE_FAQ "What are the seller fees? — Monthly plans start at $49/mo. Platform commission applies per category (typically 8–15%)…" · "When do I get paid? — Payouts are processed weekly after order delivery and return window."
 
 **get-app:** "Card, wallet & mobile money"/"Carte, portefeuille et mobile money"
 
-**Legal (`app/legal/terms`, `…/privacy`):** §2 "Orders & Payments — We support Stripe card payments, Airtel Money, and the Somba&Teka Wallet."/"Commandes et paiements — Nous acceptons les paiements par carte Stripe, Airtel Money et le portefeuille Somba&Teka." · §3 "Refunds may be issued to the original payment method or Somba&Teka Wallet…"/"Les remboursements peuvent être effectués sur le moyen de paiement d'origine ou sur le portefeuille…" · Privacy "payment details (tokenized)"/"détails de paiement (tokenisés)" · Terms §1 "…facilitates transactions, payments, and logistics…"/"…facilite les transactions, les paiements…"
+**Legal (`app/legal/terms`, `…/privacy`):** §2 "Orders & Payments — We support Stripe card payments, Airtel Money, and the KOMORIKO Wallet."/"Commandes et paiements — Nous acceptons les paiements par carte Stripe, Airtel Money et le portefeuille KOMORIKO." · §3 "Refunds may be issued to the original payment method or KOMORIKO Wallet…"/"Les remboursements peuvent être effectués sur le moyen de paiement d'origine ou sur le portefeuille…" · Privacy "payment details (tokenized)"/"détails de paiement (tokenisés)" · Terms §1 "…facilitates transactions, payments, and logistics…"/"…facilite les transactions, les paiements…"
 
 ---
 

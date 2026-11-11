@@ -103,7 +103,7 @@ describe('hub scoping of orders, incidents and inventory', () => {
         ['pickup', 'delivered', 'Rita', null, 'Limete'],
         ['transfer', 'in_transit', null, 'Limete', 'Gombe'],
       ]);
-      expect(v.tracking).toMatchObject({ currentLeg: 'transfer', carrier: 'Somba&Teka' });
+      expect(v.tracking).toMatchObject({ currentLeg: 'transfer', carrier: 'KOMORIKO' });
       expect(JSON.stringify(v.tracking)).not.toContain('+2439'); // no contact in the journey
       // No tasks yet: tracking is null, names still there. Several orders at once each get their own.
       const bare = await mkOrder({ customerId: 'c1', destinationHubId: paris.id, originHubIds: [] });

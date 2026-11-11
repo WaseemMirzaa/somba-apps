@@ -194,7 +194,7 @@ export default function HomePage() {
                 href="/sell-online"
                 className="inline-flex items-center gap-2 rounded-xl px-6 py-3.5 text-base font-semibold text-slate-700 transition-colors hover:bg-slate-100"
               >
-                {fr ? "Vendre sur Somba&Teka" : "Sell on Somba&Teka"}
+                {fr ? "Vendre sur KOMORIKO" : "Sell on KOMORIKO"}
                 <ChevronRight className="h-4 w-4" />
               </Link>
             </div>
@@ -380,7 +380,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4">
           <SectionIntro
             center
-            label={fr ? "Nos services" : "Why Somba&Teka"}
+            label={fr ? "Nos services" : "Why KOMORIKO"}
             title={fr ? MODULES_SECTION.titleFr : MODULES_SECTION.title}
             desc={fr ? MODULES_SECTION.subtitleFr : MODULES_SECTION.subtitle}
           />
@@ -615,7 +615,7 @@ export default function HomePage() {
           <SectionIntro
             center
             label={fr ? "Vendeurs" : "For sellers"}
-            title={fr ? "Vendez sur Somba&Teka" : "Sell on Somba&Teka"}
+            title={fr ? "Vendez sur KOMORIKO" : "Sell on KOMORIKO"}
             desc={
               fr
                 ? "Ouvrez votre boutique — choisissez un plan et commencez à vendre."
@@ -698,7 +698,7 @@ export default function HomePage() {
           <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-white p-2 shadow-lg shadow-blue-950/20">
             <Image
               src="/brand/logo-stack.png"
-              alt="Somba&Teka"
+              alt="KOMORIKO"
               width={96}
               height={96}
               priority
@@ -710,8 +710,8 @@ export default function HomePage() {
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-lg text-white/75">
             {fr
-              ? "Parcourez les produits ou ouvrez votre boutique sur Somba&Teka."
-              : "Browse the products or open your seller store on Somba&Teka."}
+              ? "Parcourez les produits ou ouvrez votre boutique sur KOMORIKO."
+              : "Browse the products or open your seller store on KOMORIKO."}
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link

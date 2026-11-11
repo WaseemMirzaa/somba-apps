@@ -357,7 +357,7 @@ export function useSellerShipments() {
           orderRealId: o.orderId,
           status,
           createdDate: localDay(o.createdAt),
-          carrier: tracking?.carrier ?? "Somba&Teka",
+          carrier: tracking?.carrier ?? "KOMORIKO",
           riderFirstName: tracking?.riderFirstName ?? null,
           currentLeg: tracking?.currentLeg ?? null,
           lastUpdateAt: tracking?.lastUpdateAt ?? null,

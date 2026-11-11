@@ -1,6 +1,6 @@
-# Somba&Teka — Application Screenshot Preview
+# KOMORIKO — Application Screenshot Preview
 
-A visual walkthrough of every screen across the Somba&Teka apps. Two mobile apps are shown: the **Customer app** and the **Rider app**. The web portals (Seller, Admin, Warehouse) are covered separately.
+A visual walkthrough of every screen across the KOMORIKO apps. Two mobile apps are shown: the **Customer app** and the **Rider app**. The web portals (Seller, Admin, Warehouse) are covered separately.
 
 > **Note:** these captures show the UI/UX and full screen inventory. The apps now run on the live realtime backend; a refreshed set against live data can be regenerated on request.
 

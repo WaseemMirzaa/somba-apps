@@ -1,4 +1,4 @@
-# Somba&Teka API. Single-stage (prototype) — native deps (better-sqlite3,
+# KOMORIKO API. Single-stage (prototype) — native deps (better-sqlite3,
 # mysql2) compile against the full node image's toolchain.
 FROM node:22
 

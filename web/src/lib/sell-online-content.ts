@@ -5,7 +5,7 @@
  */
 
 export const SELL_ONLINE_WHY = [
-  { icon: "Users", title: "Shoppers already here", titleFr: "Des acheteurs déjà présents", desc: "Your products appear in the Somba&Teka shop and app next to other sellers' listings, so you do not have to build a storefront and its traffic from scratch.", descFr: "Vos produits apparaissent dans la boutique et l'app Somba&Teka à côté de ceux des autres vendeurs : pas besoin de construire une vitrine et son trafic." },
+  { icon: "Users", title: "Shoppers already here", titleFr: "Des acheteurs déjà présents", desc: "Your products appear in the KOMORIKO shop and app next to other sellers' listings, so you do not have to build a storefront and its traffic from scratch.", descFr: "Vos produits apparaissent dans la boutique et l'app KOMORIKO à côté de ceux des autres vendeurs : pas besoin de construire une vitrine et son trafic." },
   { icon: "Truck", title: "Delivery handled", titleFr: "Livraison prise en charge", desc: "Riders collect parcels from your pickup address and deliver them. You pack the order and mark it ready.", descFr: "Les livreurs collectent les colis à votre adresse de collecte et les livrent. Vous préparez la commande et la marquez prête." },
   { icon: "Wallet", title: "Clear payouts", titleFr: "Paiements clairs", desc: "Earnings from delivered orders become available for payout. Request one from your finance dashboard and follow it until it is paid.", descFr: "Les gains des commandes livrées deviennent disponibles. Demandez un paiement depuis votre tableau de bord finance et suivez-le jusqu'au versement." },
   { icon: "TrendingUp", title: "Growth tools", titleFr: "Outils de croissance", desc: "Discount campaigns, real sales analytics, a store health score and public replies to customer reviews.", descFr: "Campagnes de remise, analytique de ventes réelle, score de santé de la boutique et réponses publiques aux avis clients." },
@@ -30,7 +30,7 @@ export const SELL_ONLINE_TOOLS = [
 ] as const;
 
 export const SELL_ONLINE_FAQ = [
-  { q: "Who can sell on Somba&Teka?", qFr: "Qui peut vendre sur Somba&Teka ?", a: "Anyone can apply: create a seller account and open a store. Moderators approve each store before it can list products.", aFr: "Tout le monde peut postuler : créez un compte vendeur et ouvrez une boutique. La modération valide chaque boutique avant qu'elle puisse publier des produits." },
+  { q: "Who can sell on KOMORIKO?", qFr: "Qui peut vendre sur KOMORIKO ?", a: "Anyone can apply: create a seller account and open a store. Moderators approve each store before it can list products.", aFr: "Tout le monde peut postuler : créez un compte vendeur et ouvrez une boutique. La modération valide chaque boutique avant qu'elle puisse publier des produits." },
   { q: "What does it cost?", qFr: "Combien ça coûte ?", a: "The plans above show the current prices and listing limits. On top of the plan, a commission is deducted from each delivered sale; your finance dashboard shows the exact rate and amounts.", aFr: "Les offres ci-dessus affichent les prix et limites d'annonces actuels. En plus de l'offre, une commission est déduite de chaque vente livrée ; votre tableau de bord finance montre le taux et les montants exacts." },
   { q: "How does delivery work?", qFr: "Comment fonctionne la livraison ?", a: "You pack the order and mark it ready. A rider collects it from your pickup address and delivers it to the customer.", aFr: "Vous préparez la commande et la marquez prête. Un livreur la collecte à votre adresse de collecte et la livre au client." },
   { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Once orders are delivered their earnings become available. Request a payout from your finance dashboard; the finance team reviews it and you can follow its status there.", aFr: "Une fois les commandes livrées, leurs gains deviennent disponibles. Demandez un paiement depuis votre tableau de bord finance ; l'équipe finance l'examine et vous suivez son statut au même endroit." },
@@ -38,8 +38,8 @@ export const SELL_ONLINE_FAQ = [
 ] as const;
 
 export const SELL_ONLINE_HERO = {
-  subtitle: "Open a store, list your products and sell to shoppers on Somba&Teka. Orders, delivery, payouts, promotions and reviews are all managed from one seller portal.",
-  subtitleFr: "Ouvrez une boutique, publiez vos produits et vendez aux acheteurs de Somba&Teka. Commandes, livraison, paiements, promotions et avis se gèrent depuis un seul portail vendeur.",
+  subtitle: "Open a store, list your products and sell to shoppers on KOMORIKO. Orders, delivery, payouts, promotions and reviews are all managed from one seller portal.",
+  subtitleFr: "Ouvrez une boutique, publiez vos produits et vendez aux acheteurs de KOMORIKO. Commandes, livraison, paiements, promotions et avis se gèrent depuis un seul portail vendeur.",
   cta: "Start selling",
   ctaFr: "Commencer à vendre",
   secondaryCta: "View seller plans",

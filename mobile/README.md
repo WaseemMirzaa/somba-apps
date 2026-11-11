@@ -1,6 +1,6 @@
-# Somba — Customer App (Flutter)
+# KOMORIKO — Customer App (Flutter)
 
-The customer-facing marketplace app for **Somba&Teka**, built with Flutter.
+The customer-facing marketplace app for **KOMORIKO**, built with Flutter.
 
 ## Highlights
 
@@ -62,27 +62,27 @@ touches `mobile/`:
 1. Sets up JDK 17 + Flutter 3.35.7
 2. `flutter pub get` → `flutter analyze` → `flutter test`
 3. `flutter build apk --release` (universal) and `--split-per-abi`
-4. Uploads the APKs as a workflow artifact (`somba-customer-apk`)
-5. Publishes a GitHub Release with `somba-customer.apk` attached
+4. Uploads the APKs as a workflow artifact (`komoriko-customer-apk`)
+5. Publishes a GitHub Release with `komoriko-customer.apk` attached
 
 Download the latest APK from the repository **Releases** page or from the workflow
 run's **Artifacts**.
 
 ## Install the test APK
 
-The CI build of this app talks to the **live test server** (`http://107.170.116.169`), so a client can install it and try it.
+The CI build of this app talks to the **live test server** (`https://komoriko.com`), so a client can install it and try it.
 
-1. **Download.** Open the repository **Releases** page and take `somba-customer.apk` from the latest `customer-apk-v<N>` release, or open the **Actions** tab, pick the latest "Customer App · Build APK" run and download the `somba-customer-apk` artifact (a zip containing `somba-customer.apk` and the per-ABI APKs). Use `somba-customer.apk` (universal) unless you know the phone's ABI.
+1. **Download.** Open the repository **Releases** page and take `komoriko-customer.apk` from the latest `customer-apk-v<N>` release, or open the **Actions** tab, pick the latest "Customer App · Build APK" run and download the `komoriko-customer-apk` artifact (a zip containing `komoriko-customer.apk` and the per-ABI APKs). Use `komoriko-customer.apk` (universal) unless you know the phone's ABI.
 2. **Allow the install.** On the phone: Settings, then Security (or "Install unknown apps"), then allow your browser or file manager to install unknown apps. Open the APK and confirm.
 3. **Server.** The APK was built with `API_URL` set to the server named in the release notes and in the run summary ("Talks to: ..."). The Socket.IO realtime connection uses the same host. Plain HTTP is allowed on Android only for `107.170.116.169` (`android/app/src/main/res/xml/network_security_config.xml`, release builds included); any other host must be HTTPS. To point a build elsewhere, run the workflow by hand (Actions, "Run workflow") and fill in **api_url**, or set the repo variable `LIVE_API_URL`; if the new host is plain HTTP, add it to the network security config first.
-4. **Sign in.** Sign in with one of the demo **customers** (their e-mail ends in `@demo.sombateka.test`). Accounts and where their passwords are kept: `deploy/DEMO-SEED.md` (the demo data must be installed on the server). Do not share passwords in the repository or in tickets.
+4. **Sign in.** Sign in with one of the demo **customers** (their e-mail ends in `@demo.komoriko.test`). Accounts and where their passwords are kept: `deploy/DEMO-SEED.md` (the demo data must be installed on the server). Do not share passwords in the repository or in tickets.
 5. **Upgrading.** If a debug-signed APK is installed (an earlier CI build, or `flutter run`), uninstall it before installing a release-signed one: Android refuses to update an app signed with a different key. The same applies the other way round. Signing: `docs/ANDROID-RELEASE-SIGNING.md`.
 
 ### Repo variables and secrets the APK workflow reads
 
 | Name | Kind | Becomes | Needed |
 |---|---|---|---|
-| `LIVE_API_URL` | variable | `--dart-define=API_URL` (base URL, no `/api/v1`; the **api_url** run input wins) | optional, default `http://107.170.116.169` |
+| `LIVE_API_URL` | variable | `--dart-define=API_URL` (base URL, no `/api/v1`; the **api_url** run input wins) | optional, default `https://komoriko.com` |
 | `LIVE_SOCKET_URL` | variable | `--dart-define=SOCKET_URL` | optional, only if Socket.IO is on another host |
 | `GOOGLE_MAPS_API_KEY` | secret | `--dart-define=GOOGLE_MAPS_API_KEY` and the Android manifest placeholder of the same name | optional, map off without it |
 | `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_ANDROID_APP_ID` | secrets | `--dart-define` with the same names | optional, all four for push |

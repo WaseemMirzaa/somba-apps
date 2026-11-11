@@ -55,7 +55,7 @@ export interface SellerTracking {
   lastUpdateAt: Date | null;
 }
 
-export const CARRIER = 'Somba&Teka';
+export const CARRIER = 'KOMORIKO';
 
 /** The coarse place of a delivery address: its city only (never the street, number or contact). */
 export function cityOf(shippingAddress: string | null | undefined): string | null {

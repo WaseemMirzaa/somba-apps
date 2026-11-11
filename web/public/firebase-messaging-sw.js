@@ -1,4 +1,4 @@
-/* Firebase web push for the Somba&Teka portals (registered by src/lib/web-push.ts).
+/* Firebase web push for the KOMORIKO portals (registered by src/lib/web-push.ts).
  *
  * Shows a notification when a push arrives and no portal tab is in front, and opens the page it is about when
  * clicked. The public Firebase config comes from this file's URL (?apiKey=…&projectId=…), so nothing is

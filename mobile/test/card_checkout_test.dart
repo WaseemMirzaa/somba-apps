@@ -81,7 +81,7 @@ Map<String, dynamic> _sheetAnswer(Map<String, dynamic>? body) {
     'publishableKey': _publishableKey,
     'amountUsd': 23,
     'currency': 'usd',
-    'merchantName': 'Somba & Teka',
+    'merchantName': 'KOMORIKO',
   };
 }
 
@@ -236,7 +236,7 @@ void main() {
       expect(_sheet.opened, hasLength(1));
       expect(_sheet.opened.single.publishableKey, _publishableKey, reason: 'the key comes from the server answer');
       expect(_sheet.opened.single.clientSecret, _clientSecret);
-      expect(_sheet.opened.single.merchantName, 'Somba & Teka');
+      expect(_sheet.opened.single.merchantName, 'KOMORIKO');
     });
 
     for (final lang in ['en', 'fr']) {
