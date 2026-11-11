@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
+import '../../widgets/notifications_off_row.dart';
 import 'auth_screens.dart' show OtpScreen, VerifyEmailScreen;
 import 'support_extra.dart';
 
@@ -29,6 +30,7 @@ class CustomerSettingsScreen extends StatelessWidget {
           appBar: backAppBar(context, s.settings),
           body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
             _group(s.settingsNotifications, [
+              const NotificationsOffRow(),
               _toggle(Icons.notifications_active_rounded, s.settingsPush, s.settingsPushSub, pref('push'), (v) => store.setPref('push', v)),
               _toggle(Icons.mail_outline_rounded, s.settingsEmail, s.settingsEmailSub, pref('email'), (v) => store.setPref('email', v)),
               _toggle(Icons.sms_outlined, s.settingsSms, s.settingsSmsSub, pref('sms'), (v) => store.setPref('sms', v)),

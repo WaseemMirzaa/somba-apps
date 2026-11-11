@@ -14,6 +14,7 @@ import 'shift_screen.dart';
 import 'vehicle_screen.dart';
 import 'support_screen.dart';
 import '../theme/app_theme.dart';
+import '../widgets/notifications_off_row.dart';
 import '../widgets/ui.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -114,6 +115,7 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(height: 12),
               const _DocumentsEntry(),
               const SizedBox(height: 12),
+              const NotificationsOffRow(),
               ListenableBuilder(
                 listenable: NotificationSound.instance,
                 builder: (context, _) => SurfaceCard(

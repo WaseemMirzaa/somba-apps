@@ -8,6 +8,7 @@ import { ShopProvider } from "@/context/shop-context";
 import { MarketProvider } from "@/context/market-context";
 import { RealtimeProvider } from "@/context/realtime-context";
 import { LocaleAccountSync } from "@/components/layout/locale-account-sync";
+import { AlertsPrompt } from "@/components/layout/alerts-prompt";
 
 // Fonts ship inside the app (npm packages @fontsource-variable/*), so a build or a deploy never depends on Google being reachable.
 const inter = localFont({
@@ -53,6 +54,7 @@ export default function RootLayout({
                                                             <ShopProvider>
                         <ToastProvider>
                           <LocaleAccountSync />
+                          <AlertsPrompt />
                           {children}
                         </ToastProvider>
                       </ShopProvider>

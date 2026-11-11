@@ -7,6 +7,7 @@ import { Bell, BellRing } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { noticeHref, type NoticePortal } from "@/lib/notice-links";
+import { alertsResultToast } from "@/lib/alerts-feedback";
 import { enableAlerts, notificationPermission, notificationsSupported, webPushActive, webPushConfigured } from "@/lib/web-push";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { SoundSwitch } from "@/components/ui/sound-switch";
@@ -105,20 +106,8 @@ export function NotificationBell({ portal, fr }: { portal: NoticePortal; fr: boo
     const r = await enableAlerts();
     setBusy(false);
     setPermission(notificationPermission());
-    if (r.ok) {
-      toast(
-        r.push
-          ? fr ? "Alertes activées, même onglet fermé" : "Alerts on, even with the tab closed"
-          : fr ? "Alertes activées tant qu'un onglet est ouvert" : "Alerts on while a tab is open",
-        "success",
-      );
-    } else if (r.reason === "denied") {
-      toast(fr ? "Alertes bloquées : autorisez-les dans les réglages du navigateur" : "Alerts are blocked: allow them in your browser settings", "error");
-    } else if (r.reason === "unsupported") {
-      toast(fr ? "Ce navigateur ne gère pas les alertes" : "This browser does not support alerts", "error");
-    } else {
-      toast(fr ? `Impossible d'activer les alertes : ${r.message ?? ""}` : `Could not turn on alerts: ${r.message ?? ""}`, "error");
-    }
+    const t = alertsResultToast(r, fr);
+    toast(t.text, t.kind);
   }
 
   /** `devices:test`: a test notice to yourself, pushed to every device registered for your account. */
@@ -177,6 +166,11 @@ export function NotificationBell({ portal, fr }: { portal: NoticePortal; fr: boo
                 {busy ? "…" : fr ? "Activer les alertes" : "Turn on alerts"}
               </button>
             </div>
+          )}
+          {notificationsSupported() && permission === "denied" && (
+            <p className="border-b border-[var(--border)] bg-slate-50 px-4 py-2.5 text-xs text-slate-600">
+              {fr ? "Les notifications sont bloquées dans les réglages de votre navigateur." : "Notifications are blocked in your browser settings."}
+            </p>
           )}
           <SoundSwitch className="border-b border-[var(--border)] px-4 py-2.5" />
           {latest.length === 0 ? (
