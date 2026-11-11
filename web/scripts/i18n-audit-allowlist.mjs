@@ -45,6 +45,10 @@ export const ALLOW_DATA_NAMES = [
   "Gombe, Kinshasa", // demo address (place names)
   "Maluku, Kinshasa", // demo address (place names)
   "Family (Maluku)", // address label typed by the demo customer
+  "Entrepôt Kinshasa · Kinshasa", // demo warehouse name and city
+  "12 Avenue du Commerce, Gombe, Kinshasa", // demo delivery address
+  "Demo Warehouse Supervisor", // demo staff member
+  "Samuel Kitenge", // demo reviewer
   "Somba@2026", // the demo password printed on the /live developer console in a demo build
 ];
 
