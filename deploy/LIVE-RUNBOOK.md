@@ -98,7 +98,7 @@ The two flags can be given together.
 |---|---|
 | Your real admin login | the `ADMIN_EMAIL` you passed. Password: `ADMIN_PASSWORD` in `/etc/somba/secrets.env`; read it with `grep '^ADMIN_PASSWORD=' /etc/somba/secrets.env` (root). It was also printed once by the first deploy. If you changed it in the app, the file is stale |
 | Demo accounts, passwords, two-factor keys | `cat /etc/somba/demo-credentials.txt` (root, mode 600, never in git or on screen by itself) |
-| Two-factor code of a **demo** account (admins and store owners A, B, D, E, F, G, H) | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.komoriko.test` (root; replace the e-mail; the code lasts about 30 seconds). Or add that account's `totp_key` as a setup key in an authenticator app. Each `recovery_codes` entry works once instead of a code |
+| Two-factor code of a **demo** account (only when seeded with `--with-2fa`; the default is OFF, the password is enough) | `bash /opt/somba/deploy/seed-demo.sh code seller.a@demo.komoriko.test` (root; replace the e-mail; the code lasts about 30 seconds). Or add that account's `totp_key` as a setup key in an authenticator app. Each `recovery_codes` entry works once instead of a code |
 | Two-factor code of your **real** admin | not available from any script: use the authenticator app you enrolled (the script only reads demo accounts) |
 | List, rename or remove admin accounts | `cd /opt/somba/api && sudo -u somba npm run manage:admin:prod -- list` (root). See `docs/DEPLOYMENT.md` step 6 for `update-email` and `remove` |
 

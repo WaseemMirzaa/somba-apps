@@ -5,6 +5,7 @@
 #
 #   bash /opt/somba/deploy/seed-demo.sh              add the demo (a second run adds nothing)
 #   bash /opt/somba/deploy/seed-demo.sh --with-express  add the demo AND switch express delivery on (see below)
+#   bash /opt/somba/deploy/seed-demo.sh --with-2fa      add the demo with two-factor ON for the admins and stores (default: OFF, the password is enough)
 #   bash /opt/somba/deploy/seed-demo.sh reset        same, and give every demo account a NEW password
 #   bash /opt/somba/deploy/seed-demo.sh remove       show what would be removed (changes nothing)
 #   bash /opt/somba/deploy/seed-demo.sh remove --yes remove it
@@ -26,10 +27,10 @@ CRED="$CONF_DIR/demo-credentials.txt"
 API_ENV="$APP_DIR/api/.env"
 die() { printf 'seed-demo: %s\n' "$*" >&2; exit 1; }
 
-# --with-express may stand anywhere; the other arguments keep their order. An old --with-cod is accepted and ignored.
+# --with-express and --with-2fa may stand anywhere; the other arguments keep their order. An old --with-cod is accepted and ignored.
 args=()
 for a in "$@"; do
-  if [[ "$a" == "--with-cod" ]]; then echo "Cash on delivery was removed from the product; the flag does nothing." >&2; elif [[ "$a" == "--with-express" ]]; then export DEMO_WITH_EXPRESS=1; else args+=("$a"); fi
+  if [[ "$a" == "--with-cod" ]]; then echo "Cash on delivery was removed from the product; the flag does nothing." >&2; elif [[ "$a" == "--with-express" ]]; then export DEMO_WITH_EXPRESS=1; elif [[ "$a" == "--with-2fa" ]]; then export DEMO_WITH_2FA=1; else args+=("$a"); fi
 done
 set -- ${args[@]+"${args[@]}"}
 cmd="${1:-seed}"
@@ -41,7 +42,7 @@ envval() { grep -E "^$1=" "$API_ENV" | head -1 | cut -d= -f2- || true; }
 export UPLOAD_DIR="$(envval UPLOAD_DIR)" PRIVATE_UPLOAD_DIR="$(envval PRIVATE_UPLOAD_DIR)" PUBLIC_API_URL="$(envval PUBLIC_API_URL)"
 [[ -n "$PUBLIC_API_URL" && -n "$UPLOAD_DIR" ]] || die "PUBLIC_API_URL and UPLOAD_DIR must be set in $API_ENV."
 
-run_as_app() { if [[ $EUID -eq 0 ]]; then sudo -u "$APP_USER" --preserve-env=UPLOAD_DIR,PRIVATE_UPLOAD_DIR,PUBLIC_API_URL,DEMO_PASSWORD,DEMO_RESET_PASSWORDS,DEMO_WITH_EXPRESS,DEMO_CREDENTIALS_FILE "$@"; else "$@"; fi; }
+run_as_app() { if [[ $EUID -eq 0 ]]; then sudo -u "$APP_USER" --preserve-env=UPLOAD_DIR,PRIVATE_UPLOAD_DIR,PUBLIC_API_URL,DEMO_PASSWORD,DEMO_RESET_PASSWORDS,DEMO_WITH_EXPRESS,DEMO_WITH_2FA,DEMO_CREDENTIALS_FILE "$@"; else "$@"; fi; }
 reload_api() { [[ "${SKIP_RELOAD:-}" == "1" ]] && return 0; [[ $EUID -eq 0 ]] && sudo -u "$APP_USER" bash -c 'pm2 reload somba-api --update-env >/dev/null' && echo "API reloaded." || true; }
 
 case "$cmd" in

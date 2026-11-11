@@ -53,9 +53,12 @@ const totp = (k) => { const m = Buffer.alloc(8); m.writeBigUInt64BE(BigInt(Math.
   console.log('\n— Admin approves');
   const adminEmail = 'admin.super@demo.komoriko.test';
   const l = await post('/api/v1/auth/login', { email: adminEmail, password: field(adminEmail, 'password') });
-  await sleep(1200);
-  const t = await post('/api/v1/auth/login/2fa', { challenge: l.json.challenge, code: totp(field(adminEmail, 'totp_key')) });
-  ok(t.status === 200 || t.status === 201, 'demo super admin signs in with the two-factor code', JSON.stringify(t.json));
+  let t = l; // two-factor is off by default on the demo (seed-demo.sh --with-2fa switches it on)
+  if (l.json.needs2fa) {
+    await sleep(1200);
+    t = await post('/api/v1/auth/login/2fa', { challenge: l.json.challenge, code: totp(field(adminEmail, 'totp_key')) });
+  }
+  ok(t.status === 200 || t.status === 201, 'demo super admin signs in', JSON.stringify(t.json));
   const as = await connect(t.json.accessToken);
   const pending = (await req(as, 'sellers:list', { status: 'pending', limit: 50 })).data ?? [];
   const mine = (Array.isArray(pending) ? pending : pending.items ?? []).find((s) => s.name === 'Guide Store');

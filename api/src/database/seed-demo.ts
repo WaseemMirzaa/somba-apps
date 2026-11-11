@@ -153,6 +153,10 @@ async function main(app: INestApplicationContext) {
     process.env.DEMO_WITH_EXPRESS === '1' ||
       process.argv.includes('--with-express'),
   );
+  // Two-factor is OFF on the demo accounts unless asked for (`--with-2fa` / DEMO_WITH_2FA=1): a client signs in with the password only.
+  const withTwofa =
+    process.env.DEMO_WITH_2FA === '1' || process.argv.includes('--with-2fa');
+  let twofaCleared = 0;
 
   const images = new DemoImages();
   const copied = images.install();
@@ -255,7 +259,21 @@ async function main(app: INestApplicationContext) {
     }
     let totp: string | null = null;
     let recovery: string[] | undefined;
-    if (def.twofa) {
+    if (!withTwofa && user.twofaEnabled) {
+      // A server seeded earlier with two-factor on: switch it off again (demo accounts only), so the password is enough.
+      await userRepo.update(
+        { id: user.id },
+        {
+          twofaEnabled: false,
+          twofaSecret: null as never,
+          twofaRecovery: null as never,
+          twofaLastStep: 0,
+        },
+      );
+      user = (await userRepo.findOne({ where: { id: user.id } }))!;
+      twofaCleared++;
+    }
+    if (def.twofa && withTwofa) {
       if (!user.twofaEnabled || !user.twofaSecret) {
         const secret = newTotpSecret();
         recovery = newRecoveryCodes();
@@ -383,6 +401,11 @@ async function main(app: INestApplicationContext) {
   }
   log(
     `✓ accounts: ${counts.created} created, ${counts.existing} already there`,
+  );
+  log(
+    withTwofa
+      ? '• two-factor is ON for the demo admins and stores (--with-2fa): codes are in the credentials file.'
+      : `• two-factor is OFF on every demo account: the password is enough${twofaCleared ? ` (switched off on ${twofaCleared} account(s) that had it)` : ''}. To switch it on: seed-demo.sh --with-2fa.`,
   );
 
   // ── stores ─────────────────────────────────────────────────────────────────────

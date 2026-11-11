@@ -52,9 +52,11 @@ Customers and store owners share one random password (the one you may hand to a 
 
 The credentials file is readable by root only (mode 600). It is never in git and never printed by the script. Run the add again later and accounts that exist keep their password; only `reset` changes them.
 
-Accounts with two-factor authentication (all six admins and the store owners A, B, D, E, F, G, H) need the six-digit code from an authenticator app. In the app choose "enter a setup key" and paste the `totp_key` of that account (time based, 6 digits). Or run the `code` command above. The `recovery_codes` in the file work once each instead of a code.
+**Two-factor is OFF on every demo account by default**: a client signs in with the password only. Running the seed again also switches it off on accounts that had it from an earlier run.
 
-If you later switch on the platform rule "staff two-factor required", the demo admins are not locked out: all of them already have it on.
+To get two-factor on the demo (all six admins and the store owners A, B, D, E, F, G, H), run `bash /opt/somba/deploy/seed-demo.sh --with-2fa`. Those accounts then need the six-digit code from an authenticator app: choose "enter a setup key" and paste the `totp_key` of that account (time based, 6 digits), or run the `code` command above. The `recovery_codes` in the file work once each instead of a code.
+
+If you switch on the platform rule "staff two-factor required" while the demo has two-factor off, the demo admins are asked to enrol at their next sign-in. Seed with `--with-2fa` first if you want them ready.
 
 ## What it creates
 
@@ -79,7 +81,7 @@ These orders are made through the real order service (basket, wallet payment, pi
 | | Stand fan + USB charger (`reviewer.3`, Bandalungwa) | Two lines: **Cancel items**. |
 | | Steam iron (`reviewer.4`, Kintambo) | Already marked ready, waiting for a rider. |
 
-Store C has no two-factor, so it signs in without a code (see its row above). Stores A and B need the six-digit code.
+No demo store needs a code unless the seed ran with `--with-2fa` (then stores A and B do; store C never has two-factor).
 
 ### Split delivery (stores A and B in one order)
 
