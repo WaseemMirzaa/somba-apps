@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AuditLog, DeliveryStatus, DeliveryTask, Order, User } from '../database/entities';
@@ -10,6 +10,7 @@ import { tasksOfHub } from '../logistics/hub-scope';
 import { CUSTOMER_KINDS, isCustomerKind, isHubBound, kindWithArticle, riderNext } from '../logistics/leg-rules';
 import { Actor, LogisticsService } from '../logistics/logistics.service';
 import { RunsService } from '../logistics/runs.service';
+import { ParcelsService } from '../logistics/parcels.service';
 import { DESK_ROLES, tierAllows } from '../logistics/tiers';
 import { ALERT_FROM, CODE_MESSAGES, CodeLock, isCodeLocked, lockAfter, lockedMessage, sameCode, triesLeft } from './delivery-code-lock';
 
@@ -36,6 +37,7 @@ export class DeliveryService {
     private readonly settings: SettingsService,
     private readonly logistics: LogisticsService,
     private readonly runs?: RunsService,
+    @Optional() private readonly parcels?: ParcelsService,
   ) {}
 
   /** Open tasks nobody has been given yet, for a warehouse (staff). */
@@ -89,6 +91,10 @@ export class DeliveryService {
     if (status === 'delivered' && isHubBound(kind)) {
       throw new BadRequestException('This leg ends at the warehouse: warehouse staff scan the parcel in.');
     }
+    // C-parcel-scan: a leg is picked up only once every box was scanned on the way out, and handed over only once every box was
+    // scanned on arrival (before the customer's code is even asked for). The apps disable the buttons with the same counter.
+    if (status === 'picked_up' && task.status === 'assigned') await this.parcels?.assertComplete(task, 'pickup');
+    if (status === 'delivered' && task.status === 'in_transit') await this.parcels?.assertComplete(task, 'dropoff');
     // Proof of delivery: the customer's code must be entered to complete the handover.
     // Every wrong code is counted on the task in the database and locks the step after 5 (see delivery-code-lock.ts).
     if (status === 'delivered' && isCustomerKind(kind) && (await this.settings.get('requireDeliveryCode')) === 'true') {

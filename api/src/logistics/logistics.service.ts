@@ -47,6 +47,8 @@ import {
 } from './leg-rules';
 import { DESK_ADMINS_ONLY, DESK_ROLES, isDeskAdmin, tierAllows } from './tiers';
 import { HubOpsSettingsService } from './hub-ops-settings.service';
+import { Checklist, ParcelLine, ParcelsService } from './parcels.service';
+import { REQUIRE_PARCEL_SCAN, scanRequired } from './parcel-rules';
 import { AUTO_ASSIGN_KINDS, Candidate, EXPRESS_NOT_RETURNABLE, RETURN_TO_SELLER_REASON, canReturnToSeller, isWorkingNow, pickLeastBusy } from './hub-ops-rules';
 import { pushOrderToOps } from './hub-scope';
 import { frenchLineNames } from '../translation/line-names';
@@ -141,6 +143,11 @@ export interface TaskView {
   sellerIds: (string | null)[] | null;
   /** On a customer leg: does delivering it finish the order (every live line not delivered by another leg is on it)? False on every other leg. */
   completesOrder: boolean;
+  /** The boxes this leg carries with their scans (empty when the leg carries no labelled parcel), and whether the platform blocks the leg until every box is scanned. */
+  parcels: ParcelLine[];
+  pickupComplete: boolean;
+  dropoffComplete: boolean;
+  scanRequired: boolean;
 }
 
 export type LogisticsEventType = 'created' | 'assigned' | 'picked_up' | 'in_transit' | 'scanned_in' | 'delivered' | 'failed' | 'voided';
@@ -190,6 +197,7 @@ export class LogisticsService {
     private readonly settings?: SettingsService,
     @Optional() private readonly translations?: TranslationService,
     @Optional() private readonly hubOps?: HubOpsSettingsService,
+    @Optional() private readonly parcels?: ParcelsService,
   ) {}
 
   // ── listeners (after-sale and others follow the legs) ────────────────────────
@@ -285,6 +293,8 @@ export class LogisticsService {
     const hubs = await this.allHubs();
     // The handover code is only asked for when the platform requires it (`requireDeliveryCode`), and only on the delivery to the customer.
     const codeRequired = (await this.settings?.get('requireDeliveryCode')) === 'true';
+    const parcelRule = scanRequired(await this.settings?.get(REQUIRE_PARCEL_SCAN));
+    const lists = (await this.parcels?.checklists(tasks)) ?? new Map<string, Checklist>();
     const sellerKeys = [...new Set(tasks.map((t) => t.sellerId).filter((x): x is string => !!x))];
     const sellers = sellerKeys.length ? await this.sellers.find({ where: [{ id: In(sellerKeys) }, { userId: In(sellerKeys) }] }) : [];
     const sellerOf = (id: string | null) => (id ? (sellers.find((s) => s.id === id) ?? sellers.find((s) => s.userId === id) ?? null) : null);
@@ -408,6 +418,10 @@ export class LogisticsService {
         hops: t.hops ?? 1,
         sellerIds: isCustomerKind(t.kind ?? 'delivery') ? (t.sellerIds ?? null) : null,
         completesOrder: completes.get(t.id) ?? false,
+        parcels: lists.get(t.id)?.parcels ?? [],
+        pickupComplete: lists.get(t.id)?.pickupComplete ?? true,
+        dropoffComplete: lists.get(t.id)?.dropoffComplete ?? true,
+        scanRequired: parcelRule,
       };
       if (audience === 'seller') {
         // A seller sees where their parcel is, never the customer.
@@ -1002,6 +1016,8 @@ export class LogisticsService {
     if (task.status === 'failed') throw new BadRequestException('A failed task cannot be scanned in.');
     // A parcel can only arrive after a rider collected it.
     if (!COLLECTED_STATUSES.includes(task.status)) throw new BadRequestException('A rider must collect this parcel before it can be scanned in.');
+    // C-parcel-scan: every box of the leg must have been scanned on arrival (by the rider at the door or by the desk) while the rule is on.
+    await this.parcels?.assertComplete(task, 'dropoff');
     const now = new Date();
     const claim = await this.tasks
       .createQueryBuilder()
@@ -1074,6 +1090,38 @@ export class LogisticsService {
     await this.tellSellerArrived(saved);
     await this.fire('scanned_in', saved);
     return { task: saved, next };
+  }
+
+  /**
+   * Staff scan a box by its code at their warehouse (`logistics:scanIn { code }`): the box is recorded as arrived, and when every
+   * box of its leg is in (or the rule is off) the leg is scanned in with the normal next-leg logic.
+   */
+  async scanInByCode(code: unknown, hubId: string | null, actor: Actor, manual = false): Promise<{ task: DeliveryTask; next: DeliveryTask[]; parcels: Checklist; completed: boolean }> {
+    // A desk admin has no warehouse of their own: the box's leg says which one it is arriving at.
+    if (hubId) this.assertMayScan(actor, hubId);
+    else if (!isDeskAdmin(actor.role)) throw new BadRequestException('Your account is not linked to a warehouse. Ask an administrator.');
+    if (!this.parcels) throw new BadRequestException('Parcel scanning is not available.');
+    const r = await this.parcels.staffScan(actor, { code, mode: 'in', hubId, manual });
+    if (!r.complete) {
+      await this.emitTask(r.task);
+      return { task: r.task, next: [], parcels: r.checklist, completed: false };
+    }
+    const { task, next } = await this.onScanIn(r.task.id, hubId ?? (r.task.toHubId as string), actor);
+    return { task, next, parcels: await this.parcels.checklist(task), completed: true };
+  }
+
+  /** Staff scan a box on the way out (`logistics:dispatchTransfer { code }`): when every box of the leg is out (or the rule is off) the parcel is handed to its rider. A box of a transfer run only ticks the run's manifest. */
+  async scanOutByCode(code: unknown, hubId: string | null, actor: Actor, manual = false): Promise<{ task: DeliveryTask; parcels: Checklist; completed: boolean }> {
+    if (hubId) this.assertMayScan(actor, hubId);
+    else if (!isDeskAdmin(actor.role)) throw new BadRequestException('Your account is not linked to a warehouse. Ask an administrator.');
+    if (!this.parcels) throw new BadRequestException('Parcel scanning is not available.');
+    const r = await this.parcels.staffScan(actor, { code, mode: 'out', hubId, manual });
+    if (!r.complete || r.task.runId) {
+      await this.emitTask(r.task);
+      return { task: r.task, parcels: r.checklist, completed: false };
+    }
+    const task = await this.scanOut(r.task.id, hubId ?? (r.task.fromHubId as string), actor);
+    return { task, parcels: await this.parcels.checklist(task), completed: true };
   }
 
   /** Where a replacement / exchange chain must end: the order's destination warehouse. */
@@ -1160,6 +1208,8 @@ export class LogisticsService {
       pickupAddress: order.shippingAddress,
       itemsJson: JSON.stringify(lines),
     });
+    // The box the customer sends back gets its own KOMORIKO label (shown in the customer's return screen).
+    await this.parcels?.createForReturn(order.id, input.disputeId);
     await this.announce(task);
     return task;
   }
@@ -1532,6 +1582,8 @@ export class LogisticsService {
     if (!OUTBOUND_KINDS.includes(task.kind) || task.fromHubId !== hubId) throw new BadRequestException('This parcel does not leave from your warehouse.');
     if (task.runId) throw new BadRequestException('This parcel is part of a transfer run. Manage it from the run.');
     if (!canScanOutAt(task, hubId)) throw new BadRequestException('Assign a rider before handing the parcel over.');
+    // C-parcel-scan: every box must be scanned on the way out before the rider takes the parcel.
+    await this.parcels?.assertComplete(task, 'pickup');
     const claim = await this.tasks
       .createQueryBuilder()
       .update(DeliveryTask)
@@ -1776,6 +1828,7 @@ export class LogisticsService {
       await this.emitTask(saved);
       await this.fire('voided', saved);
     }
+    await this.parcels?.voidFor(orderId);
     return open;
   }
 
@@ -1790,6 +1843,7 @@ export class LogisticsService {
       await this.emitTask(saved);
       await this.fire('voided', saved);
     }
+    await this.parcels?.voidFor(orderId, sellerKeys);
     await this.progressChain({ orderId });
   }
 

@@ -68,6 +68,9 @@ export type { AreaLevel } from './geo-area.entity';
 export { HubCoverage } from './hub-coverage.entity';
 export { HubLane } from './hub-lane.entity';
 export { TransferRun } from './transfer-run.entity';
+export { Parcel } from './parcel.entity';
+export { ParcelScan } from './parcel-scan.entity';
+export type { ParcelScanStage } from './parcel-scan.entity';
 export type { TransferRunStatus } from './transfer-run.entity';
 export { WarehouseBatch } from './warehouse-batch.entity';
 export { StockTransfer } from './stock-transfer.entity';
@@ -153,6 +156,8 @@ import { GeoArea } from './geo-area.entity';
 import { HubCoverage } from './hub-coverage.entity';
 import { HubLane } from './hub-lane.entity';
 import { TransferRun } from './transfer-run.entity';
+import { Parcel } from './parcel.entity';
+import { ParcelScan } from './parcel-scan.entity';
 import { WarehouseBatch } from './warehouse-batch.entity';
 import { StockTransfer } from './stock-transfer.entity';
 import { Campaign } from './campaign.entity';
@@ -227,6 +232,8 @@ export const ENTITIES = [
   HubCoverage,
   HubLane,
   TransferRun,
+  Parcel,
+  ParcelScan,
   WarehouseBatch,
   StockTransfer,
   Campaign,

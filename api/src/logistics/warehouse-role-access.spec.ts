@@ -109,7 +109,7 @@ describe('warehouse and logistics desk: who may work it', () => {
     warehouse = new WarehouseService(ds.getRepository(Hub), ds.getRepository('WarehouseBatch') as never, ds.getRepository(DeliveryTask), ds.getRepository(Product), ds.getRepository(Order), ds.getRepository(WarehouseException), emitter as never, notif as never, {} as never, {} as never, logistics, settings);
     const hubsSvc = new HubsService(ds.getRepository(Hub), ds.getRepository(User), {} as never, emitter as never, {} as never, {} as never);
     jest.spyOn(hubsSvc, 'list').mockResolvedValue([{ id: hubA.id, name: hubA.name, city: 'Kinshasa', country: 'CD', lat: 1, lng: 2, active: true, areaId: null, activeRiders: 3, staffCount: 4, capacity: 500, address: 'secret street' }] as never);
-    logisticsGw = new LogisticsGateway(logistics, {} as never, hubsSvc as never, {} as never, {} as never, ds.getRepository(User));
+    logisticsGw = new LogisticsGateway(logistics, {} as never, hubsSvc as never, {} as never, {} as never, { checklist: async () => ({ parcels: [], pickupComplete: true, dropoffComplete: true }) } as never, ds.getRepository(User));
     transfersGw = new TransfersGateway({ list: jest.fn(async () => []), preview: jest.fn(async () => ({})) } as never, runs, ds.getRepository(User));
     const aged = new AgedParcelsService(ds.getRepository(DeliveryTask), ds.getRepository('AgedAlert') as never, ds.getRepository(User), settings, notif as never);
     opsGw = new WarehouseOpsGateway(settings, aged, new OpsAnalyticsService(ds.getRepository(DeliveryTask), ds.getRepository(User), settings), logistics, new WarehouseOpsJob(aged, logistics), ds.getRepository(User));
