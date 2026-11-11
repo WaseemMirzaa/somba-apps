@@ -398,7 +398,6 @@ const settled = async (sock, id) => until(async () => {
   ok(adm12.gmvByCategory.find((g) => g.category === 'Electronics')?.categoryFr === 'Électronique', 'with the category\'s French name (Électronique)');
 
   section('Order lines of a product without options: variantFr is null');
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
   const plain = await settled(sellerU.sock, fr1.id);
   const airtel = await req(demo.sock, 'orders:create', {
     items: [{ productId: plain.id, qty: 1 }], paymentMethod: 'airtel_money', paymentPhone: PHONE,
@@ -423,18 +422,17 @@ const settled = async (sock, id) => until(async () => {
   const txs = (await req(demo.sock, 'wallet:transactions')).data;
   const topup = txs.find((t) => /^Wallet top-up via Orange Money$/.test(t.description));
   ok(topup && topup.descriptionFr === 'Recharge du portefeuille via Orange Money', 'the wallet line names the method ("Orange Money") in both languages', JSON.stringify(txs.slice(0, 2)));
-  const cod = await req(demo.sock, 'orders:create', {
-    items: [{ productId: plain.id, qty: 1 }], paymentMethod: 'cod',
+  const cardOrder = await req(demo.sock, 'orders:create', {
+    items: [{ productId: plain.id, qty: 1 }], paymentMethod: 'stripe_card',
     shippingAddress: JSON.stringify({ line1: '12 Ave. du Commerce', city: 'Kinshasa', commune: 'Gombe' }),
   });
-  ok(cod.ok, 'the customer places a cash-on-delivery order', cod.error);
-  await toDelivery(admin, rider, cod.data.id); // the warehouse gives the pickup, then the delivery, to the rider
+  ok(cardOrder.ok, 'the customer places a prepaid card order', cardOrder.error);
+  await toDelivery(admin, rider, cardOrder.data.id); // the warehouse gives the pickup, then the delivery, to the rider
   const taskNotes = await until(async () => {
-    const all = (await req(rider.sock, 'notifications:list')).data.filter((n) => n.title === 'New task assigned to you' && n.body.startsWith(`${cod.data.reference}:`));
+    const all = (await req(rider.sock, 'notifications:list')).data.filter((n) => n.title === 'New task assigned to you' && n.body.startsWith(`${cardOrder.data.reference}:`));
     return all.length >= 2 ? all : null;
   }, 8000);
-  ok(taskNotes && taskNotes.some((n) => n.body === `${cod.data.reference}: pickup is now in your tasks.` && n.bodyFr === `${cod.data.reference} : tâche « enlèvement » ajoutée à vos tâches.`) && taskNotes.some((n) => n.bodyFr === `${cod.data.reference} : tâche « livraison » ajoutée à vos tâches.` && n.titleFr === 'Nouvelle tâche qui vous est assignée'), "the rider's task notices come in French (\"tâche « livraison » ajoutée à vos tâches\")", JSON.stringify(taskNotes?.map((n) => n.bodyFr)));
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
+  ok(taskNotes && taskNotes.some((n) => n.body === `${cardOrder.data.reference}: pickup is now in your tasks.` && n.bodyFr === `${cardOrder.data.reference} : tâche « enlèvement » ajoutée à vos tâches.`) && taskNotes.some((n) => n.bodyFr === `${cardOrder.data.reference} : tâche « livraison » ajoutée à vos tâches.` && n.titleFr === 'Nouvelle tâche qui vous est assignée'), "the rider's task notices come in French (\"tâche « livraison » ajoutée à vos tâches\")", JSON.stringify(taskNotes?.map((n) => n.bodyFr)));
 
   section('Replacements and exchanges carry French names');
   const seenRep = new Promise((res) => { admin.sock.on('replacement:updated', (r) => { if (r.reason === `Cracked ${tag}`) res(r); }); setTimeout(() => res(null), 6000); });

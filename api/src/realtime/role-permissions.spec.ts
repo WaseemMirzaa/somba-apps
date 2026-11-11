@@ -33,7 +33,6 @@ function gateway() {
   };
   const warehouse = {
     aged: jest.fn(async () => []),
-    reconcile: jest.fn(async () => []),
     listExceptions: jest.fn(async () => []),
     setExceptionStatus: jest.fn(async () => ({ id: 'e1' })),
     createException: jest.fn(async () => ({ id: 'e1' })),
@@ -134,21 +133,17 @@ describe('campaigns (campaigns:setStatus, create, update)', () => {
 describe('warehouse tiers on the socket', () => {
   const tierRefusal = 'Only supervisors and managers can see this.';
 
-  it('aged parcels and COD cash: supervisor and above; admins keep full access; others are refused', async () => {
+  it('aged parcels: supervisor and above; admins keep full access; others are refused', async () => {
     const { gw, warehouse } = gateway();
     for (const id of ['op', 'none']) {
       expect(await gw.whAged(as('warehouse_staff', id), {})).toEqual({ ok: false, error: tierRefusal });
-      expect(await gw.whReconcile(as('warehouse_staff', id), {})).toEqual({ ok: false, error: tierRefusal });
     }
     for (const role of ['customer', 'seller', 'rider']) {
       expect((await gw.whAged(as(role), {})).ok).toBe(false);
-      expect((await gw.whReconcile(as(role), {})).ok).toBe(false);
     }
     expect(warehouse.aged).not.toHaveBeenCalled();
-    expect(warehouse.reconcile).not.toHaveBeenCalled();
     for (const [role, id] of [['warehouse_staff', 'sup'], ['warehouse_staff', 'mgr'], ['admin', 'a'], ['admin_operations', 'a']] as const) {
       expect((await gw.whAged(as(role, id), {})).ok).toBe(true);
-      expect((await gw.whReconcile(as(role, id), {})).ok).toBe(true);
     }
   });
 
@@ -184,7 +179,7 @@ describe('warehouse tiers on the socket', () => {
   });
 });
 
-describe('round 2 least privilege: listing as the platform, translations, store identity papers, rider cash', () => {
+describe('round 2 least privilege: listing as the platform, translations, store identity papers', () => {
   const MODERATION = ['admin', 'admin_moderation'];
   const KYC = ['admin', 'admin_moderation', 'admin_operations'];
 
@@ -241,23 +236,6 @@ describe('round 2 least privilege: listing as the platform, translations, store 
     }
     expect(sellersSvc.list).toHaveBeenCalledTimes(ADMIN_ROLES.length);
     expect(KYC.every((r) => ADMIN_ROLES.includes(r))).toBe(true);
-  });
-
-  it('warehouse:reconcile (rider cash): the Super Admin, Finance, Operations and supervisors and above; other admin roles and operators are refused', async () => {
-    const { gw, warehouse } = gateway();
-    const CASH = ['admin', 'admin_finance', 'admin_operations'];
-    for (const role of OTHER_ADMINS(CASH)) {
-      expect(await gw.whReconcile(as(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
-    }
-    expect(await gw.whReconcile(as('warehouse_staff', 'op'), {})).toEqual({ ok: false, error: 'Only supervisors and managers can see this.' });
-    expect(warehouse.reconcile).not.toHaveBeenCalled();
-    for (const role of CASH) expect((await gw.whReconcile(as(role), {})).ok).toBe(true);
-    expect((await gw.whReconcile(as('warehouse_staff', 'sup'), {})).ok).toBe(true);
-    expect((await gw.whReconcile(as('warehouse_staff', 'mgr'), {})).ok).toBe(true);
-    // Staff are limited to their own warehouse, whatever hub they ask for.
-    expect(warehouse.reconcile).toHaveBeenLastCalledWith('h1');
-    await gw.whReconcile(as('warehouse_staff', 'sup'), { hubId: 'other-hub' });
-    expect(warehouse.reconcile).toHaveBeenLastCalledWith('h1');
   });
 
   it('the legacy stock-transfer events are gone', () => {

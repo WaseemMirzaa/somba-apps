@@ -8,7 +8,6 @@ import {
   Campaign,
   CartLine,
   CmsBlock,
-  CodHandover,
   Conversation,
   ConversationMessage,
   DeliveryTask,
@@ -503,14 +502,6 @@ function steps(i: Ids): Step[] {
       ],
     },
     {
-      label: 'cod_handovers',
-      entity: CodHandover,
-      terms: [
-        ['riderId', i.users],
-        ['hubId', i.hubs],
-      ],
-    },
-    {
       label: 'warehouse_batches',
       entity: WarehouseBatch,
       terms: [['id', i.batches]],
@@ -793,22 +784,6 @@ export async function planRemoval(
     notes.push(
       `${realOrdersOfDemoUsers.length} order line(s) of demo customers are for real products: their stock is not given back.`,
     );
-  // Cash on delivery is a platform setting the demo may have switched on (--with-cod). The removal never touches settings.
-  if (ids.payments.length) {
-    const cod = await ds
-      .getRepository(Payment)
-      .createQueryBuilder('x')
-      .where('x.id IN (:...p)', { p: ids.payments.slice(0, CHUNK) })
-      .andWhere("x.method = 'cod'")
-      .getCount();
-    const on = await ds
-      .getRepository(Setting)
-      .findOne({ where: { key: 'codEnabled' } });
-    if (cod && on?.value === 'true')
-      notes.push(
-        'Cash on delivery is ON (setting codEnabled). The removal does not change settings, so it stays on: real customers can pay cash at the door. Switch it off in Admin > Settings > Checkout and delivery > Cash on delivery (or see deploy/LIVE-RUNBOOK.md section 7) if the platform should not offer it.',
-      );
-  }
   // Express delivery: the same, for the platform setting `--with-express` may have switched on.
   if (ids.orders.length) {
     const express = await ds

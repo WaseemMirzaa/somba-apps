@@ -68,12 +68,10 @@ const EXPECTED: Record<string, string> = {
   requireSellerPickupPin: 'true',
   productModeration: 'true',
   requireDeliveryCode: 'true',
-  codEnabled: 'false',
 };
 
 async function preflight(
   ds: DataSource,
-  withCod: boolean,
 ): Promise<{ warnings: string[]; mainHub: Hub }> {
   const settings = new Map(
     (await ds.getRepository(Setting).find()).map((s) => [s.key, s.value]),
@@ -110,8 +108,6 @@ async function preflight(
     );
   const warnings: string[] = [];
   for (const [k, v] of Object.entries(EXPECTED)) {
-    // With --with-cod the seed switches cash on delivery on itself and says so; every other difference is only reported.
-    if (k === 'codEnabled' && withCod) continue;
     if (settings.get(k) !== v)
       warnings.push(
         `Setting ${k} is "${settings.get(k) ?? 'not set'}" (the demo is written for "${v}"). It was NOT changed; some scenarios will behave differently.`,
@@ -149,11 +145,8 @@ async function main(app: INestApplicationContext) {
   for (const e of moved.skipped)
     log(`! ${e} was not renamed: the new address already exists.`);
 
-  const withCod =
-    process.env.DEMO_WITH_COD === '1' || process.argv.includes('--with-cod');
-  const { warnings, mainHub } = await preflight(ds, withCod);
+  const { warnings, mainHub } = await preflight(ds);
   for (const w of warnings) log(`! ${w}`);
-  const codOn = await settleCod(ds, withCod);
   const expressOn = await settleExpress(
     ds,
     process.env.DEMO_WITH_EXPRESS === '1' ||
@@ -192,7 +185,6 @@ async function main(app: INestApplicationContext) {
     stores: new Map(),
     products: new Map(),
     created: counts,
-    codOn,
     expressOn,
     area: async (code: string) => {
       const a = await app.get(GeoService).getByCode(code);
@@ -418,42 +410,6 @@ async function main(app: INestApplicationContext) {
   log(
     `\n✅ Demo data ready. Credentials: ${credFile} (${credentials.size} accounts${unknown ? `, ${unknown} with an unknown password` : ''}).`,
   );
-}
-
-/**
- * Cash on delivery is off on a production server, so the cash-on-delivery orders need an explicit opt-in. This is the ONLY
- * setting the demo ever changes, and only when asked (`seed-demo.sh --with-cod`, or DEMO_WITH_COD=1). The removal leaves it as
- * it is (it cannot know whether someone else relies on it) and tells how to switch it off. Returns whether COD is on.
- */
-async function settleCod(ds: DataSource, withCod: boolean): Promise<boolean> {
-  const repo = ds.getRepository(Setting);
-  const row = await repo.findOne({ where: { key: 'codEnabled' } });
-  if (withCod && row?.value !== 'true') {
-    if (row) await repo.update({ key: 'codEnabled' }, { value: 'true' });
-    else await repo.save(repo.create({ key: 'codEnabled', value: 'true' }));
-    log('');
-    log(
-      '!!! CASH ON DELIVERY WAS SWITCHED ON (setting codEnabled = true), because you asked for --with-cod.',
-    );
-    log(
-      '!!! Real customers can now choose cash on delivery too. The demo removal does NOT switch it back off:',
-    );
-    log(
-      '!!! turn it off in Admin > Settings > Checkout and delivery > Cash on delivery when you are done testing.',
-    );
-    log('');
-    return true;
-  }
-  if (row?.value === 'true') {
-    log(
-      '• cash on delivery is on: the cash-on-delivery orders are made (the seed did not change that setting).',
-    );
-    return true;
-  }
-  log(
-    '• cash on delivery is off, so the cash-on-delivery orders are skipped. To get them: bash /opt/somba/deploy/seed-demo.sh --with-cod (this switches the setting on; see deploy/DEMO-SEED.md).',
-  );
-  return false;
 }
 
 /**

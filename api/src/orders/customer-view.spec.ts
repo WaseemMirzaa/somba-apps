@@ -30,7 +30,7 @@ function make(over: { product?: Record<string, unknown>; settings?: Record<strin
   return { svc, calls, view: registered.view };
 }
 
-const line = (variant?: string) => ({ items: [{ productId: 'p1', qty: 1, variant }], paymentMethod: 'cod' as const, deliveryFeeUsd: 1 });
+const line = (variant?: string) => ({ items: [{ productId: 'p1', qty: 1, variant }], paymentMethod: 'stripe_card' as const, deliveryFeeUsd: 1 });
 
 describe('OrdersService.create: variants and delivery estimate', () => {
   it('refuses a line without the required choice and reserves nothing', async () => {

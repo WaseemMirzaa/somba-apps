@@ -27,7 +27,7 @@ interface Finding {
 }
 
 /**
- * The fraud rules beyond cash on delivery. Each rule counts something about one customer over a window, compares it
+ * The fraud rules. Each rule counts something about one customer over a window, compares it
  * with a platform setting (the thresholds, defaults in fraud-rules.config.ts) and, when it is reached, raises
  * ONE alert with the reason, at most once per rule per customer per day (`dedupeKey`). The rules run right after an order
  * is placed, when an address or device signal is recorded, and on a sweep every few minutes (for what no order
@@ -84,15 +84,10 @@ export class FraudRulesService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * After an order was placed: the cash-on-delivery cap (only while cash on delivery is offered), then every other rule.
-   * Never throws: the order is already saved.
+   * After an order was placed: run every rule. Never throws: the order is already saved.
    */
   async afterOrder(customer: { id: string; name: string }, order: { id: string; paymentMethod: string; totalUsd: number }): Promise<void> {
     try {
-      if (order.paymentMethod === 'cod' && (await this.settings.get('codEnabled')) === 'true') {
-        const cap = Number((await this.settings.get('codCapUsd')) ?? '500');
-        await this.fraud.flagCodRisk(customer.name, order.id, order.totalUsd, cap, customer.id);
-      }
       await this.evaluate(customer.id, { orderId: order.id });
     } catch (e) {
       this.logger.warn(`fraud check after order failed: ${(e as Error).message}`);

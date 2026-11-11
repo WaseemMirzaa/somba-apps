@@ -5,7 +5,7 @@ import { ORDER_ACCESS_DENIED } from '../common/order-access';
 /**
  * The warehouse events on the main socket (`delivery:*`, `warehouse:*`, `exceptions:*`, `orders:list`): only the desk admins
  * (super admin, operations) and warehouse staff may use them. Marketing, moderation, support and finance are refused with one
- * clear sentence, and the services behind are never called. Finance keeps what its own screens need (rider cash, the warehouse
+ * clear sentence, and the services behind are never called. Finance keeps what its own screens need (the warehouse
  * figures, orders without addresses). Built without the constructor, like `role-permissions.spec.ts`.
  */
 const as = (role: string, id = `${role}-1`) => ({ data: { user: { id, role, name: `${role} name` } } }) as never;
@@ -39,7 +39,6 @@ function gateway() {
     inventory: jest.fn(async () => []),
     listBatches: jest.fn(async () => []),
     buildBatch: jest.fn(async () => ({ id: 'b1' })),
-    reconcile: jest.fn(async () => [{ riderId: 'r1', heldUsd: 3 }]),
     listExceptions: jest.fn(async () => []),
     createException: jest.fn(async () => ({ id: 'e1' })),
     setExceptionStatus: jest.fn(async () => ({ id: 'e1' })),
@@ -123,16 +122,6 @@ describe('warehouse events on the main socket', () => {
 });
 
 describe('what finance and the others still read in the warehouse', () => {
-  it('rider cash (warehouse:reconcile): super admin, operations and finance read it; support, marketing and moderation do not', async () => {
-    const { gw, warehouse } = gateway();
-    for (const role of ['admin', 'admin_operations', 'admin_finance']) expect(await gw.whReconcile(as(role), {})).toMatchObject({ ok: true });
-    expect(warehouse.reconcile).toHaveBeenCalledTimes(3);
-    warehouse.reconcile.mockClear();
-    for (const role of ['admin_support', 'admin_marketing', 'admin_moderation']) expect(await gw.whReconcile(as(role), {})).toEqual({ ok: false, error: 'Not allowed.' });
-    expect(await gw.whReconcile(as('warehouse_staff', 'op'), {})).toEqual({ ok: false, error: 'Only supervisors and managers can see this.' });
-    expect(warehouse.reconcile).not.toHaveBeenCalled();
-  });
-
   it('warehouse figures (analytics:warehouse): super admin, operations and finance (their analytics page); not support, marketing or moderation', async () => {
     const { gw, analytics } = gateway();
     for (const role of ['admin', 'admin_operations', 'admin_finance']) expect(await gw.analyticsWarehouse(as(role), {})).toMatchObject({ ok: true });

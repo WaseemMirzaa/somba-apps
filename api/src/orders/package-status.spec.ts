@@ -24,10 +24,9 @@ describe('seller package status', () => {
     expect(OrdersService.packageStatus({ ...paid, status: 'delivered' }, lines('received'))).toBe('delivered');
   });
 
-  it('an unpaid order is not packed yet, but cash on delivery is', () => {
+  it('an unpaid order is not packed yet', () => {
     expect(OrdersService.packageStatus({ status: 'pending', paymentMethod: 'airtel_money' }, lines('open'))).toBe('pending');
-    expect(OrdersService.packageStatus({ status: 'pending', paymentMethod: 'cod' }, lines('open'))).toBe('to_pack');
-    expect(OrdersService.fulfillable({ status: 'pending', paymentMethod: 'cod' })).toBe(true);
+    expect(OrdersService.fulfillable({ status: 'pending', paymentMethod: 'airtel_money' })).toBe(false);
     expect(OrdersService.fulfillable({ status: 'pending', paymentMethod: 'orange_money' })).toBe(false);
     expect(OrdersService.fulfillable({ status: 'shipped', paymentMethod: 'wallet' })).toBe(false);
   });

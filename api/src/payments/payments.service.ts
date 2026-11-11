@@ -84,18 +84,6 @@ const STRIPE_REFUND_ID = /^re_/;
 /** Stripe forgets an idempotency key after 24 hours: an unanswered refund is only retried with its key well inside that. */
 const REFUND_REPLAY_WINDOW_MS = 20 * 3_600_000;
 
-/** The cash record of a COD delivery, as the payment's audit line reports it. */
-export interface CodReceipt {
-  amountUsd: number;
-  byId: string;
-  byName: string;
-  byRole: string;
-  at: Date;
-  taskId: string;
-  /** `rider`: the rider confirmed the cash at the door; `admin_close`: an admin closed the delivery by hand. */
-  source: 'rider' | 'admin_close';
-}
-
 /** Called when pawaPay reports on a seller payout (set by PayoutsService, which owns payouts). */
 export type PayoutCallbackHandler = (payoutId: string) => Promise<void>;
 
@@ -182,12 +170,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   /** Which payment methods may be used right now (policy + configuration). */
   async assertMethodAllowed(method: string): Promise<void> {
     if (method === 'wallet') return;
-    if (method === 'cod') {
-      if ((await this.settings.get('codEnabled')) !== 'true') {
-        throw new BadRequestException('Cash on delivery is not available.');
-      }
-      return;
-    }
     if (isMobileMoney(method)) {
       if (!this.mobileMoney) {
         throw new BadRequestException('Mobile money is not available yet. Please use another method.');
@@ -220,7 +202,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    *  - mobile money  → `pending` until the subscriber approves (webhook settles)
    *  - card          → a Stripe PaymentIntent, `pending` until the customer completes the card sheet (the webhook
    *                    settles it); without Stripe, a mock authorize (non-production only)
-   *  - cod           → pending; collected on delivery
    */
   async processForOrder(order: Order, phone?: string): Promise<Payment> {
     await this.assertMethodAllowed(order.paymentMethod);
@@ -238,8 +219,6 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     try {
       if (order.paymentMethod === 'wallet') {
         await this.wallet.debit(order.customerId, order.totalUsd, `Order ${order.reference}`);
-      } else if (order.paymentMethod === 'cod') {
-        status = 'pending';
       }
     } catch (err) {
       status = 'failed';
@@ -1008,34 +987,8 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * COD collected when the parcel is delivered. `receipt` is the cash record the delivery wrote (how much, who took it,
-   * when): it goes into the audit trail on the payment, so finance sees the amount and the person where the payment turns
-   * "succeeded". Only the call that actually flips the payment writes it, so a repeated call records nothing twice.
-   */
-  async markCollected(orderId: string, receipt?: CodReceipt): Promise<void> {
-    const payment = await this.payments.findOne({ where: { orderId } });
-    if (!payment || payment.status !== 'pending' || payment.method !== 'cod') return;
-    const claim = await this.payments
-      .createQueryBuilder()
-      .update(Payment)
-      .set({ status: 'succeeded' })
-      .where("id = :id AND status = 'pending'", { id: payment.id })
-      .execute();
-    if (!claim.affected) return; // another request collected it a moment ago
-    payment.status = 'succeeded';
-    if (receipt) {
-      const detail = `${payment.orderReference ?? payment.reference}: ${receipt.amountUsd.toFixed(2)} USD cash collected by ${receipt.byName} (${receipt.byRole}) on ${receipt.at.toISOString()}${receipt.source === 'admin_close' ? ' - delivery closed by hand' : ''}; due ${payment.amountUsd.toFixed(2)} USD; task ${receipt.taskId}`;
-      const log = await this.payments.manager.getRepository(AuditLog).save(
-        this.payments.manager.getRepository(AuditLog).create({ actor: receipt.byName, role: receipt.byRole, action: 'payment.cod_collected', entity: 'payment', entityId: payment.id, detail }),
-      );
-      this.emitter.toRoles(AUDIT_ROLES, 'audit:created', log);
-    }
-    this.publish((await this.payments.findOne({ where: { id: payment.id } })) ?? payment);
-  }
-
-  /**
    * Called when an order is cancelled. If we actually collected money for it
-   * (prepaid, not COD), the payment is marked refunded and the wallet credited in
+   * (always, payment is taken up front), the payment is marked refunded and the wallet credited in
    * ONE transaction; a pending payment is simply abandoned (a late approval is
    * then credited to the wallet by [settle]). Returns the amount credited to the wallet (0 when none).
    */
@@ -1054,7 +1007,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       }
       return 0;
     }
-    if (payment.status !== 'succeeded' || order.paymentMethod === 'cod') return 0;
+    if (payment.status !== 'succeeded') return 0;
     // C-refund: only what is left on the payment goes back (lines a seller or a return already refunded are out).
     const due = refundableUsd(payment, order.items);
     const won = await this.payments.manager.transaction(async (m) => {

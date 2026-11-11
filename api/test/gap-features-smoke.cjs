@@ -7,7 +7,7 @@
  *
  * ADMIN_PW / RIDER_PW override the seed password when those accounts were changed (admin@somba.app and
  * rider@somba.app). CUSTOMER_PW is the verified demo customer's (customer@somba.app, phone +243900000001), used for
- * the cart and the phone-code login. productModeration / requireVerifiedForCheckout / codEnabled are toggled and
+ * the cart and the phone-code login. productModeration / requireVerifiedForCheckout are toggled and
  * restored at the end (even when a check throws); the products and orders it creates are removed / cancelled.
  * Without a rider login the "Call the rider" section is skipped and reported as such.
  */
@@ -70,7 +70,7 @@ const dayPlus = (n) => new Date(Date.now() + 3_600_000 + n * 86_400_000).toISOSt
   const saved = (await req(admin.sock, 'settings:get')).data ?? {};
   const setting = (key, value) => req(admin.sock, 'settings:set', { key, value });
   const restore = async () => {
-    for (const k of ['productModeration', 'requireVerifiedForCheckout', 'codEnabled']) {
+    for (const k of ['productModeration', 'requireVerifiedForCheckout']) {
       if (saved[k] !== undefined) await setting(k, String(saved[k])).catch(() => undefined);
     }
   };
@@ -82,7 +82,6 @@ const dayPlus = (n) => new Date(Date.now() + 3_600_000 + n * 86_400_000).toISOSt
   try {
     await setting('productModeration', 'true');
     await setting('requireVerifiedForCheckout', 'false');
-    await setting('codEnabled', 'true');
 
     // ---- actors -----------------------------------------------------------
     const seller = await (async () => {

@@ -190,7 +190,7 @@ describe('payments:card-sheet', () => {
     const payment = await payOf(order.id);
     await expect(payments.cardSheet(customer.id, { reference: payment.reference })).rejects.toThrow('This payment is not waiting for a card.'); // already paid
     // a pending payment that is not a card
-    await w.ds.getRepository(Payment).update({ id: payment.id }, { status: 'pending', method: 'cod' });
+    await w.ds.getRepository(Payment).update({ id: payment.id }, { status: 'pending', method: 'airtel_money' });
     await expect(payments.cardSheet(customer.id, { reference: payment.reference })).rejects.toThrow('This payment is not waiting for a card.');
   });
 
@@ -601,7 +601,7 @@ describe('every other refund path with a card payment', () => {
 
 describe('the public settings carry cardPayments', () => {
   const rows = [
-    { key: 'codEnabled', value: 'true' },
+    { key: 'returnWindowDays', value: '14' },
     { key: 'commissionPct', value: '12' },
   ];
   const service = () => {
@@ -614,10 +614,10 @@ describe('the public settings carry cardPayments', () => {
   it('is "stripe" when the three keys are set, "off" otherwise, and never a stored setting', async () => {
     const { svc } = service();
     Object.assign(process.env, GOOD_ENV);
-    expect(await svc.clientView()).toMatchObject({ codEnabled: 'true', cardPayments: 'stripe' });
+    expect(await svc.clientView()).toMatchObject({ returnWindowDays: '14', cardPayments: 'stripe' });
     process.env.STRIPE_WEBHOOK_SECRET = '';
-    expect(await svc.clientView()).toMatchObject({ codEnabled: 'true', cardPayments: 'off' });
-    expect(await svc.publicView()).toEqual({ codEnabled: 'true' }); // the stored view is unchanged
+    expect(await svc.clientView()).toMatchObject({ returnWindowDays: '14', cardPayments: 'off' });
+    expect(await svc.publicView()).toEqual({ returnWindowDays: '14' }); // the stored view is unchanged
     await expect(svc.set('cardPayments', 'stripe')).rejects.toThrow('Unknown setting.');
   });
 
@@ -625,11 +625,11 @@ describe('the public settings carry cardPayments', () => {
     const { svc, sent } = service();
     Object.assign(process.env, GOOD_ENV);
     const gateway = Object.assign(Object.create(RealtimeGateway.prototype), { settings: svc, can: (role: string) => role === 'admin' });
-    expect(await gateway.settingsGet({ data: {} })).toMatchObject({ ok: true, data: { codEnabled: 'true', cardPayments: 'stripe' } });
+    expect(await gateway.settingsGet({ data: {} })).toMatchObject({ ok: true, data: { returnWindowDays: '14', cardPayments: 'stripe' } });
     expect(await gateway.settingsGet({ data: { user: { role: 'customer' } } })).toMatchObject({ data: { cardPayments: 'stripe' } });
-    expect(await gateway.settingsGet({ data: { user: { role: 'admin' } } })).toEqual({ ok: true, data: { codEnabled: 'true', commissionPct: '12' } });
-    await svc.set('codEnabled', 'true');
-    expect(sent.find((s) => s.roles.includes('customer'))!.payload).toMatchObject({ codEnabled: 'true', cardPayments: 'stripe' });
+    expect(await gateway.settingsGet({ data: { user: { role: 'admin' } } })).toEqual({ ok: true, data: { returnWindowDays: '14', commissionPct: '12' } });
+    await svc.set('returnWindowDays', '14');
+    expect(sent.find((s) => s.roles.includes('customer'))!.payload).toMatchObject({ returnWindowDays: '14', cardPayments: 'stripe' });
     expect(sent.find((s) => s.roles.includes('admin'))!.payload).not.toHaveProperty('cardPayments');
   });
 });

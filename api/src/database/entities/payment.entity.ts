@@ -11,7 +11,7 @@ import { encryptedColumn } from '../../common/crypto/field-crypto';
 export type PaymentPurpose = 'order' | 'topup' | 'plan';
 
 export type PaymentStatus =
-  | 'pending' // COD collected on delivery, or mobile money awaiting approval
+  | 'pending' // mobile money or card awaiting approval
   | 'succeeded'
   | 'failed'
   | 'refunded';
@@ -56,7 +56,7 @@ export class Payment {
   userId: string;
 
   @Column({ type: 'varchar', length: 20 })
-  method: string; // stripe_card | cod | airtel_money | wallet
+  method: string; // stripe_card | airtel_money | wallet
 
   @Column({ type: 'float' })
   amountUsd: number;

@@ -61,7 +61,6 @@ import { DESK_ADMINS_ONLY, isDeskAdmin, tierAllows, tierOf } from '../logistics/
 import type { DeskAction } from '../logistics/tiers';
 import { ROLE_GROUPS } from '../common/role-groups';
 import { ORDER_ACCESS_DENIED, orderAudienceOf } from '../common/order-access';
-import { CASH_DESK_ADMINS } from '../common/staff-access';
 import { RiderService } from '../warehouse/rider.service';
 import { CampaignsService } from '../flows/campaigns.service';
 import { ReplacementsService } from '../flows/replacements.service';
@@ -755,7 +754,7 @@ export class RealtimeGateway
         body,
         { dedupWithoutKey: true },
       );
-      // Fraud rules: the COD cap (only while COD is offered), failed payments, new-account bursts, shared phone/device, returns, address changes.
+      // Fraud rules: failed payments, new-account bursts, shared phone/device, returns, address changes.
       // A replay is the same order: it is not counted twice.
       if (!replayed) await this.fraud.afterOrder({ id: user.id, name: user.name }, order);
       // The same view the customer's list and pushes carry (journey and warehouse names).
@@ -881,7 +880,7 @@ export class RealtimeGateway
   @SubscribeMessage('delivery:updateStatus')
   async deliveryUpdateStatus(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { taskId: string; status: DeliveryStatus; reason?: string; code?: string; cashUsd?: number },
+    @MessageBody() body: { taskId: string; status: DeliveryStatus; reason?: string; code?: string },
   ) {
     try {
       const user = this.requireUser(client);
@@ -889,7 +888,7 @@ export class RealtimeGateway
       if (!(['picked_up', 'in_transit', 'delivered', 'failed'] as string[]).includes(body?.status)) {
         return fail('Invalid delivery status.');
       }
-      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason, body.code, body.cashUsd));
+      return ok(await this.delivery.updateStatus(body.taskId, body.status, user.id, body.reason, body.code));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -2198,20 +2197,6 @@ export class RealtimeGateway
       if (!rider || rider.role !== 'rider' || !rider.active) return fail('Choose an active rider.');
       if (!Array.isArray(body.taskIds) || body.taskIds.length === 0 || body.taskIds.length > 200) return fail('Select 1–200 parcels.');
       return ok(await this.warehouse.buildBatch(await this.deskActor(user), body.taskIds.map(String), { id: rider.id, name: rider.name, hubId: rider.hubId ?? null }));
-    } catch (e) {
-      return fail((e as Error).message);
-    }
-  }
-
-  @SubscribeMessage('warehouse:reconcile')
-  async whReconcile(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { hubId?: string }) {
-    try {
-      const user = this.requireUser(client);
-      // Rider cash: the Super Admin, Finance and Operations, or a supervisor or manager of their own warehouse (hubScope).
-      const cashAdmin = CASH_DESK_ADMINS.includes(user.role);
-      if (!cashAdmin && user.role !== 'warehouse_staff') return fail('Not allowed.');
-      if (!cashAdmin && !(await this.tierOk(user, 'oversee'))) return fail('Only supervisors and managers can see this.');
-      return ok(await this.warehouse.reconcile(await this.hubScope(user, body?.hubId)));
     } catch (e) {
       return fail((e as Error).message);
     }

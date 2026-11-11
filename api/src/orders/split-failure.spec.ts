@@ -10,7 +10,7 @@ import { OrdersService } from './orders.service';
 
 /**
  * A delivery that fails on a split order (B11): below the limit the leg is planned again and the order keeps its status when part of
- * it was delivered; at the limit only the leg's lines are cancelled (refunded, or less cash to collect), restocked and sent back to
+ * it was delivered; at the limit only the leg's lines are cancelled (refunded), restocked and sent back to
  * their sellers, and the rest of the order carries on. Real logistics, delivery and orders services over an in-memory schema.
  */
 describe('split order: a customer leg that fails', () => {
@@ -33,7 +33,6 @@ describe('split order: a customer leg that fails', () => {
     toRole: jest.fn(async () => undefined),
   };
   const emitter = { toUser: jest.fn(), toRoles: jest.fn(), toRolesOnly: jest.fn(), toHub: jest.fn(), registerFanout: jest.fn(), registerUserView: jest.fn() };
-  const markCollected = jest.fn(async () => undefined);
   const admin: Actor = { id: 'a1', role: 'admin', name: 'Admin', hubId: null, tier: null };
   const hours = (h: number) => new Date(Date.now() + h * 3_600_000);
   let gombe: Hub;
@@ -49,8 +48,8 @@ describe('split order: a customer leg that fails', () => {
   };
   const fail = (taskId: string, reason = 'Customer not reachable') => delivery.updateStatus(taskId, 'failed', rider.id, reason);
 
-  /** Two sellers in Gombe, each with a $10 line; both parcels scanned in only on request. `cod` = cash on delivery. */
-  async function place(opts: { cod?: boolean } = {}) {
+  /** Two sellers in Gombe, each with a $10 line; both parcels scanned in only on request. */
+  async function place() {
     const n = ++seq;
     const o = await ds.getRepository(Order).save(
       ds.getRepository(Order).create({
@@ -58,7 +57,7 @@ describe('split order: a customer leg that fails', () => {
         customerId: customer.id,
         customerName: 'Marie Dubois',
         status: 'confirmed',
-        paymentMethod: opts.cod ? 'cod' : 'stripe_card',
+        paymentMethod: 'stripe_card',
         subtotalUsd: 20,
         deliveryFeeUsd: 5,
         totalUsd: 25,
@@ -67,7 +66,7 @@ describe('split order: a customer leg that fails', () => {
       }),
     );
     await ds.getRepository(Payment).save(
-      ds.getRepository(Payment).create({ reference: `PAY-${n}`, orderId: o.id, orderReference: o.reference, userId: customer.id, method: opts.cod ? 'cod' : 'stripe_card', amountUsd: 25, status: opts.cod ? 'pending' : 'succeeded' }),
+      ds.getRepository(Payment).create({ reference: `PAY-${n}`, orderId: o.id, orderReference: o.reference, userId: customer.id, method: 'stripe_card', amountUsd: 25, status: 'succeeded' }),
     );
     const route = await world.routing.route({ shippingAddress: o.shippingAddress, sellerIds: [sellerA.id, sellerB.id] });
     await ds.getRepository(Order).update({ id: o.id }, { destinationHubId: route.destinationHubId, originHubIds: route.originHubIds, originBySeller: route.originBySeller, routeBySeller: route.routeBySeller });
@@ -76,8 +75,8 @@ describe('split order: a customer leg that fails', () => {
     return { id: o.id, pA: pickups.find((t) => t.sellerId === sellerA.id)!, pB: pickups.find((t) => t.sellerId === sellerB.id)! };
   }
   /** A's parcel is at the warehouse and the sweeper has sent it alone after the limit. */
-  async function partialLegForA(opts: { cod?: boolean } = {}) {
-    const placed = await place(opts);
+  async function partialLegForA() {
+    const placed = await place();
     await scan(placed.pA.id);
     await logistics.planWaiting(hours(25));
     const leg = await openLeg(placed.id);
@@ -115,7 +114,7 @@ describe('split order: a customer leg that fails', () => {
       emitter as never,
       settings as never,
     );
-    delivery = new DeliveryService(ds.getRepository(DeliveryTask), ds.getRepository(Order), emitter as never, { markCollected } as never, settings as never, logistics);
+    delivery = new DeliveryService(ds.getRepository(DeliveryTask), ds.getRepository(Order), emitter as never, settings as never, logistics);
     const payments = {
       registerOrderSettledHandler: () => undefined,
       forOrder: (orderId: string) => ds.getRepository(Payment).findOne({ where: { orderId }, order: { createdAt: 'DESC' } }),
@@ -204,20 +203,6 @@ describe('split order: a customer leg that fails', () => {
     expect((await tasks(id)).filter((t) => t.kind === 'return_to_seller')).toHaveLength(1);
   });
 
-  it('cash on delivery: the lines given up lower the payment, and the leg that finishes the order takes the remainder', async () => {
-    const { id, pB, leg } = await partialLegForA({ cod: true });
-    expect(leg.codAmountUsd).toBe(15); // Alpha's $10 + the $5 fee
-    await ds.getRepository(DeliveryTask).update({ id: leg.id }, { attempts: 3 });
-    await fail(leg.id);
-    const pay = await ds.getRepository(Payment).findOneByOrFail({ orderId: id });
-    expect(pay).toMatchObject({ amountUsd: 15, status: 'pending' }); // $25 - Alpha's $10
-    expect(await balance()).toBe(0); // nothing was paid, so nothing is refunded
-    await scan(pB.id);
-    const last = await openLeg(id);
-    // the fee was never collected (the first leg failed): the remainder of the payment is what is due
-    expect(last.codAmountUsd).toBe(15);
-  });
-
   it('a whole-order leg that fails below the limit sends the order back to confirmed and the re-opened leg does not push it forward again', async () => {
     const placed = await place();
     await scan(placed.pA.id);
@@ -246,7 +231,7 @@ describe('split order: a customer leg that fails', () => {
 
   describe('express order: a delivery that fails (C4)', () => {
     /** One seller, express: the route is recorded the way `orders:create` does (mode express, origin = destination = the warehouse). */
-    async function placeExpress(opts: { cod?: boolean } = {}) {
+    async function placeExpress() {
       const n = ++seq;
       const o = await ds.getRepository(Order).save(
         ds.getRepository(Order).create({
@@ -254,7 +239,7 @@ describe('split order: a customer leg that fails', () => {
           customerId: customer.id,
           customerName: 'Marie Dubois',
           status: 'confirmed',
-          paymentMethod: opts.cod ? 'cod' : 'stripe_card',
+          paymentMethod: 'stripe_card',
           subtotalUsd: 10,
           deliveryFeeUsd: 2,
           totalUsd: 12,
@@ -268,7 +253,7 @@ describe('split order: a customer leg that fails', () => {
         }),
       );
       await ds.getRepository(Payment).save(
-        ds.getRepository(Payment).create({ reference: `PAY-X${n}`, orderId: o.id, orderReference: o.reference, userId: customer.id, method: opts.cod ? 'cod' : 'stripe_card', amountUsd: 12, status: opts.cod ? 'pending' : 'succeeded' }),
+        ds.getRepository(Payment).create({ reference: `PAY-X${n}`, orderId: o.id, orderReference: o.reference, userId: customer.id, method: 'stripe_card', amountUsd: 12, status: 'succeeded' }),
       );
       await logistics.planOrder(await order(o.id));
       await logistics.markSellerReady(o.id, [sellerA.id]);

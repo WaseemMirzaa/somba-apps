@@ -179,7 +179,6 @@ export class Driver {
         rider.id,
         undefined,
         code ?? undefined,
-        t.codAmountUsd > 0 ? t.codAmountUsd : undefined,
       );
       return true;
     }
@@ -207,7 +206,6 @@ export class Driver {
         rider.id,
         undefined,
         code ?? undefined,
-        t.codAmountUsd > 0 ? t.codAmountUsd : undefined,
       );
       return true;
     }
@@ -383,7 +381,7 @@ export async function backdateOrder(
   if (taskIds.length)
     await q(
       ds,
-      `UPDATE delivery_tasks SET ${shift(['createdAt', 'updatedAt', 'readyAt', 'receivedAt', 'pickedUpAt', 'deliveredAt', 'codCollectedAt'])} WHERE id IN (${taskIds.map(() => '?').join(',')})`,
+      `UPDATE delivery_tasks SET ${shift(['createdAt', 'updatedAt', 'readyAt', 'receivedAt', 'pickedUpAt', 'deliveredAt'])} WHERE id IN (${taskIds.map(() => '?').join(',')})`,
       taskIds,
     );
   await q(
@@ -621,7 +619,7 @@ export interface Moments {
   deliveredAt?: Date;
 }
 
-/** Set the moments of one delivery leg. A cash record on the leg follows its delivery time. */
+/** Set the moments of one delivery leg. */
 export async function stampTask(
   ds: DataSource,
   taskId: string,
@@ -633,10 +631,6 @@ export async function stampTask(
     if (!v) continue;
     set.push(`${col} = ?`);
     params.push(v);
-  }
-  if (m.deliveredAt) {
-    set.push('codCollectedAt = IF(codCollectedAt IS NULL, NULL, ?)');
-    params.push(m.deliveredAt);
   }
   const last = m.deliveredAt ?? m.pickedUpAt ?? m.receivedAt ?? m.createdAt;
   if (last) {

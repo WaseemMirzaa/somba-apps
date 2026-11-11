@@ -33,7 +33,7 @@ const FR: Words = {
   's.delivered': 'livrée', 's.cancelled': 'annulée', 's.returned': 'retournée',
   'p.to_pack': 'à emballer', 'p.ready': 'prêt', 'p.at_hub': 'à l’entrepôt',
   'o.requested': 'demandé', 'o.sending': 'en cours d’envoi', 'o.rejected': 'rejeté', 'o.paid': 'payé',
-  'm.cod': 'Paiement à la livraison', 'm.card': 'Carte', 'm.stripe_card': 'Carte', 'm.wallet': 'Portefeuille',
+  'm.card': 'Carte', 'm.stripe_card': 'Carte', 'm.wallet': 'Portefeuille',
 };
 
 export interface CsvWords {

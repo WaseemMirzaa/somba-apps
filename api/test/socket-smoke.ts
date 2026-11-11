@@ -99,7 +99,7 @@ async function main() {
   const product = ownListings.find((p) => p.status === 'live');
   check("seller@somba.app has a live listing of their own to buy", !!product && products.some((p) => p.id === product.id));
 
-  // COD is off by default (client scope: codEnabled=false) — refused until an admin enables it.
+  // Payment is always up front: 'cod' is refused like any unknown method.
   let codRefused = false;
   try {
     await emit(cSock, 'orders:create', {
@@ -107,20 +107,19 @@ async function main() {
       paymentMethod: 'cod',
       shippingAddress: ADDRESS,
     });
-  } catch {
-    codRefused = true;
+  } catch (e) {
+    codRefused = /Unknown payment method\./.test((e as Error).message);
   }
-  check('COD refused while codEnabled is false (default)', codRefused);
-  await emit(aSock, 'settings:set', { key: 'codEnabled', value: 'true' });
+  check('cod is refused like any unknown method', codRefused);
 
   // Admin dashboard listens for the new order pushed in real time.
   const adminSawOrder = waitFor<any>(aSock, 'order:created');
   const created = await emit<any>(cSock, 'orders:create', {
     items: [{ productId: product.id, qty: 2 }],
-    paymentMethod: 'cod',
+    paymentMethod: 'stripe_card',
     shippingAddress: ADDRESS,
   });
-  check('order created + acked to customer', !!created.id && created.status === 'pending');
+  check('order created + acked to customer (paid up front)', !!created.id && created.status === 'confirmed');
   const pushed = await adminSawOrder;
   check('admin dashboard received order:created LIVE', pushed.id === created.id);
 
@@ -216,8 +215,8 @@ async function main() {
   // ---- Payouts (seller ⇄ finance) ----
   // A payout can only draw on DELIVERED sales, so complete the first delivery.
   const sold = waitFor<any>(cSock, 'order:updated', (o) => o.status === 'delivered');
-  // A cash-on-delivery parcel: the rider confirms the exact cash due (the server records it and refuses any other amount).
-  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered', ...(task.codAmountUsd > 0 ? { cashUsd: task.codAmountUsd } : {}) });
+  // The order was paid up front: the rider hands the parcel over, nothing is collected at the door.
+  await emit(rSock, 'delivery:updateStatus', { taskId: task.id, status: 'delivered' });
   check('rider completes the delivery → order delivered', (await sold).status === 'delivered');
   const avail = await emit<{ available: number }>(sSock, 'payouts:available');
   check(`seller has earnings available to withdraw ($${avail.available})`, avail.available >= 120);

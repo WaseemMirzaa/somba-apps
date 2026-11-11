@@ -75,7 +75,6 @@ const register = async (label, role = 'customer') => {
   const rider = await login('rider@somba.app');
   const cust = await register('cust');
   const cust2 = await register('cust2');
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
 
   // ---- sellers (need an approved store to sell) ----------------------------
   const makeSeller = async (label, approve) => {
@@ -575,7 +574,7 @@ const register = async (label, role = 'customer') => {
   const supervisor = await login('warehouse.limete@somba.app');
   const manager = warehouse; // warehouse@somba.app is the Kinshasa manager
   const tierRefusal = /supervisors and managers|managers can/;
-  const supervisorEvents = ['warehouse:aged', 'warehouse:reconcile', 'exceptions:list', 'replacements:list', 'exchanges:list'];
+  const supervisorEvents = ['warehouse:aged', 'exceptions:list', 'replacements:list', 'exchanges:list'];
   for (const ev of supervisorEvents) {
     a = await req(operator.sock, ev, {});
     ok(!a.ok && tierRefusal.test(a.error ?? ''), `${ev}: an operator is refused`, a.error ?? '');
@@ -600,7 +599,7 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(operator.sock, 'exceptions:list', { status: 'all' })).ok, 'but not the whole list');
   if (excId) ok((await req(supervisor.sock, 'exceptions:setStatus', { id: excId, status: 'resolved' })).ok === false, "a supervisor of another warehouse still cannot touch this warehouse's incident");
   ok((await req(manager.sock, 'exceptions:setStatus', { id: excId, status: 'resolved', resolution: 'Smoke' })).ok, 'the warehouse manager resolves it');
-  ok(!(await req(rider.sock, 'warehouse:aged', {})).ok && !(await req(cust.sock, 'warehouse:reconcile', {})).ok, 'riders and customers never');
+  ok(!(await req(rider.sock, 'warehouse:aged', {})).ok && !(await req(cust.sock, 'exceptions:list', {})).ok, 'riders and customers never');
 
   // The warehouse and logistics desk: dispatch, scanning, batches, runs, task reads. Only the super admin, operations and warehouse staff.
   section('Least privilege: the warehouse desk is for operations and warehouse staff, not for every admin');
@@ -660,7 +659,7 @@ const register = async (label, role = 'customer') => {
   ok(a.ok, 'finance keeps the warehouse figures of its analytics page');
   ok(!(await req(support.sock, 'analytics:warehouse', {})).ok && !(await req(marketing.sock, 'analytics:warehouse', {})).ok && !(await req(moderation.sock, 'analytics:warehouse', {})).ok, 'support, marketing and moderation do not');
 
-  section('Round 2 least privilege: listing as the platform, translations, store identity papers, rider cash');
+  section('Round 2 least privilege: listing as the platform, translations, store identity papers');
   const reviewers = { admin, moderation, ops };
   const notReviewers = { finance, support, marketing };
   const platformListers = { admin, moderation };
@@ -703,28 +702,6 @@ const register = async (label, role = 'customer') => {
     ok(a.ok && a.data.name === withKyc.name && PAPERS.every((k) => !(k in a.data)) && !JSON.stringify(a.data).includes(withKyc.idNumber), `${name}: sellers:get returns the public profile only`, a.error ?? '');
   }
   ok(!(await req(cust.sock, 'sellers:list')).ok && !(await req(sellerA.sock, 'sellers:get', { id: withKyc.id })).ok, 'customers and sellers cannot ask');
-  // Rider cash (cash:handover, cash:history, warehouse:reconcile): Super Admin, Finance, Operations, and supervisors / managers of the rider's own warehouse.
-  const cashAdmins = { admin, finance, ops };
-  const notCash = { support, marketing, moderation };
-  for (const [name, u] of Object.entries(notCash)) {
-    a = await req(u.sock, 'cash:history');
-    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot read cash hand-overs`, a.error ?? 'was allowed');
-    a = await req(u.sock, 'cash:handover', { riderId: rider.user.id, amountUsd: 1 });
-    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot record a hand-over`, a.error ?? 'was allowed');
-    a = await req(u.sock, 'warehouse:reconcile', {});
-    ok(!a.ok && /Not allowed/.test(a.error ?? ''), `${name} admin cannot open the cash reconciliation`, a.error ?? 'was allowed');
-  }
-  for (const [name, u] of Object.entries(cashAdmins)) {
-    ok((await req(u.sock, 'cash:history')).ok && (await req(u.sock, 'warehouse:reconcile', {})).ok, `the ${name} admin reads the cash history and reconciliation`);
-    a = await req(u.sock, 'cash:handover', { riderId: rider.user.id, amountUsd: 1 });
-    ok(!/Not allowed|Staff only/.test(a.error ?? ''), `the ${name} admin passes the role check (any refusal is about the cash, not the role)`, a.error ?? '');
-  }
-  a = await req(operator.sock, 'cash:history');
-  ok(!a.ok && /supervisors and managers/.test(a.error ?? ''), 'an operator cannot read the cash hand-overs', a.error ?? 'was allowed');
-  ok((await req(supervisor.sock, 'cash:history')).ok && (await req(manager.sock, 'cash:history')).ok, 'a supervisor and a manager of a warehouse can');
-  ok(!(await req(cust.sock, 'cash:history')).ok && !(await req(rider.sock, 'cash:history')).ok, 'customers and riders never');
-  a = await req(supervisor.sock, 'cash:handover', { riderId: rider.user.id, amountUsd: 1 });
-  ok(!a.ok && /another warehouse|holds no cash|no cash/.test(a.error ?? ''), "a supervisor can only take cash from their own warehouse's riders", a.error ?? 'was allowed');
   for (const u of [moderation, marketing, support, operator, supervisor]) u.sock.close();
 
   section('List limits cannot be abused');

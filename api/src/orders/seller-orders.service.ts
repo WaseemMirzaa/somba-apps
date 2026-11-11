@@ -62,7 +62,7 @@ export class SellerOrdersService {
       if ((ORDER_STATUSES as readonly string[]).includes(status)) qb.andWhere('o.status = :status', { status });
       else if ((PACKAGE_STATUSES as readonly string[]).includes(status)) {
         const step = status === 'to_pack' ? 'open' : status === 'ready' ? 'ready' : 'received';
-        qb.andWhere("i.fulfilment = :step AND (o.status IN ('confirmed','processing') OR (o.status = 'pending' AND o.paymentMethod = 'cod'))", { step });
+        qb.andWhere("i.fulfilment = :step AND o.status IN ('confirmed','processing')", { step });
       } else throw new BadRequestException(`Status must be one of: ${[...ORDER_STATUSES, ...PACKAGE_STATUSES].join(', ')}.`);
     }
     const from = dateInput(input.from, false);

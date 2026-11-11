@@ -135,8 +135,6 @@ async function run() {
   const settings = ds.getRepository(Setting);
   const defaults: Record<string, string> = {
     fxRate: '2850',
-    codCapUsd: '500',
-    codEnabled: 'false', // matches the client scope: no cash on delivery at launch
     // Delivery fee is decided by the SERVER: base + per km (destination warehouse -> customer pin), capped, plus a
     // transfer fee between warehouses (edit in Admin -> Settings).
     deliveryBaseUsd: '2',

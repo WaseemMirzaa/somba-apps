@@ -32,5 +32,5 @@ export type FraudThresholdName = keyof typeof FRAUD_THRESHOLDS;
 /** The setting keys, for the settings whitelist. */
 export const FRAUD_SETTING_KEYS: readonly string[] = Object.values(FRAUD_THRESHOLDS).map((t) => t.key);
 
-export const FRAUD_ALERT_TYPES = ['cod_risk', 'failed_payments', 'new_account_orders', 'shared_identity', 'return_rate', 'address_changes'] as const;
+export const FRAUD_ALERT_TYPES = ['failed_payments', 'new_account_orders', 'shared_identity', 'return_rate', 'address_changes'] as const;
 export type FraudAlertType = (typeof FRAUD_ALERT_TYPES)[number];

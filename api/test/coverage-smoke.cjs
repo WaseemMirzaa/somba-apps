@@ -183,10 +183,12 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(!(await req(other.sock, 'payments:status', { reference: pays[0].reference })).ok, "another customer cannot read someone else's payment");
 
   section('Fraud flags');
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'true' });
-  await req(admin.sock, 'settings:set', { key: 'codCapUsd', value: 100 });
-  a = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 5 }], paymentMethod: 'cod', shippingAddress: addr });
-  ok(a.ok, 'a large cash-on-delivery order is accepted');
+  await req(admin.sock, 'settings:set', { key: 'fraudNewAccountOrders24h', value: 2 });
+  const flagger = await register('flagger');
+  const flaggerOrder = () => req(flagger.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr });
+  ok((await flaggerOrder()).ok, 'a brand-new customer places a first prepaid order');
+  a = await flaggerOrder();
+  ok(a.ok, 'and a second one within the day', a.error ?? '');
   const flagged = await until(async () => (await req(finance.sock, 'fraud:list')).data.find((f) => f.orderId === a.data.id));
   ok(!!flagged, 'and flagged for fraud review');
   ok(!(await req(cust.sock, 'fraud:list')).ok, 'customers cannot read fraud alerts');
@@ -196,8 +198,9 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
 
   section('Fraud Block really suspends the account (and unblock reactivates it)');
   const fraudy = await register('fraudy');
-  const fo = await req(fraudy.sock, 'orders:create', { items: [{ productId: prod.id, qty: 5 }], paymentMethod: 'cod', shippingAddress: addr });
-  ok(fo.ok, 'a second customer places a large cash-on-delivery order');
+  ok((await req(fraudy.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr })).ok, 'a second brand-new customer places a first prepaid order');
+  const fo = await req(fraudy.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr });
+  ok(fo.ok, 'and a second one within the day', fo.error ?? '');
   const fAlert = await until(async () => (await req(finance.sock, 'fraud:list')).data.find((f) => f.orderId === fo.data.id));
   ok(!!fAlert, 'and it is flagged');
   const fraudyActive = async () => (await req(admin.sock, 'customers:list', { limit: 1000 })).data.find((c) => c.id === fraudy.user.id)?.active;
@@ -288,8 +291,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok(facets.ok && facets.data.actions.includes('fraud.blocked') && facets.data.roles.includes('admin'), 'audit:facets lists the actions and roles for the pickers');
   ok(!(await req(finance.sock, 'audit:list', { action: 'fraud.blocked' })).ok && !(await req(finance.sock, 'audit:facets')).ok && !(await req(cust.sock, 'audit:list')).ok, 'finance and customers cannot read the audit log');
 
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
-  await req(admin.sock, 'settings:set', { key: 'codCapUsd', value: 500 });
+  await req(admin.sock, 'settings:set', { key: 'fraudNewAccountOrders24h', value: 3 }); // back to the default
 
   section('Seller reads and product removal');
   a = await req(sellerU.sock, 'sellers:mine');
@@ -339,10 +341,9 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
   ok((await req(warehouse.sock, 'warehouse:aged')).ok, 'warehouse:aged');
   a = await req(warehouse.sock, 'warehouse:inventory');
   ok(a.ok && a.data.length > 0 && a.data[0].sku !== undefined, 'warehouse:inventory');
-  ok((await req(warehouse.sock, 'warehouse:reconcile')).ok, 'warehouse:reconcile (cash per rider)');
   a = await req(warehouse.sock, 'warehouse:riders');
   ok(a.ok && a.data.some((r) => r.name), 'warehouse:riders lists active riders');
-  for (const ev of ['warehouse:hubs', 'warehouse:parcels', 'warehouse:aged', 'warehouse:inventory', 'warehouse:reconcile', 'warehouse:riders', 'warehouse:batches']) {
+  for (const ev of ['warehouse:hubs', 'warehouse:parcels', 'warehouse:aged', 'warehouse:inventory', 'warehouse:riders', 'warehouse:batches']) {
     ok(!(await req(cust.sock, ev)).ok && !(await req(rider.sock, ev)).ok, `${ev} is closed to customers and riders`);
   }
   // batch
@@ -452,7 +453,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
 
   section('Analytics: finance');
   const fin0 = (await req(finance.sock, 'analytics:finance')).data;
-  for (const k of ['grossGmvUsd', 'commissionPct', 'commissionEarnedUsd', 'commissionExpectedUsd', 'refundsUsd', 'payouts', 'receivables', 'series30', 'walletLiabilityUsd', 'codOutstandingUsd']) ok(fin0[k] !== undefined, `analytics:finance has ${k}`);
+  for (const k of ['grossGmvUsd', 'commissionPct', 'commissionEarnedUsd', 'commissionExpectedUsd', 'refundsUsd', 'payouts', 'receivables', 'series30', 'walletLiabilityUsd']) ok(fin0[k] !== undefined, `analytics:finance has ${k}`);
   ok(fin0.series30.length === 30 && fin0.series30[29].date === today, 'series30 is 30 zero-filled daily rows ending today');
   ok(!('mobileMoneyFees' in fin0) && !('feesUsd' in fin0), 'no mobile-money fee figure is invented (fees are not tracked)');
   a = await req(cust.sock, 'wallet:topup', { amountUsd: 21, method: 'airtel_money', phone: '+243812345678' });
@@ -481,7 +482,7 @@ const addr = JSON.stringify({ line1: '1 Cov St', city: 'Kinshasa' });
 
   section('Analytics: warehouse throughput and timing');
   const wh0 = (await req(warehouse.sock, 'analytics:warehouse')).data;
-  for (const k of ['totalParcels', 'unassigned', 'inTransit', 'delivered', 'codToCollect', 'byStatus']) ok(wh0[k] !== undefined, `analytics:warehouse keeps ${k}`);
+  for (const k of ['totalParcels', 'unassigned', 'inTransit', 'delivered', 'byStatus']) ok(wh0[k] !== undefined, `analytics:warehouse keeps ${k}`);
   ok(wh0.throughput.length === 7 && wh0.throughput[6].date === today && wh0.throughput.every((d) => 'received' in d && 'delivered' in d), 'throughput is the last 7 days of received / delivered counts');
   // receive one parcel at the hub, then deliver it
   const ro = (await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty: 1 }], paymentMethod: 'stripe_card', shippingAddress: addr })).data;

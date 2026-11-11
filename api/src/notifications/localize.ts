@@ -29,13 +29,12 @@ const METHODS_FR: Record<string, string> = {
   vodacom_mpesa: 'Vodacom M-Pesa',
   stripe_card: 'carte bancaire',
   card: 'carte bancaire',
-  cod: 'paiement à la livraison',
   wallet: 'portefeuille',
 };
 
 /**
  * A payment method in French. Takes the id ("airtel_money") or the English name the server writes now
- * ("Airtel Money", "Cash on delivery"), in any case: notices stored before the names were used still carry the id.
+ * ("Airtel Money", "Card"), in any case: notices stored before the names were used still carry the id.
  */
 export function methodFr(m: string): string {
   const id = paymentMethodId(m);
@@ -454,10 +453,7 @@ const BODIES: Rule[] = [
     /^(\S+): one seller's package is ready, waiting for (\d+) more sellers?\.$/,
     (m) => `${m[1]} : le colis d’un vendeur est prêt, en attente de ${m[2]} ${Number(m[2]) > 1 ? 'autres vendeurs' : 'autre vendeur'}.`,
   ],
-  [
-    /^(\S+)( · collect \$([\d.]+) cash)?\. Open the app to accept it\.$/,
-    (m) => `${m[1]}${m[2] !== undefined ? ` · à encaisser : ${moneyFr(m[3])} en espèces` : ''}. Ouvrez l’application pour l’accepter.`,
-  ],
+  [/^(\S+)\. Open the app to accept it\.$/, (m) => `${m[1]}. Ouvrez l’application pour l’accepter.`],
   [/^(.+) — collect them at the warehouse\.$/, (m) => `${m[1]} — à récupérer à l’entrepôt.`],
   [/^(\S+) · \$([\d.]+) from (.+)$/, (m) => `${m[1]} · ${moneyFr(m[2])} de ${m[3]}`],
   [/^(\S+): (\d+) item\(s\) to pack — \$([\d.]+)$/, (m) => `${m[1]} : ${m[2]} article(s) à préparer — ${moneyFr(m[3])}`],

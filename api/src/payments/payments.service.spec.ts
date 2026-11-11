@@ -80,20 +80,20 @@ describe('PaymentsService.normalisePhone', () => {
 });
 
 describe('PaymentsService.assertMethodAllowed', () => {
-  const make = (codEnabled: string | null, provider: unknown) =>
+  const make = (_flag: string | null, provider: unknown) =>
     new PaymentsService(
       {} as never, {} as never, {} as never, {} as never, {} as never,
-      { get: async () => codEnabled } as never,
+      {} as never,
       provider as never,
       {} as never, {} as never,
     );
   const env = { ...process.env };
   afterEach(() => { process.env = { ...env }; });
 
-  it('COD is refused unless codEnabled is "true"', async () => {
-    await expect(make(null, null).assertMethodAllowed('cod')).rejects.toThrow(/not available/);
-    await expect(make('false', null).assertMethodAllowed('cod')).rejects.toThrow();
-    await expect(make('true', null).assertMethodAllowed('cod')).resolves.toBeUndefined();
+  it('cod is refused like any unknown method, whatever is configured', async () => {
+    await expect(make(null, null).assertMethodAllowed('cod')).rejects.toThrow('Unknown payment method.');
+    await expect(make(null, { name: 'x' }).assertMethodAllowed('cod')).rejects.toThrow('Unknown payment method.');
+    await expect(make(null, null).assertMethodAllowed('bitcoin')).rejects.toThrow('Unknown payment method.');
   });
   it('mobile money is refused with no provider, allowed with one', async () => {
     await expect(make('false', null).assertMethodAllowed('orange_money')).rejects.toThrow(/not available/);

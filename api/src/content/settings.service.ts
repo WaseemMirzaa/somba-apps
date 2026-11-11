@@ -12,7 +12,7 @@ import { translationMode } from '../translation/translation-mode';
 import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
-export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'] as const;
+export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'] as const;
 /**
  * How shoppers reach KOMORIKO from Help (support phone, e-mail and a WhatsApp number). Blank = not offered. Public like
  * the rest of the shopper settings; written by admins only (see `WRITABLE`).
@@ -21,10 +21,10 @@ export const CONTACT_SETTINGS = ['supportPhone', 'supportEmail', 'supportWhatsap
 const isContactKey = (k: string) => (CONTACT_SETTINGS as readonly string[]).includes(k);
 // `deliveryZones` stays readable for old clients but is never written or used: zones are gone (nearest-warehouse routing).
 /** The only keys that can be written, each with its own validation. */
-const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'codEnabled', 'codCapUsd', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm', ...FRAUD_SETTING_KEYS] as const;
+const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm', ...FRAUD_SETTING_KEYS] as const;
 
 /**
- * Key/value platform config: FX rate, COD cap, delivery fee numbers,
+ * Key/value platform config: FX rate, delivery fee numbers,
  * feature flags. Values are stored as strings; JSON values are parsed by
  * callers.
  */
@@ -73,12 +73,8 @@ export class SettingsService {
     switch (key) {
       case 'fxRate':
         return String(num(value, 'Exchange rate', { min: 1, max: 100000 }));
-      case 'codCapUsd':
-        return String(num(value, 'COD cap', { min: 0, max: 100000 }));
       case 'commissionPct':
         return String(num(value, 'Commission', { min: 0, max: 60 }));
-      case 'codEnabled':
-        return oneOf(String(value), ['true', 'false'] as const, 'COD flag');
       case 'supportPhone':
       case 'supportWhatsapp': {
         const v = String(value ?? '').trim();
@@ -154,7 +150,7 @@ export class SettingsService {
     const all = await this.all();
     // Shoppers/guests only ever receive the public subset. The full set (fraud thresholds, plans, fees...) goes only to the
     // Super Admin, whose Settings page is the one screen that reads it; every other admin role follows the public subset
-    // (the exchange rate, COD switch...) like the apps do.
+    // (the exchange rate...) like the apps do.
     const view = await this.clientView();
     this.emitter.toRoles(['customer', 'guest', 'seller', 'rider', 'warehouse_staff', ...ADMIN_ROLES.filter((r) => r !== 'admin')], 'settings:updated', view);
     this.emitter.toRoles(['admin'], 'settings:updated', all);

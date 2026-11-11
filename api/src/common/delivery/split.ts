@@ -6,7 +6,7 @@ export const cents2 = (n: number): number => Math.round((n + Number.EPSILON) * 1
 
 /**
  * The money a set of lines is worth to the customer: their value less their pro-rata share of the promo discount. The same
- * rule a seller's part-cancel refunds by, so a partial leg's cash and a refund of the same lines are the same figure.
+ * rule a seller's part-cancel refunds by, so a split leg's share and a refund of the same lines are the same figure.
  */
 export function lineShareUsd(order: { subtotalUsd: number; discountUsd?: number | null }, valueUsd: number): number {
   const share = order.subtotalUsd > 0 ? valueUsd / order.subtotalUsd : 0;

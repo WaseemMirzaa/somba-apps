@@ -79,7 +79,6 @@ const addr = (p, extra = {}) => JSON.stringify({ line1: '1 Test Street', city: p
   const riderL = await login('rider.limete@somba.app');
 
   const settings0 = (await req(admin.sock, 'settings:get')).data;
-  await req(admin.sock, 'settings:set', { key: 'codEnabled', value: 'false' });
   const restore = async () => {
     for (const k of ['deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireDeliveryCode', 'allowInterCityDelivery']) {
       if (settings0[k] !== undefined) await req(admin.sock, 'settings:set', { key: k, value: settings0[k] });
@@ -407,8 +406,6 @@ const addr = (p, extra = {}) => JSON.stringify({ line1: '1 Test Street', city: p
     const parcelsAll = (await req(admin.sock, 'warehouse:parcels', {})).data ?? [];
     ok(parcelsAll.length >= parcelsK.length + 1, 'admins see every warehouse', `${parcelsAll.length} vs ${parcelsK.length}`);
     ok((await req(admin.sock, 'warehouse:parcels', { hubId: lim.id })).data.every((t) => [t.hubId, t.fromHubId, t.toHubId].includes(lim.id)), 'and may look at one');
-    const recK = (await req(mgrK.sock, 'warehouse:reconcile', {})).data ?? [];
-    ok(Array.isArray(recK), 'warehouse:reconcile answers for a warehouse');
     const whK = (await req(mgrK.sock, 'analytics:warehouse', {})).data;
     const whAll = (await req(admin.sock, 'analytics:warehouse', {})).data;
     ok(whK && whAll && whK.totalParcels < whAll.totalParcels, 'analytics:warehouse is scoped to the warehouse for staff', `${whK?.totalParcels} vs ${whAll?.totalParcels}`);

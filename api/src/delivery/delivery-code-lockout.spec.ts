@@ -10,8 +10,8 @@ import { lockAfter, sameCode, triesLeft } from './delivery-code-lock';
 
 /**
  * RD-01 / A-13: the 4-digit delivery code had no attempt limit, so a rider who was not at the door could try all 10,000
- * codes and finish the delivery (and its cash on delivery) without the customer. Real (in-memory SQLite) schema, the real
- * DeliveryService and LogisticsService; only payments, the emitter and the notification sender are stand-ins.
+ * codes and finish the delivery without the customer. Real (in-memory SQLite) schema, the real
+ * DeliveryService and LogisticsService; only the emitter and the notification sender are stand-ins.
  */
 describe('delivery code lockout (RD-01)', () => {
   let ds: DataSource;
@@ -25,7 +25,6 @@ describe('delivery code lockout (RD-01)', () => {
   const CODE = '4321';
   const notif = { toUser: jest.fn(async () => undefined), toUsers: jest.fn(async () => undefined), toAdmins: jest.fn(async () => undefined), toRole: jest.fn(async () => undefined) };
   const emitter = { toUser: jest.fn(), toRoles: jest.fn(), toHub: jest.fn() };
-  const payments = { markCollected: jest.fn(async () => undefined) };
   const WRONG = '0000';
   const LOCK_15 = /locked for 15 minutes/;
 
@@ -46,7 +45,6 @@ describe('delivery code lockout (RD-01)', () => {
         status: 'in_transit',
         riderId: rider.id,
         hubId: hub.id,
-        codAmountUsd: 0,
         proofCode: CODE,
         ...extra,
       } as DeliveryTask),
@@ -58,7 +56,7 @@ describe('delivery code lockout (RD-01)', () => {
     return rows[0];
   };
   const state = async (id = task.id) => (await ds.getRepository(DeliveryTask).findOneByOrFail({ id })).status;
-  const tryCode = (code: string | undefined, id = task.id, riderId = rider.id, cash?: number) => delivery.updateStatus(id, 'delivered', riderId, undefined, code, cash);
+  const tryCode = (code: string | undefined, id = task.id, riderId = rider.id) => delivery.updateStatus(id, 'delivered', riderId, undefined, code);
   const makeServices = () => {
     const settings = { all: async () => ({ ...setting }), get: async (k: string) => setting[k] ?? null };
     const lg = new LogisticsService(
@@ -78,7 +76,7 @@ describe('delivery code lockout (RD-01)', () => {
     );
     jest.spyOn(lg, 'afterRiderStatus').mockResolvedValue(undefined as never);
     jest.spyOn(lg, 'emitTask').mockResolvedValue(undefined);
-    const ds2 = new DeliveryService(ds.getRepository(DeliveryTask), ds.getRepository(Order), emitter as never, payments as never, settings as never, lg);
+    const ds2 = new DeliveryService(ds.getRepository(DeliveryTask), ds.getRepository(Order), emitter as never, settings as never, lg);
     return { lg, ds2 };
   };
 
@@ -104,7 +102,6 @@ describe('delivery code lockout (RD-01)', () => {
     await expect(tryCode(CODE)).rejects.toThrow(LOCK_15);
     await expect(tryCode(CODE)).rejects.toThrow(/Ask the customer to confirm the code in their app, or call the warehouse/);
     expect(await state()).toBe('in_transit');
-    expect(payments.markCollected).not.toHaveBeenCalled();
   });
 
   it('a brute force cannot finish the delivery: every one of 10,000 guesses fails once the lock is on', async () => {
@@ -149,17 +146,6 @@ describe('delivery code lockout (RD-01)', () => {
     expect(await state()).toBe('delivered');
     expect(await counters()).toMatchObject({ codeFailures: 0, codeLockedUntil: null });
     expect(await ds.getRepository(AuditLog).count({ where: { action: 'delivery.code_failed' } })).toBe(4); // the correct one left no failure line
-  });
-
-  it('a correct code on a COD task whose cash is wrong still resets the counter (the rider is not punished for the cash)', async () => {
-    const cod = await mkTask({ codAmountUsd: 20 });
-    for (let i = 0; i < 4; i++) await expect(tryCode(WRONG, cod.id)).rejects.toThrow(/Wrong delivery code/);
-    await expect(tryCode(CODE, cod.id)).rejects.toThrow(/Confirm the cash you collected/);
-    expect((await counters(cod.id)).codeFailures).toBe(0);
-    // and four more wrong codes do not lock: the count started again
-    for (let i = 0; i < 4; i++) await expect(tryCode(WRONG, cod.id)).rejects.toThrow(/Wrong delivery code/);
-    await tryCode(CODE, cod.id, rider.id, 20);
-    expect(await state(cod.id)).toBe('delivered');
   });
 
   it('escalates: 15 minutes, then 1 hour, then only a supervisor unlocks it (waiting does not)', async () => {

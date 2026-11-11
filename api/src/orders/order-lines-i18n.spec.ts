@@ -158,7 +158,7 @@ describe('OrdersService.create writes the snapshot with the order', () => {
     return { svc, snapshots, saved, txs: () => txs };
   }
   const buy = (svc: OrdersService, variant = 'Colour: Black') =>
-    svc.create({ id: 'c1', name: 'C' }, { items: [{ productId: 'p1', qty: 1, variant }], paymentMethod: 'cod' }).catch(() => undefined);
+    svc.create({ id: 'c1', name: 'C' }, { items: [{ productId: 'p1', qty: 1, variant }], paymentMethod: 'stripe_card' }).catch(() => undefined);
 
   it('snapshots the French name and the French option label in the same transaction as the order', async () => {
     const { svc, snapshots, txs } = make(product());

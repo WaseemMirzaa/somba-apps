@@ -253,6 +253,7 @@ export class AnalyticsService {
         .getCount(),
       this.payments
         .createQueryBuilder('p')
+        // `<> 'cod'`: orders placed before cash on delivery was removed keep a pending payment nobody will ever collect.
         .where("p.status = 'pending' AND p.method <> 'cod' AND p.createdAt < :c", { c: ago(PENDING_PAYMENT_ALERT_MIN) })
         .getCount(),
       this.disputes.count({ where: { status: 'open' } }),
@@ -317,7 +318,7 @@ export class AnalyticsService {
     const { keys, from } = lastDays(30);
     const commissionPct = await this.commissionPct();
 
-    const [orderAgg, payAgg, refundAgg, payoutRows, seriesGmv, seriesPay, seriesRefunds, receivableRows, codRow, wallets] = await Promise.all([
+    const [orderAgg, payAgg, refundAgg, payoutRows, seriesGmv, seriesPay, seriesRefunds, receivableRows, wallets] = await Promise.all([
       // Merchandise value of delivered vs still-open orders (the commission base: item prices, no delivery fee).
       this.orders
         .createQueryBuilder('o')
@@ -374,15 +375,10 @@ export class AnalyticsService {
         .addSelect('COUNT(*)', 'n')
         .addSelect('COALESCE(SUM(p.amountUsd), 0)', 'amount')
         .addSelect('MIN(p.createdAt)', 'oldest')
+        // Not a receivable: a leftover pending payment of an order placed before cash on delivery was removed.
         .where("p.status = 'pending' AND p.method <> 'cod'")
         .groupBy('p.method')
         .getRawMany<{ method: string; n: string; amount: string; oldest: unknown }>(),
-      this.payments
-        .createQueryBuilder('p')
-        .select('COUNT(*)', 'n')
-        .addSelect('COALESCE(SUM(p.amountUsd), 0)', 'amount')
-        .where("p.status = 'pending' AND p.method = 'cod'")
-        .getRawOne<{ n: string; amount: string }>(),
       this.users
         .createQueryBuilder('u')
         .select('COALESCE(SUM(u.walletBalance), 0)', 'total')
@@ -435,8 +431,6 @@ export class AnalyticsService {
         oldestMinutes: receivables.reduce((m, r) => Math.max(m, r.oldestMinutes), 0),
         byMethod: receivables,
       },
-      codOutstandingUsd: round2(n(codRow?.amount)),
-      codOutstandingCount: n(codRow?.n),
       walletLiabilityUsd: round2(n(wallets?.total)),
       series30: series,
       // Changes whenever an order, payment or payout does: lets a screen that refreshes on status changes skip a no-op.
@@ -459,10 +453,9 @@ export class AnalyticsService {
         .select('t.status', 'status')
         .addSelect('t.kind', 'kind')
         .addSelect('COUNT(*)', 'n')
-        .addSelect('COALESCE(SUM(t.codAmountUsd), 0)', 'cod')
         .groupBy('t.status')
         .addGroupBy('t.kind')
-        .getRawMany<{ status: string; kind: string; n: string; cod: string }>(),
+        .getRawMany<{ status: string; kind: string; n: string }>(),
       scope(this.deliveries.createQueryBuilder('t'))
         .select(AnalyticsService.day('t.receivedAt'), 'day')
         .addSelect('COUNT(*)', 'received')
@@ -532,14 +525,12 @@ export class AnalyticsService {
     const by: Record<string, number> = {};
     const byKind: Record<string, number> = {};
     let total = 0;
-    let cod = 0;
     let deliveredParcels = 0;
     for (const r of statusRows) {
       by[r.status] = (by[r.status] ?? 0) + n(r.n);
       total += n(r.n);
       const open = r.status !== 'delivered' && r.status !== 'failed';
       if (open) {
-        cod += n(r.cod);
         byKind[r.kind ?? 'delivery'] = (byKind[r.kind ?? 'delivery'] ?? 0) + n(r.n);
       }
       if (r.status === 'delivered' && isCustomerKind(r.kind)) deliveredParcels += n(r.n);
@@ -555,7 +546,6 @@ export class AnalyticsService {
       inTransit: by['in_transit'] ?? 0,
       // Customer deliveries completed; `byStatus` counts every leg (a pickup scanned in is "delivered" at its warehouse).
       delivered: deliveredParcels,
-      codToCollect: round2(cod),
       byStatus: by,
       // Legs still open, by kind (pickup, transfer, delivery, return_*, replacement_delivery).
       byKind,

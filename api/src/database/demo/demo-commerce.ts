@@ -162,8 +162,6 @@ export interface OrderSpec {
   after?: (c: Scenario) => Promise<void>;
   /** Like `after`, but only for an order made in this run and after its clock was moved (the steps there set their own moments). */
   afterBackdate?: (c: Scenario) => Promise<void>;
-  /** Paid in cash at the door: made only while `codEnabled` is on. */
-  cod?: boolean;
   /** Same-commune express delivery: made only while `expressDeliveryEnabled` is on. */
   express?: boolean;
 }
@@ -276,10 +274,9 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
   // ── orders, oldest first so the wallet history reads in order ──────────────────
   const driver = new Driver(ctx);
   const all = [...orderSpecs(), ...orderTypeSpecs()];
-  const skipped = all.filter((s) => s.cod && !ctx.codOn);
   const skippedExpress = all.filter((s) => s.express && !ctx.expressOn);
   const specs = all
-    .filter((s) => (!s.cod || ctx.codOn) && (!s.express || ctx.expressOn))
+    .filter((s) => !s.express || ctx.expressOn)
     .sort((a, b) => b.placedAgoH - a.placedAgoH);
   let made = 0;
   for (const spec of specs) {
@@ -309,7 +306,7 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
           qty: l.qty,
           ...(l.variant !== 'Default' ? { variant: l.variant } : {}),
         })),
-        paymentMethod: spec.cod ? 'cod' : 'wallet',
+        paymentMethod: 'wallet',
         shippingAddress: shipping(spec.address, areaIds.get(spec.address)!),
         ...(spec.promo ? { promoCode: spec.promo } : {}),
       } as never);
@@ -361,10 +358,6 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
   if (skippedExpress.length)
     log(
       `! ${skippedExpress.length} express-delivery order(s) NOT made: express delivery is off on this server. To get them, run the seed with --with-express (seed-demo.sh --with-express, or DEMO_WITH_EXPRESS=1); that switches expressDeliveryEnabled on. Switch it on only once the rider app that knows express is installed.`,
-    );
-  if (skipped.length)
-    log(
-      `! ${skipped.length} cash-on-delivery order(s) NOT made: cash on delivery is off on this server. To get them, run the seed with --with-cod (seed-demo.sh --with-cod, or DEMO_WITH_COD=1); that switches the setting on, and the removal leaves it on.`,
     );
   await payoutsAndFinance(ctx);
 }

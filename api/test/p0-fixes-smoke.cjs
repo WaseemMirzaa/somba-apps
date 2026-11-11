@@ -7,7 +7,7 @@
  *   API_URL=http://localhost:3001 ADMIN_PW=... WAREHOUSE_PW=... node test/p0-fixes-smoke.cjs
  *
  * ADMIN_PW / WAREHOUSE_PW / RIDER_PW override the seed password when those accounts were changed.
- * It toggles requireVerifiedForCheckout / productModeration / codEnabled / minPayoutUsd /
+ * It toggles requireVerifiedForCheckout / productModeration / minPayoutUsd /
  * payoutClearanceHours and restores them at the end (even when a check throws).
  */
 const { io } = require('socket.io-client');
@@ -76,7 +76,7 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
   const saved = (await req(admin.sock, 'settings:get')).data ?? {};
   const setting = (key, value) => req(admin.sock, 'settings:set', { key, value });
   const restore = async () => {
-    for (const k of ['productModeration', 'requireVerifiedForCheckout', 'codEnabled', 'minPayoutUsd', 'payoutClearanceHours']) {
+    for (const k of ['productModeration', 'requireVerifiedForCheckout', 'minPayoutUsd', 'payoutClearanceHours']) {
       if (saved[k] !== undefined) await setting(k, String(saved[k])).catch(() => undefined);
     }
   };
@@ -84,7 +84,6 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
   try {
     await setting('productModeration', 'false');
     await setting('requireVerifiedForCheckout', 'false');
-    await setting('codEnabled', 'true');
     await setting('minPayoutUsd', '1');
     await setting('payoutClearanceHours', '0');
 
@@ -159,18 +158,6 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
     ok(a.ok && a.data.status === 'returned', 'delivered → returned', a.error);
     a = await step(ops, o1.id, 'delivered');
     ok(!a.ok && a.error === 'Cannot move an order from returned to delivered.', 'a returned order is final', a.error);
-
-    // cash on delivery: hand delivery collects the cash
-    a = await order([{ productId: prodA.id, qty: 1 }], { paymentMethod: 'cod' });
-    ok(a.ok && a.data.status === 'pending', 'a COD order starts pending', a.error ?? a.data?.status);
-    const cod = a.data;
-    const codPay = async () => (await req(admin.sock, 'payments:list')).data.find((p) => p.orderId === cod.id);
-    ok((await codPay())?.status === 'pending', 'its COD payment is pending (not collected yet)');
-    a = await walk(ops, cod.id, ['confirmed', 'processing', 'shipped', 'out_for_delivery']);
-    ok(a.ok && (await codPay())?.status === 'pending', 'COD stays uncollected until delivery', a.error ?? '');
-    a = await step(ops, cod.id, 'delivered');
-    ok(a.ok && (await codPay())?.status === 'succeeded', 'delivering a COD order by hand collects the cash', a.error ?? (await codPay())?.status);
-    ok((await taskNow(cod.id))?.status === 'delivered', '…and closes its delivery task');
 
     // =======================================================================
     section('2. Operator cancel with a reason');
@@ -388,9 +375,9 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
     const cA = await until(async () => (await notesOf(shopA)).find((n) => n.entityId === o8.id && n.type === 'order' && /cancelled/i.test(n.title)));
     const cB = await until(async () => (await notesOf(shopB)).find((n) => n.entityId === o8.id && n.type === 'order' && /cancelled/i.test(n.title)));
     ok(!!cA && !!cB, 'both affected sellers are notified of the customer cancellation', JSON.stringify([cA?.title, cB?.title]));
-    a = await order([{ productId: prodA2.id, qty: 1 }], { paymentMethod: 'cod' });
+    a = await order([{ productId: prodA2.id, qty: 1 }]);
     const o9 = a.data;
-    ok(a.ok && !!(await until(() => newOrderNote(shopA, o9))), 'a cash-on-delivery order notifies the seller too', a.error ?? '');
+    ok(a.ok && !!(await until(() => newOrderNote(shopA, o9))), 'a single-seller prepaid order notifies the seller too', a.error ?? '');
     ok(!(await newOrderNote(shopB, o9)), 'a seller with no item on the order is not notified');
     await req(cust.sock, 'orders:cancel', { orderId: o9.id });
 
