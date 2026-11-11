@@ -1,6 +1,7 @@
 
 import 'shift_messages.dart' show kShiftServerErrorsFr;
 import 'compliance_messages.dart' show translateComplianceError;
+import 'parcel_messages.dart' show kParcelServerErrorsFr;
 import 'strings.dart';
 
 /// Server errors reach the app in English. The common ones are shown in the
@@ -24,6 +25,7 @@ Iterable<String> get knownServerErrors => _exactFr.keys;
 
 final Map<String, String> _exactFr = {
   ...kShiftServerErrorsFr,
+  ...kParcelServerErrorsFr,
   // forced password change (api/src/auth/password-change.ts, me:changePassword)
   'You must set a new password before you can continue.': 'Vous devez définir un nouveau mot de passe avant de continuer.',
   'Choose a new password that is different from the temporary one.': 'Choisissez un nouveau mot de passe différent du mot de passe temporaire.',
@@ -205,6 +207,12 @@ final Map<String, String> _exactFr = {
 };
 
 final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
+  // parcel scanning (rider:scanParcel and the status changes it guards)
+  (RegExp(r'^Scan every parcel first: (\d+) of (\d+) scanned\.$'), (m) => 'Scannez d’abord chaque colis : ${m[1]} sur ${m[2]} scannés.'),
+  (RegExp(r'^(PKG-[A-Z0-9]+) is not part of this (.+)\.$'), (m) => '${m[1]} ne fait pas partie de ${_scanLeg(m[2]!)}.'),
+  (RegExp(r'^(PKG-[A-Z0-9]+) was already scanned\.$'), (m) => '${m[1]} a déjà été scanné.'),
+  (RegExp(r'^(PKG-[A-Z0-9]+) was cancelled; use the new label\.$'), (m) => '${m[1]} a été annulé ; utilisez la nouvelle étiquette.'),
+  (RegExp(r'^Collect (PKG-[A-Z0-9]+) first: this leg is not picked up yet\.$'), (m) => 'Récupérez d’abord ${m[1]} : cette étape n’est pas encore récupérée.'),
   // delivery code
   (RegExp(r'^Wrong delivery code\. Ask the customer for the 4-digit code shown in their app\. (\d+) tr(?:y|ies) left before this step locks\.$'),
       (m) => 'Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application. Il vous reste ${m[1]} ${m[1] == '1' ? 'essai' : 'essais'} avant le verrouillage.'),
@@ -258,4 +266,17 @@ String _legKind(String k) => switch (k) {
       'return to seller' => 'Un retour au vendeur',
       'replacement delivery' => 'Une livraison de remplacement',
       _ => 'Une étape « $k »',
+    };
+
+/// "this pickup" in French, for "X is not part of this pickup."
+String _scanLeg(String k) => switch (k) {
+      'pickup' => 'cette collecte',
+      'transfer' => 'ce transfert',
+      'delivery' => 'cette livraison',
+      'express delivery' => 'cette livraison express',
+      'return pickup' => 'cette collecte de retour',
+      'return transfer' => 'ce transfert de retour',
+      'return to seller' => 'ce retour au vendeur',
+      'replacement delivery' => 'cette livraison de remplacement',
+      _ => 'cette étape',
     };

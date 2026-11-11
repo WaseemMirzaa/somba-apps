@@ -3,11 +3,13 @@
 
 import 'shift_messages.dart';
 import 'compliance_messages.dart' show kComplianceMessages;
+import 'parcel_messages.dart' show kParcelMessages;
 
 /// key -> (English, French). Placeholders are written {name}.
 const Map<String, (String, String)> kMessages = {
   ...kShiftMessages,
   ...kComplianceMessages,
+  ...kParcelMessages,
   'close': ('Close', 'Fermer'),
   'cancel': ('Cancel', 'Annuler'),
   'email': ('Email', 'E-mail'),
