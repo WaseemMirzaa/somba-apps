@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { ArrowRight, Bike, Clock, MapPin, Navigation, Package, Store, Warehouse, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { BoxChecklist } from "@/components/warehouse/box-checklist";
 import { LegActions } from "@/components/warehouse/leg-actions";
+import { boxesSummary, scanStageFor } from "@/lib/parcel-scan";
 import { useLocale } from "@/context/locale-context";
 import { codeLockLabel } from "@/lib/code-lock";
 import { useOpsPath } from "@/lib/ops-path";
@@ -106,6 +108,12 @@ export function LegCard({ task, onChanged }: { task: DeskTask; onChanged?: (res?
             <Package className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="break-words">{legItemsText(task.items, fr)}</span>
           </p>
+          {(task.parcels?.length ?? 0) > 0 && (
+            <p className="break-all font-mono text-[11px] text-slate-500" data-testid="leg-boxes">
+              {boxesSummary(task.parcels, scanStageFor(task.status), fr)}
+            </p>
+          )}
+          <BoxChecklist task={task} onChanged={onChanged} compact />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1">
               <Bike className="h-3.5 w-3.5" />

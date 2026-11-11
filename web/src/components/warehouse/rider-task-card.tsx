@@ -7,6 +7,7 @@ import { useLocale } from "@/context/locale-context";
 import { LEG_KIND, pickL } from "@/lib/logistics";
 import type { RiderTask, RiderTaskStatus } from "@/lib/rider";
 import { riderBrief } from "@/lib/rider-actions";
+import { boxesWord, scanCounterText, scanStageFor, stageCounts } from "@/lib/parcel-scan";
 
 export const RIDER_STATUS_LABEL: Record<RiderTaskStatus, { en: string; fr: string }> = {
   assigned: { en: "Assigned", fr: "Assigné" },
@@ -41,6 +42,8 @@ export function RiderTaskCard({
   const { locale } = useLocale();
   const fr = locale === "fr";
   const label = RIDER_STATUS_LABEL[task.status];
+  const stage = scanStageFor(task.status);
+  const counts = stage ? stageCounts(task.parcels, stage) : null;
   return (
     <div className="card-premium p-4">
       <Link href={`/rider/tasks/${task.id}`} className="block">
@@ -80,6 +83,11 @@ export function RiderTaskCard({
           <Package className="h-3.5 w-3.5" />
           {task.legItemsText(fr) !== "—" ? task.legItemsText(fr) : `${task.items} ${fr ? "article(s)" : "item(s)"}`}
         </p>
+        {counts && counts.total > 0 && (
+          <p className="mt-1 text-xs font-medium text-slate-600" data-testid="card-scan-counter">
+            {boxesWord(counts.total, fr)} · {scanCounterText(counts.scanned, counts.total, fr)}
+          </p>
+        )}
       </Link>
       {action && <div className="mt-3">{action}</div>}
     </div>

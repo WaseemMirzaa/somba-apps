@@ -54,6 +54,8 @@ export interface PublicSettings {
   /** A multi-seller order leaves with what arrived once its oldest parcel waited this long (0 = never split). */
   splitDeliveryAfterHours: number;
   expressDeliveryEnabled: boolean;
+  /** Riders and warehouse staff must scan each parcel label before a leg moves on (default on). */
+  requireParcelScan: boolean;
 }
 
 const EMPTY_SETTINGS: PublicSettings = {
@@ -73,6 +75,7 @@ const EMPTY_SETTINGS: PublicSettings = {
   localDeliveryDays: 1,
   splitDeliveryAfterHours: 24,
   expressDeliveryEnabled: false,
+  requireParcelScan: true,
 };
 
 const num = (v: string | undefined, d: number) => {
@@ -98,6 +101,7 @@ function parseSettings(raw: Record<string, string>): PublicSettings {
     localDeliveryDays: num(raw.localDeliveryDays, 1),
     splitDeliveryAfterHours: num(raw.splitDeliveryAfterHours, 24),
     expressDeliveryEnabled: raw.expressDeliveryEnabled === "true",
+    requireParcelScan: raw.requireParcelScan !== "false",
   };
 }
 
@@ -174,6 +178,7 @@ export function usePublicSettings(): PublicSettings {
         localDeliveryDays: raw.localDeliveryDays ?? str("localDeliveryDays"),
         splitDeliveryAfterHours: raw.splitDeliveryAfterHours ?? str("splitDeliveryAfterHours"),
         expressDeliveryEnabled: raw.expressDeliveryEnabled ?? str("expressDeliveryEnabled"),
+        requireParcelScan: raw.requireParcelScan ?? (cur.requireParcelScan === false ? "false" : "true"),
       });
     });
   });

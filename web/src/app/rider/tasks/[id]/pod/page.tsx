@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { DeliveredForm } from "@/components/warehouse/rider-task-actions";
+import { actionGate } from "@/lib/parcel-scan";
 import { useRiderData } from "@/lib/rider";
 import { useLocale } from "@/context/locale-context";
 
@@ -37,6 +38,7 @@ export default function RiderPodPage() {
         {task.status === "in_transit" && !task.hubBound ? (
           <DeliveredForm
             task={task}
+            blocked={actionGate(task, "deliver").blocked}
             onDone={() => {
               void refresh();
               router.push(`/rider/tasks/${id}`);

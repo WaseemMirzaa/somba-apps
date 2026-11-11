@@ -6,22 +6,31 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal, ErrorNote } from "@/components/admin/modal";
 import { AssignRiderModal } from "@/components/warehouse/assign-rider-modal";
+import { BoxChecklist } from "@/components/warehouse/box-checklist";
+import { useBoxScan } from "@/components/warehouse/use-box-scan";
 import { ScanInput } from "@/components/warehouse/scan-input";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { fmtDateTime, legItemsText, type Run, type RunProposal } from "@/lib/logistics";
 import { parcelCode, shortId, type DeskTask } from "@/lib/warehouse";
 import { runActions, runStatusLabel, runStatusVariant } from "@/lib/warehouse-runs";
+import { parcelErrorWithHint } from "@/lib/parcel-errors";
+import { mergeBoxes, scanCounterText, stageCounts } from "@/lib/parcel-scan";
 import { errorMessage } from "@/lib/warehouse-live";
 
 /** One parcel in a run: its code, order, cargo; the desk may know more than the run's taskIds say. */
-function ParcelLine({ id, task, fr, trailing }: { id: string; task?: DeskTask; fr: boolean; trailing?: React.ReactNode }) {
+function ParcelLine({ id, task, fr, trailing, stage, onChanged }: { id: string; task?: DeskTask; fr: boolean; trailing?: React.ReactNode; stage?: "pickup" | "dropoff"; onChanged?: () => void }) {
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm" data-testid="run-parcel" data-task-id={id}>
       <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600">{task ? parcelCode(task) : `PKG-${shortId(id)}`}</span>
       {task && <span className="font-medium text-slate-800">{task.orderReference}</span>}
       {task && <span className="min-w-0 flex-1 truncate text-xs text-slate-500">{legItemsText(task.items, fr)}</span>}
       {trailing}
+      {task && stage && (task.parcels?.length ?? 0) > 0 && (
+        <div className="basis-full pl-2">
+          <BoxChecklist task={task} stage={stage} onChanged={onChanged} compact />
+        </div>
+      )}
     </li>
   );
 }
@@ -74,6 +83,12 @@ export function RunCard({
   const hopTask = ids.map((id) => taskOf(id)).find((t) => t?.hops && t.hops > 1);
   const hopText = hopTask?.hop && hopTask.hops ? (fr ? `Étape ${hopTask.hop}/${hopTask.hops}` : `Hop ${hopTask.hop}/${hopTask.hops}`) : null;
 
+  const runBoxes = mergeBoxes(ids.map((id) => taskOf(id)).filter((t): t is DeskTask => !!t));
+  const boxCounts = stageCounts(runBoxes, incoming ? "dropoff" : "pickup");
+  // A box of this run scanned in / out only ticks the run's manifest (the run itself is received or dispatched as a whole).
+  const boxIn = useBoxScan("in", onChanged);
+  const boxOut = useBoxScan("out", onChanged);
+
   async function act(name: string, fn: () => Promise<unknown>, done: string) {
     if (busy) return;
     setBusy(name);
@@ -83,8 +98,9 @@ export function RunCard({
       toast(done, "success");
       onChanged();
     } catch (e) {
-      setError(errorMessage(e));
-      toast(errorMessage(e), "error");
+      const msg = parcelErrorWithHint(errorMessage(e), fr);
+      setError(msg);
+      toast(msg, "error");
     } finally {
       setBusy(null);
     }
@@ -121,6 +137,11 @@ export function RunCard({
             </span>
             {run.dispatchedAt && <span>{fr ? "Départ" : "Left"}: {fmtDateTime(run.dispatchedAt, fr)}</span>}
             {run.arrivedAt && <span>{fr ? "Arrivée" : "Arrived"}: {fmtDateTime(run.arrivedAt, fr)}</span>}
+            {runBoxes.length > 0 && (
+              <span data-testid="run-box-counter">
+                {incoming ? (fr ? "Cartons reçus" : "Boxes in") : fr ? "Cartons sortis" : "Boxes out"}: {scanCounterText(boxCounts.scanned, boxCounts.total, fr)}
+              </span>
+            )}
             {(run.status !== "planned") && (
               <span data-testid="run-counts">
                 {fr ? "Reçus" : "Received"} {run.receivedCount}/{ids.length}
@@ -187,6 +208,16 @@ export function RunCard({
           <ScanInput
             legs={[...ids, ...addable].map((id) => taskOf(id)).filter((t): t is DeskTask => !!t)}
             buttonLabel={fr ? "Charger" : "Load"}
+            onBoxCode={async (code, manual) => {
+              const owner = [...ids, ...addable].map((id) => taskOf(id)).find((t) => t?.parcels?.some((p) => p.code === code));
+              // A box of a parcel already in the run ticks the run's manifest; a box of a waiting parcel loads that parcel.
+              if (owner && ids.includes(owner.id)) return boxOut(code, manual);
+              if (owner && addable.includes(owner.id)) {
+                await act("load", () => runActions.update(run.id, { addTaskIds: [owner.id] }), fr ? `${code} : ${parcelCode(owner)} chargé dans ${run.reference}` : `${code}: ${parcelCode(owner)} loaded into ${run.reference}`);
+                return { ok: true, text: fr ? `${parcelCode(owner)} chargé` : `${parcelCode(owner)} loaded` };
+              }
+              return boxOut(code, manual);
+            }}
             onFound={async (leg) => {
               if (ids.includes(leg.id)) {
                 toast(fr ? `${parcelCode(leg)} est déjà dans cette tournée.` : `${parcelCode(leg)} is already in this run.`, "info");
@@ -208,6 +239,7 @@ export function RunCard({
           <ScanInput
             legs={ids.map((id) => taskOf(id)).filter((t): t is DeskTask => !!t)}
             buttonLabel={fr ? "Recevoir" : "Receive"}
+            onBoxCode={boxIn}
             onFound={async (leg) => {
               if (!ids.includes(leg.id)) {
                 toast(fr ? `${parcelCode(leg)} ne fait pas partie de cette tournée.` : `${parcelCode(leg)} is not part of this run.`, "error");
@@ -230,6 +262,8 @@ export function RunCard({
                 id={id}
                 task={t as DeskTask | undefined}
                 fr={fr}
+                stage={incoming ? "dropoff" : "pickup"}
+                onChanged={onChanged}
                 trailing={
                   !incoming && planned && canAssign ? (
                     <button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline disabled:opacity-50" disabled={!!busy} onClick={() => void act("remove", () => runActions.update(run.id, { removeTaskIds: [id] }), fr ? "Colis retiré de la tournée" : "Parcel removed from the run")} data-testid="run-remove">

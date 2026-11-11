@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { StepList } from "@/components/shop/step-list";
+import { ReturnParcelCard } from "@/components/shop/return-parcel-card";
 import { PhotoPicker } from "@/components/shop/photo-picker";
 import { CONDITION_LABEL, categoryLabel, requestSteps, stageText, useDisputeDetail } from "@/lib/after-sale";
 import { useLocale } from "@/context/locale-context";
@@ -166,6 +167,8 @@ function RequestStatus() {
               <p className="mt-2 text-xs text-slate-500">{fr ? "Réponse du vendeur attendue avant le" : "The seller should answer by"} {new Date(d.sellerDueAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</p>
             )}
           </DetailSection>
+
+          {open && d.type === "return" && !d.receivedAt && <ReturnParcelCard returnId={d.id} />}
 
           <DetailSection title={fr ? "Détails" : "Details"}>
             <InfoGrid items={[

@@ -10,6 +10,7 @@ import { showUnlockCode } from "@/lib/code-lock";
 import { LEG_KIND, pickL, useWarehouseSelf, type TaskView } from "@/lib/logistics";
 import { useNow } from "@/lib/use-now";
 import { deskActions, parcelCode, useHubScope, type DeskTask } from "@/lib/warehouse";
+import { parcelErrorWithHint } from "@/lib/parcel-errors";
 import { errorMessage } from "@/lib/warehouse-live";
 
 /**
@@ -51,7 +52,7 @@ export function LegActions({
       );
       onChanged?.(res);
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toast(parcelErrorWithHint(errorMessage(e), fr), "error");
     } finally {
       setBusy(null);
     }
@@ -65,7 +66,7 @@ export function LegActions({
       toast(fr ? `${parcelCode(task)} remis au livreur ${res.riderName ?? ""}`.trim() : `${parcelCode(task)} handed to rider ${res.riderName ?? ""}`.trim());
       onChanged?.({ task: res });
     } catch (e) {
-      toast(errorMessage(e), "error");
+      toast(parcelErrorWithHint(errorMessage(e), fr), "error");
     } finally {
       setBusy(null);
     }

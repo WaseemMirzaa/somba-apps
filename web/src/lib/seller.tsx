@@ -17,6 +17,7 @@ import { campaignStatusLabel } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 import { localDay, localDateTime } from "@/lib/dates";
 import { socketClient } from "@/lib/realtime/socket-client";
+import type { ParcelLabel, ParcelLabelPack } from "@/lib/parcel-labels";
 import { authApi } from "@/lib/realtime/auth-api";
 import type {
   Dispute,
@@ -305,6 +306,14 @@ export type StoreGateState =
 // ─── Small helpers ───────────────────────────────────────────────────────────
 function request<T>(event: string, body?: unknown): Promise<T> {
   return socketClient.request<T>(event, body);
+}
+
+/** The label payloads the server sends (`locked` on labels / boxes, `boxesLocked` on ready). */
+type RawLabelPack = { labels: ParcelLabel[]; boxCount?: number; locked?: boolean; boxesLocked?: boolean };
+
+function toLabelPack(raw: Partial<RawLabelPack>): ParcelLabelPack {
+  const labels = Array.isArray(raw.labels) ? raw.labels : [];
+  return { labels, boxCount: raw.boxCount ?? labels.length, locked: Boolean(raw.locked ?? raw.boxesLocked) };
 }
 
 function upsert<T extends { id: string }>(list: T[], item: T): T[] {
@@ -1127,7 +1136,11 @@ interface Actions {
    * orders:sellerReady — marks this seller's open lines ready (after the server accepted). The delivery
    * task is only released once EVERY seller of the order is ready, so a null `readyAt` is normal.
    */
-  sellerReady: (orderId: string) => Promise<void>;
+  sellerReady: (orderId: string, boxCount?: number) => Promise<ParcelLabelPack | null>;
+  /** orders:sellerLabels — the labels of a package that is ready (reprint until delivery) and whether the box count is locked. */
+  sellerLabels: (orderId: string) => Promise<ParcelLabelPack>;
+  /** orders:sellerBoxes — changes the box count of a package already ready (old labels void, new ones made). */
+  sellerBoxes: (orderId: string, boxCount: number) => Promise<ParcelLabelPack>;
   /**
    * orders:sellerCancel — cancels only this seller's lines (all open/ready ones, or just `itemIds`).
    * The customer is refunded for those lines; the order continues with the other sellers.
@@ -1543,14 +1556,20 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         void refreshAvailable();
         return p;
       },
-      sellerReady: async (orderId) => {
-        await request<{ readyAt?: string | null }>("orders:sellerReady", { orderId });
+      sellerReady: async (orderId, boxCount) => {
+        const res = await request<{ readyAt?: string | null } & Partial<RawLabelPack>>("orders:sellerReady", {
+          orderId,
+          ...(boxCount ? { boxCount } : {}),
+        });
         // The task's readyAt stays null until every seller is ready, so the state is NOT taken from it:
         // flag this seller's lines ready now and let the re-read / next push give the server's truth.
         const now = new Date().toISOString();
         setOrdersRaw((cur) => (cur ?? []).map((o) => (o.id === orderId ? applySellerReady(o, now) : o)));
         void refreshOrders();
+        return res && Array.isArray(res.labels) ? toLabelPack(res) : null;
       },
+      sellerLabels: async (orderId) => toLabelPack(await request<RawLabelPack>("orders:sellerLabels", { orderId })),
+      sellerBoxes: async (orderId, boxCount) => toLabelPack(await request<RawLabelPack>("orders:sellerBoxes", { orderId, boxCount })),
       sellerCancel: async (orderId, reason, itemIds) => {
         const view = await request<SellerOrderView>("orders:sellerCancel", {
           orderId,

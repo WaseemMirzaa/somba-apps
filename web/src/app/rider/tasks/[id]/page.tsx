@@ -12,7 +12,9 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RIDER_STATUS_LABEL, riderStatusVariant } from "@/components/warehouse/rider-task-card";
 import { TaskActions } from "@/components/warehouse/rider-task-actions";
+import { RiderRunCard } from "@/components/warehouse/rider-run-card";
 import { useRiderData } from "@/lib/rider";
+import { useRiderRuns } from "@/lib/rider-runs-live";
 import { riderBrief } from "@/lib/rider-actions";
 import { usePublicSettings } from "@/lib/shop-live";
 import { formatCurrency } from "@/lib/utils";
@@ -24,9 +26,21 @@ export default function RiderTaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
-  const { getRiderTask, refresh, loading } = useRiderData();
+  const { getRiderTask, refresh, loading, mine } = useRiderData();
+  const rr = useRiderRuns(mine);
   const task = getRiderTask(id);
+  // The id may also be a transfer run: the same scan panel works on the whole run.
+  const run = task ? undefined : rr.runs.find((r) => r.id === id);
   const settings = usePublicSettings();
+
+  if (!task && run) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title={run.reference} subtitle={fr ? "Tournée de transfert" : "Transfer run"} backHref="/rider/tasks" />
+        <RiderRunCard run={run} parcels={rr.parcelsOf(run)} onRoad={rr.onRoad(run)} onMarkOnRoad={rr.markOnRoad} />
+      </div>
+    );
+  }
 
   if (!task) {
     return (

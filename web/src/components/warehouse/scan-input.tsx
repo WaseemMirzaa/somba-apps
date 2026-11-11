@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ScanLine } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { CameraButton } from "@/components/warehouse/camera-scanner";
+import { normalizeBoxCode } from "@/lib/parcel-scan";
 import { findLeg, parcelCode, type DeskTask } from "@/lib/warehouse";
 
 /**
@@ -18,21 +19,29 @@ export function ScanInput({
   onFound,
   autoFocus = false,
   buttonLabel,
+  onBoxCode,
 }: {
   legs: DeskTask[];
   onFound: (leg: DeskTask) => void | Promise<void>;
   autoFocus?: boolean;
   buttonLabel?: string;
+  /**
+   * A KOMORIKO box code (`PKG-` + 8 characters) goes here instead of the leg lookup (the server finds the leg from the box).
+   * `manual` is true for a typed code, false for a camera read. Old 6-character leg codes and order references still use `onFound`.
+   */
+  onBoxCode?: (code: string, manual: boolean) => Promise<{ ok: boolean; text: string }>;
 }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const [code, setCode] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   /** Look the code up among the loaded legs and hand the leg on; returns what to tell the person. */
-  async function lookUp(raw: string): Promise<{ ok: boolean; text: string }> {
+  async function lookUp(raw: string, manual: boolean): Promise<{ ok: boolean; text: string }> {
     const value = raw.trim();
+    const box = onBoxCode ? normalizeBoxCode(value) : null;
+    if (box && onBoxCode) return onBoxCode(box, manual);
     const hit = findLeg(legs, value);
     if (hit) {
       await onFound(hit);
@@ -45,12 +54,13 @@ export function ScanInput({
     e.preventDefault();
     const value = code.trim();
     if (!value) return;
-    const r = await lookUp(value);
+    const r = await lookUp(value, true);
     if (r.ok) {
-      setMessage(null);
+      // A box scan says what happened right here too (a leg lookup just opens the leg).
+      setMessage(onBoxCode && normalizeBoxCode(value) ? { text: r.text, ok: true } : null);
       setCode("");
     } else {
-      setMessage(r.text);
+      setMessage({ text: r.text, ok: false });
       inputRef.current?.select();
     }
   }
@@ -79,15 +89,15 @@ export function ScanInput({
         <CameraButton
           title={fr ? "Scanner un colis" : "Scan a parcel"}
           hint={fr ? "Cadrez le code-barres ou le QR du colis. La caméra reste ouverte pour le suivant." : "Point at the parcel's barcode or QR. The camera stays open for the next one."}
-          onCode={async (value) => {
-            const r = await lookUp(value);
-            return r.ok ? { text: fr ? `${r.text} traité` : `${r.text} done` } : { text: r.text, error: true };
+          onCode={async (value, origin) => {
+            const r = await lookUp(value, origin.manual);
+            return r.ok ? { text: onBoxCode && normalizeBoxCode(value) ? r.text : fr ? `${r.text} traité` : `${r.text} done` } : { text: r.text, error: true };
           }}
         />
       </div>
       {message && (
-        <p role="alert" className="text-xs text-red-600">
-          {message}
+        <p role={message.ok ? "status" : "alert"} className={message.ok ? "text-xs font-medium text-emerald-700" : "text-xs text-red-600"} data-testid="scan-result">
+          {message.text}
         </p>
       )}
     </form>

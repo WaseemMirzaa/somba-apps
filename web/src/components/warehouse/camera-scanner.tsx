@@ -8,6 +8,11 @@ import { CAMERA_PROBLEM_TEXT, cameraProblem, cleanScan, shouldAccept, type Camer
 /** What a scan handler may answer: nothing, or a line to show under the picture ("PKG-AB12CD received", "No parcel matches…"). */
 export type ScanReply = void | string | { text: string; error?: boolean };
 
+/** How a code arrived: `manual` is true for a typed code (typed field or a keyboard-wedge scanner), false for a camera read. */
+export interface ScanOrigin {
+  manual: boolean;
+}
+
 /**
  * Camera barcode / QR scanning for the warehouse desk, built on `@zxing/browser` (loaded only when the camera opens, so
  * the pages stay light). It reads Code 128 / 39 / EAN / UPC / ITF / QR / Data Matrix with the back camera, which is what a
@@ -21,12 +26,15 @@ export function CameraScanPanel({
   onCode,
   title,
   hint,
+  footer,
 }: {
   open: boolean;
   onClose: () => void;
-  onCode: (code: string) => ScanReply | Promise<ScanReply>;
+  onCode: (code: string, origin: ScanOrigin) => ScanReply | Promise<ScanReply>;
   title: string;
   hint?: string;
+  /** Shown under the reply line, above the typed field (a checklist that ticks while the camera stays open). */
+  footer?: React.ReactNode;
 }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
@@ -42,12 +50,12 @@ export function CameraScanPanel({
     handlerRef.current = onCode;
   }, [onCode]);
 
-  const deliver = useCallback(async (raw: string) => {
+  const deliver = useCallback(async (raw: string, manual: boolean) => {
     const text = cleanScan(raw);
     if (!text) return;
     let out: ScanReply;
     try {
-      out = await handlerRef.current(text);
+      out = await handlerRef.current(text, { manual });
     } catch (e) {
       out = { text: e instanceof Error ? e.message : "Request failed.", error: true };
     }
@@ -101,7 +109,7 @@ export function CameraScanPanel({
             } catch {
               /* no vibration on this device */
             }
-            void deliver(text);
+            void deliver(text, false);
           },
         );
         if (stopped) controls.stop();
@@ -163,13 +171,15 @@ export function CameraScanPanel({
           {reply && <p className={reply.error ? "font-medium text-red-600" : "font-medium text-emerald-700"}>{reply.text}</p>}
         </div>
 
+        {footer}
+
         <form
           className="mt-3 flex items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             const v = typed;
             setTyped("");
-            void deliver(v);
+            void deliver(v, true);
           }}
         >
           <input
@@ -201,7 +211,7 @@ export function CameraButton({
   hint,
   className = "",
 }: {
-  onCode: (code: string) => ScanReply | Promise<ScanReply>;
+  onCode: (code: string, origin: ScanOrigin) => ScanReply | Promise<ScanReply>;
   title: string;
   hint?: string;
   className?: string;

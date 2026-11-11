@@ -4,12 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, ChevronDown, ChevronUp, CircleAlert, Navigation, PackageCheck, PackageOpen, Route, Truck, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { RiderParcelPanel, useLiveBoxes } from "@/components/warehouse/rider-parcel-panel";
+import { mergeBoxes } from "@/lib/parcel-scan";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { mapsLinkTo } from "@/lib/google-maps";
 import type { RiderTask } from "@/lib/rider";
 import {
   handoverText,
+  isActiveRun,
   runBadge,
   runBadgeText,
   runBadgeVariant,
@@ -23,6 +26,7 @@ import {
   showsReceived,
   type RiderRun,
 } from "@/lib/rider-runs";
+import { localizeParcelError } from "@/lib/parcel-errors";
 import { errorMessage } from "@/lib/warehouse-live";
 
 /**
@@ -50,6 +54,9 @@ export function RiderRunCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { boxes, apply } = useLiveBoxes(mergeBoxes(parcels));
+  // Boxes are scanned out at the sending warehouse until the run is on the road, then in at the receiving one.
+  const scanStage = onRoad ? "dropoff" : "pickup";
   const badge = runBadge(run, onRoad);
   const hop = runHop(run, parcels);
   const to = run.toHubName ?? runWord("the_warehouse", fr);
@@ -67,7 +74,7 @@ export function RiderRunCard({
       await onMarkOnRoad(run.id);
       toast(runWord("done_run_on_road", fr));
     } catch (e) {
-      setError(errorMessage(e));
+      setError(localizeParcelError(errorMessage(e), fr));
     } finally {
       setBusy(false);
     }
@@ -139,6 +146,11 @@ export function RiderRunCard({
         </div>
       )}
 
+      {boxes.length > 0 && isActiveRun(run) && (
+        <div className="mt-3">
+          <RiderParcelPanel target={{ runId: run.id }} stage={scanStage} boxes={boxes} onChecklist={apply} />
+        </div>
+      )}
       {run.status === "planned" && (
         <p className="mt-2 text-xs text-slate-500" data-testid="run-wait-load">
           {runWord("run_wait_load", fr)}

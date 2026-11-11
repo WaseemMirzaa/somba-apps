@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import type { Ack, RequestError } from "./types";
 import { currentLocale, localizeApiError } from "../api-errors";
+import { localizeParcelError } from "../parcel-errors";
 import { PASSWORD_CHANGE_EVENT, PASSWORD_CHANGE_REQUIRED } from "../password-change";
 import { authApi } from "./auth-api";
 
@@ -54,7 +55,7 @@ class SocketClient {
         if (!res || res.ok === false) {
           // `raw` keeps the server's English sentence so callers can recognise a known failure (e.g. "not served")
           // whatever language the message was shown in.
-          const failure = new Error(localizeApiError(res?.error ?? "Request failed.", currentLocale())) as RequestError;
+          const failure = new Error(localizeParcelError(localizeApiError(res?.error ?? "Request failed.", currentLocale()), currentLocale() === "fr")) as RequestError;
           failure.raw = res?.error ?? "Request failed.";
           // The refusal's structured fields (docs/contracts/areas.md `not_served`: areaName, areaNameEn, servedCities…).
           if (res && typeof res === "object") {

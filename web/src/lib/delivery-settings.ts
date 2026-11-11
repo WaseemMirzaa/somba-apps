@@ -106,6 +106,14 @@ export const DELIVERY_MODEL_FIELDS: DeliveryModelField[] = [
     range: { min: 0, max: 100 },
     express: true,
   },
+  {
+    key: "requireParcelScan",
+    kind: "toggle",
+    label: "Require parcel scanning",
+    labelFr: "Exiger le scan des colis",
+    hint: "Riders and warehouse staff must scan every parcel label at each pick-up and drop-off before a leg can move on. Off: scanning still records but nothing is blocked.",
+    hintFr: "Les livreurs et le personnel d'entrepôt doivent scanner l'étiquette de chaque colis à chaque collecte et chaque dépôt avant qu'un trajet puisse avancer. Désactivé : le scan est quand même enregistré mais rien n'est bloqué.",
+  },
 ];
 
 /** The fields to draw: the express ones only while express delivery is on (a value that is not "true" counts as off). */

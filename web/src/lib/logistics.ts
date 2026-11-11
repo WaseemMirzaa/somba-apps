@@ -53,6 +53,30 @@ export interface DeskFlags {
 }
 
 /** One leg of a journey, exactly as `task:updated` and `logistics:queue` send it. */
+/** One box of a leg's checklist (`TaskView.parcels`, `rider:legParcels`). */
+export interface ParcelLine {
+  code: string;
+  boxNo: number;
+  boxCount: number;
+  pickupScannedAt: string | null;
+  dropoffScannedAt: string | null;
+}
+
+/** What `rider:legParcels` and `rider:scanParcel` answer; the scan also carries `scanned` / `total` of its stage and `already` for a repeat. */
+export interface ParcelChecklist {
+  parcels: ParcelLine[];
+  pickupComplete: boolean;
+  dropoffComplete: boolean;
+  taskId?: string;
+  taskIds?: string[];
+  stage?: "pickup" | "dropoff";
+  code?: string;
+  scanned?: number;
+  total?: number;
+  already?: boolean;
+  required?: boolean;
+}
+
 export interface TaskView {
   id: string;
   orderId: string;
@@ -106,6 +130,11 @@ export interface TaskView {
   sellerIds?: (string | null)[] | null;
   /** True when delivering this leg completes the order; false = a partial delivery, more follows. */
   completesOrder?: boolean;
+  /** The boxes this leg carries (empty: no labelled parcel) with when each was scanned out / in, and whether the platform blocks the leg until every box is scanned. */
+  parcels?: ParcelLine[];
+  pickupComplete?: boolean;
+  dropoffComplete?: boolean;
+  scanRequired?: boolean;
 }
 
 export interface Hub {

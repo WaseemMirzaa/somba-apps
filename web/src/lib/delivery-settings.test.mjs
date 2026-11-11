@@ -1,4 +1,4 @@
-// Run: npm test (from web/). The admin's delivery-model settings: the eight keys, their ranges (the API's), both languages.
+// Run: npm test (from web/). The admin's delivery-model settings: the nine keys, their ranges (the API's), both languages.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { loadTs } from "./ts-load.mjs";
@@ -6,10 +6,10 @@ import { loadTs } from "./ts-load.mjs";
 const d = await loadTs("delivery-settings");
 const byKey = Object.fromEntries(d.DELIVERY_MODEL_FIELDS.map((f) => [f.key, f]));
 
-test("the eight settings of the delivery model are all there", () => {
+test("the nine settings of the delivery model are all there", () => {
   assert.deepEqual(
     d.DELIVERY_MODEL_FIELDS.map((f) => f.key),
-    ["localDeliveryDays", "splitDeliveryAfterHours", "expressDeliveryEnabled", "expressDeliveryDays", "expressBaseUsd", "expressPerKmUsd", "expressMaxUsd", "expressMaxKm"],
+    ["localDeliveryDays", "splitDeliveryAfterHours", "expressDeliveryEnabled", "expressDeliveryDays", "expressBaseUsd", "expressPerKmUsd", "expressMaxUsd", "expressMaxKm", "requireParcelScan"],
   );
 });
 
@@ -36,14 +36,17 @@ test("the ranges match the API (settings.service.ts)", () => {
   }
   assert.equal(byKey.expressDeliveryEnabled.kind, "toggle");
   assert.equal(byKey.expressDeliveryEnabled.range, undefined);
+  assert.equal(byKey.requireParcelScan.kind, "toggle");
+  assert.equal(byKey.requireParcelScan.range, undefined);
+  assert.equal(byKey.requireParcelScan.express, undefined); // shown whether or not express is on
 });
 
 test("the express settings show only while express delivery is on", () => {
   const off = d.visibleDeliveryFields("false").map((f) => f.key);
-  assert.deepEqual(off, ["localDeliveryDays", "splitDeliveryAfterHours", "expressDeliveryEnabled"]);
+  assert.deepEqual(off, ["localDeliveryDays", "splitDeliveryAfterHours", "expressDeliveryEnabled", "requireParcelScan"]);
   for (const v of [undefined, null, "", "nope"]) assert.deepEqual(d.visibleDeliveryFields(v).map((f) => f.key), off);
-  assert.equal(d.visibleDeliveryFields("true").length, 8);
-  assert.equal(d.visibleDeliveryFields(" TRUE ").length, 8);
+  assert.equal(d.visibleDeliveryFields("true").length, 9);
+  assert.equal(d.visibleDeliveryFields(" TRUE ").length, 9);
 });
 
 test("a value outside its range is refused with a sentence in the admin's language", () => {

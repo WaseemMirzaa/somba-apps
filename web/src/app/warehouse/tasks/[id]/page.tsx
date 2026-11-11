@@ -9,6 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
+import { BoxChecklist } from "@/components/warehouse/box-checklist";
 import { DeliveryProofCard } from "@/components/warehouse/delivery-proof-card";
 import { ExceptionForm } from "@/components/warehouse/exception-form";
 import { LegActions } from "@/components/warehouse/leg-actions";
@@ -17,6 +18,7 @@ import { OpsLoading } from "@/components/warehouse/ops-state";
 import { useLocale } from "@/context/locale-context";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { LEG_KIND, LEG_STATUS, endpointName, fmtDateTime, legItemsText, legStatusVariant, mapsLink, pickL, isHubBound, isCustomerLeg } from "@/lib/logistics";
+import { boxesSummary, scanStageFor } from "@/lib/parcel-scan";
 import { addressText, findLeg, isOpenLeg, legAgeHours, parcelCode, riderLabel, useDeskQueue } from "@/lib/warehouse";
 import { EXCEPTION_STATUS, EXCEPTION_TYPE, pick, useOpsQuery, type ExceptionRow } from "@/lib/warehouse-live";
 
@@ -182,6 +184,13 @@ export default function WarehouseLegDetailPage() {
             </button>
           )}
         </DetailGridSection>
+
+        {(task.parcels?.length ?? 0) > 0 && (
+          <DetailGridSection title={fr ? "Cartons KOMORIKO" : "KOMORIKO boxes"} span={3}>
+            <p className="mb-2 break-all font-mono text-[11px] text-slate-500">{boxesSummary(task.parcels, scanStageFor(task.status), fr)}</p>
+            <BoxChecklist task={task} onChanged={(r) => (r?.task ? q.applyTask(r.task) : void q.reload())} />
+          </DetailGridSection>
+        )}
 
         <DetailGridSection title={fr ? "Articles transportés" : "Items carried"} span={2}>
           {task.items.length === 0 ? (
