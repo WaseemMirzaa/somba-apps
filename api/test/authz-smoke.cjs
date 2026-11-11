@@ -305,6 +305,8 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(finance.sock, 'roles:setRole', { id: cust.user.id, role: 'admin' })).ok, 'only the super admin changes roles');
   ok(!(await req(admin.sock, 'roles:setRole', { id: cust.user.id, role: 'superuser' })).ok, 'an unknown role is rejected');
   ok(!(await req(admin.sock, 'roles:setRole', { id: admin.user.id, role: 'customer' })).ok, 'you cannot change your own role');
+  // A real, harmless settings write: the audit-log check just below looks for a `settings.set` entry.
+  ok((await req(admin.sock, 'settings:set', { key: 'localDeliveryDays', value: '1' })).ok, 'the admin saves a setting');
   const audit = (await req(admin.sock, 'audit:list')).data;
   ok(audit.some((l) => l.action === 'role.set'), 'role changes are written to the audit log');
   ok(audit.some((l) => l.action === 'settings.set'), 'settings changes are written to the audit log');
@@ -574,8 +576,6 @@ const register = async (label, role = 'customer') => {
   const supervisor = await login('warehouse.limete@somba.app');
   const manager = warehouse; // warehouse@somba.app is the Kinshasa manager
   const tierRefusal = /supervisors and managers|managers can/;
-  // A real, harmless settings write: the audit-log check near the end of this suite looks for a `settings.set` entry.
-  ok((await req(admin.sock, 'settings:set', { key: 'localDeliveryDays', value: '1' })).ok, 'the admin saves a setting');
   const supervisorEvents = ['warehouse:aged', 'exceptions:list', 'replacements:list', 'exchanges:list'];
   for (const ev of supervisorEvents) {
     a = await req(operator.sock, ev, {});
