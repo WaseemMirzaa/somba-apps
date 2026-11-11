@@ -182,6 +182,13 @@ Editing rules:
   - It accepts **stored ids only** (L19), uses the per-socket throttle, and caches the result as a `translations`
     row.
   - Returns `{ text, sourceLang, same }`, where `same: true` means the text is already in the target language.
+- **Addendum (translated at write time):** reviews, seller replies, questions, answers and chat messages are no longer
+  translated only on demand. `translateForSave` detects the language and translates into the other platform language
+  BEFORE the record is stored (bounded by `TRANSLATE_SAVE_TIMEOUT_MS`, default 4000); both languages are saved together as
+  `translations` rows, and every list, get and realtime payload that carries the text ships both (`textI18n`, `replyI18n`,
+  `questionI18n`, `answerI18n`; chat adds `lastMessageI18n` to conversation rows). When anything fails the text is stored
+  untranslated exactly as before and `translate:text` stays the fallback (it reuses the rows written at save). See
+  `docs/contracts/stored-text-i18n.md`.
 
 ### 2.5 Notifications, SMS, locale
 - The app's `notification_text.dart` patterns move to `api/src/notifications/localize.ts`.

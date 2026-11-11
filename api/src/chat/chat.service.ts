@@ -10,6 +10,7 @@ import { SellerContextService } from '../sellers/seller-context';
 import { TeamDirectory } from '../sellers/team-directory';
 import { roleAllows } from '../sellers/seller-permissions';
 import { TranslationService } from '../translation/translation.service';
+import type { TextI18n } from '../translation/translation.service';
 import { pageOf } from '../common/paging';
 import { RateWindow } from '../common/rate-window';
 
@@ -51,6 +52,8 @@ export interface ConversationView {
   orderReference: string | null;
   lastMessageAt: Date | null;
   lastMessagePreview: string;
+  /** The last message's preview in both languages (same rows as `textI18n`, cut like the preview); absent when unknown. */
+  lastMessageI18n?: TextI18n;
   /** Messages the viewer has not read. */
   unread: number;
 }
@@ -64,9 +67,12 @@ export interface MessageView {
   text: string;
   attachments: string[];
   createdAt: Date;
+  /** Both languages of `text`; absent when no translation is known (use `translate:text`). */
+  textI18n?: TextI18n;
 }
 
-const preview = (text: string, attachments: number) => (text.trim() ? text.trim().replace(/\s+/g, ' ').slice(0, 140) : attachments ? '📷' : '');
+const previewOf = (text: string) => text.trim().replace(/\s+/g, ' ').slice(0, 140);
+const preview = (text: string, attachments: number) => (text.trim() ? previewOf(text) : attachments ? '📷' : '');
 
 /** A strictly increasing time for each message, so history paging (`before`) has an exact order even within one millisecond. */
 let lastStamp = 0;
@@ -137,6 +143,7 @@ export class ChatService {
     const prods = new Map((pids.length ? await this.products.find({ where: { id: In(pids) } }) : []).map((p) => [p.id, p]));
     // Both languages of each product's name (a product written in French has its English from the translator).
     const shown = this.translations && prods.size ? await this.translations.present('product', [...prods.values()]) : new Map();
+    const lastI18n = await this.lastMessagesI18n(rows);
     const ords = new Map((oids.length ? await this.orders.find({ where: { id: In(oids) } }) : []).map((o) => [o.id, o]));
     return rows.map((c) => {
       const side = sideFor(c);
@@ -159,12 +166,46 @@ export class ChatService {
         orderReference: c.orderId ? (ords.get(c.orderId)?.reference ?? null) : null,
         lastMessageAt: c.lastMessageAt,
         lastMessagePreview: c.lastMessagePreview,
+        ...(lastI18n.has(c.id) ? { lastMessageI18n: lastI18n.get(c.id) } : {}),
         unread: side === 'buyer' ? c.buyerUnread : c.sellerUnread,
       };
     });
   }
 
-  private static message(m: ConversationMessage): MessageView {
+  /**
+   * The last message of each conversation, in both languages, cut like `lastMessagePreview`. Two queries for the whole
+   * list (the latest message per thread, then the translation rows): nothing per conversation.
+   */
+  private async lastMessagesI18n(rows: Conversation[]): Promise<Map<string, TextI18n>> {
+    const out = new Map<string, TextI18n>();
+    const ids = rows.filter((c) => c.lastMessageAt).map((c) => c.id);
+    if (!this.translations || !ids.length) return out;
+    try {
+      const last = await this.msgs
+        .createQueryBuilder('m')
+        .innerJoin(
+          (qb) => qb.select('s.conversationId', 'cid').addSelect('MAX(s.createdAt)', 'mx').from(ConversationMessage, 's').where('s.conversationId IN (:...ids)', { ids }).groupBy('s.conversationId'),
+          'x',
+          'x.cid = m.conversationId AND x.mx = m.createdAt',
+        )
+        .where('m.conversationId IN (:...ids)', { ids })
+        .getMany();
+      const i18n = await this.translations.i18nFor('chat_message', last.map((m) => ({ id: m.id, text: m.text })));
+      for (const m of last) {
+        const t = i18n.get(m.id);
+        if (!t) continue;
+        const cut: TextI18n = { sourceLang: t.sourceLang };
+        if (t.en !== undefined && previewOf(t.en)) cut.en = previewOf(t.en);
+        if (t.fr !== undefined && previewOf(t.fr)) cut.fr = previewOf(t.fr);
+        out.set(m.conversationId, cut);
+      }
+    } catch {
+      /* the preview itself is served; its translation is a bonus */
+    }
+    return out;
+  }
+
+  private static message(m: ConversationMessage, i18n?: TextI18n): MessageView {
     let attachments: string[] = [];
     try {
       const v = JSON.parse(m.attachments ?? '[]');
@@ -181,6 +222,7 @@ export class ChatService {
       text: m.text,
       attachments,
       createdAt: m.createdAt,
+      ...(i18n ? { textI18n: i18n } : {}),
     };
   }
 
@@ -259,9 +301,12 @@ export class ChatService {
   /** Store the message, move the counters, tell both sides live, and leave a notice for whoever was not already waiting. */
   private async post(conv: Conversation, side: ChatSide, user: ChatCaller, text: string, attachments: string[], seller: Seller | null, rateChecked = false): Promise<MessageView> {
     if (!rateChecked && !this.sends.take(user.id)) throw new Error('You are sending messages too fast. Wait a moment.');
+    // Translate first, then store (null: stored untranslated, as before). The sender's language is the first guess for the detect call.
+    const translated = text ? await this.translations?.translateForSave(text, await this.localeOf(user.id)) : null;
     const saved = await this.msgs.save(
       this.msgs.create({ conversationId: conv.id, senderId: user.id, senderSide: side, senderName: user.name, text, attachments: attachments.length ? JSON.stringify(attachments) : null, createdAt: stamp() }),
     );
+    await this.translations?.saveTranslated('chat_message', saved.id, translated);
     const other: ChatSide = side === 'buyer' ? 'seller' : 'buyer';
     const wasWaiting = (other === 'buyer' ? conv.buyerUnread : conv.sellerUnread) > 0;
     // Atomic counter bump so two simultaneous messages both count.
@@ -270,11 +315,21 @@ export class ChatService {
     conv.lastMessagePreview = preview(text, attachments.length);
     await this.convs.update({ id: conv.id }, { lastMessageAt: conv.lastMessageAt, lastMessagePreview: conv.lastMessagePreview });
     const fresh = (await this.convs.findOne({ where: { id: conv.id } }))!;
-    const message = ChatService.message(saved);
+    const message = ChatService.message(saved, text ? (await this.translations?.i18nFor('chat_message', [{ id: saved.id, text }]))?.get(saved.id) : undefined);
 
     await this.fanout(fresh, message);
     if (!wasWaiting) await this.notify(fresh, side, user, seller);
     return message;
+  }
+
+  /** The sender's language, when translation is on (one primary-key read); a hint for the detect call, never required. */
+  private async localeOf(userId: string): Promise<string | undefined> {
+    if (!this.translations?.enabled) return undefined;
+    try {
+      return (await this.users.findOne({ where: { id: userId }, select: { id: true, locale: true } }))?.locale ?? undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /** `chat:message` to everyone on both sides, each with their own unread count. */
@@ -346,7 +401,8 @@ export class ChatService {
     const rows = await this.msgs.find({ where, order: { createdAt: 'DESC' }, take: take + 1 });
     const hasMore = rows.length > take;
     const page = rows.slice(0, take).reverse();
-    return { conversation: (await this.views([conv], () => side))[0], messages: page.map(ChatService.message), hasMore };
+    const i18n = await this.translations?.i18nFor('chat_message', page.map((m) => ({ id: m.id, text: m.text })));
+    return { conversation: (await this.views([conv], () => side))[0], messages: page.map((m) => ChatService.message(m, i18n?.get(m.id))), hasMore };
   }
 
   /** The viewer read the thread: their side's unread count goes to zero; their other open screens and the other side hear it. */

@@ -275,6 +275,7 @@ const settled = async (sock, id) => until(async () => {
   a = await req(demo.sock, 'reviews:create', { productId: deliveredProduct, rating: 5, text: 'Très bon produit, livraison rapide' });
   ok(a.ok, 'a customer reviews a delivered product', a.error);
   const review = a.data;
+  ok(review.textI18n?.sourceLang === 'fr' && review.textI18n.fr === 'Très bon produit, livraison rapide' && review.textI18n.en === '[en] Très bon produit, livraison rapide', 'the review ships both languages at once (translated before it was stored)', JSON.stringify(review.textI18n));
   a = await req(guest.sock, 'translate:text', { kind: 'review', id: review.id, target: 'en' });
   ok(a.ok && a.data.text === '[en] Très bon produit, livraison rapide' && a.data.sourceLang === 'fr' && a.data.same === false, 'a French review translates to English', JSON.stringify(a));
   a = await req(guest.sock, 'translate:text', { kind: 'review', id: review.id, target: 'fr' });
@@ -294,20 +295,26 @@ const settled = async (sock, id) => until(async () => {
   await req(sellerU.sock, 'sellers:mine');
   const q = await req(demo.sock, 'questions:ask', { productId: en1.id, question: 'Is the battery easy to replace?' });
   ok(q.ok, 'a customer asks a question');
+  ok(q.data.questionI18n?.sourceLang === 'en' && q.data.questionI18n.fr === '[fr] Is the battery easy to replace?' && !('askerId' in q.data), 'the question ships both languages, in the public shape', JSON.stringify(q.data));
   a = await req(guest.sock, 'translate:text', { kind: 'question', id: q.data.id, target: 'fr' });
   ok(a.ok && a.data.text === '[fr] Is the battery easy to replace?', 'a question translates by its row id', JSON.stringify(a));
   a = await req(guest.sock, 'translate:text', { kind: 'answer', id: q.data.id, target: 'fr' });
   ok(!a.ok, 'an unanswered question has no answer to translate');
-  await req(sellerU.sock, 'questions:answer', { id: q.data.id, answer: 'Yes, it clips out.' });
+  a = await req(sellerU.sock, 'questions:answer', { id: q.data.id, answer: 'Yes, it clips out.' });
+  ok(a.ok && a.data.answerI18n?.fr === '[fr] Yes, it clips out.' && a.data.questionI18n?.sourceLang === 'en', 'the answer ships both languages next to the question', JSON.stringify(a.data));
+  a = await req(guest.sock, 'questions:list', { productId: en1.id });
+  ok(a.ok && a.data.some((x) => x.id === q.data.id && x.answerI18n?.fr === '[fr] Yes, it clips out.' && x.questionI18n?.fr), 'questions:list carries questionI18n and answerI18n', JSON.stringify(a.data));
   a = await req(guest.sock, 'translate:text', { kind: 'answer', id: q.data.id, target: 'fr' });
   ok(a.ok && a.data.text === '[fr] Yes, it clips out.', 'and the answer translates by the same row id', JSON.stringify(a));
   // The reviewed product is the one the order above delivered: its store (sellerU) replies.
   const rep = await req(sellerU.sock, 'reviews:reply', { reviewId: review.id, text: 'Thank you for your order' });
   ok(rep.ok, 'the seller replies to the review', rep.error ?? '');
+  ok(rep.data.replyI18n?.fr === '[fr] Thank you for your order' && rep.data.textI18n?.sourceLang === 'fr', 'the reply ships both languages (replyI18n) with the review text', JSON.stringify(rep.data));
   a = await req(guest.sock, 'translate:text', { kind: 'review_reply', id: review.id, target: 'fr' });
   ok(a.ok && a.data.text === '[fr] Thank you for your order', 'a seller reply translates by the review id', JSON.stringify(a));
   const reviewsOf = (await req(guest.sock, 'reviews:list', { productId: deliveredProduct })).data;
   ok(reviewsOf.some((r) => r.id === review.id), 'reviews:list is unchanged');
+  ok(reviewsOf.find((r) => r.id === review.id)?.replyI18n?.fr === '[fr] Thank you for your order', 'reviews:list carries textI18n and replyI18n', JSON.stringify(reviewsOf.find((r) => r.id === review.id)));
 
   // ---- 10. Admin: status, retry, other texts -------------------------------------------------------------
   section('Admin: translation status, campaigns, flash sales, CMS, broadcasts');

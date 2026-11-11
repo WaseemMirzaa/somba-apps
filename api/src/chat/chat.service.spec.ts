@@ -57,6 +57,9 @@ beforeEach(async () => {
     ctx,
     {
       translateStored: translate,
+      translateForSave: async () => null,
+      saveTranslated: async () => undefined,
+      i18nFor: async () => new Map(),
       present: async (_type: string, rows: { id: string; name: string }[]) =>
         new Map(rows.map((r) => [r.id, { texts: { name: productNames[r.id]?.[0] ?? r.name, nameFr: productNames[r.id]?.[1] ?? r.name } }])),
     } as never,
