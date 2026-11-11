@@ -172,4 +172,12 @@ extension StringsAfterSale on Strings {
   String asExReturned(Object? amount) => t('as_ex_returned', {'amount': amount});
   String asExWillRefund(Object? amount) => t('as_ex_will_refund', {'amount': amount});
   String asExRefunded(Object? amount) => t('as_ex_refunded', {'amount': amount});
+  String get asPlTitle => t('as_pl_title');
+  String get asPlQrAlt => t('as_pl_qr_alt');
+  String get asPlCode => t('as_pl_code');
+  String asPlBox(int n, int m) => m <= 1 ? t('as_pl_box_one') : t('as_pl_box', {'n': n, 'm': m});
+  String get asPlWrite => t('as_pl_write');
+  String get asPlPending => t('as_pl_pending');
+  String get asPlCopy => t('as_pl_copy');
+  String get asPlCopied => t('as_pl_copied');
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../l10n/strings.dart';
 import '../../services/aftersale_models.dart';
 import '../../services/aftersale_store.dart';
@@ -8,6 +9,7 @@ import '../../widgets/kit.dart';
 import '../../widgets/photo_picker.dart';
 import 'aftersale_widgets.dart';
 import 'chat_entry.dart';
+import 'return_parcel_card.dart';
 
 /// One return or dispute request: where it stands, the items and the refund, the conversation with the seller
 /// and KOMORIKO support, and what the customer may do next. Follows the live pushes while it is open.
@@ -39,12 +41,16 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
   bool _sending = false;
   bool _acting = false;
   String? _replyError;
+  bool _parcelLoading = false;
+  String? _parcelAsked;
+  Object? _parcelError;
 
   String get _id => widget.returnRequest?.id ?? widget.requestId!;
 
   @override
   void initState() {
     super.initState();
+    _store.addListener(_loadParcelWhenDue);
     _load();
     for (final id in widget.siblings) {
       _store.tryFetchDispute(id);
@@ -53,6 +59,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
 
   @override
   void dispose() {
+    _store.removeListener(_loadParcelWhenDue);
     _reply.dispose();
     _photos.dispose();
     super.dispose();
@@ -68,6 +75,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
     try {
       await _store.fetchDispute(_id);
       if (mounted) setState(() => _loading = false);
+      _loadParcelWhenDue(force: true);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -77,6 +85,39 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
       // With the request already on screen only the thread failed: say so (a full-screen error speaks for itself).
       if (_store.disputeById(_id) != null || widget.returnRequest != null) showError(context, e);
     }
+  }
+
+  /// The label exists once the return is approved and its pickup created; it is shown until the box is collected.
+  bool _parcelDue(DisputeView? d) => d != null && d.isReturn && d.isOpen && (d.stage == 'approved' || d.stage == 'pickup');
+
+  /// Fetches the label when the return reaches a stage that carries one (also when a push moves it there).
+  /// [force]: ask again although a previous try failed or found none (an open or a pull to refresh).
+  Future<void> _loadParcelWhenDue({bool force = false}) async {
+    final d = _store.disputeById(_id) ?? widget.returnRequest;
+    if (!mounted || !_parcelDue(d) || _parcelLoading || _store.parcelOf(_id) != null) return;
+    if (!force && (_parcelError != null || _parcelAsked == d!.stage)) return;
+    _parcelAsked = d!.stage;
+    setState(() {
+      _parcelLoading = true;
+      _parcelError = null;
+    });
+    try {
+      await _store.parcelForReturn(_id);
+      if (mounted) setState(() => _parcelLoading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _parcelLoading = false;
+        _parcelError = e;
+      });
+      showError(context, e);
+    }
+  }
+
+  Future<void> _copyCode(String code) async {
+    final s = Strings.of(context);
+    await Clipboard.setData(ClipboardData(text: code));
+    if (mounted) showSnack(context, s.asPlCopied);
   }
 
   Future<void> _send(DisputeView d) async {
@@ -179,6 +220,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
                     ]),
                   ),
                 ],
+                if (_parcelDue(d)) ...[const SizedBox(height: AppSpace.lg), _parcelCard(d)],
                 if (d.isReturn && _showProgress(d)) ...[const SizedBox(height: AppSpace.lg), _progress(s, d)],
                 const SizedBox(height: AppSpace.lg),
                 _details(s, d),
@@ -198,6 +240,18 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
         );
       },
     );
+  }
+
+  Widget _parcelCard(DisputeView d) {
+    final parcel = _store.parcelOf(d.id);
+    final state = parcel != null
+        ? ParcelCardState.ready
+        : _parcelLoading
+            ? ParcelCardState.loading
+            : _parcelError != null
+                ? ParcelCardState.failed
+                : ParcelCardState.pending;
+    return ReturnParcelCard(state: state, parcel: parcel, onCopy: parcel == null ? null : () => _copyCode(parcel.code), onRetry: () => _loadParcelWhenDue(force: true));
   }
 
   Widget _banner(StageBanner b, DisputeView d) => Container(
