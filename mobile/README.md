@@ -70,7 +70,7 @@ run's **Artifacts**.
 
 ## Install the test APK
 
-The CI build of this app talks to the **live test server** (`http://107.170.116.169`), so a client can install it and try it.
+The CI build of this app talks to the **live test server** (`https://komoriko.com`), so a client can install it and try it.
 
 1. **Download.** Open the repository **Releases** page and take `komoriko-customer.apk` from the latest `customer-apk-v<N>` release, or open the **Actions** tab, pick the latest "Customer App · Build APK" run and download the `komoriko-customer-apk` artifact (a zip containing `komoriko-customer.apk` and the per-ABI APKs). Use `komoriko-customer.apk` (universal) unless you know the phone's ABI.
 2. **Allow the install.** On the phone: Settings, then Security (or "Install unknown apps"), then allow your browser or file manager to install unknown apps. Open the APK and confirm.
@@ -82,7 +82,7 @@ The CI build of this app talks to the **live test server** (`http://107.170.116.
 
 | Name | Kind | Becomes | Needed |
 |---|---|---|---|
-| `LIVE_API_URL` | variable | `--dart-define=API_URL` (base URL, no `/api/v1`; the **api_url** run input wins) | optional, default `http://107.170.116.169` |
+| `LIVE_API_URL` | variable | `--dart-define=API_URL` (base URL, no `/api/v1`; the **api_url** run input wins) | optional, default `https://komoriko.com` |
 | `LIVE_SOCKET_URL` | variable | `--dart-define=SOCKET_URL` | optional, only if Socket.IO is on another host |
 | `GOOGLE_MAPS_API_KEY` | secret | `--dart-define=GOOGLE_MAPS_API_KEY` and the Android manifest placeholder of the same name | optional, map off without it |
 | `FIREBASE_API_KEY`, `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_ANDROID_APP_ID` | secrets | `--dart-define` with the same names | optional, all four for push |

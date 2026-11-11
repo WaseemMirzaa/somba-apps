@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       api_url:
-        description: 'Server the APK talks to (base URL, no /api/v1). Empty = repo variable LIVE_API_URL, else http://107.170.116.169'
+        description: 'Server the APK talks to (base URL, no /api/v1). Empty = repo variable LIVE_API_URL, else https://komoriko.com'
         required: false
         default: ''
         type: string
@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           url="${INPUT_API_URL:-${VAR_API_URL:-}}"
-          url="${url:-http://107.170.116.169}"
+          url="${url:-https://komoriko.com}"
           url="${url%/}"; url="${url%/api/v1}"; url="${url%/}"
           case "$url" in http://*|https://*) ;; *) echo "::error::API URL '$url' must start with http:// or https://"; exit 1 ;; esac
           socket="${VAR_SOCKET_URL:-}"
