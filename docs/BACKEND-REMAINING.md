@@ -11,11 +11,11 @@ _Companion to `BACKEND-AUDIT.md` and `PRODUCTION-READINESS-AUDIT.md`. Database t
 | Account lifecycle | Register, email verification, phone OTP (lockout), forgot/reset, change password, profile + prefs, avatar upload, account deletion, device-token registry. |
 | Web (customer + seller + warehouse + rider + admin) | Live hooks on the core flows. Real email/password sign-in on `/login` (demo persona picker only when `NEXT_PUBLIC_DEMO_MODE=true`). |
 | Deployment | `docker-compose.yml`, `deploy/nginx/somba.conf`, `deploy/droplet-deploy.sh` (one-command idempotent droplet deploy), GitHub Actions CI incl. MySQL job. |
-| Payments | Mobile-money lifecycle (Airtel / Orange / M-Pesa): order + payment stay `pending` until a signed webhook (HMAC over the raw body, `POST /api/v1/payments/webhook/mobile-money`) or the sandbox confirms; atomic idempotent settlement; late success credited to the wallet; stale intents expire (`MM_PENDING_TTL_MIN`). Wallet orders are atomic. **COD is disabled** (`codEnabled=false`, admin can enable). **Account is mandatory** (no guest checkout). |
+| Payments | Mobile-money lifecycle (Airtel / Orange / M-Pesa): order + payment stay `pending` until a signed webhook (HMAC over the raw body, `POST /api/v1/payments/webhook/mobile-money`) or the sandbox confirms; atomic idempotent settlement; late success credited to the wallet; stale intents expire (`MM_PENDING_TTL_MIN`). Wallet orders are atomic. Payment is always taken up front (wallet, mobile money, card). **Account is mandatory** (no guest checkout). |
 | Money/stock integrity | Atomic stock reservation, conditional `UPDATE` transitions for cancel / settle / refund / payout approve / delivery accept, server-authoritative prices, promo limits, zone-based delivery fee (`deliveryZones` setting), payouts only from delivered sales after `PAYOUT_CLEARANCE_HOURS`. |
 | Authorization | Every WebSocket handler is role-checked; least-privilege admin sub-roles (operations / finance / warehouse); suspension and role change kick live sockets and revoke tokens; self-registration limited to customer/seller; audit log. 114-assertion authz smoke test in CI. |
 | Flutter customer app (`mobile/`) | Rewritten onto the live backend (no mock catalogue/state, real auth incl. verify/forgot/reset, mobile-money checkout with pending screen, orders, wallet, addresses, wishlist, promos, notifications). `flutter analyze` clean; 3 widget tests + 15 live-API tests; web build loaded and signed in a real browser. |
-| Flutter rider app (`rider-app/`) | Rewritten onto the live backend: real sign-in, active / done deliveries assigned by the warehouse (no accept), picked up -> in transit -> delivered, real GPS stream (`delivery:location`), work stats + cash to hand over, notifications. `flutter analyze` clean; 3 widget tests + live-API test; web build signed in and claimed deliveries in a real browser. |
+| Flutter rider app (`rider-app/`) | Rewritten onto the live backend: real sign-in, active / done deliveries assigned by the warehouse (no accept), picked up -> in transit -> delivered, real GPS stream (`delivery:location`), work stats, notifications. `flutter analyze` clean; 3 widget tests + live-API test; web build signed in and claimed deliveries in a real browser. |
 | Not verified here | Android/iOS device or emulator builds (no Android SDK in the sandbox), the droplet itself, and any real aggregator / SMTP / SMS / FCM account. |
 
 ## 2. Remaining work (scope vs backend)
@@ -25,7 +25,6 @@ Priority: **P0** blocks real money / launch, **P1** scope feature missing server
 | # | Item | Pri | Today | Proposed API / work |
 |---|---|---|---|---|
 | 1 | **Mobile-money aggregator adapter** | P0 | Lifecycle, webhook, idempotency, expiry, refunds are built and tested against the sandbox provider. In production `MM_PROVIDER` defaults to `none`, so mobile money and top-ups are **refused** (fail closed); only the wallet works. | Implement the adapter for the chosen aggregator (`api/src/payments/mobile-money.provider.ts` interface: `charge`, signature verify) and set `MM_PROVIDER`, `MM_WEBHOOK_SECRET`. Needs the aggregator contract + credentials. Fallback if none: manual confirmation by finance in the admin panel. |
-| 2 | ~~COD policy conflict~~ | done | `codEnabled=false` by default; `cod` is refused until an admin enables it in Settings. | — |
 | 3 | ~~Guest checkout~~ | decided | Client decision: account mandatory. | No work. |
 | 4 | **Proof of delivery** | P1 | `delivery:updateStatus` only | `delivery:complete {taskId, otp, photoUrl}`; OTP generated at dispatch and sent to the customer; photo via `/uploads`. |
 | 5 | **Open-box / cross-city delivery flags** | P1 | Not modelled | Boolean columns on `order`/`delivery_task`; fee rules per zone. |
@@ -115,7 +114,7 @@ Optional integrations go in `/etc/somba/api.extra.env` (SMTP, Twilio, Firebase, 
 | `customers` | `list`, `setActive` |
 | `broadcasts` | `list`, `send` |
 | `roles` | `defs`, `staff`, `setRole` |
-| `warehouse` | `hubs`, `parcels`, `aged`, `inventory`, `batches`, `buildBatch`, `reconcile`, `transfers`, `createTransfer` |
+| `warehouse` | `hubs`, `parcels`, `aged`, `inventory`, `batches`, `buildBatch`, `transfers`, `createTransfer` |
 | `rider` | `workStats` (alias `earnings`), `tasks` |
 | `campaigns` | `list`, `create`, `update`, `setStatus` |
 | `replacements` | `list`, `create`, `setStatus` |
@@ -169,7 +168,7 @@ Automated checks that already pass locally: `flutter analyze`, `flutter test` (w
 
 ## 7. Decisions
 
-Decided by the client: **payment = mobile money** (Airtel / Orange / M-Pesa), **COD disabled**, **account mandatory (no guest checkout)**, **MySQL**, **Firebase optional**.
+Decided by the client: **payment = mobile money** (Airtel / Orange / M-Pesa), **payment always taken up front**, **account mandatory (no guest checkout)**, **MySQL**, **Firebase optional**.
 
 Still needed:
 1. **Which aggregator** (and sandbox credentials + webhook signing secret) so the adapter can be written, or approval of the manual-confirmation fallback.

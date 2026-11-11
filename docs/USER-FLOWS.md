@@ -83,8 +83,8 @@ flowchart LR
 | Visitor | — | Customer app, web shop | Browse products, categories, deals, stores, reviews; must sign in to buy |
 | Customer | Self sign-up (email + password) | Customer app, web shop | Buy, pay (wallet or mobile money), track deliveries live, cancel, return/dispute, review, support, wallet, addresses, wishlist |
 | Seller | Self sign-up as seller, then store approval by an admin | Seller portal (and the shop) | Store profile, products and stock, orders containing their products, promotions/campaigns, reviews and questions, payouts, analytics |
-| Rider | Created by the admin (role `rider`) | Rider app, rider web | Take deliveries from the pool or by assignment, pick up, deliver, share live location, collect cash (if COD is on), see their work stats (riders are salaried, no per-task pay) |
-| Warehouse staff | Created by the admin (role `warehouse_staff`) | Warehouse portal | Parcels by stage, batches, assign riders, exceptions, transfers, exchanges, replacements, returns, cash reconciliation |
+| Rider | Created by the admin (role `rider`) | Rider app, rider web | Take deliveries from the pool or by assignment, pick up, deliver, share live location, see their work stats (riders are salaried, no per-task pay) |
+| Warehouse staff | Created by the admin (role `warehouse_staff`) | Warehouse portal | Parcels by stage, batches, assign riders, exceptions, transfers, exchanges, replacements, returns |
 | Admin (super admin) | Bootstrap account | Admin portal | Everything, including staff roles |
 | Admin — operations | Admin assigns the role | Admin portal | Orders, sellers, catalogue, customers, fulfilment, settings, audit, fraud |
 | Admin — finance | Admin assigns the role | Admin portal | Payments, refunds, payouts, disputes with refunds, settings, analytics, fraud |
@@ -194,7 +194,7 @@ flowchart TD
   subgraph Rider
     R1([⚡ Task appears in Available]) --> R2["delivery:accept"]
     R2 --> R3[Picked up] --> R4[On the way, GPS shared] --> R5{Delivered?}
-    R5 -- Yes --> R6["delivered (cash confirmed if COD)"]
+    R5 -- Yes --> R6["delivered"]
     R5 -- No --> R7[Could not deliver]
   end
   subgraph Seller
@@ -1058,7 +1058,7 @@ flowchart TD
   SRV -.-> GAP["⚠ buttons on this page change the screen only today"]
   RF(["/admin/refunds"]) --> RFA[Authorise - demo]
   OR(["Order"]) -.-> ORF["Server supports orders:refund (to wallet or original method) - no button yet"]
-  FR(["/admin/fraud"]) --> FRL["fraud:list - COD orders above the cap are flagged"] --> FRO[Open the order]
+  FR(["/admin/fraud"]) --> FRL["fraud:list - orders raised by the fraud rules"] --> FRO[Open the order]
 ```
 
 #### A-6 Marketing and content
@@ -1083,7 +1083,7 @@ flowchart TD
   RO -.-> RS["Server supports roles:staff and roles:setRole<br/>(change a user's role, ends their sessions) - no screen yet"]
   AU(["Audit log"]) --> AL["audit:list - who did what, when"]
   SE(["Settings"]) --> SF[Commission, FX rate, minimum payout, clearance hours]
-  SF -.-> SS["Server supports settings:set (codEnabled, codCapUsd,<br/>deliveryZones, fxRate, commissionPct) - Save not wired"]
+  SF -.-> SS["Server supports settings:set (deliveryZones,<br/>fxRate, commissionPct) - Save not wired"]
   ZN(["Zones"]) --> ZA[Add zone, assign riders, pause - local today]
   WH(["Warehouses"]) --> WC[Create hub + portal credentials, staff - local today]
 ```
@@ -1093,7 +1093,7 @@ flowchart TD
 | # | Gap |
 |---|---|
 | 1 | Only five admin actions reach the server today: seller approve/reject, product approve/reject, dispute resolve, customer suspend/reactivate (and the warehouse "Receive", which the server refuses) |
-| 2 | No screen yet for: order status change, order refund or cancel, payout approve/reject, dispute reject, fraud status, role assignment and staff list, settings save (COD on/off, zones, FX, commission), promo codes, flash-sale create, CMS edit, broadcasts, categories (server CRUD), campaigns, support tickets |
+| 2 | No screen yet for: order status change, order refund or cancel, payout approve/reject, dispute reject, fraud status, role assignment and staff list, settings save (zones, FX, commission), promo codes, flash-sale create, CMS edit, broadcasts, categories (server CRUD), campaigns, support tickets |
 | 3 | Finance, refunds, analytics, disputes list, returns, reviews, promotions, marketing, broadcasts, zones, warehouses and staff show demo or browser-only data |
 | 4 | Links from admin pages to `/warehouse`, `/shop` or other groups bounce back; `/admin/fulfillment/aged` does not exist |
 | 5 | In demo mode several admin personas sign into the super-admin server account |
@@ -1263,18 +1263,17 @@ flowchart TD
 |---|---|
 | 1 | "Receive" sends a status the server refuses (only riders may move a delivery); receiving needs its own server action |
 | 2 | Batches, dispatch, rider assignment, transfers, exceptions, exchanges, replacements and returns are local or demo; the server already has `warehouse:buildBatch`, `delivery:assign`, `warehouse:createTransfer`, `exceptions:*`, `exchanges:setStatus`, `replacements:setStatus` |
-| 3 | COD cash reconciliation (`warehouse:reconcile`) has no screen |
-| 4 | Barcode scanning is simulated (no camera) |
-| 5 | Dashboard, analytics, deliveries-by-type and settings are demo |
-| 6 | All warehouse staff share one server account in demo mode, so data is not scoped per hub |
-| 7 | Links to admin and shop pages bounce warehouse users back to their dashboard |
+| 3 | Barcode scanning is simulated (no camera) |
+| 4 | Dashboard, analytics, deliveries-by-type and settings are demo |
+| 5 | All warehouse staff share one server account in demo mode, so data is not scoped per hub |
+| 6 | Links to admin and shop pages bounce warehouse users back to their dashboard |
 
 
 ---
 
 ## 9. Rider — mobile app (Flutter) and web portal (`/rider`)
 
-The **mobile app is the complete rider tool** (claim, status updates, live GPS, cash confirmation, work stats). The web rider portal is mostly read-only today.
+The **mobile app is the complete rider tool** (claim, status updates, live GPS, work stats). The web rider portal is mostly read-only today.
 
 ### 9.1 Rider mobile app — navigation
 
@@ -1298,10 +1297,10 @@ flowchart TD
 | Sign in | Email, password, "accounts are created by the fleet team" | **Sign in** (`POST /auth/login`; non-rider accounts refused) · Forgot password? |
 | Reset password | Email, then code + new password | Send link (`POST /auth/forgot`) · Save (`POST /auth/reset`) |
 | Deliveries | Greeting, connection pill (Online / Connecting / Error / Offline), tabs with counts | Pull to refresh (`rider:tasks`, `rider:workStats`, `notifications:list`) |
-| — Available tab | Unclaimed deliveries: reference, COD amount, address, items | **Accept this delivery** (`delivery:accept`) |
-| — Active tab | My deliveries: status, customer, address, phone, items, cash banner, GPS status | **Picked up the parcel** → **On my way** → **Delivered** (`delivery:updateStatus`), cash confirmation for COD, **Could not deliver** (confirm) |
+| — Available tab | Unclaimed deliveries: reference, address, items | **Accept this delivery** (`delivery:accept`) |
+| — Active tab | My deliveries: status, customer, address, phone, items, GPS status | **Picked up the parcel** → **On my way** → **Delivered** (`delivery:updateStatus`), **Could not deliver** (confirm) |
 | — Done tab | Delivered and failed | — |
-| My work | Tasks completed today, this week and all time; completed, in progress, failed, success rate; completed by type (counts only); cash in hand. Riders are salaried: no pay is shown | Pull to refresh |
+| My work | Tasks completed today, this week and all time; completed, in progress, failed, success rate; completed by type (counts only). Riders are salaried: no pay is shown | Pull to refresh |
 | Profile | Name, email, phone, language, notifications (15 latest) | EN/FR · tap notification (`notifications:markRead`) · **Sign out** |
 
 ### 9.2 Rider mobile flowcharts
@@ -1336,12 +1335,8 @@ flowchart TD
   PU --> C2[⚡ customer: shipped] --> GPS[GPS sharing starts - see R-3]
   PU -->|On my way to the customer| IT["delivery:updateStatus in_transit"]
   IT --> C3[⚡ customer: out for delivery]
-  IT -->|Delivered| COD{Cash on delivery order?}
-  COD -- no --> DL["delivery:updateStatus delivered"]
-  COD -- yes --> CQ{Cash collected?}
-  CQ -- "Not yet" --> IT
-  CQ -- "Yes, collected" --> DL
-  DL --> C4[⚡ customer: delivered, cash marked collected, seller sale counts toward payout]
+  IT -->|Delivered| DL["delivery:updateStatus delivered"]
+  DL --> C4[⚡ customer: delivered, seller sale counts toward payout]
   DL --> DN([Done tab])
   PU & IT -->|Could not deliver| FC{Confirm mark as failed?}
   FC -- Cancel --> IT
@@ -1370,7 +1365,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  E([My work]) --> ER["rider:workStats"] --> EV[Completed today / week / all time, in progress, failed, success rate, by type, cash collected to hand over]
+  E([My work]) --> ER["rider:workStats"] --> EV[Completed today / week / all time, in progress, failed, success rate, by type]
   P([Profile]) --> N[Notifications list ⚡ notification:new] --> NR["tap → notifications:markRead"]
   P --> LG[EN / FR]
   P --> SO[Sign out] --> X[Stop GPS, forget tokens, close connection] --> L([Sign in])
@@ -1388,7 +1383,7 @@ Bottom tabs: **Dashboard · Active tasks · My zone · My work · My account**. 
 | `/rider/tasks/:id/pod` | OTP, recipient, notes, photo placeholder | Confirm delivered (message only) | STUB |
 | `/rider/tasks/:id/fail` | Reason, notes | Report failed (message only) | STUB |
 | `/rider/zone` | Zone (set by warehouse, stored in browser), zone fee (demo), tasks in / outside zone | Open task | LIVE + LOCAL |
-| `/rider/work` | Work stats (`rider:workStats`): completed today / this week / all time, completed, in progress, failed, success rate, by type, cash collected. `/rider/earnings` redirects here | Refresh | LIVE |
+| `/rider/work` | Work stats (`rider:workStats`): completed today / this week / all time, completed, in progress, failed, success rate, by type. `/rider/earnings` redirects here | Refresh | LIVE |
 | `/rider/profile` | Name, id, phone, current deliveries; rating and vehicle demo | Availability toggle (local), history, notifications | LIVE + LOCAL |
 | `/rider/history` | Delivered tasks | Open task | LIVE |
 | `/rider/notifications` | Demo notifications | Mark read (local) | MOCK |
@@ -1413,7 +1408,7 @@ flowchart TD
 | 1 | No proof of delivery (customer OTP / photo / signature) in the app; the web POD page is not connected |
 | 2 | No reason captured when a delivery fails; "could not deliver" is not offered before pickup |
 | 3 | No background location (tracking pauses when the app is closed); no button to open phone settings when permission is blocked |
-| 4 | No batches, zone, shift / availability or cash hand-over in the app |
+| 4 | No batches, zone or shift / availability in the app |
 | 5 | App text is English even when French is selected (only system widgets change) |
 | 6 | Web rider portal cannot accept or update deliveries; notifications are demo |
 | 7 | Rider staff onboarding (first password) is not connected |
@@ -1455,7 +1450,6 @@ flowchart TD
 | Claim delivery | — | — | — | — | — | ✅ | — | `delivery:accept` |
 | Picked up → on the way → delivered / failed | — | — | — | — | — | ✅ | 🧪 | `delivery:updateStatus` |
 | Share live location | — | — | — | — | — | ✅ | — | `delivery:location` |
-| Cash collected (COD, when enabled) | — | — | — | — | 🧪 reconcile (server ready) | ✅ | 🧪 | `delivery:updateStatus delivered`, `warehouse:reconcile` |
 | Work stats | — | — | — | — | 🟡 per rider | ✅ | ✅ | `rider:workStats` (`rider:earnings` is a deprecated alias) |
 
 ### 10.1 Readiness by user
@@ -1475,10 +1469,10 @@ flowchart LR
 
 ### 10.2 Recommended order to close the gaps
 
-1. **Admin finance and operations actions** — wire payout approve/reject, order refund/cancel/status, dispute reject, fraud status, settings save (COD, zones, FX, commission), role assignment. The server already supports all of them.
-2. **Warehouse and dispatch** — wire rider assignment and batches (`delivery:assign`, `warehouse:buildBatch`), exceptions, exchanges, replacements, transfers and the COD reconciliation screen; give hub "receiving" its own server action.
+1. **Admin finance and operations actions** — wire payout approve/reject, order refund/cancel/status, dispute reject, fraud status, settings save (zones, FX, commission), role assignment. The server already supports all of them.
+2. **Warehouse and dispatch** — wire rider assignment and batches (`delivery:assign`, `warehouse:buildBatch`), exceptions, exchanges, replacements, transfers; give hub "receiving" its own server action.
 3. **Customer app fixes** — open product cards from search, lists, store and wishlist; return to Sign in after account deletion; push notifications; remember the price-currency choice; verify phone/email later.
-4. **Rider** — proof of delivery (customer code and photo), failure reasons, background location, cash hand-over.
+4. **Rider** — proof of delivery (customer code and photo), failure reasons, background location.
 5. **Seller** — show server errors, real approval gating, full product editing (images, variants, stock), seller fulfilment step, payouts with the server's available amount.
 6. **Web shop** — add to cart and real checkout with saved addresses and mobile-money number, returns through `disputes:open`, support tickets on the server.
 
@@ -1509,8 +1503,8 @@ In the flowcharts below, red boxes mark where the flow breaks.
 | Web shop | 3 | 4 | 5 | 2 |
 | Seller portal | 2 | 4 | 5 | 2 |
 | Admin portal | 4 | 4 | 3 | 2 |
-| Warehouse portal | 1 | 3 | 3 | 2 |
-| Rider app | — | 2 | 3 | 1 |
+| Warehouse portal | 1 | 3 | 2 | 2 |
+| Rider app | — | 2 | 2 | 1 |
 | Rider web | 1 | 3 | 1 | 1 |
 
 ---
@@ -1519,7 +1513,7 @@ In the flowcharts below, red boxes mark where the flow breaks.
 
 #### X-1 🔴 In production nobody can pay for an order
 
-Mobile money is the chosen payment method, but no aggregator is connected, so production refuses it. The wallet is the only other method, and the wallet can only be topped up with mobile money. COD is switched off and card is refused in production. A new customer therefore has no way to pay.
+Mobile money is the chosen payment method, but no aggregator is connected, so production refuses it. The wallet is the only other method, and the wallet can only be topped up with mobile money. Card is refused in production. A new customer therefore has no way to pay.
 
 ```mermaid
 flowchart TD
@@ -1528,15 +1522,13 @@ flowchart TD
   M -- Wallet --> W{Balance ≥ total?}
   W -- "no - every new account starts at $0" --> TU[Top up wallet]
   TU --> TM[Top-up needs mobile money]:::bad --> R1
-  M -- "Cash on delivery" --> COD[Disabled by policy]:::bad
   M -- Card --> CARD[Refused in production]:::bad
   R1 --> DEAD([No order can be placed]):::bad
-  COD --> DEAD
   CARD --> DEAD
   classDef bad fill:#fde2e1,stroke:#c0392b,color:#5c1410
 ```
 
-**Fix:** connect the aggregator (or a finance manual-confirmation fallback) before launch; until then, allow an admin to credit wallets or temporarily enable COD.
+**Fix:** connect the aggregator (or a finance manual-confirmation fallback) before launch; until then, allow an admin to credit wallets.
 
 > **Update (October 2026).** The manual fallback (`MM_PROVIDER=manual`) is in place, and the **pawaPay adapter** is built: set `MM_PROVIDER=pawapay` and the token to take real mobile-money payments, refunds to the phone and payouts. See PAYMENTS-PAWAPAY.md.
 
@@ -1719,7 +1711,7 @@ flowchart TD
 | ID | Flow | What happens | Severity | Fix |
 |---|---|---|---|---|
 | AD-1 | Approve / reject payout | Badge changes and a toast confirms, but nothing is sent; the next live update reverts the row. Finance believes the seller was paid | 🔴 | Call `payouts:approve` / `payouts:reject` |
-| AD-2 | Settings → Save | Toast "Settings saved (audit logged)" but nothing is saved or audited (COD, zones, FX, commission cannot be changed from the portal) | 🔴 | Call `settings:set` |
+| AD-2 | Settings → Save | Toast "Settings saved (audit logged)" but nothing is saved or audited (zones, FX, commission cannot be changed from the portal) | 🔴 | Call `settings:set` |
 | AD-3 | Broadcast → Send now | Appears as "sent" but no one receives it | 🔴 | Call `broadcasts:send` |
 | AD-4 | Refunds → Authorise | Screen only, on demo refunds; orders cannot be refunded from the portal at all | 🔴 | Use `orders:refund` from order detail |
 | AD-5 | Order management | Orders can be viewed but not moved, cancelled or refunded | 🟠 | Add `orders:updateStatus`, `orders:cancel`, `orders:refund` |
@@ -1751,7 +1743,6 @@ flowchart TD
 | WH-3 | Batch builder, dispatch, assign rider | Demo parcels and riders, screen-only; nothing is assigned on the server | 🟠 | `warehouse:buildBatch`, `delivery:assign` |
 | WH-4 | Scan barcode | Simulated; always opens a demo parcel that is "not found" | 🟠 | Camera / scanner input matched to real parcels |
 | WH-5 | Exceptions, exchanges, replacements, returns, transfers | Demo or browser-only; replacement workflow can be completed entirely without the server | 🟡 | Wire the `*:setStatus`, `exceptions:create`, `warehouse:createTransfer` events |
-| WH-6 | COD reconciliation | No screen, although the server computes it | 🟡 | Add a reconciliation page |
 | WH-7 | Demo hubs share one account | All hubs see the same parcels | 🟡 | Hub-scoped accounts |
 | WH-8 | Status filters | "pending" / "received" never match live stages | ⚪ | Align values |
 | WH-9 | Links | Links into admin and shop bounce back to the warehouse dashboard | ⚪ | Warehouse routes |
@@ -1773,7 +1764,6 @@ flowchart TD
 | RA-1 | Could not deliver | No reason is captured, and the order is left in limbo (X-2); not offered before pickup | 🟠 | Reason codes; allow fail from assigned |
 | RA-2 | Delivered | No proof of delivery (customer code, photo, signature) | 🟠 | Customer OTP + photo |
 | RA-3 | GPS when the app is closed | Tracking stops in the background; when permission is blocked there is no button to open settings | 🟡 | Foreground service; "open settings" button |
-| RA-4 | Cash collected | Shown as "hand it over at the warehouse" but there is no hand-over or reconciliation step | 🟡 | Cash hand-over flow with warehouse sign-off |
 | RA-5 | Pay | Riders are salaried: the platform pays nothing per task, and the My work tab shows work stats, not pay | ⚪ | None (by design) |
 | RA-6 | Language | Choosing French only changes system widgets; app text stays English | ⚪ | Translate strings |
 
@@ -1835,8 +1825,8 @@ Every item in section 11 was worked on. This table says what is fixed, what is o
 | Web shop (WS) | WS-1 no fake confirmation, real mobile-money flow · WS-2 returns call the server and list live · WS-3 delete account calls the server · WS-4/5 real cart, saved addresses, zones · WS-6 live ids · WS-7…10 · WS-11 support on the server · WS-12 live bell, sign-out, real profile and wallet top-up · WS-13/14 legal pages, search | `/sell-online/subscribe` is still a demo checkout · tracking has coordinates and a map link, not an embedded map |
 | Seller (SP) | SP-1/2 errors shown, wizard sends every field with real photo upload · SP-3 registration and approval gating · SP-4 browser-only subscription removed · SP-5 edit, delete, pause/resume · SP-6 real available balance and payout destination · SP-7 "package ready" reaches the server · SP-8/9 campaigns, notifications, support, replacements live · SP-11 stock adjust · SP-12/13 | Reviews are read-only (no server reply event) · disputes/replacements lists are limited by the server · conversion/retention/segments widgets are labelled "demo data" |
 | Admin (AD) | AD-1 payouts · AD-2 settings and zones saved · AD-3 broadcasts · AD-4/5 order status, cancel, refund; live refunds and pending-payment queue · AD-6 live disputes and returns with "goods received" · AD-7 staff list, role change, staff creation · AD-8 warehouse staff accounts · AD-9 flash sales, promo codes, CMS, categories, campaign decisions · AD-10 suspend / reinstate · AD-12/13 | Hub directory is still local · finance KPIs, analytics charts and the reviews moderation are labelled "demo data" |
-| Warehouse (WH) | WH-1/2 receive and stages · WH-3 assign rider and batches · WH-4 returns received · WH-5 exceptions, exchanges, replacements, transfers live · WH-6 COD reconciliation page · scanner is a typed/scanned code input | Dashboard throughput/goals widgets are demo (labelled) · no cash hand-over sign-off |
-| Rider app (RA) | RA-1 reasons on failure, from `assigned` · RA-2 handover code · pickup address, seller-ready, attempts · RA-3 open phone settings · RA-4 cash note | RA-6 French text for app strings · background location |
+| Warehouse (WH) | WH-1/2 receive and stages · WH-3 assign rider and batches · WH-4 returns received · WH-5 exceptions, exchanges, replacements, transfers live · scanner is a typed/scanned code input | Dashboard throughput/goals widgets are demo (labelled) |
+| Rider app (RA) | RA-1 reasons on failure, from `assigned` · RA-2 handover code · pickup address, seller-ready, attempts · RA-3 open phone settings | RA-6 French text for app strings · background location |
 | Rider web (RW) | RW-1…5 accept, picked up, on the way, delivered with code, failed with reason, GPS from the browser, work stats page, live notifications | — |
 
 ### 12.3 Bugs found and fixed while verifying

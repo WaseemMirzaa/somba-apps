@@ -22,7 +22,7 @@ export interface FxRate {
   setBy: string;
 }
 
-export type PaymentMethod = "stripe_card" | "cod" | "airtel_money" | "wallet";
+export type PaymentMethod = "stripe_card" | "airtel_money" | "orange_money" | "vodacom_mpesa" | "wallet";
 
 export type UserRole =
   | "customer"
@@ -78,7 +78,7 @@ export interface WalletTransaction {
 
 export interface FraudAlert {
   id: string;
-  type: "cod_risk" | "address_block" | "velocity" | "otp_fail";
+  type: "failed_payments" | "new_account_orders" | "shared_identity" | "return_rate" | "address_changes";
   severity: "low" | "medium" | "high";
   customer: string;
   orderId?: string;

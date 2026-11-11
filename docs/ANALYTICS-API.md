@@ -60,7 +60,7 @@ Added:
 | `kind` | Counts | Severity |
 |---|---|---|
 | `unassigned_deliveries` | deliveries `unassigned` for more than 60 min | warning, critical at >= 5 |
-| `pending_payments` | non-COD payments `pending` for more than 30 min | warning, critical at >= 5 |
+| `pending_payments` | payments `pending` for more than 30 min | warning, critical at >= 5 |
 | `open_disputes` | disputes/returns with status `open` | warning, critical at >= 10 |
 | `payout_requests` | payouts `requested` | warning |
 | `out_of_stock` | live products with stock 0 | warning |
@@ -79,7 +79,7 @@ Request: none. Roles: **finance** (`admin`, `admin_finance`) only. Everyone else
   "grossGmvUsd": 4836,            // totalUsd of non-cancelled orders, all time
   "deliveryFeesUsd": 15,          // inside grossGmvUsd
   "promoDiscountsUsd": 0,         // promo-code discounts already deducted from totals
-  "collectedUsd": 1800,           // succeeded order payments (cash actually received; COD counts once collected)
+  "collectedUsd": 1800,           // succeeded order payments (money actually received)
   "commissionEarnedUsd": 203.52,  // commissionPct x item value of DELIVERED orders (the base payouts use)
   "commissionExpectedUsd": 375,   // same rate on orders not yet delivered and not cancelled/returned
   "subscriptionRevenueUsd": 0,    // succeeded seller-plan payments
@@ -90,7 +90,6 @@ Request: none. Roles: **finance** (`admin`, `admin_finance`) only. Everyone else
     "count": 0, "amountUsd": 0, "oldestMinutes": 0,
     "byMethod": [ { "method": "airtel_money", "count": 1, "amountUsd": 21, "oldestMinutes": 3 } ]
   },
-  "codOutstandingUsd": 3036, "codOutstandingCount": 4,   // cash on delivery not collected yet
   "walletLiabilityUsd": 250,      // sum of customer wallet balances
   "series30": [ { "date": "2026-10-17", "gmv": 4836, "orders": 5, "revenue": 1800, "refunds": 0 } ]  // 30 daily rows
 }
@@ -102,7 +101,7 @@ Request: none. Roles: **finance** (`admin`, `admin_finance`) only. Everyone else
 
 Request: none. Roles: any `admin*` role and `warehouse_staff` (unchanged).
 
-Existing fields: `totalParcels`, `unassigned`, `inTransit`, `delivered`, `codToCollect` (COD of parcels not delivered **and not failed**), `byStatus`.
+Existing fields: `totalParcels`, `unassigned`, `inTransit`, `delivered`, `byStatus`.
 
 Added:
 
@@ -251,7 +250,6 @@ Defaults are generous so existing apps are not truncated: **500** rows (staff qu
 | `analytics:admin.gmv` | sum of all orders incl. cancelled | non-cancelled orders |
 | `analytics:admin.revenue` | all succeeded payments (incl. top-ups) | succeeded **order** payments |
 | `analytics:admin.commissionUsd` | revenue x fixed 12% | revenue x `commissionPct` |
-| `analytics:warehouse.codToCollect` | all non-delivered | non-delivered and non-failed |
 | `analytics:revenue[].date` | `'D-n'` placeholders | `YYYY-MM-DD` |
 | `sellers:stats.orders/revenue` | included cancelled/returned | excludes them |
 

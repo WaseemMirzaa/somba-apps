@@ -17,7 +17,7 @@ Generated from a full sweep of `web/src`. Grouped by area; "Sentences" = UI/mark
 | Refund target | "Original Payment" | "Paiement d'origine" |
 | Currency | "USD", "$" | "CDF", "USD" |
 
-Config (`lib/config.ts`): `PAYMENTS.methods = [stripe_card, airtel_money, orange_money, vodacom_mpesa, wallet]`, `codEnabled: false`; wallet flags `storeCredit / topUpViaMobileMoney / refundToWallet / refundToOriginal`; `MOBILE_MONEY` providers Airtel/Orange/Vodacom; commission rates by category & tier.
+Config (`lib/config.ts`): `PAYMENTS.methods = [stripe_card, airtel_money, orange_money, vodacom_mpesa, wallet]`, wallet flags `storeCredit / topUpViaMobileMoney / refundToWallet / refundToOriginal`; `MOBILE_MONEY` providers Airtel/Orange/Vodacom; commission rates by category & tier.
 
 ---
 
@@ -94,15 +94,8 @@ Settings: "Commission (Δ4)", "Default commission %"/"Commission par défaut %",
 
 ---
 
-## 4. Warehouse & Rider — payment collection (operational)
+## 4. Warehouse — returns
 
-> Note: customer "pay at delivery" was removed (PR #49) and `codEnabled = false`; these are the staff-side
-> "payment collection / reconciliation" features. `codAmount` is mostly 0 now, but the labels remain.
-
-**KPI / headings:** "Payments collected"/"Paiements collectés" (warehouse analytics, warehouse dashboard, rider dashboard) · "Payment collection"/"Encaissement paiement" (rider task type) · "Payment to Collect"/"Paiement à collecter" · "Amount Due / Amount to collect"/"Montant à collecter" · "Cash collected"/"Espèces collectées" · "Confirm payment collection"/"Confirmez la collecte du paiement" · "Collect · $X"/"À encaisser · $X"
-**Payment types:** Prepaid/Prépayé · Card/Carte · Cash/Espèces · Mobile money
-**Issues:** rider fail reason "Payment issue"/"Problème de paiement" · "Payment mismatch"/"Écart de paiement" (warehouse exception) · "Payment mismatch — BAT-039 · $240 variance"/"Écart paiement — BAT-039 · Écart 240 $"
-**COD reconciliation** (`warehouse-entities.ts`): expected / collected / difference / variance fields; shift-reconciliation variance notes ("Rider reported customer on ORD-2024-006 paid $439 instead of $499…" / "Le livreur signale que le client … a payé 439 $ au lieu de 499 $…")
 **Refund methods** (warehouse returns): "KOMORIKO Wallet"/"Portefeuille KOMORIKO", "Original Payment"/"Paiement d'origine"
 
 ---
@@ -121,7 +114,7 @@ Settings: "Commission (Δ4)", "Default commission %"/"Commission par défaut %",
 
 ## 6. i18n keys (`lib/i18n.ts`)
 
-`securePaymentsDesc` "Wallet, card & mobile money"/"Portefeuille, carte et mobile money" · `paymentMethods` "Payment Methods"/"Moyens de paiement" · `payouts` "Payouts"/"Paiements" · `requestPayout` "Request Payout"/"Demander paiement" · `refunds` "Refunds"/"Remboursements" · `fraudPayments` "Fraud & Payments"/"Fraude et paiements" · `cod` "Payment Reconciliation"/"Réconciliation des paiements" · `codCollections` "Payment Collections"/"Collectes de paiement"
+`securePaymentsDesc` "Wallet, card & mobile money"/"Portefeuille, carte et mobile money" · `paymentMethods` "Payment Methods"/"Moyens de paiement" · `payouts` "Payouts"/"Paiements" · `requestPayout` "Request Payout"/"Demander paiement" · `refunds` "Refunds"/"Remboursements" · `fraudPayments` "Fraud & Payments"/"Fraude et paiements"
 
 ---
 

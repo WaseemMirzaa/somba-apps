@@ -66,10 +66,9 @@ KOMORIKO is a multi-vendor marketplace for Kinshasa / DRC (and Paris), with a cu
 | Cart & checkout | ✅ | Server-side pricing, atomic stock reservation, promo codes with limits, zone-based delivery fee; cart lives on the client |
 | Payments — wallet | ✅ | Atomic debit/credit, ledger of wallet transactions |
 | Payments — mobile money | 🟡 | Full lifecycle, signed webhook, idempotent settlement, expiry, late-success credit — **but no real aggregator adapter yet** (production refuses mobile money until one is configured) |
-| Payments — COD | ✅ (disabled) | Implemented and tested, **switched off** per client scope (`codEnabled=false`) |
 | Payments — card | ❌ | Mock only, refused in production |
-| Fulfilment & delivery | 🟡 | Delivery tasks assigned to riders by the warehouse (riders do not claim), forward-only status, live GPS, COD collection. **No proof of delivery, no seller "ready to ship" step, no per-seller sub-orders** |
-| Warehouse | 🟡 | Hubs, parcels by stage, aged parcels, batches, transfers, exceptions, COD reconciliation. **No hub inventory, no receiving/sorting model; about half of the warehouse pages are mock** |
+| Fulfilment & delivery | 🟡 | Delivery tasks assigned to riders by the warehouse (riders do not claim), forward-only status, live GPS. **No proof of delivery, no seller "ready to ship" step, no per-seller sub-orders** |
+| Warehouse | 🟡 | Hubs, parcels by stage, aged parcels, batches, transfers, exceptions. **No hub inventory, no receiving/sorting model; about half of the warehouse pages are mock** |
 | After-sales | 🟡 | Disputes/returns (refund to wallet or original method), exchanges, replacements, support tickets. **No return pickup logistics, no attachments** |
 | Seller finance | 🟡 | Available balance (delivered + clearance − commission), payout request/approve. **"Paid" credits the seller's in-app wallet only — no real bank / mobile-money disbursement, no statements/invoices** |
 | Marketing | 🟡 | Promo codes, flash sales, campaigns, CMS blocks, broadcasts. **No referral, loyalty or campaign-to-price linkage** |
@@ -584,7 +583,7 @@ erDiagram
         varchar customerId FK
         varchar customerName
         varchar status  "default pending"
-        varchar paymentMethod  "default cod"
+        varchar paymentMethod
         float subtotalUsd  "default 0"
         float deliveryFeeUsd  "default 0"
         float discountUsd  "default 0"
@@ -666,7 +665,6 @@ erDiagram
         varchar status  "default unassigned"
         text address  "encrypted, nullable"
         varchar zoneId  "nullable"
-        float codAmountUsd  "default 0"
         float lat  "nullable"
         float lng  "nullable"
         datetime createdAt
@@ -1088,7 +1086,7 @@ _Source: `api/src/database/entities/order.entity.ts`_
 | `customerId` | varchar |  |  | yes |  |
 | `customerName` | varchar |  |  |  |  |
 | `status` | varchar(20) |  | pending | yes | Values: pending, confirmed, processing, shipped, out_for_delivery, delivered, cancelled, returned |
-| `paymentMethod` | varchar(20) |  | cod |  | Values: stripe_card, cod, airtel_money, orange_money, vodacom_mpesa, wallet |
+| `paymentMethod` | varchar(20) |  | wallet |  | Values: stripe_card, airtel_money, orange_money, vodacom_mpesa, wallet |
 | `subtotalUsd` | float |  | 0 |  |  |
 | `deliveryFeeUsd` | float |  | 0 |  |  |
 | `discountUsd` | float |  | 0 |  | Promo discount already deducted from the total (server-validated). |
@@ -1213,7 +1211,6 @@ _Source: `api/src/database/entities/delivery-task.entity.ts`_
 | `address` | text | yes |  |  | **AES-256-GCM encrypted at rest**; Encrypted at rest — delivery address text. |
 | `zoneId` | varchar | yes |  |  | Taken from the shipping address's commune when the order sent none. |
 | `hubId` | varchar | yes |  | yes | The warehouse whose riders deliver it (from the zone's warehouse). |
-| `codAmountUsd` | float |  | 0 |  | COD amount to collect (USD); 0 for prepaid. |
 | `lat` | float | yes |  |  | Live rider position, updated over the socket. |
 | `lng` | float | yes |  |  |  |
 | `createdAt` | datetime |  |  |  | Set on insert |
@@ -1446,11 +1443,11 @@ stateDiagram-v2
   pending --> cancelled: mobile money failed or expired 🔒
   pending --> cancelled: customer cancels 🔒
   confirmed --> cancelled: customer cancels 🔒 (restock + wallet refund)
-  pending --> processing: the warehouse assigns a rider (COD orders stay pending until then)
+  pending --> processing: the warehouse assigns a rider
   confirmed --> processing: rider assigned
   processing --> shipped: rider picked_up
   shipped --> out_for_delivery: rider in_transit
-  out_for_delivery --> delivered: rider delivered (COD collected)
+  out_for_delivery --> delivered: rider delivered
   delivered --> returned: admin refund or dispute refund 🔒
   cancelled --> [*]
   returned --> [*]
@@ -1468,8 +1465,8 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
   [*] --> succeeded: wallet / card mock (immediate)
-  [*] --> pending: mobile money (prompt sent) / COD
-  pending --> succeeded: signed webhook or sandbox 🔒 / COD delivered
+  [*] --> pending: mobile money (prompt sent)
+  pending --> succeeded: signed webhook or sandbox 🔒
   pending --> failed: declined, provider error, or expired after MM_PENDING_TTL_MIN 🔒
   failed --> refunded: late success → amount credited to wallet 🔒
   succeeded --> refunded: cancel of a paid order / admin refund / dispute refund 🔒
@@ -1482,7 +1479,7 @@ Purposes: `order` (linked to an order) and `topup` (wallet top-up; on success th
 
 ```mermaid
 stateDiagram-v2
-  [*] --> unassigned: order paid (or COD) → openFulfilment
+  [*] --> unassigned: order paid → openFulfilment
   unassigned --> assigned: ops assigns 🔒
   assigned --> picked_up 🔒
   picked_up --> in_transit 🔒
@@ -1508,7 +1505,7 @@ stateDiagram-v2
 | Warehouse exception | `open` → `investigating` → `resolved` / `escalated` | ⚠ not enforced |
 | Campaign | `draft` → `pending` → `scheduled` → `active` → `ended`, or `rejected` | ⚠ not enforced; no scheduler activates/ends campaigns |
 | Support ticket | `open` ↔ `pending` (staff reply → pending, customer reply → open) → `resolved` / `closed` | Partly automatic |
-| Fraud alert | `open` → `reviewed` / `blocked` | Manual; alerts raised only for COD orders above `codCapUsd` |
+| Fraud alert | `open` → `reviewed` / `blocked` | Manual; alerts raised by the rules failed payments, new-account orders, shared identity, return rate and address changes |
 | Warehouse batch | `building` → … | Minimal |
 | Stock transfer | `requested` → … | Minimal (no stock actually moves) |
 | Verification token | issued → consumed / expired; OTP `attempts` ≤ 5 | email 24 h, phone 10 min, reset 60 min; 30 s resend cooldown |
@@ -1554,7 +1551,7 @@ Gaps: no login lockout / progressive delay per account; refresh tokens are rotat
 
 ### F3. Browsing the catalogue ✅ / 🟡
 
-* Guests and customers: `products:list` (live only), `products:get`, `categories:list`, `reviews:list`, `questions:list`, `flashsales:list`, `sellers:storefront`, `cms:list`, `settings:get` (public subset: `fxRate`, `codEnabled`, `codCapUsd`, `deliveryZones`).
+* Guests and customers: `products:list` (live only), `products:get`, `categories:list`, `reviews:list`, `questions:list`, `flashsales:list`, `sellers:storefront`, `cms:list`, `settings:get` (public subset: `fxRate`, `deliveryZones`).
 * Live pushes `product:created/updated`, `categories:updated`, `flashsale:updated`, `cms:updated`, `settings:updated` update every open screen (e.g. a price change appears in carts instantly).
 * Gaps: `products:list` returns **everything** (no pagination, sort or server search); search is done on the client; no recommendations, recently viewed or "buy again" on the server.
 
@@ -1625,7 +1622,7 @@ Status: lifecycle, webhook, idempotency, expiry and late-success handling are im
 ### F7. Cancellation and refunds ✅
 
 * **Customer cancel** (`orders:cancel`): atomic claim from `pending`/`confirmed` → if money was received, payment `refunded` + wallet credit (one transaction); pending mobile money is abandoned (late approval goes to wallet) → stock restocked → delivery task `failed` → pushes to customer, ops and the assigned rider.
-* **Part-delivered orders** (split delivery, logistics contract §16): once some lines reached the customer and others have not, `orders:cancel`, `orders:adminCancel` and `orders:refund` are refused with "Part of this order was already delivered. Contact support to stop the rest." A delivery that is given up at the attempt limit cancels only its own lines (`cancelLines`: refund or lower the COD payment, restock, return-to-seller legs).
+* **Part-delivered orders** (split delivery, logistics contract §16): once some lines reached the customer and others have not, `orders:cancel`, `orders:adminCancel` and `orders:refund` are refused with "Part of this order was already delivered. Contact support to stop the rest." A delivery that is given up at the attempt limit cancels only its own lines (`cancelLines`: refund, restock, return-to-seller legs).
 * **Admin refund** (`orders:refund`, admin/finance): only a `succeeded` payment, and only what is LEFT on it (amount paid − already refunded, returns and seller cancellations included; refused with "That is more than what is left…" / "Nothing is left to refund on this order." / "Already refunded."); to wallet (instant) or back to the paying phone through pawaPay; recorded in the refund ledger like every refund; order → `returned`.
 * **Dispute refund**: see F12.
 
@@ -1650,18 +1647,14 @@ sequenceDiagram
     API-->>WH: delivery:location
   end
   R->>API: delivery:updateStatus in_transit → out_for_delivery
-  R->>API: delivery:updateStatus delivered (COD: "cash collected?" confirm)
-  API->>API: COD payment → succeeded, order → delivered
+  R->>API: delivery:updateStatus delivered (with the customer's code when required)
+  API->>API: order → delivered
   API-->>C: order:updated (delivered) + notification
 ```
 
-Missing for a professional operation: **seller fulfilment step** (seller accepts, packs, marks ready; pickup from seller or drop-off at hub), **inbound / receiving / sorting** at the hub (pages exist, not modelled), **proof of delivery** (customer OTP, photo, signature — the web has a `pod` page, mock), **failed-delivery handling** (reason codes, re-attempt scheduling, return to hub, customer contact), **delivery slots**, **shift assignment for riders** (zones and warehouses are assigned: WAREHOUSE-ZONES.md), **route optimisation**, **rider cash hand-over ledger** (reconcile exists as a read-only aggregate), **multi-seller orders split into parcels**.
+Missing for a professional operation: **seller fulfilment step** (seller accepts, packs, marks ready; pickup from seller or drop-off at hub), **inbound / receiving / sorting** at the hub (pages exist, not modelled), **proof of delivery** (customer OTP, photo, signature — the web has a `pod` page, mock), **failed-delivery handling** (reason codes, re-attempt scheduling, return to hub, customer contact), **delivery slots**, **shift assignment for riders** (zones and warehouses are assigned: WAREHOUSE-ZONES.md), **route optimisation**, **multi-seller orders split into parcels**.
 
-### F9. Cash on delivery ✅ (disabled)
-
-Off by default (`codEnabled=false`). When enabled by an admin: payment `pending` from creation, fulfilment opens immediately, the order is flagged to fraud review when total > `codCapUsd`, the rider confirms cash on `delivered`, `warehouse:reconcile` sums cash per rider. On a split order each customer leg collects its own share (its sellers' lines less their pro-rata discount, plus the delivery fee on the first leg); the leg that completes the order takes the remainder, and the payment turns `succeeded` once, then, with a receipt for the total (logistics contract §16).
-
-### F10. Seller onboarding and listing 🟡
+### F9. Seller onboarding and listing 🟡
 
 1. Register with role `seller` (F1) → `sellers:register {name}` → store `pending` → admins get `seller:updated`.
 2. Admin/moderation/operations `sellers:setStatus approved` (or `rejected` / `suspended` → sessions revoked).
@@ -1670,7 +1663,7 @@ Off by default (`codEnabled=false`). When enabled by an admin: payment `pending`
 
 Missing: KYC documents (ID, business registration, tax number), bank / mobile-money payout account, store profile (logo, banner, policies, address), product moderation queue, variants/SKUs and multiple images, bulk import, seller subscription plans (pages exist, mock), seller staff accounts.
 
-### F11. Seller payouts 🟡
+### F10. Seller payouts 🟡
 
 ```mermaid
 sequenceDiagram
@@ -1688,38 +1681,38 @@ sequenceDiagram
 
 Missing: real disbursement (bank transfer / mobile money B2C) and its reconciliation, payout schedule (e.g. weekly automatic), statements/invoices with commission and fees, tax reports (pages exist, mock), returns/chargebacks netted against future payouts.
 
-### F12. Disputes and returns 🟡
+### F11. Disputes and returns 🟡
 
 `disputes:open {orderId, type: dispute|return, reason}` (customer, paid, non-cancelled, one open per order) → admins get `dispute:created` → `disputes:resolve {refund?}` (refund only by admin/finance; uses the refund path of F7) or `disputes:reject`. Missing: return shipment (pickup task, label, receipt/inspection at hub), partial refunds per item, evidence attachments, seller participation in the dispute thread, SLA timers and auto-escalation.
 
-### F13. Exchanges and replacements 🟡
+### F12. Exchanges and replacements 🟡
 
 Customer `exchanges:create` / `replacements:create` against an order → ops progress the status (`*:setStatus`), customer notified on each step. Missing: enforced transitions, linking to stock movements and to a delivery task for the outbound item, price-difference payment for exchanges.
 
-### F14. Support ✅ / 🟡
+### F13. Support ✅ / 🟡
 
 `support:open {subject, category, message, orderId?}` → ticket with a message thread → `support:reply` (staff reply sets `pending`, customer reply sets `open`) → `support:setStatus`. Missing: attachments, assignment to an agent, SLA, canned replies, email notification of replies, satisfaction rating.
 
-### F15. Promotions, flash sales and campaigns 🟡
+### F14. Promotions, flash sales and campaigns 🟡
 
 * **Promo codes** (`promos:create`): percent/fixed, `minOrder`, `maxUses`, `perUserLimit`, `expiresAt`, `isPublic`; previewed with `promos:validate`, **re-validated at order creation**.
 * **Flash sales** (`flashsales:create`): product, flash price, window. ⚠ the flash price is **not applied by the order pricing** (checkout uses the product price).
 * **Campaigns**: seller proposes, admin sets status. ⚠ campaign discounts are not applied to prices; no scheduler.
 * Missing: referral programme, loyalty points, bundle / buy-X-get-Y, free-delivery rules, automatic start/end jobs.
 
-### F16. Notifications ✅ / 🟡
+### F15. Notifications ✅ / 🟡
 
 `NotificationsService.toUser / toUsers / toRole / toAdmins` → row in `notifications` + live `notification:new` (with `link`, the page it opens) → `PushService` sends FCM with `{type, entityId, notificationId, link}`, the Android channel `somba_default` and the iOS default sound (if Firebase is configured; invalid tokens pruned). A user with `prefs.push = false` gets no push. Role notices go to that role's **web** devices; phones only get marketing and rider-task pushes. Clients: `notifications:list` (with `link`), `markRead`, `markAllRead`, `devices:register/unregister`, `devices:test`. Both apps open the right screen from a tap (also for a tap that launched the app), and the portals have a bell, desktop alerts and web push. See MOBILE-PUSH.md. Email/SMS only for verification and reset. Missing: transactional email/SMS for order milestones, per-category preference enforcement, push texts in the user's language, quiet hours.
 
-### F17. Administration and moderation ✅ / 🟡
+### F16. Administration and moderation ✅ / 🟡
 
 Customers (`customers:list`, `setActive` → kick + revoke), sellers (`sellers:list/setStatus`), staff and roles (`roles:staff`, `roles:setRole` → kick, audited), settings (`settings:set`, audited), audit log, fraud alerts, analytics (`analytics:admin/revenue/warehouse`), broadcasts. Missing: staff invitation flow (create staff account with temporary password + first-login change — the rider web has a mock `first-password` page), admin 2FA, zones editor UI, report exports (CSV), impersonation for support (read-only).
 
-### F18. Account deletion ✅
+### F17. Account deletion ✅
 
 `me:delete {password}` (customer/seller): REFUSED with `{ ok:false, error, code:'account_blocked', blockers:[{kind,count,amountUsd?}] }` while the account has wallet money, an unfinished order, an open return/exchange/replacement, an open dispute, an open support ticket about an order, or a payout / phone-or-card refund / wallet top-up in flight (`AccountDeletionService`, enforced in `AuthService.deleteAccount`; `me:deleteCheck` returns the same list without changing anything, for the app to show before the customer confirms). Otherwise: PII anonymised (tombstone email, name "Deleted user", phone/address/avatar/prefs cleared), password randomised, `tokenVersion` bumped, `active=false`, every open socket of the account dropped, wishlist/cart/followed stores deleted. Orders are kept for the sellers, riders and accounting with the customer's name replaced by "Deleted user" and the address reduced to the place (area, province, city, commune); the phone paid from, the names on disputes/exchanges/replacements/tickets, the delivery-task addresses and the review author are cleared the same way. Missing: data export ("download my data"), grace period / undo.
 
-### F19. Password reset ✅
+### F18. Password reset ✅
 
 `POST /auth/forgot` (same response for unknown emails) → 60-minute single-use token by email → `POST /auth/reset` → new bcrypt hash, `tokenVersion` bumped (all sessions end).
 
@@ -1759,7 +1752,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
 | `orders:list` | Signed-in, role-scoped | `—` | Customer: own; rider: assigned; warehouse staff: their warehouse's, in full; `admin`, `admin_operations`, `admin_support` (read-only): last 200 in full, delivery address included; `admin_finance`, `admin_moderation`: last 200 with `shippingAddress` null; `admin_marketing`: refused ("Your role cannot read orders."); seller: only lines of own products, no address, first name only. Pushes of the order (`order:created`, `order:updated`) follow the same split |
-| `orders:create` | Signed-in | `{ items: [{ productId?, name?, priceUsd?, qty, variant? }], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress? (JSON), paymentPhone?, promoCode? }` | Server prices, stock reservation, promo, zone fee, payment start; COD fraud check above `codCapUsd` |
+| `orders:create` | Signed-in | `{ items: [{ productId?, name?, priceUsd?, qty, variant? }], paymentMethod, zoneId?, deliveryFeeUsd?, shippingAddress? (JSON), paymentPhone?, promoCode? }` | Server prices, stock reservation, promo, zone fee, payment start |
 | `orders:updateStatus` | `admin`, `admin_operations` (group orderOps) | `{ orderId: string; status: OrderStatus }` | Cannot cancel via this (use cancel); cannot fulfil while mobile money pending; delivered → only returned |
 | `orders:refund` | admin, admin_finance | `{ orderId: string; toWallet?: boolean }` | Refunds what is left on the payment (never more) to the wallet or the paying phone; answers the payment with `refund` (the ledger row of this refund); marks order returned |
 | `orders:cancel` | Order owner only (any role; staff use `orders:adminCancel`) | `{ orderId: string }` | Atomic; only from pending/confirmed; restock + wallet refund if paid |
@@ -1771,7 +1764,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `delivery:list` | Desk (`admin`, `admin_operations`, warehouse_staff), rider (own) | `—` |  |
 | `delivery:unassigned` | Desk (`admin`, `admin_operations`, warehouse_staff); riders get `[]` | `—` | Tasks waiting for a rider (ops only) |
 | `delivery:accept` | rider | `{ taskId: string }` | Always refused: "Your warehouse assigns your tasks. You cannot accept a task yourself." |
-| `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed; COD collected on delivered. With `requireDeliveryCode` on, `delivered` takes `code`: 5 wrong codes lock the step 15 min, 10 wrong 1 h, 15 wrong until a supervisor unlocks it (counted per task in `delivery_tasks.codeFailures` / `codeLockedUntil`; the correct code resets it) |
+| `delivery:updateStatus` | rider (assigned) | `{ taskId: string; status: DeliveryStatus }` | Forward-only: assigned→picked_up→in_transit→delivered, or →failed. With `requireDeliveryCode` on, `delivered` takes `code`: 5 wrong codes lock the step 15 min, 10 wrong 1 h, 15 wrong until a supervisor unlocks it (counted per task in `delivery_tasks.codeFailures` / `codeLockedUntil`; the correct code resets it) |
 | `delivery:resetCode` | warehouse supervisor or above of the task's warehouse, `admin`, `admin_operations` | `{ taskId: string }` | Clears the wrong-code counter and lock of a delivery task (audit `delivery.code_unlocked`, the rider is notified). Wrong tries are audited as `delivery.code_failed` / `delivery.code_locked`; from the 3rd the warehouse staff and admins get a notice |
 | `delivery:location` | rider (assigned) | `{ taskId: string; lat: number; lng: number }` | Pushed to the customer and ops as `delivery:location` |
 | `delivery:assign` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ taskId: string; riderId: string; riderName?: string }` | Target must be an active rider |
@@ -1873,7 +1866,7 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `settings:get` | Public subset (fxRate, codEnabled, codCapUsd, deliveryZones); group config sees all | `—` |  |
+| `settings:get` | Public subset (fxRate, deliveryZones); group config sees all | `—` |  |
 | `settings:set` | group config: admin, admin_finance, admin_operations | `{ key: string; value: string }` | Audited |
 
 #### `sellers:*`
@@ -1943,13 +1936,12 @@ Call with `socket.emit(event, payload, ack)`; the ack is always `{ ok: true, dat
 | `warehouse:inventory` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `—` | Stock view from products |
 | `warehouse:batches` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `—` |  |
 | `warehouse:buildBatch` | Desk (`admin`, `admin_operations`, warehouse_staff by tier) | `{ hubId?: string; taskIds: string[]; riderId: string; riderName?: string }` | Groups task ids for one rider |
-| `warehouse:reconcile` | `admin`, `admin_finance`, `admin_operations`; warehouse supervisors and managers (own warehouse) | `—` | COD cash reconciliation |
 
 #### `rider:*`
 
 | Event | Who may call | Payload | Behaviour / rules |
 |---|---|---|---|
-| `rider:workStats` | rider (own; other roles refused) | `—` | Work stats, no pay (riders are salaried): `{ totalTasks, completed, active, failed, completedToday, completedLast7Days, successRate, byKind: [{kind,count}], codCollectedUsd, delivered }` |
+| `rider:workStats` | rider (own; other roles refused) | `—` | Work stats, no pay (riders are salaried): `{ totalTasks, completed, active, failed, completedToday, completedLast7Days, successRate, byKind: [{kind,count}], delivered }` |
 | `rider:earnings` | rider (own) | `—` | Deprecated alias of `rider:workStats`, same payload |
 | `rider:tasks` | rider | `—` | Own tasks + open pool |
 
@@ -2122,7 +2114,7 @@ Push notifications and push-tap navigation are done (MOBILE-PUSH.md). Gaps: secu
 
 | Layer | Content |
 |---|---|
-| Screens | `RiderLoginScreen` (no prefilled credentials, no offline entry), `ForgotPasswordScreen`, `RiderShell` with tabs **Deliveries** (Active / Done; the warehouse assigns every task, the rider only moves it along: next step, fail with a reason, cash confirmation for COD; Done has a search and a date filter), **My work** (work stats: tasks completed today / this week / all time, completed, in progress, failed, success rate, completed by type, cash collected; riders are salaried, so no pay is shown, no payouts), **Profile** (edit name and phone, change password, notifications, language EN/FR, sign out) |
+| Screens | `RiderLoginScreen` (no prefilled credentials, no offline entry), `ForgotPasswordScreen`, `RiderShell` with tabs **Deliveries** (Active / Done; the warehouse assigns every task, the rider only moves it along: next step, fail with a reason, the customer's code; Done has a search and a date filter), **My work** (work stats: tasks completed today / this week / all time, completed, in progress, failed, success rate, completed by type; riders are salaried, so no pay is shown, no payouts), **Profile** (edit name and phone, change password, notifications, language EN/FR, sign out) |
 | State | `RiderStore` (ChangeNotifier): `myTasks`, `stats`, `notifications`, connection status |
 | Services | `AuthService`, `SocketService` (same as customer app), `LocationReporter` (geolocator stream, high accuracy, 10 m distance filter, max one fix / 4 s, immediate first fix; starts on `picked_up`, stops when no delivery is on the road) |
 | Permissions | `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` (Android) |
@@ -2197,11 +2189,11 @@ The **demo persona picker** on `/login` is shown only when the web build sets `N
 | `GOOGLE_TRANSLATE_API_KEY` |  | Optional server-only key; otherwise the Firebase service account's OAuth token is used (needs Cloud Translation API enabled and the Cloud Translation API User role) |
 | `TRANSLATE_DAILY_CHAR_LIMIT` | 300000 | Daily Google character budget (over it, jobs wait for the next day) |
 
-**Admin-editable settings** (`settings` table): `fxRate` (CDF per USD), `codEnabled`, `codCapUsd`, `deliveryZones`, `commissionPct`.
+**Admin-editable settings** (`settings` table): `fxRate` (CDF per USD), `deliveryZones`, `commissionPct`.
 
 ### 9.2 Database lifecycle
 
-* Development: SQLite with `synchronize`, `npm run seed` (demo users for every role, catalogue, orders, campaigns…; seed switches COD back off).
+* Development: SQLite with `synchronize`, `npm run seed` (demo users for every role, catalogue, orders, campaigns…).
 * Production: MySQL, `npm run migration:run` (4 hand-written migrations, verified up/down/up on MariaDB), `bootstrap:prod` (admin, categories, settings, hubs). The demo seed must never run in production.
 
 ### 9.3 CI (GitHub Actions)
@@ -2235,7 +2227,7 @@ Priority: **P0** = blocks a real launch with real money · **P1** = expected by 
 | D7 | No inventory per hub, no stock ledger | Single `products.stock` | Cannot know what is in which hub; transfers do not move stock; no audit of stock changes | `inventory_levels` (productVariantId, hubId, onHand, reserved) + `stock_movements` (type, qty, ref) | P1 |
 | D8 | No order status history | Only the current status and `updatedAt` | Tracking timeline, SLA metrics and disputes need timestamps of each step | `order_events` (orderId, from, to, actor, at, note) | P1 |
 | D9 | Multi-seller orders are not split | One order, one delivery task, items from many sellers | Each seller must prepare its own parcel; payouts and returns are per seller | `seller_orders` (sub-order per seller with its own status) and `shipments`/parcels | P1 |
-| D10 | Zones live in a JSON setting | `settings.deliveryZones` | No editing UI, no geometry, no per-zone rules | `zones` table (name, city, polygon/communes, fee, ETA, active, COD allowed) | P1 |
+| D10 | Zones live in a JSON setting | `settings.deliveryZones` | No editing UI, no geometry, no per-zone rules | `zones` table (name, city, polygon/communes, fee, ETA, active) | P1 |
 | D11 | Wallet is a single balance + log | `users.walletBalance` + `wallet_transactions` | Finance needs a provable ledger across wallet, commissions, payouts, refunds | Double-entry `ledger_entries` (account, debit, credit, ref) with balances derived/checked | P1 |
 | D12 | Dates as strings | `flash_sales.startsAt/endsAt`, campaign dates are varchar | Cannot query/schedule reliably | `DATETIME` columns + timezone policy (store UTC) | P2 |
 | D13 | Random order reference | `SOM-` + time + random | Small collision risk; unique index will reject a duplicate insert | Sequence table or retry on duplicate | P2 |
@@ -2276,7 +2268,7 @@ Priority: **P0** = blocks a real launch with real money · **P1** = expected by 
 | O2 | No proof of delivery | 4–6 digit OTP shown in the customer app and checked by the rider; optional photo/signature upload; store on a `delivery_proofs` table | P0 |
 | O3 | Failed deliveries are a dead end | Reason codes, re-attempt scheduling, return-to-hub, customer contact log, automatic refund/cancel after N attempts | P1 |
 | O4 | Hub operations not modelled | Receiving (scan in), sorting by zone, dispatch manifest, returns intake — tie to `inventory_levels` and `shipments` | P1 |
-| O5 | Rider management | Shifts/availability, zone assignment, capacity, ratings, documents (licence, ID), payout of rider earnings, cash hand-over ledger with sign-off | P1 |
+| O5 | Rider management | Shifts/availability, zone assignment, capacity, ratings, documents (licence, ID), payout of rider earnings | P1 |
 | O6 | Dispatch optimisation | Auto-assignment by zone/distance/load, batching, route ordering (Google Directions / OSRM) | P2 |
 | O7 | Delivery promise | ETA per zone, delivery slots, cross-city / open-box flags (scope items) | P1 |
 | O8 | Order status rules for ops | Restrict `orders:updateStatus` to an explicit transition table with reasons | P1 |
@@ -2520,7 +2512,6 @@ erDiagram
     json polygon
     decimal fee
     int etaHours
-    bool codAllowed
     bool active
   }
   RiderShift {
@@ -2552,7 +2543,7 @@ erDiagram
 2. Multi-seller orders: `seller_orders` + seller fulfilment step + shipments; order timeline (`order_events`); explicit transition tables for orders, exchanges, replacements, exceptions, campaigns.
 3. Hub operations: inventory per hub, stock movements, receiving/sorting/dispatch, real transfers.
 4. Returns logistics and refunds per item; dispute thread with evidence.
-5. Rider operations: shifts, zones, background GPS, failed-delivery workflow, cash hand-over.
+5. Rider operations: shifts, zones, background GPS, failed-delivery workflow.
 6. Push notifications end-to-end (Firebase), transactional email/SMS templates, deep links.
 7. Finish wiring the ~74 demo web pages; staff invitations + 2FA; seller KYC; invoices and statements.
 8. Security: sessions table with refresh rotation, secure token storage, audit of every sensitive change, dependency scanning.
@@ -2571,7 +2562,7 @@ Redis adapter + job queue, object storage + CDN, dispatch optimisation, recommen
 | Commission model | Single %, per category, subscription plans |
 | Pricing currency | USD only, or CDF prices; FX policy |
 | Multi-seller cart | Allowed (requires sub-orders) or one seller per order |
-| Zones | List of communes/zones, fees, ETAs, COD per zone |
+| Zones | List of communes/zones, fees, ETAs |
 | Firebase | Project files for push (optional) |
 | Email/SMS providers | Accounts and sender identities |
 

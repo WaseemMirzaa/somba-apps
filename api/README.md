@@ -184,6 +184,6 @@ Settings: `TRANSLATE_PROVIDER` (`google` | `fake` | `off`), `GOOGLE_TRANSLATE_AP
 * **Mobile money** (`airtel_money`, `orange_money`, `mpesa`): orders/payments stay `pending` until the signed webhook `POST /api/v1/payments/webhook/mobile-money` (HMAC over the raw body, `MM_WEBHOOK_SECRET`) — or the sandbox provider in development (`MM_PROVIDER=sandbox`). Production default is `MM_PROVIDER=none`: mobile money is refused (fails closed) until an aggregator adapter is configured.
 * **Verification policy:** with the public setting `requireVerifiedForCheckout=true` (the production bootstrap default; off in the dev seed) an account needs a verified phone or e-mail to place orders or top up its wallet.
 * **Campaign discounts** are applied server-side at checkout, never stacked with flash sales (lowest price wins; a promo code still applies on top) — see `docs/ANALYTICS-API.md`.
-* **COD** is off unless an admin sets `codEnabled=true`. **Account is mandatory** (no guest checkout).
+* Payment is always taken up front (wallet, mobile money, card). **Account is mandatory** (no guest checkout).
 * Prices, promo discounts and delivery fees (`deliveryZones` setting) are computed server-side; stock and wallet moves are atomic.
-* Tests: `npm test` (unit), `npm run smoke`, `npm run smoke:account`, `npm run smoke:authz` against a seeded running server (`npm run seed`; the seed switches COD back off after creating demo orders).
+* Tests: `npm test` (unit), `npm run smoke`, `npm run smoke:account`, `npm run smoke:authz` against a seeded running server (`npm run seed`).

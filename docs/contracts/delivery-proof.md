@@ -31,7 +31,7 @@ ones. Answer: `{ taskId, hasPhoto, hasSignature, capturedAt }`.
 
 The rider app uploads BEFORE it sends `delivery:updateStatus` (`delivered`), so a proof that cannot be saved is never lost
 silently: the sheet stays open with the reason, and the rider can retry or choose "Deliver without proof". `delivery:updateStatus`
-is unchanged (`taskId`, `status`, `code`, `cashUsd`). Proof is shown only once the leg is `delivered`; a photo taken before a
+is unchanged (`taskId`, `status`, `code`). Proof is shown only once the leg is `delivered`; a photo taken before a
 refused code is never served.
 
 ## Staff read

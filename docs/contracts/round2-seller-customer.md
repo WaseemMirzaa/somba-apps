@@ -42,7 +42,3 @@ Promotions switch in notification settings controls the push. Its link is `/shop
 Public settings `supportPhone`, `supportEmail`, `supportWhatsapp` (admin-written, blank = not offered, validated: a phone
 number such as `+243 970 000 000`, an e-mail address). They arrive with `settings:get` and `settings:updated`; the app's
 Help screen lists a row for each one that is set (`tel:`, `mailto:`, `https://wa.me/<digits>`).
-
-## Cash on delivery
-The customer app shows no cash-on-delivery wording unless the public setting `codEnabled` is `"true"`: not in
-checkout (unchanged), not on an old COD order's detail page or receipt (they read "Payment").

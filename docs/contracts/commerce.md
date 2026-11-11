@@ -224,7 +224,7 @@ tracking: null | {
   carrier: 'KOMORIKO', currentLeg: kind | null, riderFirstName: string | null, lastUpdateAt,
   legs: [{ id, kind, status, riderFirstName, readyAt, receivedAt, pickedUpAt, deliveredAt, createdAt, updatedAt, attempts, failureReason }] }
 ```
-Built read-only from `delivery_tasks` (`kind`, `sellerId`, status, rider, timestamps); other sellers' pickup legs are hidden, and so is a customer leg of a split order that carries only other sellers' parcels (`delivery_tasks.sellerIds`, logistics contract §16). `packageStatus` can now be `delivered` (all the seller's live lines have `deliveredAt`); a part-cancel lowers the pending COD payment and the open delivery leg's cash is recomputed, not reduced blindly. Each line also carries `couponDiscountUsd`, `commissionPct`, `commissionUsd`.
+Built read-only from `delivery_tasks` (`kind`, `sellerId`, status, rider, timestamps); other sellers' pickup legs are hidden, and so is a customer leg of a split order that carries only other sellers' parcels (`delivery_tasks.sellerIds`, logistics contract §16). `packageStatus` can now be `delivered` (all the seller's live lines have `deliveredAt`); a part-cancel refunds the cancelled lines (`cancelLines`) and the order total is recomputed, not reduced blindly. Each line also carries `couponDiscountUsd`, `commissionPct`, `commissionUsd`.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -256,7 +256,7 @@ Smoke: `npm run smoke:commerce` (`api/test/commerce-smoke.cjs`).
 
 - **`products:list` for a seller** returns only THEIR store's listings (drafts / pending included, `removed` excluded; the optional `status` filter narrows it; team members get the store's through `catalog_read`). Customers and guests still get every live listing.
 - **CSV language.** Server-built CSVs (`orders:sellerList` / `orders:list` with `format:'csv'`, `finance:statements`, `finance:transactions`) use the caller's saved language (the REAL caller, a team member keeps their own),
-  or `locale: 'en'|'fr'` in the request. French files translate the headings and the status / kind words (order status, package step, payout status, `sale`/`refund`/`payout`, cash on delivery, card, wallet); names, references and amounts are unchanged. English files are exactly as before.
+  or `locale: 'en'|'fr'` in the request. French files translate the headings and the status / kind words (order status, package step, payout status, `sale`/`refund`/`payout`, card, wallet); names, references and amounts are unchanged. English files are exactly as before.
 - **Live counters.** `campaigns:track` (counted view / click) pushes `campaign:updated` to the owning seller (throttle: one push per `CAMPAIGN_STATS_PUSH_MS`, default 3000; 0 = at once). Placing or cancelling an order that carries a store coupon pushes `coupon:updated` (with the new `uses`) to the owner (throttle `COUPON_USAGE_PUSH_MS`, default 2000). Admins are not pushed per view.
 - **`finance:statements {month}`**: `payoutsRequestedUsd` excludes rejected payouts (they stay in `payouts[]` with `status: 'rejected'`).
 - **`campaigns:list`** needs only `catalog_read` (creating / editing / submitting still need `catalog`).
