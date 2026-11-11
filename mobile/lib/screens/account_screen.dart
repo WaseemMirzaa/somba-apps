@@ -206,13 +206,18 @@ class AccountScreen extends StatelessWidget {
     return (parts.length == 1 ? parts[0].substring(0, parts[0].length >= 2 ? 2 : 1) : '${parts[0][0]}${parts[1][0]}').toUpperCase();
   }
 
+  /// One cell of the profile stats row. The value (a long franc amount such as "FC 3,501,400") stays on ONE line and is set in the
+  /// largest size that fits the cell, with a margin on each side so it never touches the vertical dividers.
   Widget _stat(String value, String label) => Expanded(
-        child: Column(
-          children: [
-            Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Column(
+            children: [
+              _FitLine(value, const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800), minSize: 10),
+              const SizedBox(height: 2),
+              _FitLine(label, TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12), minSize: 9),
+            ],
+          ),
         ),
       );
 
@@ -360,4 +365,36 @@ class _MenuItem {
   final int badge;
   final String? key;
   _MenuItem(this.icon, this.label, this.color, this.onTap, {this.badge = 0, this.key});
+}
+
+/// A single line of text that shrinks (down to [minSize]) until it fits the width it is given; beyond that it ends with an
+/// ellipsis. It measures the text, so no scaling transform is involved and the layout stays what it appears to be.
+class _FitLine extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+  final double minSize;
+  const _FitLine(this.text, this.style, {required this.minSize});
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+        final scaler = MediaQuery.textScalerOf(context);
+        final dir = Directionality.of(context);
+        double widthAt(double size) => (TextPainter(
+          text: TextSpan(text: text, style: style.copyWith(fontSize: size)),
+          textDirection: dir,
+          textScaler: scaler,
+          maxLines: 1,
+        )..layout())
+            .width;
+        var size = style.fontSize!;
+        if (box.maxWidth.isFinite) {
+          final w = widthAt(size);
+          if (w > box.maxWidth) size = (size * box.maxWidth / w).floorToDouble();
+          while (size > minSize && widthAt(size) > box.maxWidth) {
+            size -= 0.5;
+          }
+          if (size < minSize) size = minSize;
+        }
+        return Text(text, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, style: style.copyWith(fontSize: size));
+      });
 }
