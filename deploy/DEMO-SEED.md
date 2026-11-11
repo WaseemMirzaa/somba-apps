@@ -28,7 +28,7 @@ A server seeded before the rename to KOMORIKO has its demo accounts on `@demo.so
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/waseemmirzaa/somba-apps/main/deploy/droplet-deploy.sh -o deploy.sh
-DOMAIN=107.170.116.169 ADMIN_EMAIL=<your admin e-mail> SSL=0 bash deploy.sh
+DOMAIN=komoriko.com ADMIN_EMAIL=<your admin e-mail> bash deploy.sh
 ```
 
 Then, from the same shell:
