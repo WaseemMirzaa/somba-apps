@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { withErrorFr } from '../common/error-fr';
 import { Setting, User } from '../database/entities';
 
 /** The staff the platform setting `requireStaffTwoFactor` applies to: the super admin and the five department admins. */
@@ -108,9 +109,9 @@ export function guardStaffTwoFa(socket: GuardableSocket, getPolicy: () => StaffT
     policy.refusal(user, String(event), body).then(
       (why) => {
         if (!why) return next();
-        ack?.({ ok: false, error: why, code: 'twofa_required' });
+        ack?.(withErrorFr({ ok: false, error: why, code: 'twofa_required' }));
       },
-      () => ack?.({ ok: false, error: 'Could not check your account security. Try again.' }),
+      () => ack?.(withErrorFr({ ok: false, error: 'Could not check your account security. Try again.' })),
     );
   });
 }

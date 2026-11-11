@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { GLOBAL_THROTTLE_LIMIT, THROTTLE_WINDOW_MS } from './auth/throttle';
 import { AppController } from './app.controller';
 import configuration from './config/configuration';
 import { CryptoModule } from './common/crypto/crypto.module';
+import { ErrorFrFilter } from './common/error-fr.filter';
 import { DatabaseModule } from './database/database.module';
 import { RealtimeCoreModule } from './realtime/realtime-core.module';
 import { UsersModule } from './users/users.module';
@@ -89,5 +91,9 @@ import { RiderComplianceModule } from './rider-compliance/rider-compliance.modul
     RealtimeModule,
   ],
   controllers: [AppController],
+  providers: [
+    // HTTP error bodies gain `messageFr` (docs/contracts/error-text.md). Socket acks gain `errorFr` in SocketIoAdapter.bindMessageHandlers.
+    { provide: APP_FILTER, useClass: ErrorFrFilter },
+  ],
 })
 export class AppModule {}

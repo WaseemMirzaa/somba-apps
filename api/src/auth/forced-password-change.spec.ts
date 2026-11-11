@@ -270,7 +270,8 @@ describe('the socket guard (one place for every event of every gateway)', () => 
     const { send } = socketOf({ id: 'u1', role: 'rider', mustChangePassword: true });
     const { ack, next } = send(event);
     expect(next).not.toHaveBeenCalled();
-    expect(ack).toHaveBeenCalledWith({ ok: false, error: expect.stringMatching(/new password/), code: PASSWORD_CHANGE_REQUIRED });
+    // the English text and the code are unchanged; the French sentence (`errorFr`, docs/contracts/error-text.md) rides along
+    expect(ack).toHaveBeenCalledWith({ ok: false, error: expect.stringMatching(/new password/), errorFr: expect.stringMatching(/nouveau mot de passe/), code: PASSWORD_CHANGE_REQUIRED });
   });
 
   it('lets exactly the change, the own profile and the sign-out calls through', () => {
