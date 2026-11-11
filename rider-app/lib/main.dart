@@ -8,6 +8,7 @@ import 'screens/forced_password_screen.dart';
 import 'screens/rider_shell.dart';
 import 'screens/more/rider_auth.dart';
 import 'services/maps_config.dart';
+import 'services/notification_sound.dart';
 import 'services/push_service.dart';
 import 'services/rider_store.dart';
 import 'theme/app_theme.dart';
@@ -49,6 +50,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
     super.initState();
     Strings.langNotifier.addListener(_onLang);
     // A tapped notification opens its delivery once the rider is in and the queue is loaded.
+    unawaited(NotificationSound.instance.load());
     PushService.instance.pendingTap.addListener(_openPendingTap);
     RiderStore.instance.addListener(_openPendingTap);
     RiderStore.instance.addListener(_syncPasswordHold);
@@ -102,6 +104,7 @@ class _SombaRiderAppState extends State<SombaRiderApp> {
   /// A push while the app is open: a banner with "Open" (the lists refresh on their own).
   void _showForegroundPush(PushMessage m) {
     if (!_authed || (m.title ?? '').isEmpty) return;
+    NotificationSound.instance.play();
     final s = Strings.current;
     final text = displayNotice(s, title: m.title ?? '', body: m.body ?? '', titleFr: m.titleFr, bodyFr: m.bodyFr);
     _messenger.currentState?.showSnackBar(SnackBar(

@@ -2,6 +2,8 @@ package com.somba.somba_rider
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -36,6 +38,14 @@ class MainActivity : FlutterActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(CHANNEL_ID, getString(R.string.notify_channel_name), NotificationManager.IMPORTANCE_HIGH).apply {
             description = getString(R.string.notify_channel_description)
+            // The default notification sound, set explicitly (that is also what a channel without a sound gets, so
+            // phones that already created this channel keep working: a channel cannot be changed after creation).
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION), attrs)
+            enableVibration(true)
         }
         getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
     }

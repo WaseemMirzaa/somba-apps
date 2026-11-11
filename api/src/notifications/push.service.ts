@@ -28,6 +28,9 @@ export interface PushScope {
 
 /** Android channel created by the apps (MainActivity) so pushes use the app's own sound and importance. */
 export const ANDROID_CHANNEL_ID = 'somba_default';
+/** The sound every alert push asks for on iOS (the system's default notification sound). */
+export const APNS_SOUND = 'default';
+export const APNS_ALERT_HEADERS = { 'apns-push-type': 'alert', 'apns-priority': '10' };
 
 /** Who a push goes to: these users, or every device of a role. */
 type Audience = { userIds: string[] } | { role: string };
@@ -204,8 +207,11 @@ export class PushService {
             tokens: batch,
             notification: { title: text.title, body: text.body },
             data,
-            android: { priority: 'high', notification: { channelId: ANDROID_CHANNEL_ID } },
-            apns: { payload: { aps: { sound: 'default' } } },
+            // Android 8+: the channel's sound plays; `sound: 'default'` covers Android 7 and older, which have no channels.
+            android: { priority: 'high', notification: { channelId: ANDROID_CHANNEL_ID, sound: 'default' } },
+            // iOS: a visible alert (title and body above) with the default sound. `apns-push-type: alert` and priority 10
+            // make APNs deliver it at once and play the sound; a data-only push (no notification block) would be silent.
+            apns: { headers: APNS_ALERT_HEADERS, payload: { aps: { sound: APNS_SOUND } } },
             ...(webLink ? { webpush: { fcmOptions: { link: webLink } } } : {}),
           });
           reached += res.successCount;

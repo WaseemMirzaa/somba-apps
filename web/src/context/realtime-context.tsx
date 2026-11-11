@@ -15,6 +15,13 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { canListDeliveries, canReadOrders } from "@/lib/staff-access";
 import { PASSWORD_CHANGE_EVENT, heldAtPasswordChange } from "@/lib/password-change";
 import { rememberAllSeen, rememberSeen, withSeen } from "@/lib/notice-links";
+import {
+  armNotificationSound,
+  currentView,
+  playChime,
+  shouldChimeForChat,
+  shouldChimeForNotice,
+} from "@/lib/notification-sound";
 import { syncWebPush, unregisterWebPush } from "@/lib/web-push";
 import type {
   AppNotification,
@@ -181,6 +188,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const recovering = useRef<Promise<void> | null>(null);
   // The signed-in account, for per-viewer "seen" marks on notices sent to a whole role.
   const userIdRef = useRef<string | undefined>(undefined);
+  const knownNoticeIds = useRef<Set<string>>(new Set());
+  useEffect(() => armNotificationSound(), []);
   const userRoleRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     userIdRef.current = user?.id;
@@ -197,6 +206,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     setOrders([]);
     setDeliveries([]);
     setNotifications([]);
+    knownNoticeIds.current.clear();
     setRiderLocations({});
     setWalletBalance(0);
     setWalletTransactions([]);
@@ -243,9 +253,24 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     s.on("delivery:location", (loc: RiderLocation) =>
       setRiderLocations((cur) => ({ ...cur, [loc.orderId]: loc })),
     );
-    s.on("notification:new", (n: AppNotification) =>
-      setNotifications((cur) => upsert(cur, n)),
-    );
+    // The one place every live notice of every portal (shop, seller, admin, warehouse, rider) passes: sound here.
+    s.on("notification:new", (n: AppNotification) => {
+      try {
+        if (shouldChimeForNotice(n, { knownIds: knownNoticeIds.current, viewing: currentView() })) playChime();
+        if (n?.id) knownNoticeIds.current.add(n.id);
+      } catch {
+        /* a sound never breaks the notice */
+      }
+      setNotifications((cur) => upsert(cur, n));
+    });
+    // A chat message from the other side (a notice of type "chat" follows; the 2 s throttle keeps it to one chime).
+    s.on("chat:message", (p: { message?: { senderId?: string; conversationId?: string } }) => {
+      try {
+        if (p?.message && shouldChimeForChat(p.message, { userId: userIdRef.current, viewing: currentView() })) playChime();
+      } catch {
+        /* ignore */
+      }
+    });
     s.on("product:created", (p: Product) =>
       setProducts((cur) => upsert(cur, p)),
     );
@@ -328,6 +353,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         setOrders(ord);
         fetched.current.orders = ord.length;
         setHasMoreOrders(ord.length >= PAGE_SIZE);
+        // History is not announced: remember what the first load held.
+        for (const n of notif) knownNoticeIds.current.add(n.id);
         setNotifications(withSeen(userIdRef.current, notif));
         // A browser that turned alerts on keeps getting them for whoever is signed in now.
         void syncWebPush();

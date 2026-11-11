@@ -3,6 +3,7 @@ import '../l10n/notification_text.dart';
 import '../l10n/shift_strings.dart';
 import '../l10n/strings.dart';
 import '../services/models.dart';
+import '../services/notification_sound.dart';
 import '../services/rider_store.dart';
 import '../services/support_store.dart';
 import '../l10n/compliance_strings.dart';
@@ -112,6 +113,28 @@ class ProfileScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const _DocumentsEntry(),
+              const SizedBox(height: 12),
+              ListenableBuilder(
+                listenable: NotificationSound.instance,
+                builder: (context, _) => SurfaceCard(
+                  child: Row(children: [
+                    Icon(NotificationSound.instance.enabled ? Icons.volume_up_rounded : Icons.volume_off_rounded, color: AppColors.primary),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(s.soundTitle, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
+                        Text(s.soundSub, style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+                      ]),
+                    ),
+                    Switch(
+                      key: const ValueKey('sound-switch'),
+                      value: NotificationSound.instance.enabled,
+                      activeThumbColor: AppColors.primary,
+                      onChanged: NotificationSound.instance.setEnabled,
+                    ),
+                  ]),
+                ),
+              ),
               const SizedBox(height: 18),
               Text(store.unreadCount > 0 ? s.notificationsNew(store.unreadCount) : s.notifications, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(height: 10),

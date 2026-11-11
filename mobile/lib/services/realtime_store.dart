@@ -7,8 +7,10 @@ import '../l10n/strings.dart';
 import '../util/format.dart' show marketNotifier;
 import 'account_deletion.dart';
 import 'auth_service.dart';
+import 'chat_store.dart';
 import 'feature_hooks.dart';
 import 'models.dart';
+import 'notification_sound.dart';
 import 'push_service.dart';
 import 'socket_service.dart';
 
@@ -419,7 +421,11 @@ class RealtimeStore extends ChangeNotifier {
     _socket.on('order:created', _upsertOrder);
     _socket.on('order:updated', _upsertOrder);
     _socket.on('notification:new', (d) {
-      notifications.insert(0, NotificationDto.fromJson(_map(d)));
+      final n = NotificationDto.fromJson(_map(d));
+      notifications.insert(0, n);
+      // Every notice type sounds here (orders, payments, deliveries, returns, disputes, support, promotions, chat...);
+      // a chat notice stays quiet while that very conversation is on screen.
+      if (!shouldMuteNotice(n.type, n.entityId, ChatStore.instance.openConversationId)) NotificationSound.instance.play();
       notifyListeners();
     });
     _socket.on('delivery:location', (d) {

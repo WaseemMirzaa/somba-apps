@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
+import { SoundSwitch } from "@/components/ui/sound-switch";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useRealtime } from "@/context/realtime-context";
@@ -84,6 +85,8 @@ export default function ShopNotificationsPage() {
           ) : undefined
         }
       />
+
+      <SoundSwitch className="max-w-sm rounded-xl border border-[var(--border)] bg-white px-4 py-2.5" />
 
       <ListFilters
         values={filters}

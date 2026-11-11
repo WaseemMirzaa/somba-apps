@@ -9,6 +9,7 @@ import { useToast } from "@/context/toast-context";
 import { noticeHref, type NoticePortal } from "@/lib/notice-links";
 import { enableAlerts, notificationPermission, notificationsSupported, webPushActive, webPushConfigured } from "@/lib/web-push";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { SoundSwitch } from "@/components/ui/sound-switch";
 import { localizedNotice } from "@/lib/i18n-fields";
 import type { AppNotification } from "@/lib/realtime/types";
 
@@ -177,6 +178,7 @@ export function NotificationBell({ portal, fr }: { portal: NoticePortal; fr: boo
               </button>
             </div>
           )}
+          <SoundSwitch className="border-b border-[var(--border)] px-4 py-2.5" />
           {latest.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-slate-400">{fr ? "Aucune notification" : "No notifications yet"}</p>
           ) : (
