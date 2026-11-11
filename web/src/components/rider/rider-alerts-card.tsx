@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { alertsCardState } from "@/lib/rider-alerts";
+import { alertsResultToast } from "@/lib/alerts-feedback";
 import { enableAlerts, notificationPermission, webPushActive, webPushConfigured } from "@/lib/web-push";
 
 /**
@@ -33,20 +34,8 @@ export function RiderAlertsCard() {
     const r = await enableAlerts();
     setBusy(false);
     setState(read());
-    if (r.ok) {
-      toast(
-        r.push
-          ? fr ? "Alertes activées, même onglet fermé" : "Alerts on, even with the tab closed"
-          : fr ? "Alertes activées tant qu'un onglet est ouvert" : "Alerts on while a tab is open",
-        "success",
-      );
-    } else if (r.reason === "denied") {
-      toast(fr ? "Alertes bloquées : autorisez-les dans les réglages du navigateur" : "Alerts are blocked: allow them in your browser settings", "error");
-    } else if (r.reason === "unsupported") {
-      toast(fr ? "Ce navigateur ne gère pas les alertes" : "This browser does not support alerts", "error");
-    } else {
-      toast(fr ? `Impossible d'activer les alertes : ${r.message ?? ""}` : `Could not turn on alerts: ${r.message ?? ""}`, "error");
-    }
+    const t = alertsResultToast(r, fr);
+    toast(t.text, t.kind);
   }
 
   if (state === "hidden") return null;

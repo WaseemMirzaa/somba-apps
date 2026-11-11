@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'firebase_env.dart';
+import 'notification_permission.dart';
 
 /// A push notification as the app sees it. The server sends the same data on
 /// every push: `type`, `entityId`, `notificationId` and `link` (plus `orderId`
@@ -117,12 +118,13 @@ class FirebasePushBackend implements PushBackend {
 /// in, data loaded); the app takes them with [takeTap]. Pushes that arrive while
 /// the app is open are on [foreground], for an in-app banner.
 class PushService {
-  PushService(this.backend);
+  PushService(this.backend, {NotificationPermission? permission}) : _permission = permission;
 
   /// The service the app uses. Tests replace [backend].
   static PushService instance = PushService(FirebasePushBackend());
 
   final PushBackend backend;
+  final NotificationPermission? _permission;
   StreamSubscription<String>? _refreshSub;
   StreamSubscription<PushMessage>? _messageSub;
   StreamSubscription<PushMessage>? _openedSub;
@@ -156,6 +158,11 @@ class PushService {
     required void Function(PushMessage message) onMessage,
   }) async {
     if (_started) return;
+    // Ask for the notification permission first, through a path that does not need Firebase (Android 13+ never
+    // shows the prompt otherwise); a denial or a failure never stops the rest.
+    try {
+      await (_permission ?? NotificationPermission.instance).askOnce();
+    } catch (_) {}
     try {
       if (!await backend.initialize()) return;
       _started = true;

@@ -605,6 +605,10 @@ extension StringsKeys on Strings {
   String get pushOpen => t('push_open');
   String get soundTitle => t('sound_title');
   String get soundSub => t('sound_sub');
+  String get notifOffTitle => t('notif_off_title');
+  String get notifOffSub => t('notif_off_sub');
+  String get notifOffAction => t('notif_off_action');
+  String get notifOffFailed => t('notif_off_failed');
   String get translatedAuto => t('translated_auto');
   String get seeTranslation => t('see_translation');
   String get seeOriginal => t('see_original');
