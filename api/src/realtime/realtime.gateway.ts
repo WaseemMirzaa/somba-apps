@@ -962,12 +962,36 @@ export class RealtimeGateway
   @SubscribeMessage('orders:sellerReady')
   async ordersSellerReady(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { orderId: string },
+    @MessageBody() body: { orderId: string; boxCount?: number },
   ) {
     try {
       const user = this.requireUser(client);
       const ctx = await this.kit.ctx.resolve(user, 'orders');
-      return ok(await this.orders.sellerReady(ctx.actor, String(body?.orderId ?? '')));
+      return ok(await this.orders.sellerReady(ctx.actor, String(body?.orderId ?? ''), body?.boxCount));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The labels of the seller's package (code, box number, order, store, destination area) to print or reprint until it is delivered. */
+  @SubscribeMessage('orders:sellerLabels')
+  async ordersSellerLabels(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderId: string }) {
+    try {
+      const user = this.requireUser(client);
+      const ctx = await this.kit.ctx.resolve(user, 'orders');
+      return ok(await this.orders.sellerLabels(ctx.actor, String(body?.orderId ?? '')));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The seller changes the box count of a ready package (1 to 20) before the first pickup scan: the old labels are void, new ones are made. */
+  @SubscribeMessage('orders:sellerBoxes')
+  async ordersSellerBoxes(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderId: string; boxCount: number }) {
+    try {
+      const user = this.requireUser(client);
+      const ctx = await this.kit.ctx.resolve(user, 'orders');
+      return ok(await this.orders.sellerBoxes(ctx.actor, String(body?.orderId ?? ''), body?.boxCount));
     } catch (e) {
       return fail((e as Error).message);
     }

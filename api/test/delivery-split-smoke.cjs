@@ -40,13 +40,16 @@ const connect = (token) => new Promise((resolve, reject) => {
   s.on('connect_error', reject);
   setTimeout(() => reject(new Error('socket timeout')), 8000);
 });
-const req = async (s, ev, b = {}) => {
+const rawReq = async (s, ev, b = {}) => {
   for (let attempt = 0; ; attempt++) {
     const res = await new Promise((r) => s.emit(ev, b, r));
     if (res?.ok === false && /Too many requests/.test(res.error ?? '') && attempt < 5) { await sleep(1100); continue; }
     return res;
   }
 };
+// Parcel scanning is on by default: each move that needs the boxes scanned first gets them (journey.cjs `withScans`); parcel-scan-smoke.cjs tests the scanning itself.
+const scanOpts = {};
+const req = require('./journey.cjs').withScans(rawReq, scanOpts);
 const until = async (fn, ms = 6000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
 const login = async (email, pw = PW) => {
   const r = await rest('/api/v1/auth/login', { email, password: pw });
@@ -63,6 +66,7 @@ const hoursFromNow = (h) => new Date(Date.now() + h * 3_600_000).toISOString();
 
 (async () => {
   const admin = await login('admin@somba.app', process.env.ADMIN_PW ?? PW);
+  scanOpts.admin = admin; // desk admin: marks a run's boxes in by hand when a run is received
   const finance = await login('finance@somba.app');
   const demoRider = await login('rider@somba.app');
   const limeteRider = await login('rider.limete@somba.app').catch(() => null);

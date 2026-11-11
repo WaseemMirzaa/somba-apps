@@ -298,6 +298,7 @@ async function run() {
     // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
     setRepo.create({ key: 'productModeration', value: 'false' }),
     setRepo.create({ key: 'requireDeliveryCode', value: 'false' }),
+    setRepo.create({ key: 'requireParcelScan', value: 'true' }),
     setRepo.create({ key: 'requireStaffTwoFactor', value: 'false' }),
     ...Object.values(FRAUD_THRESHOLDS).map((t) => setRepo.create({ key: t.key, value: String(t.default) })),
     // Dev/demo accounts are not verified, so the policy is off here; bootstrap-prod turns it on.

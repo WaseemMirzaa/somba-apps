@@ -11,6 +11,7 @@ import { cleanPoint } from '../common/geo/geo';
 import { notServedFields } from '../geo/geo.service';
 import { HubsService } from './hubs.service';
 import { Actor, LogisticsService } from './logistics.service';
+import { ParcelsService } from './parcels.service';
 import { RoutingService } from './routing.service';
 import { estimateOrder } from './order-estimate';
 import type { EstimateLine } from './order-estimate';
@@ -38,6 +39,7 @@ export class LogisticsGateway {
     private readonly hubsSvc: HubsService,
     private readonly products: ProductsService,
     private readonly addresses: AddressesService,
+    private readonly parcels: ParcelsService,
     @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
 
@@ -265,16 +267,24 @@ export class LogisticsGateway {
     }
   }
 
-  /** Scan a parcel in at my warehouse; the next leg is created when it is due. */
+  /**
+   * Scan a parcel in at my warehouse; the next leg is created when it is due. `{ taskId }` scans the whole leg in (refused until
+   * every box was scanned while `requireParcelScan` is on); `{ code: 'PKG-XXXXXXXX' }` scans one box by its KOMORIKO code: the
+   * leg is found from the box, and scanned in when its last box arrives (`completed`, with the checklist).
+   */
   @SubscribeMessage('logistics:scanIn')
-  async scanIn(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId: string }) {
+  async scanIn(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId?: string; code?: string; manual?: boolean }) {
     try {
       const me = await this.actor(client);
+      if (body?.code) {
+        const r = await this.logistics.scanInByCode(body.code, me.hubId ?? null, me, body.manual === true);
+        return ok({ task: await this.logistics.view(r.task), next: await this.logistics.viewMany(r.next), checklist: r.parcels, completed: r.completed });
+      }
       const taskId = String(body?.taskId ?? '');
       const hubId = me.hubId ?? (await this.logistics.getTask(taskId)).toHubId;
       if (!hubId) return fail('This parcel is not due at a warehouse.');
       const { task, next } = await this.logistics.onScanIn(taskId, hubId, me);
-      return ok({ task: await this.logistics.view(task), next: await this.logistics.viewMany(next) });
+      return ok({ task: await this.logistics.view(task), next: await this.logistics.viewMany(next), checklist: await this.parcels.checklist(task), completed: true });
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -282,18 +292,22 @@ export class LogisticsGateway {
 
   /** Hand a parcel to its (assigned) rider at my warehouse: assigned -> picked up. */
   @SubscribeMessage('logistics:dispatchTransfer')
-  async dispatchTransfer(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId: string }) {
+  async dispatchTransfer(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId?: string; code?: string; manual?: boolean }) {
     return this.scanOutImpl(client, body);
   }
 
   @SubscribeMessage('logistics:scanOut')
-  async scanOut(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId: string }) {
+  async scanOut(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId?: string; code?: string; manual?: boolean }) {
     return this.scanOutImpl(client, body);
   }
 
-  private async scanOutImpl(client: AuthedSocket, body: { taskId: string }) {
+  private async scanOutImpl(client: AuthedSocket, body: { taskId?: string; code?: string; manual?: boolean }) {
     try {
       const me = await this.actor(client);
+      if (body?.code) {
+        const r = await this.logistics.scanOutByCode(body.code, me.hubId ?? null, me, body.manual === true);
+        return ok({ ...(await this.logistics.view(r.task)), checklist: r.parcels, completed: r.completed });
+      }
       const taskId = String(body?.taskId ?? '');
       const hubId = me.hubId ?? (await this.logistics.getTask(taskId)).fromHubId;
       if (!hubId) return fail('This parcel does not leave from a warehouse.');
@@ -355,6 +369,69 @@ export class LogisticsGateway {
       const hubId = me.hubId ?? (body?.hubId ? String(body.hubId) : null);
       if (!hubId) return fail('Choose a warehouse.');
       return ok({ hubId, ...(await this.logistics.custody(hubId)) });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  // ── parcels: labels and scans ────────────────────────────────────────────────
+  /** A rider scans one box on their leg (or on a transfer run): `{ taskId | runId, code, stage: 'pickup' | 'dropoff', manual? }`. Answers the checklist. */
+  @SubscribeMessage('rider:scanParcel')
+  async riderScanParcel(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId?: string; runId?: string; code?: string; stage?: string; manual?: boolean }) {
+    try {
+      const u = this.signedIn(client);
+      if (u.role !== 'rider') return fail('Riders only.');
+      return ok(await this.parcels.riderScan(u.id, body ?? {}));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The checklist of a rider's leg (or run): every box with when it was scanned out and in. */
+  @SubscribeMessage('rider:legParcels')
+  async riderLegParcels(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId?: string; runId?: string }) {
+    try {
+      const u = this.signedIn(client);
+      if (u.role !== 'rider') return fail('Riders only.');
+      return ok(await this.parcels.legChecklist(u.id, body ?? {}));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** Supervisors and managers mark a box scanned by hand (damaged label): needs a reason; audited. Riders cannot skip a scan. */
+  @SubscribeMessage('logistics:markParcel')
+  async markParcel(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId?: string; code?: string; stage?: string; reason?: string }) {
+    try {
+      const me = await this.actor(client);
+      const checklist = await this.parcels.markByHand(me, body ?? {}, (t) => !me.hubId || this.logistics.touches(t, me.hubId));
+      const task = await this.logistics.getTask(String(body?.taskId ?? ''));
+      await this.logistics.emitTask(task);
+      return ok({ task: await this.logistics.view(task), checklist });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The checklist of any leg for the desk (staff of a warehouse that touches it, and the desk admins). */
+  @SubscribeMessage('logistics:legParcels')
+  async deskLegParcels(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { taskId?: string }) {
+    try {
+      const me = await this.actor(client);
+      const task = await this.logistics.getTask(String(body?.taskId ?? ''));
+      if (me.hubId && !this.logistics.touches(task, me.hubId)) return fail('This task belongs to another warehouse.');
+      return ok(await this.parcels.checklist(task));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** The label of a return, so the customer can show it to the rider (`null` until the return pickup exists). */
+  @SubscribeMessage('parcels:forReturn')
+  async parcelForReturn(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { returnId?: string; disputeId?: string }) {
+    try {
+      const u = this.signedIn(client);
+      return ok(await this.parcels.returnParcelFor(u, String(body?.returnId ?? body?.disputeId ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }

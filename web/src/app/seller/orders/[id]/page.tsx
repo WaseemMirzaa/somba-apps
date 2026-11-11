@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
@@ -33,13 +33,15 @@ import type { TrackingLegView } from "@/lib/realtime/types";
 import { MissingRecord } from "@/components/seller/data-state";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
+import { BoxCountStepper } from "@/components/seller/box-count-stepper";
+import { BOXES_LOCKED_COPY, boxesPhrase, labelsReadyToast, type ParcelLabelPack } from "@/lib/parcel-labels";
 
 export default function SellerOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerOrder, sellerReady, load } = useSellerData();
+  const { getSellerOrder, sellerReady, sellerLabels, sellerBoxes, load } = useSellerData();
   const { getByOrder } = useSellerShipments();
   const access = useSellerAccess();
   const order = getSellerOrder(id);
@@ -47,6 +49,48 @@ export default function SellerOrderDetailPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  // Boxes: the count chosen with "Package ready", then the pack the server holds once it is ready (count, lock).
+  const [boxes, setBoxes] = useState(1);
+  const [pack, setPack] = useState<ParcelLabelPack | null>(null);
+  const [packError, setPackError] = useState<string | null>(null);
+  const [newBoxes, setNewBoxes] = useState<number | null>(null);
+  const [savingBoxes, setSavingBoxes] = useState(false);
+
+  const orderId = order?.orderId;
+  const readyNow = order?.packageStatus === "ready" || order?.packageStatus === "at_hub";
+  // The labels are read once the package is ready; a failure shows Retry (which also toasts: it is the seller's action).
+  const [attempt, setAttempt] = useState(0);
+  const userRetry = useRef(false);
+  const api = useRef({ sellerLabels, toast });
+  useEffect(() => {
+    api.current = { sellerLabels, toast };
+  });
+  useEffect(() => {
+    if (!readyNow || !orderId || pack) return;
+    let live = true;
+    api.current.sellerLabels(orderId).then(
+      (p) => {
+        if (!live) return;
+        setPack(p);
+        setNewBoxes(null);
+      },
+      (e) => {
+        if (!live) return;
+        const msg = errMessage(e);
+        setPackError(msg);
+        if (userRetry.current) api.current.toast(msg, "error");
+        userRetry.current = false;
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [readyNow, orderId, pack, attempt]);
+  function retryPack() {
+    userRetry.current = true;
+    setPackError(null);
+    setAttempt((n) => n + 1);
+  }
 
   if (!order) return <MissingRecord load={load} label="Order not found" labelFr="Commande introuvable" />;
 
@@ -65,14 +109,17 @@ export default function SellerOrderDetailPage() {
     setBusy(true);
     setError(null);
     try {
-      await sellerReady(order.orderId);
+      const made = await sellerReady(order.orderId, boxes);
+      if (made) {
+        setPack(made);
+        setNewBoxes(null);
+      }
       // Others still packing (the server's count; unknown on old payloads → assume yes).
       const othersStillPacking = shared && (order.otherSellersPacking ?? 1) > 0;
-      toast(
-        othersStillPacking
-          ? (fr ? "Colis marqué prêt : le livreur passera quand tous les vendeurs seront prêts" : "Package marked ready: the rider comes once every seller is ready")
-          : (fr ? "Colis marqué prêt : le livreur est prévenu" : "Package marked ready: the rider can collect it"),
-      );
+      const readyMsg = othersStillPacking
+        ? (fr ? "Colis marqué prêt : le livreur passera quand tous les vendeurs seront prêts" : "Package marked ready: the rider comes once every seller is ready")
+        : (fr ? "Colis marqué prêt : le livreur est prévenu" : "Package marked ready: the rider can collect it");
+      toast(made ? `${labelsReadyToast(made.boxCount, fr)}. ${readyMsg}` : readyMsg);
     } catch (e) {
       const msg = errMessage(e);
       setError(msg);
@@ -82,6 +129,20 @@ export default function SellerOrderDetailPage() {
     }
   }
 
+  async function saveBoxes() {
+    if (!order || newBoxes == null) return;
+    setSavingBoxes(true);
+    try {
+      const p = await sellerBoxes(order.orderId, newBoxes);
+      setPack(p);
+      setNewBoxes(null);
+      toast(fr ? `${labelsReadyToast(p.boxCount, true)}. Les anciennes étiquettes ne sont plus valables : imprimez les nouvelles.` : `${labelsReadyToast(p.boxCount, false)}. The old labels are void: print the new ones.`);
+    } catch (e) {
+      toast(errMessage(e), "error");
+    } finally {
+      setSavingBoxes(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -91,6 +152,12 @@ export default function SellerOrderDetailPage() {
         backHref="/seller/orders"
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {showReady && (
+              <div className="flex items-center gap-2">
+                <label htmlFor="box-count" className="text-sm text-slate-700">{fr ? "Colis (boîtes) dans cet envoi" : "Boxes in this package"}</label>
+                <BoxCountStepper id="box-count" value={boxes} onChange={setBoxes} disabled={busy || access.suspended} fr={fr} />
+              </div>
+            )}
             {showReady && (
               <button type="button" disabled={busy || access.suspended} onClick={() => void markReady()} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
                 {busy ? (fr ? "Envoi…" : "Sending…") : fr ? "Confirmer colis prêt" : "Package Ready"}
@@ -148,6 +215,43 @@ export default function SellerOrderDetailPage() {
             ? "Votre boutique est suspendue : vous pouvez consulter cette commande mais pas la modifier."
             : "Your store is suspended: you can view this order but not change it."}
         </p>
+      )}
+
+      {isReady && (
+        <section className="card-premium space-y-3 p-4" data-testid="parcel-labels" aria-label={fr ? "Étiquettes du colis" : "Parcel labels"}>
+          <h2 className="text-sm font-semibold text-slate-900">{fr ? "Étiquettes du colis" : "Parcel labels"}</h2>
+          {packError && !pack ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p role="alert" className="text-sm text-red-700">{packError}</p>
+              <button type="button" onClick={retryPack} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700">{fr ? "Réessayer" : "Retry"}</button>
+            </div>
+          ) : !pack ? (
+            <p className="text-sm text-slate-500">{fr ? "Chargement…" : "Loading…"}</p>
+          ) : (
+            <>
+              <p className="text-sm text-slate-700">
+                {fr ? "Boîtes dans cet envoi :" : "Boxes in this package:"} <strong>{boxesPhrase(pack.boxCount, fr)}</strong>
+                {" · "}{fr ? "Collez une étiquette KOMORIKO sur chaque boîte : le livreur la scanne à la collecte." : "Stick one KOMORIKO label on each box: the rider scans it at pick-up."}
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <label htmlFor="box-count-change" className="text-sm text-slate-700">{fr ? "Modifier" : "Change"}</label>
+                <BoxCountStepper id="box-count-change" value={newBoxes ?? pack.boxCount} onChange={setNewBoxes} disabled={pack.locked || savingBoxes || access.suspended} fr={fr} />
+                <button
+                  type="button"
+                  onClick={() => void saveBoxes()}
+                  disabled={pack.locked || savingBoxes || access.suspended || newBoxes == null || newBoxes === pack.boxCount}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 disabled:opacity-50"
+                >
+                  {savingBoxes ? (fr ? "Envoi…" : "Saving…") : fr ? "Enregistrer" : "Save"}
+                </button>
+                <Link href={`/seller/orders/${encodeURIComponent(order.orderId)}/labels`} className="btn-primary rounded-lg px-4 py-2 text-sm">
+                  {fr ? "Imprimer les étiquettes" : "Print labels"}
+                </Link>
+              </div>
+              {pack.locked && <p role="note" className="text-xs text-amber-700">{fr ? BOXES_LOCKED_COPY.fr : BOXES_LOCKED_COPY.en}</p>}
+            </>
+          )}
+        </section>
       )}
 
       {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p>}

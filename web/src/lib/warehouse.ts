@@ -8,6 +8,7 @@ import {
   useWarehouseSelf,
   type DeskFlags,
   type DeskQueue,
+  type ParcelChecklist,
   type TaskView,
 } from "@/lib/logistics";
 import { useOpsQuery, type InventoryRow, type WarehouseRider } from "@/lib/warehouse-live";
@@ -98,6 +99,12 @@ export interface DeskActions {
   assign: (taskId: string, riderId: string) => Promise<TaskView>;
   scanIn: (taskId: string) => Promise<{ task: TaskView; next: TaskView[] }>;
   scanOut: (taskId: string) => Promise<TaskView>;
+  /** One box scanned in by its KOMORIKO code (`PKG-XXXXXXXX`): the leg is found from the box; `completed` when its last box arrived. */
+  scanInCode: (code: string, manual: boolean) => Promise<{ task: TaskView; next: TaskView[]; checklist: ParcelChecklist; completed: boolean }>;
+  /** One box handed over on the way out; `completed` when the leg is handed to its rider (a box of a run only ticks the manifest). */
+  scanOutCode: (code: string, manual: boolean) => Promise<TaskView & { checklist: ParcelChecklist; completed: boolean }>;
+  /** A supervisor or manager marks one box scanned by hand (damaged label), with a reason. */
+  markParcel: (taskId: string, code: string, stage: "pickup" | "dropoff", reason: string) => Promise<{ task: TaskView; checklist: ParcelChecklist }>;
   /** `delivery:resetCode`: clears the wrong-code counter and the lock of a delivery; answers the task view. */
   unlockCode: (taskId: string) => Promise<TaskView>;
 }
@@ -106,6 +113,9 @@ export const deskActions: DeskActions = {
   assign: (taskId, riderId) => socketClient.request<TaskView>("logistics:assign", { taskId, riderId }),
   scanIn: (taskId) => socketClient.request<{ task: TaskView; next: TaskView[] }>("logistics:scanIn", { taskId }),
   scanOut: (taskId) => socketClient.request<TaskView>("logistics:dispatchTransfer", { taskId }),
+  scanInCode: (code, manual) => socketClient.request("logistics:scanIn", { code, manual }),
+  scanOutCode: (code, manual) => socketClient.request("logistics:dispatchTransfer", { code, manual }),
+  markParcel: (taskId, code, stage, reason) => socketClient.request("logistics:markParcel", { taskId, code, stage, reason }),
   unlockCode: (taskId) => socketClient.request<TaskView>("delivery:resetCode", { taskId }),
 };
 
@@ -137,6 +147,8 @@ export function findLeg<T extends TaskView>(legs: T[], raw: string): T | undefin
       `bc-${shortId(t.id)}`.toLowerCase() === code ||
       t.orderReference.toLowerCase() === code ||
       t.orderId.toLowerCase() === code ||
+      // A KOMORIKO box code (PKG- + 8 characters) finds the leg that carries the box.
+      !!t.parcels?.some((p) => p.code.toLowerCase() === code) ||
       (short.length === 6 && shortId(t.id) === short),
   );
   // An order ref matches several legs: prefer the one waiting at the desk.

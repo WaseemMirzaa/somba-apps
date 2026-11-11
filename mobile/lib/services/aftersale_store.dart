@@ -20,6 +20,9 @@ class AfterSaleStore extends ChangeNotifier {
   /// Fetched details (with their thread), by request id.
   final Map<String, DisputeView> _details = {};
 
+  /// Labels of returns already fetched, by request id: the code never changes once it exists, so the screen shows it at once.
+  final Map<String, ReturnParcel> _parcels = {};
+
   bool disputesLoaded = false;
   bool replacementsLoaded = false;
   bool exchangesLoaded = false;
@@ -53,6 +56,7 @@ class AfterSaleStore extends ChangeNotifier {
     replacements.clear();
     exchanges.clear();
     _details.clear();
+    _parcels.clear();
     disputesLoaded = replacementsLoaded = exchangesLoaded = false;
     notifyListeners();
   }
@@ -121,6 +125,22 @@ class AfterSaleStore extends ChangeNotifier {
     _upsert(exchanges, x, (e) => e.id, (e) => e.updatedAt, (e) => e.createdAt);
     notifyListeners();
     return x;
+  }
+
+  /// The label already fetched for a return (null when none is known yet).
+  ReturnParcel? parcelOf(String returnId) => _parcels[returnId];
+
+  /// `parcels:forReturn`: the label of the return's box, or null until the return pickup exists (the server creates
+  /// it when the return is approved). A fetched label is kept, so coming back to the screen shows the same code.
+  Future<ReturnParcel?> parcelForReturn(String returnId) async {
+    final known = _parcels[returnId];
+    if (known != null) return known;
+    final parcel = ReturnParcel.tryParse(await _call('parcels:forReturn', {'returnId': returnId}));
+    if (parcel != null) {
+      _parcels[returnId] = parcel;
+      notifyListeners();
+    }
+    return parcel;
   }
 
   /// Like the fetches above, but null when the request can't be loaded (a notice then opens the list instead).

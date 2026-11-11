@@ -68,6 +68,7 @@ const EXPECTED: Record<string, string> = {
   requireSellerPickupPin: 'true',
   productModeration: 'true',
   requireDeliveryCode: 'true',
+  requireParcelScan: 'true',
 };
 
 async function preflight(

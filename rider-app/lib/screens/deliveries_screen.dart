@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/parcel_strings.dart';
 import '../l10n/strings.dart';
 import '../services/history_filter.dart';
 import '../services/location_reporter.dart';
 import '../services/maps_config.dart';
 import '../services/models.dart';
 import '../services/navigation_link.dart';
+import '../services/parcel_scanner.dart';
+import '../services/parcels.dart';
 import '../services/auth_service.dart' show ApiException;
 import '../services/rider_store.dart';
 import '../theme/app_theme.dart';
@@ -14,6 +19,8 @@ import '../services/delivery_proof.dart';
 import '../widgets/ui.dart';
 import 'delivery_proof_sheet.dart';
 import 'location_access_screen.dart';
+import 'parcel_checklist.dart';
+import 'parcel_scan_screen.dart';
 import 'task_route_screen.dart';
 
 /// Ids of the failure reasons a rider can pick (texts: `fail_<id>`).
@@ -57,7 +64,10 @@ class DeliveriesScreen extends StatefulWidget {
 
   /// Tests: draw something else than the Google map on the route map screen.
   final RouteMapBuilder? routeMapBuilder;
-  const DeliveriesScreen({super.key, this.launcher, this.isIPhone, this.googleInstalled, this.pickDays, this.routeMapBuilder});
+
+  /// The camera behind the parcel scanner; tests swap in a fake that emits codes.
+  final ParcelScanner scanner;
+  const DeliveriesScreen({super.key, this.launcher, this.isIPhone, this.googleInstalled, this.pickDays, this.routeMapBuilder, this.scanner = const CameraParcelScanner()});
   @override
   State<DeliveriesScreen> createState() => _DeliveriesScreenState();
 }
@@ -163,6 +173,58 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
       builder: (ctx) => DeliveryCodeDialog(onSubmit: (code) => store.advance(t.id, 'delivered', code: code)),
     );
     if (done == true && mounted) showSnack(context, Strings.of(context).doneDelivered);
+  }
+
+  /// The scanner for one leg's boxes. Whatever it reports is in the store, which the cards listen to.
+  Future<void> _scanLeg(DeliveryTaskDto t, ParcelStage stage) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ParcelScanScreen(
+        title: t.orderReference,
+        stage: stage,
+        scanner: widget.scanner,
+        refresh: store,
+        parcels: () => store.myTasks.where((x) => x.id == t.id).fold<List<ParcelDto>>(t.parcels, (_, x) => x.parcels),
+        onScan: (code, manual) => store.scanParcel(t, code, stage, manual: manual),
+      ),
+    ));
+    if (mounted) unawaited(store.legParcels(t));
+  }
+
+  /// The scanner for a transfer run: one checklist over every parcel of the run.
+  Future<void> _scanRun(TransferRun r, ParcelStage stage) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ParcelScanScreen(
+        title: r.reference,
+        stage: stage,
+        scanner: widget.scanner,
+        refresh: store,
+        parcels: () => store.parcelsOfRun(r),
+        onScan: (code, manual) => store.scanRunParcel(r, code, stage, manual: manual),
+      ),
+    ));
+    if (mounted) unawaited(store.legParcelsOfRun(r));
+  }
+
+  /// The boxes of a card and the button that opens the scanner (secondary: the card's one filled button stays its main action).
+  List<Widget> _scanBlock(Strings s, {required Object id, required List<ParcelDto> parcels, required ParcelStage stage, required bool offer, required VoidCallback open}) {
+    if (parcels.isEmpty) return const [];
+    final n = scanCount(parcels, stage);
+    return [
+      Padding(padding: const EdgeInsets.only(top: 6, bottom: 4), child: Container(
+        key: ValueKey('parcels-$id'),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14)),
+        child: ParcelChecklist(parcels: parcels, stage: stage, idPrefix: '$id-'),
+      )),
+      if (offer)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(key: ValueKey('scan-parcels-$id'), onPressed: _busy ? null : open, child: ButtonLabel(s.parcelScanBtn(n.scanned, n.total))),
+          ),
+        ),
+    ];
   }
 
   Future<void> _advance(DeliveryTaskDto t, String to) async {
@@ -337,6 +399,13 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
     final next = nextStatusFor(t);
     final nav = navTargetFor(t);
     final hubName = (t.toHubName ?? s.theWarehouse);
+    // The status change waits for the boxes of its stage (the server refuses it too): collecting needs the pickup scans,
+    // handing over the drop-off scans (also before the customer's code).
+    final ParcelStage? blocked = switch (next?.$1) {
+      'picked_up' => t.scanBlocks(ParcelStage.pickup) ? ParcelStage.pickup : null,
+      'delivered' => t.scanBlocks(ParcelStage.dropoff) ? ParcelStage.dropoff : null,
+      _ => null,
+    };
     return SurfaceCard(
       key: ValueKey('task-${t.id}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -434,14 +503,27 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
         if (t.isActive && t.needsCode && store.requireDeliveryCode && t.status != 'assigned')
           Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.codeHint, key: ValueKey('code-hint-${t.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         if (t.status == 'in_transit') _gpsRow(s, toCustomer: t.isCustomerLeg || t.kind == LegKind.replacementDelivery),
+        if (t.isActive)
+          ..._scanBlock(s,
+              id: t.id,
+              parcels: t.parcels,
+              stage: t.scanStage ?? ParcelStage.pickup,
+              offer: t.offersScan,
+              open: () => _scanLeg(t, t.scanStage!)),
         if (next != null) ...[
           const SizedBox(height: 12),
           _cardAction(
             key: ValueKey('next-${t.id}'),
             alone: alone,
-            onPressed: _busy ? null : () => _advance(t, next.$1),
+            onPressed: _busy || blocked != null ? null : () => _advance(t, next.$1),
             label: s.t(next.$2),
           ),
+          if (blocked != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(blocked == ParcelStage.pickup ? s.parcelNeedPickup : s.parcelNeedDropoff,
+                  key: ValueKey('scan-hint-${t.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3)),
+            ),
         ],
         if (t.isActive)
           Align(
@@ -495,6 +577,17 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
                     : (s.runStatusPlanned, AppColors.muted);
     final nav = r.isDispatched && parcels.isNotEmpty ? navTargetFor(parcels.first) : null;
     final open = _openRuns.contains(r.id);
+    final runParcels = store.parcelsOfRun(r);
+    // Loading out at the warehouse: the pickup scans; at the receiving door: the drop-off scans.
+    final ParcelStage? runStage = r.isClosed || r.allReceived
+        ? null
+        : r.isDispatched && !onRoad
+            ? ParcelStage.pickup
+            : (onRoad || r.isArrived)
+                ? ParcelStage.dropoff
+                : null;
+    final runDone = runStage == null || store.runStageDone(r, runStage);
+    final runBlocked = runStage == ParcelStage.pickup && !runDone && store.runScanRequired(r);
     return SurfaceCard(
       key: ValueKey('run-${r.id}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -582,6 +675,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
               ),
             ]),
           ),
+        if (runStage != null) ..._scanBlock(s, id: 'run-${r.id}', parcels: runParcels, stage: runStage, offer: !runDone, open: () => _scanRun(r, runStage)),
         if (onRoad && !r.isArrived && !r.isClosed) _gpsRow(s, toCustomer: false),
         if (nav != null)
           Padding(
@@ -601,7 +695,9 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
           ),
         if (r.isDispatched && !onRoad) ...[
           const SizedBox(height: 12),
-          _cardAction(key: ValueKey('run-next-${r.id}'), alone: alone, onPressed: _busy ? null : () => _runOnRoad(r), label: s.actRunOnRoad),
+          _cardAction(key: ValueKey('run-next-${r.id}'), alone: alone, onPressed: _busy || runBlocked ? null : () => _runOnRoad(r), label: s.actRunOnRoad),
+          if (runBlocked)
+            Padding(padding: const EdgeInsets.only(top: 6), child: Text(s.parcelNeedRoad, key: ValueKey('scan-hint-run-${r.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.3))),
         ],
       ]),
     );

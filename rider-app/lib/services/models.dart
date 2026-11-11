@@ -1,6 +1,8 @@
 // Lightweight DTOs mirroring the API payloads.
 import 'dart:convert';
 
+import 'parcels.dart';
+
 class BackendUser {
   final String id;
   final String email;
@@ -428,6 +430,15 @@ class DeliveryTaskDto {
   /// keeps what the list knew.
   final bool partialKnown;
 
+  /// The labelled boxes this leg carries and where their scans stand (empty: nothing to scan). Updated in place by the store
+  /// when a scan is answered, so the buttons react at once; a `task:updated` push replaces the whole task.
+  List<ParcelDto> parcels;
+  bool pickupComplete;
+  bool dropoffComplete;
+
+  /// The admin setting `requireParcelScan`: while true the status changes wait for the scans.
+  bool scanRequired;
+
   DeliveryTaskDto({
     required this.id,
     required this.orderId,
@@ -471,7 +482,13 @@ class DeliveryTaskDto {
     this.hasOrder = true,
     this.partial = false,
     this.partialKnown = false,
-  }) : _needsCode = needsCode;
+    this.parcels = const [],
+    bool? pickupComplete,
+    bool? dropoffComplete,
+    this.scanRequired = true,
+  })  : _needsCode = needsCode,
+        pickupComplete = pickupComplete ?? stageComplete(parcels, ParcelStage.pickup),
+        dropoffComplete = dropoffComplete ?? stageComplete(parcels, ParcelStage.dropoff);
 
   /// This leg is one hop of a route of several: "hop 1/2".
   bool get isRelayHop => hop != null && hops != null && hops! > 1;
@@ -633,6 +650,10 @@ class DeliveryTaskDto {
       // "Part of the order" is a statement about a customer leg only: a seller pickup, transfer or return never carries it.
       partial: LegKind.customerKinds.contains(kindRaw ?? LegKind.delivery) && (o['partial'] == true || j['completesOrder'] == false),
       partialKnown: o['partial'] is bool || j['completesOrder'] is bool,
+      parcels: ParcelDto.listFrom(j['parcels']),
+      pickupComplete: j['pickupComplete'] is bool ? j['pickupComplete'] as bool : null,
+      dropoffComplete: j['dropoffComplete'] is bool ? j['dropoffComplete'] as bool : null,
+      scanRequired: j['scanRequired'] != false,
     );
   }
 
@@ -683,6 +704,10 @@ class DeliveryTaskDto {
       // A push says whether the leg completes the order; without it what the list knew stands.
       partial: partialKnown ? partial : old.partial,
       partialKnown: partialKnown || old.partialKnown,
+      parcels: parcels,
+      pickupComplete: pickupComplete,
+      dropoffComplete: dropoffComplete,
+      scanRequired: scanRequired,
     );
   }
 }

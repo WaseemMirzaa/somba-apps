@@ -1,4 +1,4 @@
-import { AuditLog, WarehouseBatch } from '../entities';
+import { AuditLog, Parcel, ParcelScan, WarehouseBatch } from '../entities';
 import { mkdtempSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -349,6 +349,25 @@ describe('demo removal', () => {
       );
       return w;
     }
+
+    it('removes the parcel labels and their scans of the demo orders and returns, and keeps a real order\'s', async () => {
+      const w = await splitWorld();
+      const tasks = await ds.getRepository(DeliveryTask).find();
+      const demoParcel = await ds.getRepository(Parcel).save(ds.getRepository(Parcel).create({ code: 'PKG-DEMOAAAA', orderId: w.dOrder.id, sellerId: 's-a', boxNo: 1, boxCount: 2 }));
+      const demoReturn = await ds.getRepository(Parcel).save(ds.getRepository(Parcel).create({ code: 'PKG-DEMOBBBB', orderId: w.dOrder.id, sellerId: null, returnId: 'dispute-none', boxNo: 1, boxCount: 1 }));
+      const realParcel = await ds.getRepository(Parcel).save(ds.getRepository(Parcel).create({ code: 'PKG-REALAAAA', orderId: 'real-order', sellerId: 's-z', boxNo: 1, boxCount: 1 }));
+      for (const stage of ['pickup', 'dropoff'] as const)
+        await ds.getRepository(ParcelScan).save(ds.getRepository(ParcelScan).create({ parcelId: demoParcel.id, taskId: tasks[0].id, stage, actorId: null, actorRole: 'rider', at: new Date(), manual: false }));
+      await ds.getRepository(ParcelScan).save(ds.getRepository(ParcelScan).create({ parcelId: realParcel.id, taskId: 'real-task', stage: 'pickup', actorId: null, actorRole: 'rider', at: new Date(), manual: false }));
+      const plan = await planRemoval(ds);
+      expect(plan.counts.find(([t]) => t === 'parcels')?.[1]).toBe(2);
+      expect(plan.counts.find(([t]) => t === 'parcel_scans')?.[1]).toBe(2);
+      const res = await removeDemo(ds, { yes: true, uploadDir: dirs.up, privateDir: dirs.priv });
+      expect(res.blockers).toEqual([]);
+      expect((await ds.getRepository(Parcel).find()).map((p) => p.code)).toEqual(['PKG-REALAAAA']);
+      expect(await ds.getRepository(ParcelScan).count()).toBe(1);
+      expect(demoReturn.returnId).toBe('dispute-none');
+    });
 
     it('removes the legs, the lines and the payment', async () => {
       await splitWorld();

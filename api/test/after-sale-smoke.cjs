@@ -39,13 +39,15 @@ const connect = (token) => new Promise((resolve, reject) => {
   s.on('connect_error', reject);
   setTimeout(() => reject(new Error('socket timeout')), 8000);
 });
-const req = async (s, ev, b = {}) => {
+const rawReq = async (s, ev, b = {}) => {
   for (let attempt = 0; ; attempt++) {
     const res = await new Promise((r) => { const t = setTimeout(() => r({ ok: false, error: `timeout: ${ev}` }), 15000); s.emit(ev, b, (x) => { clearTimeout(t); r(x); }); });
     if (res?.ok === false && /Too many requests/.test(res.error ?? '') && attempt < 5) { await sleep(1100); continue; }
     return res;
   }
 };
+// Parcel scanning: the boxes are scanned at each pick-up and drop-off unless a test is about scanning itself.
+const req = require("./journey.cjs").withScans(rawReq);
 const until = async (fn, ms = 8000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
 /** The next time `ev` arrives on `sock` (or null after `ms`). Start BEFORE doing the thing that causes it. */
 const nextEvent = (sock, ev, match = () => true, ms = 6000) => new Promise((res) => {

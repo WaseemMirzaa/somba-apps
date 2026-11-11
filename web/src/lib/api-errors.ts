@@ -14,6 +14,11 @@ export type ErrLocale = "en" | "fr";
 
 const EXACT: Record<string, string> = {
   // ── delivery model: preparation, split delivery, express ──
+  "The rider already scanned these boxes. Contact support to change them.": "Le livreur a déjà scanné ces colis. Contactez l'assistance pour les modifier.",
+  "Mark the package ready first: the labels are made then.": "Marquez d'abord le colis prêt : les étiquettes sont créées à ce moment-là.",
+  "This package was delivered: its labels can no longer be printed.": "Ce colis a été livré : ses étiquettes ne peuvent plus être imprimées.",
+  "Labels are not available.": "Les étiquettes ne sont pas disponibles.",
+  "Boxes must be a whole number from 1 to 20.": "Le nombre de colis doit être un nombre entier de 1 à 20.",
   "Part of this order was already delivered. Contact support to stop the rest.": "Une partie de cette commande a déjà été livrée. Contactez l'assistance pour arrêter le reste.",
   "An express parcel is still with the seller. Cancel the order instead.": "Un colis express est encore chez le vendeur. Annulez plutôt la commande.",
   "Preparation time (days) must be a whole number between 0 and 30.": "Le délai de préparation (jours) doit être un nombre entier entre 0 et 30.",

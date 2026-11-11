@@ -425,6 +425,49 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     if (S[local]) ok((await mine(local))?.handlingDays === days, `handling time: ${local} keeps ${days} day(s)`);
   }
 
+  // Parcel labels and scans: every package that is ready or further has labels, and the scans agree with each leg's state.
+  section('Parcel labels and scans');
+  {
+    const deskSock = (S['admin.super'] ?? S['warehouse.manager'])?.sock;
+    ok(settings?.requireParcelScan === 'true', 'the setting requireParcelScan is on', JSON.stringify(settings?.requireParcelScan));
+    if (deskSock) {
+      const legs = data(await req(deskSock, 'logistics:queue', { status: 'all', limit: 500 }))?.tasks ?? [];
+      const labelled = legs.filter((l) => (l.parcels ?? []).length > 0);
+      ok(labelled.length >= 5, `legs that carry labelled parcels (${labelled.length})`);
+      ok(labelled.every((l) => l.parcels.every((p) => /^PKG-[2-9A-HJ-NP-Z]{8}$/.test(p.code) && p.boxNo >= 1 && p.boxNo <= p.boxCount)), 'every code is PKG- plus 8 characters of the label alphabet');
+      ok(labelled.some((l) => l.parcels.some((p) => p.boxCount === 2)), 'some package is split in 2 boxes');
+      const started = labelled.filter((l) => ['picked_up', 'in_transit', 'delivered'].includes(l.status) && l.kind !== 'return_to_seller');
+      ok(started.length >= 3 && started.every((l) => l.pickupComplete && l.parcels.every((p) => !!p.pickupScannedAt)), `every leg already picked up has all its pickup scans (${started.length})`);
+      const done = labelled.filter((l) => l.status === 'delivered');
+      ok(done.length >= 2 && done.every((l) => l.dropoffComplete && l.parcels.every((p) => !!p.dropoffScannedAt)), `every finished leg has both scans (${done.length})`);
+      const waiting = labelled.filter((l) => ['unassigned', 'assigned'].includes(l.status) && l.kind !== 'return_to_seller');
+      ok(waiting.every((l) => l.parcels.every((p) => !p.dropoffScannedAt)), 'a leg not yet collected has no drop-off scan');
+      const codes = labelled.flatMap((l) => l.parcels.map((p) => p.code));
+      ok(codes.length > 0 && new Set(labelled.flatMap((l) => (l.kind === 'pickup' ? l.parcels.map((p) => p.code) : []))).size > 0, 'pickup legs carry their labels');
+    }
+    if (S['seller.a']) {
+      const so = list(await req(S['seller.a'].sock, 'orders:sellerList', { limit: 100 })).filter((o) => ['at_hub', 'shipped', 'out_for_delivery'].includes(o.packageStatus));
+      const o = so[0];
+      const r = o ? await req(S['seller.a'].sock, 'orders:sellerLabels', { orderId: o.orderId ?? o.id }) : null;
+      ok(!!r?.ok && r.data.labels.length === r.data.boxCount && r.data.labels.length >= 1, 'store A can reprint the labels of a package that is on its way', JSON.stringify(r)?.slice(0, 160));
+      ok(!!r?.ok && r.data.labels.every((l) => l.storeName && l.orderReference && /^PKG-/.test(l.code) && !('phone' in l) && !('address' in l)), 'a label carries the store, the order and the area, never the customer\'s phone or street');
+      ok(!!r?.ok && r.data.locked === true || so.length === 0, 'a package already collected has its box count locked');
+    }
+    if (S['rider']) {
+      const t = data(await req(S['rider'].sock, 'rider:tasks', {}));
+      const arr = Array.isArray(t) ? t : (t?.tasks ?? t?.items ?? []);
+      const open = arr.find((x) => ['assigned', 'picked_up', 'in_transit'].includes(x.status) && !x.runId);
+      if (open) {
+        const bad = await req(S['rider'].sock, 'rider:scanParcel', { taskId: open.id, code: 'PKG-ZZZZZZZZ', stage: open.status === 'assigned' ? 'pickup' : 'dropoff' });
+        ok(bad && bad.ok === false && /is not part of this/.test(bad.error ?? ''), 'a rider scanning a code that is not on the leg is refused', JSON.stringify(bad));
+        if (open.parcels?.length && open.status === 'assigned' && !open.pickupComplete) {
+          const refused = await req(S['rider'].sock, 'delivery:updateStatus', { taskId: open.id, status: 'picked_up' });
+          ok(refused && refused.ok === false && /Scan every parcel first: \d+ of \d+ scanned\./.test(refused.error ?? ''), 'a leg cannot be picked up before every box was scanned', JSON.stringify(refused));
+        }
+      }
+    }
+  }
+
   for (const s of Object.values(S)) s.sock.close();
   console.log(`\n${pass} passed, ${fails.length} failed`);
   if (fails.length) { console.log('Failed: ' + fails.join('; ')); process.exit(1); }

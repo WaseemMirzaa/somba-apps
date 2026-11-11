@@ -7,6 +7,7 @@ import 'compliance_store.dart';
 import 'location_reporter.dart';
 import 'models.dart';
 import 'notification_sound.dart';
+import 'parcels.dart';
 import 'push_service.dart';
 import 'rider_focus.dart';
 import 'socket_service.dart';
@@ -610,6 +611,67 @@ class RiderStore extends ChangeNotifier {
       final m = _map(await request('settings:get'));
       requireDeliveryCode = '${m['requireDeliveryCode']}' == 'true';
     } catch (_) {/* keep the last known value */}
+  }
+
+  // ---- parcel scanning ----
+
+  /// The boxes of every leg of [run] (the run's checklist is counted over all of them).
+  List<ParcelDto> parcelsOfRun(TransferRun run) => [for (final t in tasksOfRun(run)) ...t.parcels];
+
+  /// The run's checklist for [stage] is complete (a run without labelled boxes has nothing to scan).
+  bool runStageDone(TransferRun run, ParcelStage stage) => tasksOfRun(run).every((t) => t.stageDone(stage));
+
+  /// The scan rule is on for this run: at least one of its legs says so and carries boxes.
+  bool runScanRequired(TransferRun run) => tasksOfRun(run).any((t) => t.scanRequired && t.hasParcels);
+
+  /// The rider scans one box of [task] (`rider:scanParcel`). The answer updates the task at once, so the buttons react.
+  /// Throws what the server refuses with ("PKG-... is not part of this pickup.").
+  Future<ParcelScan> scanParcel(DeliveryTaskDto task, String code, ParcelStage stage, {bool manual = false}) async {
+    final res = await request('rider:scanParcel', {'taskId': task.id, 'code': code, 'stage': stage.wire, if (manual) 'manual': true});
+    final scan = ParcelScan.fromJson(_map(res));
+    _applyChecklist([task], scan.parcels, scan.required, single: true, pickupComplete: scan.pickupComplete, dropoffComplete: scan.dropoffComplete);
+    notifyListeners();
+    return scan;
+  }
+
+  /// Same, for a whole transfer run: one checklist over every leg of the run.
+  Future<ParcelScan> scanRunParcel(TransferRun run, String code, ParcelStage stage, {bool manual = false}) async {
+    final res = await request('rider:scanParcel', {'runId': run.id, 'code': code, 'stage': stage.wire, if (manual) 'manual': true});
+    final scan = ParcelScan.fromJson(_map(res));
+    _applyChecklist(tasksOfRun(run), scan.parcels, scan.required);
+    notifyListeners();
+    return scan;
+  }
+
+  /// Re-reads one leg's checklist (`rider:legParcels`). Quiet on failure: the card keeps what it knew.
+  Future<void> legParcels(DeliveryTaskDto task) async {
+    try {
+      final m = _map(await request('rider:legParcels', {'taskId': task.id}));
+      _applyChecklist([task], ParcelDto.listFrom(m['parcels']), m['required'] != false,
+          single: true, pickupComplete: m['pickupComplete'] as bool?, dropoffComplete: m['dropoffComplete'] as bool?);
+      notifyListeners();
+    } catch (_) {/* keep what the card knew */}
+  }
+
+  /// Re-reads a run's checklist (`rider:legParcels` with the run).
+  Future<void> legParcelsOfRun(TransferRun run) async {
+    try {
+      final m = _map(await request('rider:legParcels', {'runId': run.id}));
+      _applyChecklist(tasksOfRun(run), ParcelDto.listFrom(m['parcels']), m['required'] != false);
+      notifyListeners();
+    } catch (_) {/* keep what the card knew */}
+  }
+
+  /// Puts the server's boxes onto [tasks]: each task keeps its own boxes (matched by code) with the fresh scan times; with
+  /// [single] the answer is that one leg's own list.
+  void _applyChecklist(List<DeliveryTaskDto> tasks, List<ParcelDto> fresh, bool required, {bool single = false, bool? pickupComplete, bool? dropoffComplete}) {
+    final byCode = {for (final p in fresh) p.code: p};
+    for (final t in tasks) {
+      t.scanRequired = required;
+      t.parcels = single ? fresh : [for (final p in t.parcels) byCode[p.code] ?? p];
+      t.pickupComplete = single && pickupComplete != null ? pickupComplete : stageComplete(t.parcels, ParcelStage.pickup);
+      t.dropoffComplete = single && dropoffComplete != null ? dropoffComplete : stageComplete(t.parcels, ParcelStage.dropoff);
+    }
   }
 
   /// [reason] is required for `failed`; [code] is the customer's 4-digit code for `delivered`.

@@ -12,7 +12,7 @@ import { translationMode } from '../translation/translation-mode';
 import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
-export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'] as const;
+export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'] as const;
 /**
  * How shoppers reach KOMORIKO from Help (support phone, e-mail and a WhatsApp number). Blank = not offered. Public like
  * the rest of the shopper settings; written by admins only (see `WRITABLE`).
@@ -21,7 +21,7 @@ export const CONTACT_SETTINGS = ['supportPhone', 'supportEmail', 'supportWhatsap
 const isContactKey = (k: string) => (CONTACT_SETTINGS as readonly string[]).includes(k);
 // `deliveryZones` stays readable for old clients but is never written or used: zones are gone (nearest-warehouse routing).
 /** The only keys that can be written, each with its own validation. */
-const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm', ...FRAUD_SETTING_KEYS] as const;
+const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm', ...FRAUD_SETTING_KEYS] as const;
 
 /**
  * Key/value platform config: FX rate, delivery fee numbers,
@@ -90,6 +90,7 @@ export class SettingsService {
       case 'requireStaffTwoFactor':
       case 'allowInterCityDelivery':
       case 'requireDeliveryCode':
+      case 'requireParcelScan':
       case 'requireVerifiedForCheckout':
       case 'productModeration':
         return oneOf(String(value), ['true', 'false'] as const, 'Moderation flag');

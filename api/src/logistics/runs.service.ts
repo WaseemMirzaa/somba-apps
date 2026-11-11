@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { AuditLog, DeliveryTask, Hub, TransferRun, TransferRunStatus, User, WarehouseException } from '../database/entities';
@@ -6,6 +6,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { AUDIT_ROLES } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { Actor, LogisticsService } from './logistics.service';
+import { ParcelsService } from './parcels.service';
 import { DESK_ADMINS_ONLY, DESK_ROLES, isDeskAdmin, tierAllows } from './tiers';
 
 /** The legs a run can carry: warehouse-to-warehouse transfers (on the way out and on the way back). */
@@ -66,6 +67,7 @@ export class RunsService {
     private readonly logistics: LogisticsService,
     private readonly notifications: NotificationsService,
     private readonly emitter: RealtimeEmitter,
+    @Optional() private readonly parcels?: ParcelsService,
   ) {}
 
   // ── views and pushes ─────────────────────────────────────────────────────────
@@ -342,6 +344,8 @@ export class RunsService {
     if (!run.riderId) throw new BadRequestException('Choose a driver for this run first.');
     const ready = (await this.members(run)).filter((t) => t.status === 'assigned' && t.riderId === run.riderId);
     if (!ready.length) throw new BadRequestException('This run has no parcels left to send.');
+    // C-parcel-scan: every box of the run must be scanned on the way out (counted for the whole run: "2 of 3 scanned").
+    await this.parcels?.assertComplete(ready, 'pickup');
     const now = new Date();
     const sent: DeliveryTask[] = [];
     for (const t of ready) {
@@ -409,6 +413,8 @@ export class RunsService {
       if (![...wanted].every((id) => members.some((m) => m.id === id))) throw new BadRequestException('That parcel is not in this run.');
       targets = targets.filter((t) => wanted.has(t.id));
     }
+    // C-parcel-scan: every box of the legs being received must be scanned on arrival, checked for all of them before the first is received.
+    await this.parcels?.assertComplete(targets, 'dropoff');
     let received = 0;
     for (const t of targets) {
       await this.logistics.onScanIn(t.id, run.toHubId, actor);

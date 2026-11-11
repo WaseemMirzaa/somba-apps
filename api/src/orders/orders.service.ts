@@ -42,6 +42,7 @@ import type { EstimateLine } from '../logistics/order-estimate';
 import { linesBySeller, sellerUserId } from './order-sellers';
 import { paymentMethodLabel } from '../common/payment-method';
 import { LogisticsService } from '../logistics/logistics.service';
+import { LabelData, ParcelsService } from '../logistics/parcels.service';
 import { RoutingService } from '../logistics/routing.service';
 import type { Route } from '../logistics/routing.service';
 import { CUSTOMER_KINDS, isCustomerKind, isOrderFlow } from '../logistics/leg-rules';
@@ -166,6 +167,7 @@ export class OrdersService {
     private readonly logisticsSvc?: LogisticsService,
     private readonly routingSvc?: RoutingService,
     private readonly coupons?: CouponsService,
+    private readonly parcelsSvc?: ParcelsService,
   ) {
     // Mobile-money confirmations arrive asynchronously (webhook): the payment
     // service tells us when an order's payment is finally settled.
@@ -895,8 +897,12 @@ export class OrdersService {
     return { required, code: required && !over ? await this.delivery.codeForOrder(orderId) : null };
   }
 
-  /** The seller confirms the parcel is packed and ready for the rider. */
-  async sellerReady(user: { id: string }, orderId: string): Promise<DeliveryTask> {
+  /**
+   * The seller confirms the parcel is packed and ready for the rider, in `boxCount` boxes (1 to 20, default 1): each box gets its
+   * own KOMORIKO label (the code never changes from the seller to the customer). Calling it again with another count before the
+   * first pickup scan replaces the labels; after a pickup scan the count is locked. Answers the task and the labels to print.
+   */
+  async sellerReady(user: { id: string }, orderId: string, boxCount?: unknown): Promise<DeliveryTask & { labels?: LabelData[]; boxCount?: number; boxesLocked?: boolean }> {
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found.');
     const keys = await this.sellerKeys(user.id);
@@ -920,6 +926,10 @@ export class OrdersService {
     const allReady = live.every((i) => i.fulfilment !== 'open');
     const task = await this.logistics.markSellerReady(orderId, [...keys]);
     if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
+    // C-parcel-boxes: the labels carry the same seller key as the pickup leg; a count the seller can no longer change (a rider
+    // scanned a box) is refused here, and the data layer refuses it too.
+    const packed = this.parcelsSvc ? await this.parcelsSvc.ensureBoxes(orderId, task.sellerId ?? mine[0]?.sellerId ?? user.id, boxCount) : [];
+    const labelled = packed.length ? await this.parcelsSvc!.labelsFor(orderId, [packed[0].sellerId as string]).catch(() => null) : null;
     const sellersLeft = new Set(live.filter((i) => i.fulfilment === 'open').map((i) => i.sellerName ?? i.sellerId ?? 'Seller')).size;
     this.emitter.toUser(saved.customerId, 'order:updated', saved);
     pushOrderToOps(this.emitter, 'order:updated', saved);
@@ -931,7 +941,33 @@ export class OrdersService {
       type: 'delivery',
       entityId: order.id,
     }, 'logisticsDesk');
-    return task;
+    return Object.assign(task, labelled ? { labels: labelled.labels, boxCount: labelled.boxCount, boxesLocked: labelled.locked } : {});
+  }
+
+  /** The seller's own labels for an order (to print or reprint until it is delivered), with whether the box count can still change. */
+  async sellerLabels(user: { id: string }, orderId: string): Promise<{ labels: LabelData[]; boxCount: number; locked: boolean }> {
+    const order = await this.orders.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found.');
+    const keys = await this.sellerKeys(user.id);
+    const mine = [...(await this.linesBySeller(order))].filter(([sellerId]) => keys.has(sellerId));
+    if (!mine.length) throw new NotFoundException('Order not found.');
+    if (!this.parcelsSvc) throw new BadRequestException('Labels are not available.');
+    return this.parcelsSvc.labelsFor(orderId, [...keys]);
+  }
+
+  /** The seller changes the box count of a package that is already ready (before the first pickup scan); the labels are replaced. */
+  async sellerBoxes(user: { id: string }, orderId: string, boxCount: unknown): Promise<{ labels: LabelData[]; boxCount: number; locked: boolean }> {
+    const order = await this.orders.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found.');
+    const keys = await this.sellerKeys(user.id);
+    const mine = [...(await this.linesBySeller(order))].filter(([sellerId]) => keys.has(sellerId)).flatMap(([, items]) => items);
+    if (!mine.length) throw new NotFoundException('Order not found.');
+    if (!this.parcelsSvc) throw new BadRequestException('Labels are not available.');
+    if (!mine.some((i) => i.fulfilment === 'ready' || i.fulfilment === 'received')) throw new BadRequestException('Mark the package ready first: the labels are made then.');
+    if (mine.filter((i) => i.fulfilment !== 'cancelled').every((i) => i.deliveredAt)) throw new BadRequestException('This package was delivered: its labels can no longer be printed.');
+    const key = (await this.parcelsSvc.activeFor(orderId, [...keys]))[0]?.sellerId ?? mine[0].sellerId ?? user.id;
+    await this.parcelsSvc.ensureBoxes(orderId, key, boxCount === undefined || boxCount === null || boxCount === '' ? 1 : boxCount);
+    return this.parcelsSvc.labelsFor(orderId, [...keys]);
   }
 
   /**

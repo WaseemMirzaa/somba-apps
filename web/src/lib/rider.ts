@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { paymentMethodLabel } from "@/lib/payment-methods";
-import { isPartialLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type TaskView } from "@/lib/logistics";
+import { isPartialLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type ParcelLine, type TaskView } from "@/lib/logistics";
 
 /**
  * Live rider data layer. `rider:tasks` returns ONLY the legs assigned to this rider (their warehouse assigns them;
@@ -140,6 +140,11 @@ function toRiderTask(row: RiderQueueRow) {
     /** A partial delivery of a split order: `completesOrder` false (more follows) or the order says so. */
     partial: isPartialLeg(row.kind, row.completesOrder, o?.partial),
     collectOld: !!row.collectOld,
+    /** The KOMORIKO boxes of this leg with their scans (empty: nothing to scan), and whether the platform blocks the leg until all are scanned. */
+    parcels: (row.parcels ?? []) as ParcelLine[],
+    pickupComplete: row.pickupComplete ?? true,
+    dropoffComplete: row.dropoffComplete ?? true,
+    scanRequired: !!row.scanRequired,
     sellerName: row.sellerName,
     products: items.map((it) => ({
       productId: it.productId,

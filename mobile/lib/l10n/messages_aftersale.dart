@@ -255,4 +255,16 @@ const Map<String, (String, String)> kMessagesAfterSale = {
     '{amount} seront remboursés sur votre portefeuille à la livraison du nouvel article.'
   ),
   'as_ex_refunded': ('{amount} was refunded to your wallet.', '{amount} ont été remboursés sur votre portefeuille.'),
+  'as_pl_title': ('Your return label', 'Votre étiquette de retour'),
+  'as_pl_qr_alt': ('QR code of your return label', 'QR code de votre étiquette de retour'),
+  'as_pl_code': ('Return code', 'Code de retour'),
+  'as_pl_box_one': ('Box 1 of 1', 'Colis 1 sur 1'),
+  'as_pl_box': ('Box {n} of {m}', 'Colis {n} sur {m}'),
+  'as_pl_write': (
+    'Write this code on the package and show it to the rider: they scan it when they collect it.',
+    'Écrivez ce code sur le colis et montrez-le au livreur : il le scanne lors de la collecte.'
+  ),
+  'as_pl_pending': ('The label appears once your return is approved.', 'L’étiquette apparaît dès que votre retour est approuvé.'),
+  'as_pl_copy': ('Copy code', 'Copier le code'),
+  'as_pl_copied': ('Code copied', 'Code copié'),
 };

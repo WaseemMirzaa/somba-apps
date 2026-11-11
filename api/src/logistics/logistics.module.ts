@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AgedAlert, AuditLog, DeliveryTask, Hub, HubLane, HubOpsSettings, Order, OrderItem, Product, Seller, TransferRun, User, WarehouseException } from '../database/entities';
+import { AgedAlert, AuditLog, DeliveryTask, Hub, HubLane, HubOpsSettings, Order, Parcel, ParcelScan, OrderItem, Product, Seller, TransferRun, User, WarehouseException } from '../database/entities';
 import { AddressesModule } from '../addresses/addresses.module';
 import { ContentModule } from '../content/content.module';
 import { GeoModule } from '../geo/geo.module';
@@ -13,6 +13,7 @@ import { LanesService } from './lanes.service';
 import { LogisticsGateway } from './logistics.gateway';
 import { LogisticsService } from './logistics.service';
 import { OpsAnalyticsService } from './ops-analytics.service';
+import { ParcelsService } from './parcels.service';
 import { RoutingService } from './routing.service';
 import { RunsService } from './runs.service';
 import { StaffTierService } from './staff-tier.service';
@@ -26,14 +27,14 @@ import { WarehouseOpsJob } from './warehouse-ops.job';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DeliveryTask, Order, OrderItem, Hub, User, Seller, Product, AuditLog, HubLane, TransferRun, WarehouseException, HubOpsSettings, AgedAlert]),
+    TypeOrmModule.forFeature([DeliveryTask, Order, OrderItem, Hub, User, Seller, Product, AuditLog, HubLane, TransferRun, WarehouseException, HubOpsSettings, AgedAlert, Parcel, ParcelScan]),
     ContentModule,
     NotificationsModule,
     ProductsModule,
     AddressesModule,
     GeoModule,
   ],
-  providers: [RoutingService, LanesService, HubsService, HubOpsSettingsService, LogisticsService, RunsService, StaffTierService, AgedParcelsService, OpsAnalyticsService, WarehouseOpsJob, LogisticsGateway, TransfersGateway, WarehouseOpsGateway],
-  exports: [RoutingService, LanesService, HubsService, HubOpsSettingsService, LogisticsService, RunsService, StaffTierService],
+  providers: [RoutingService, LanesService, HubsService, HubOpsSettingsService, LogisticsService, ParcelsService, RunsService, StaffTierService, AgedParcelsService, OpsAnalyticsService, WarehouseOpsJob, LogisticsGateway, TransfersGateway, WarehouseOpsGateway],
+  exports: [RoutingService, LanesService, HubsService, HubOpsSettingsService, LogisticsService, ParcelsService, RunsService, StaffTierService],
 })
 export class LogisticsModule {}

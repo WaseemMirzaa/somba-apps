@@ -156,6 +156,7 @@ async function run() {
     commissionPct: '12',
     productModeration: 'true', // new seller listings wait for a moderator
     requireDeliveryCode: 'true', // riders must enter the customer's 4-digit code on handover
+    requireParcelScan: 'true', // riders (and the desk) must scan every parcel label at each hand-over
     minPayoutUsd: '10',
     returnWindowDays: '7', // returns are accepted this many days after delivery
     sellerResponseHours: '48', // a seller answers a return, replacement or exchange within this time

@@ -514,3 +514,27 @@ class ExchangeView {
         updatedAt: _date(j['updatedAt']),
       );
 }
+
+/// The KOMORIKO label of the box a customer sends back (`parcels:forReturn`): the rider scans [code] at the door.
+class ReturnParcel {
+  const ReturnParcel({required this.code, this.boxNo = 1, this.boxCount = 1, this.orderReference = ''});
+
+  /// `PKG-` + 8 characters, e.g. `PKG-7KQ2M9XA`.
+  final String code;
+  final int boxNo;
+  final int boxCount;
+  final String orderReference;
+
+  bool get isSingleBox => boxCount <= 1;
+
+  /// Null when the server has no label yet (`data: null`) or the payload carries no code.
+  static ReturnParcel? tryParse(Object? data) {
+    if (data is! Map) return null;
+    final j = asStringMap(data);
+    final code = _str(j['code']).trim();
+    if (code.isEmpty) return null;
+    final count = _int(j['boxCount']);
+    final no = _int(j['boxNo']);
+    return ReturnParcel(code: code, boxNo: no < 1 ? 1 : no, boxCount: count < 1 ? 1 : count, orderReference: _str(j['orderReference']));
+  }
+}

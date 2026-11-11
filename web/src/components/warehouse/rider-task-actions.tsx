@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle, PackageCheck, Truck, Warehouse, XCircle } from "lucide-react";
+import { RiderParcelPanel, useLiveBoxes } from "@/components/warehouse/rider-parcel-panel";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
+import { localizeParcelError } from "@/lib/parcel-errors";
+import { actionGate, scanFirstText, scanStageFor } from "@/lib/parcel-scan";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { errorMessage } from "@/lib/warehouse-live";
 import type { RiderTask } from "@/lib/rider";
@@ -12,6 +15,7 @@ import { FAIL_REASONS, canReportFailure, failedPayload, nextStep, stepPayload } 
 /** Run one rider action and report the real outcome. Resolves true only after the server acknowledged. */
 function useRun() {
   const { toast } = useToast();
+  const { locale } = useLocale();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   async function run(key: string, fn: () => Promise<unknown>, success: string): Promise<boolean> {
@@ -23,7 +27,7 @@ function useRun() {
       toast(success);
       return true;
     } catch (e) {
-      setError(errorMessage(e));
+      setError(localizeParcelError(errorMessage(e), locale === "fr"));
       return false;
     } finally {
       setBusy(null);
@@ -76,7 +80,7 @@ function labels(task: RiderTask, fr: boolean) {
   }
 }
 
-export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () => void }) {
+export function DeliveredForm({ task, onDone, blocked = false }: { task: RiderTask; onDone: () => void; /** Drop-off boxes not all scanned yet. */ blocked?: boolean }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { busy, error, setError, run } = useRun();
@@ -97,6 +101,10 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (blocked) {
+      setError(fr ? "Scannez tous les colis d'abord." : "Scan every parcel first.");
+      return;
+    }
     if (needsCode && !code.trim()) {
       setError(fr ? "Demandez le code à 4 chiffres au client." : "Ask the customer for their 4-digit code.");
       return;
@@ -129,7 +137,7 @@ export function DeliveredForm({ task, onDone }: { task: RiderTask; onDone: () =>
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       <button
         type="submit"
-        disabled={busy !== null}
+        disabled={busy !== null || blocked}
         className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
       >
         <CheckCircle className="h-4 w-4" />
@@ -199,9 +207,17 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
   const { busy, error, run } = useRun();
   const [panel, setPanel] = useState<"delivered" | "failed" | null>(null);
   const l = labels(task, fr);
+  const { boxes, apply } = useLiveBoxes(task.parcels);
+  const stage = scanStageFor(task.status);
 
   const next = nextStep(task);
   if (next === "none") return null;
+  const gate = actionGate({ parcels: boxes, scanRequired: task.scanRequired }, next);
+  const gateNote = gate.blocked ? (
+    <p role="status" className="text-center text-xs font-medium text-amber-700" data-testid="scan-first">
+      {scanFirstText(gate.scanned, gate.total, fr)}
+    </p>
+  ) : null;
 
   async function step(key: string, status: "picked_up" | "in_transit", success: string) {
     const ok = await run(key, () => socketClient.request("delivery:updateStatus", stepPayload(task.id, status)), success);
@@ -212,11 +228,17 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
 
   return (
     <div className="space-y-3">
+      {boxes.length > 0 && stage && (
+        <RiderParcelPanel target={{ taskId: task.id }} stage={stage} boxes={boxes} onChecklist={apply} onChanged={onChanged} />
+      )}
       {next === "picked_up" && (
-        <button onClick={() => void step("picked_up", "picked_up", l.pickedToast)} disabled={busy !== null} className={primary}>
-          <PackageCheck className="h-4 w-4" />
-          {busy === "picked_up" ? "…" : l.picked}
-        </button>
+        <>
+          <button onClick={() => void step("picked_up", "picked_up", l.pickedToast)} disabled={busy !== null || gate.blocked} className={primary}>
+            <PackageCheck className="h-4 w-4" />
+            {busy === "picked_up" ? "…" : l.picked}
+          </button>
+          {gateNote}
+        </>
       )}
       {next === "in_transit" && (
         <button onClick={() => void step("in_transit", "in_transit", l.goToast)} disabled={busy !== null} className={primary}>
@@ -234,15 +256,18 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
           </p>
         </div>
       )}
+      {next === "handover" && gateNote}
       {next === "deliver" && panel !== "delivered" && (
-        <button onClick={() => setPanel("delivered")} className={primary}>
+        <button onClick={() => setPanel("delivered")} disabled={gate.blocked} className={primary}>
           <CheckCircle className="h-4 w-4" />
           {task.kind === "return_to_seller" ? (fr ? "Remis au vendeur" : "Handed to the seller") : fr ? "Livré" : "Delivered"}
         </button>
       )}
+      {next === "deliver" && panel !== "delivered" && gateNote}
       {panel === "delivered" && next === "deliver" && (
         <div className="rounded-xl border border-emerald-200 p-4">
-          <DeliveredForm task={task} onDone={onChanged} />
+          <DeliveredForm task={task} onDone={onChanged} blocked={gate.blocked} />
+          {gateNote}
         </div>
       )}
 

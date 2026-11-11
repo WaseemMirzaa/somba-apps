@@ -15,6 +15,8 @@ import { useOpsBase, useOpsPath } from "@/lib/ops-path";
 import { LEG_KIND_SHORT, LEG_STATUS, legItemsText, pickL, type LegKind } from "@/lib/logistics";
 import { deskActions, parcelCode, useDeskQueue, useHubScope, type DeskTask } from "@/lib/warehouse";
 import { errorMessage } from "@/lib/warehouse-live";
+import { parcelErrorWithHint } from "@/lib/parcel-errors";
+import { useBoxScan } from "@/components/warehouse/use-box-scan";
 import { cn } from "@/lib/utils";
 
 type TabId = "pickup" | "transfer_out" | "transfer_in" | "transfer" | "delivery" | "express" | "return_pickup" | "replacement_delivery" | "return_transfer" | "return_to_seller";
@@ -67,6 +69,12 @@ function DeskContent() {
 
   const activeTab = tabs.find((x) => x.id === tab) ?? (tab === "transfer" ? tabs.find((x) => x.kind === "transfer") : undefined) ?? tabs[0];
 
+  // What a scanned box code does: a box arriving (receive) or leaving (hand to its rider). The tab decides, the person can flip it.
+  const [modeOverride, setModeOverride] = useState<"in" | "out" | null>(null);
+  const tabMode: "in" | "out" = ["transfer_out", "delivery", "replacement_delivery", "return_to_seller"].includes(activeTab.id) ? "out" : "in";
+  const scanMode = modeOverride ?? tabMode;
+  const onBox = useBoxScan(scanMode, () => void q.reload());
+
   const needle = query.trim().toLowerCase();
   const rows = useMemo(
     () =>
@@ -92,7 +100,7 @@ function DeskContent() {
         toast((fr ? `${parcelCode(leg)} scanné à l'arrivée` : `${parcelCode(leg)} scanned in`) + next);
         void q.reload();
       } catch (e) {
-        toast(errorMessage(e), "error");
+        toast(parcelErrorWithHint(errorMessage(e), fr), "error");
       }
     } else if (leg.desk.scanOut) {
       try {
@@ -100,7 +108,7 @@ function DeskContent() {
         toast(fr ? `${parcelCode(leg)} remis au livreur` : `${parcelCode(leg)} handed to the rider`);
         void q.reload();
       } catch (e) {
-        toast(errorMessage(e), "error");
+        toast(parcelErrorWithHint(errorMessage(e), fr), "error");
       }
     } else {
       router.push(ops(`/tasks/${leg.id}`));
@@ -117,7 +125,24 @@ function DeskContent() {
             : "Your warehouse's pickups, transfers, deliveries and returns. Scan a parcel to receive it or hand it to its rider."
         }
         breadcrumbs={[{ label: base.startsWith("/admin") ? "Admin" : fr ? "Entrepôt" : "Warehouse", href: base.startsWith("/admin") ? "/admin/fulfillment" : "/warehouse" }, { label: fr ? "Bureau" : "Desk" }]}
-        actions={<ScanInput legs={q.tasks} onFound={onScan} autoFocus buttonLabel={fr ? "Scanner" : "Scan"} />}
+        actions={
+          <div className="flex flex-col items-end gap-2">
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium" role="group" aria-label={fr ? "Effet d'un scan de carton" : "What a box scan does"} data-testid="scan-mode">
+              {(["in", "out"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  aria-pressed={scanMode === m}
+                  onClick={() => setModeOverride(m)}
+                  className={cn("rounded-md px-3 py-1.5", scanMode === m ? "bg-white text-[var(--primary)] shadow-sm" : "text-slate-500 hover:text-slate-800")}
+                >
+                  {m === "in" ? (fr ? "Réception" : "Receive") : fr ? "Remise au livreur" : "Hand to rider"}
+                </button>
+              ))}
+            </div>
+            <ScanInput legs={q.tasks} onFound={onScan} onBoxCode={onBox} autoFocus buttonLabel={fr ? "Scanner" : "Scan"} />
+          </div>
+        }
       />
       <HubScopeBar />
       {tier === "operator" && !isAdmin && (
