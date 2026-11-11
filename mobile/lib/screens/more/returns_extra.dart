@@ -400,7 +400,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
               Text(passed ? s.asWinClosedTitle : s.asWinUnavailableTitle, style: const TextStyle(color: AppColors.dangerStrong, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 2),
               Text(
-                passed ? s.asWinClosedBody(e.windowDays, s.date(e.endsAt!)) : s.serverError(e.reason ?? ''),
+                passed ? s.asWinClosedBody(e.windowDays, s.date(e.endsAt!)) : s.serverErrorOr(e.reason ?? '', e.reasonFr),
                 key: const ValueKey('return-closed-body'),
                 style: const TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35),
               ),

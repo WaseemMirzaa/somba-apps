@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as io;
-import 'auth_service.dart' show ApiException;
+import 'auth_service.dart' show ApiException, frenchText;
 import 'env.dart';
 
 /// Single authenticated Socket.IO connection. All reads/writes go through
@@ -58,7 +58,7 @@ class SocketService {
       ack: (dynamic res) {
         if (completer.isCompleted) return;
         if (res is Map && res['ok'] == false) {
-          completer.completeError(res['error'] == null ? ApiException.local('err_generic') : ApiException(res['error'].toString(), null, res['code'] is String ? res['code'] as String : null));
+          completer.completeError(res['error'] == null ? ApiException.local('err_generic') : ApiException(res['error'].toString(), null, res['code'] is String ? res['code'] as String : null, frenchText(res['errorFr'])));
         } else if (res is Map && res.containsKey('data')) {
           completer.complete(res['data']);
         } else {

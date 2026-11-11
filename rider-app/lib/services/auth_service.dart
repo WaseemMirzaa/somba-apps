@@ -46,7 +46,12 @@ class ApiException implements Exception {
 
   /// The server's machine-readable reason, when it sent one (`password_change_required`).
   final String? code;
-  ApiException(this.message, [this.status, this.code])
+
+  /// The server's own French sentence (`errorFr` of an ack, `messageFr` of an HTTP body), when it sent one. Shown
+  /// instead of the English text when the app is in French (docs/contracts/error-text.md, section 4).
+  final String? messageFr;
+
+  ApiException(this.message, [this.status, this.code, this.messageFr])
       : localKey = null,
         args = null {
     if (code == kPasswordChangeRequired) onPasswordChangeRequired?.call();
@@ -56,10 +61,23 @@ class ApiException implements Exception {
   ApiException.local(String key, {this.status, this.args})
       : localKey = key,
         code = null,
+        messageFr = null,
         message = const Strings('en').t(key, args);
 
   @override
-  String toString() => localKey != null ? Strings.current.t(localKey!, args) : Strings.current.serverError(message);
+  String toString() {
+    if (localKey != null) return Strings.current.t(localKey!, args);
+    final fr = messageFr;
+    if (fr != null && fr.trim().isNotEmpty && Strings.current.isFr) return fr.trim();
+    return Strings.current.serverError(message);
+  }
+}
+
+/// The French version the server sent with an error: a string, or a list of strings (joined with [separator] like
+/// the English `message`). Null when absent or blank, which is normal: the server only sends it when it knows the sentence.
+String? frenchText(Object? v, {String separator = '\n'}) {
+  final text = v is List ? v.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).join(separator) : (v is String ? v.trim() : '');
+  return text.isEmpty ? null : text;
 }
 
 /// REST is used ONLY for one-shot calls that happen before a socket exists
@@ -110,7 +128,7 @@ class AuthService {
             : ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode});
       }
       final code = json['code'];
-      throw ApiException(text, res.statusCode, code is String ? code : null);
+      throw ApiException(text, res.statusCode, code is String ? code : null, frenchText(json['messageFr']));
     }
     return json;
   }

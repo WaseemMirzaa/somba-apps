@@ -115,6 +115,10 @@ class Strings {
   /// A server message (always English) in the user's language; unknown messages pass through.
   String serverError(String raw) => translateServerError(raw, this);
 
+  /// Like [serverError], for a refusal that came with the server's own French (`reasonFr`, `errorFr`): that wins in
+  /// French when present; English and a missing French fall back to the phone's own mapping.
+  String serverErrorOr(String raw, String? fr) => isFr && (fr ?? '').trim().isNotEmpty ? fr!.trim() : serverError(raw);
+
   // ---- dates and numbers, per language ----
   String _fmt(DateFormat Function(String locale) build, DateTime d) {
     try {

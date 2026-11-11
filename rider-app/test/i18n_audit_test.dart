@@ -19,6 +19,7 @@ import 'package:somba_rider/screens/forced_password_screen.dart';
 import 'package:somba_rider/screens/more/rider_auth.dart';
 import 'package:somba_rider/screens/shift_screen.dart';
 import 'package:somba_rider/screens/vehicle_screen.dart';
+import 'package:somba_rider/services/auth_service.dart' show ApiException, frenchText;
 import 'package:somba_rider/services/compliance_models.dart';
 import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/rider_store.dart';
@@ -171,6 +172,29 @@ void main() {
       messages.forEach((raw, expected) {
         expect(translateServerError(raw, fr), expected, reason: raw);
         expect(translateServerError(raw, en), raw);
+      });
+    });
+
+    group('the server\'s own French (errorFr / messageFr) wins in French', () {
+      tearDown(() => Strings.setLang('fr', persist: false));
+
+      test('an ack error carries errorFr; HTTP bodies carry messageFr (string or list)', () async {
+        final e = ApiException('Wrong delivery code.', null, 'x', frenchText('Code de livraison incorrect.'));
+        await Strings.setLang('fr', persist: false);
+        expect(e.toString(), 'Code de livraison incorrect.');
+        expect(e.code, 'x');
+        await Strings.setLang('en', persist: false);
+        expect(e.toString(), 'Wrong delivery code.');
+        expect(e.message, 'Wrong delivery code.');
+        expect(frenchText(['Un.', 'Deux.']), 'Un.\nDeux.');
+        expect(frenchText(null), isNull);
+        expect(frenchText(' '), isNull);
+      });
+
+      test('no French from the server: the phone\'s own mapping, then the English text', () async {
+        await Strings.setLang('fr', persist: false);
+        expect(ApiException('Parcel scanning is not available.').toString(), 'Le scan des colis n’est pas disponible.');
+        expect(ApiException('A sentence nobody knows.', 400, null, '').toString(), 'A sentence nobody knows.');
       });
     });
   });

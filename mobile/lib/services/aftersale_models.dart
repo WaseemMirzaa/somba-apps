@@ -311,12 +311,15 @@ class EligibleLine {
 
 /// What `disputes:eligibility` says about an order.
 class ReturnEligibility {
-  const ReturnEligibility({required this.eligible, this.reason, this.windowDays = 0, this.deliveredAt, this.endsAt, this.items = const []});
+  const ReturnEligibility({required this.eligible, this.reason, this.reasonFr, this.windowDays = 0, this.deliveredAt, this.endsAt, this.items = const []});
 
   final bool eligible;
 
   /// The server's English reason when [eligible] is false.
   final String? reason;
+
+  /// The server's French version of [reason] (`reasonFr`), when it sent one.
+  final String? reasonFr;
   final int windowDays;
   final DateTime? deliveredAt;
   final DateTime? endsAt;
@@ -328,6 +331,7 @@ class ReturnEligibility {
   factory ReturnEligibility.fromJson(Map<String, dynamic> j) => ReturnEligibility(
         eligible: j['eligible'] == true,
         reason: _strOrNull(j['reason']),
+        reasonFr: _strOrNull(j['reasonFr']),
         windowDays: _int(j['windowDays']),
         deliveredAt: _date(j['deliveredAt']),
         endsAt: _date(j['endsAt']),

@@ -25,6 +25,8 @@ import 'package:lipcart/screens/more/settings_extra.dart';
 import 'package:lipcart/screens/more/support_extra.dart';
 import 'package:lipcart/screens/orders_screen.dart';
 import 'package:lipcart/screens/wallet_screen.dart';
+import 'package:lipcart/services/aftersale_models.dart';
+import 'package:lipcart/services/auth_service.dart';
 import 'package:lipcart/services/models.dart';
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/util/format.dart';
@@ -258,6 +260,52 @@ void main() {
       messages.forEach((raw, expected) {
         expect(translateServerError(raw, fr), expected, reason: raw);
         expect(translateServerError(raw, en), raw, reason: 'English stays as the server wrote it');
+      });
+    });
+
+    group('the server\'s own French (errorFr / messageFr / reasonFr) wins in French', () {
+      tearDown(() => Strings.setLang('fr', persist: false));
+
+      test('a failed ack: errorFr is shown in French, the English error in English, and neither is a structured field', () async {
+        final e = ApiException.fromAck({'ok': false, 'error': 'Only 3 of "Tote bag" left in stock.', 'errorFr': 'Il ne reste que 3 × « Tote bag » en stock.', 'code': 'low_stock', 'left': 3});
+        await Strings.setLang('fr', persist: false);
+        expect(e.toString(), 'Il ne reste que 3 × « Tote bag » en stock.');
+        await Strings.setLang('en', persist: false);
+        expect(e.toString(), 'Only 3 of "Tote bag" left in stock.');
+        expect(e.message, 'Only 3 of "Tote bag" left in stock.', reason: 'the English stays for code that reads it');
+        expect(e.code, 'low_stock');
+        expect(e.details, {'left': 3}, reason: 'errorFr is not an extra field');
+      });
+
+      test('no errorFr: the phone\'s own mapping, then the English text, as before', () async {
+        await Strings.setLang('fr', persist: false);
+        expect(ApiException.fromAck({'ok': false, 'error': 'Order not found.'}).toString(), 'Commande introuvable.');
+        expect(ApiException.fromAck({'ok': false, 'error': 'A sentence nobody knows.', 'errorFr': '  '}).toString(), 'A sentence nobody knows.');
+        expect(ApiException('Order not found.', 404).toString(), 'Commande introuvable.');
+      });
+
+      test('an HTTP body: messageFr as a string or a list, joined like message', () async {
+        await Strings.setLang('fr', persist: false);
+        expect(ApiException('Sign in to continue.', 400, frenchText('Connectez-vous pour continuer.')).toString(), 'Connectez-vous pour continuer.');
+        final list = frenchText(['Saisissez un e-mail valide.', 'Le mot de passe doit contenir au moins 8 caractères.']);
+        expect(list, 'Saisissez un e-mail valide.\nLe mot de passe doit contenir au moins 8 caractères.');
+        expect(frenchText(['a', 'b'], separator: ' '), 'a b');
+        expect(frenchText(null), isNull);
+        expect(frenchText(''), isNull);
+        expect(frenchText(const []), isNull);
+        await Strings.setLang('en', persist: false);
+        expect(ApiException('Sign in to continue.', 400, 'Connectez-vous pour continuer.').toString(), 'Sign in to continue.');
+      });
+
+      test('a refusal inside a successful answer: reasonFr in French, the mapping or English otherwise', () async {
+        await Strings.setLang('fr', persist: false);
+        expect(Strings.current.serverErrorOr('Invalid code.', 'Code invalide.'), 'Code invalide.');
+        expect(Strings.current.serverErrorOr('Invalid code.', null), Strings.current.serverError('Invalid code.'));
+        await Strings.setLang('en', persist: false);
+        expect(Strings.current.serverErrorOr('Invalid code.', 'Code invalide.'), 'Invalid code.');
+        final e = ReturnEligibility.fromJson({'eligible': false, 'reason': 'Returns are not accepted at the moment.', 'reasonFr': 'Les retours ne sont pas acceptés pour le moment.'});
+        expect(e.reasonFr, 'Les retours ne sont pas acceptés pour le moment.');
+        expect(ReturnEligibility.fromJson({'eligible': false, 'reason': 'x'}).reasonFr, isNull);
       });
     });
   });
