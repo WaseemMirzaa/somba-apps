@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useTranslationEnabled } from "@/lib/shop-live";
+import { shouldAutoTranslate } from "@/lib/translate-auto";
 
 /** What the server can translate on demand: stored records only (the request carries an id, never free text). */
 export type TranslateKind = "review" | "review_reply" | "question" | "answer";
@@ -19,12 +20,35 @@ interface TranslateResult {
 // One answer per record and language for the whole session (the server caches it too).
 const answers = new Map<string, TranslateResult>();
 
-type View = { key: string; busy: boolean; shown: boolean; same: boolean; text: string };
+// A request already on its way for a record and language is shared (a page of questions never asks twice).
+const inflight = new Map<string, Promise<TranslateResult>>();
+
+async function fetchTranslation(key: string, kind: TranslateKind, id: string, target: string): Promise<TranslateResult> {
+  const cached = answers.get(key);
+  if (cached) return cached;
+  const pending = inflight.get(key);
+  if (pending) return pending;
+  const request = socketClient
+    .request<TranslateResult>("translate:text", { kind, id, target })
+    .then((res) => {
+      answers.set(key, res);
+      return res;
+    })
+    .finally(() => inflight.delete(key));
+  inflight.set(key, request);
+  return request;
+}
+
+type View = { key: string; busy: boolean; shown: boolean; same: boolean; text: string; failed?: boolean };
 
 /**
  * A piece of customer-written text (review, seller reply, question, answer) with a "See translation" link.
  * The link asks the server for the stored record's translation (`translate:text`) and shows what comes back;
  * "See original" goes back. When the server says the text is already in the viewer's language the link disappears.
+ *
+ * With `auto` (questions and answers) the translation is fetched by itself and shown at once, in the language of the page
+ * now, and it follows a language switch (English <-> French) without a click. "See original" still shows the written text
+ * (until the language changes again). A failed automatic attempt is silent: the written text stays and the link can retry.
  */
 export function TranslatableText({
   kind,
@@ -32,6 +56,7 @@ export function TranslatableText({
   text,
   sourceLang,
   className,
+  auto = false,
 }: {
   kind: TranslateKind;
   id: string;
@@ -39,6 +64,8 @@ export function TranslatableText({
   /** Known language of the text (skips the link when it already equals the viewer's language). */
   sourceLang?: string | null;
   className?: string;
+  /** Translate into the page's language by itself and follow a language switch (questions and answers). */
+  auto?: boolean;
 }) {
   const { locale } = useLocale();
   const { toast } = useToast();
@@ -48,6 +75,27 @@ export function TranslatableText({
   const [state, setState] = useState<View | null>(null);
   // A language switch (or another record) starts over.
   const view = state && state.key === key ? state : null;
+
+  const alreadyReadable = !!sourceLang && sourceLang === locale;
+
+  // Automatic mode: ask once per record and language, as soon as there is nothing yet for the current language.
+  const wantsAuto = shouldAutoTranslate({ auto, translationOn, alreadyReadable, hasText: !!text, started: view !== null });
+  useEffect(() => {
+    if (!wantsAuto) return;
+    let stale = false;
+    fetchTranslation(key, kind, id, locale)
+      .then((res) => {
+        if (stale) return;
+        setState((cur) => (cur && cur.key !== key ? cur : { key, busy: false, shown: !res.same && !!res.text, same: !!res.same || !res.text, text: res.text ?? "" }));
+      })
+      .catch(() => {
+        if (stale) return;
+        setState((cur) => (cur && cur.key !== key ? cur : { key, busy: false, shown: false, same: false, text: "", failed: true }));
+      });
+    return () => {
+      stale = true;
+    };
+  }, [wantsAuto, key, kind, id, locale]);
 
   if (!text) return null;
 
@@ -63,8 +111,7 @@ export function TranslatableText({
     }
     setState({ key, busy: true, shown: false, same: false, text: "" });
     try {
-      const res = await socketClient.request<TranslateResult>("translate:text", { kind, id, target: locale });
-      answers.set(key, res);
+      const res = await fetchTranslation(key, kind, id, locale);
       setState({ key, busy: false, shown: !res.same && !!res.text, same: !!res.same || !res.text, text: res.text ?? "" });
     } catch (e) {
       setState(null);
@@ -72,7 +119,6 @@ export function TranslatableText({
     }
   }
 
-  const alreadyReadable = !!sourceLang && sourceLang === locale;
   const showLink = translationOn && !alreadyReadable && !view?.same;
 
   return (
