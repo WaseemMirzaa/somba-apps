@@ -1,3 +1,4 @@
+import './config/load-env'; // must stay first: it fills process.env before the other modules read it
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
