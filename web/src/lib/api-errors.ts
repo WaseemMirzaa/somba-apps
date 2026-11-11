@@ -561,6 +561,8 @@ export function localizeApiError(message: string | null | undefined, locale: Err
     const m = re.exec(msg);
     if (m) return fn(m);
   }
+  const shop = shopErrorFr(msg); // the shopper-side sentences (api-errors-shop.ts)
+  if (shop) return shop;
   // A bilingual sentence ("English / Français"): keep the French half.
   const slash = msg.split(" / ");
   if (slash.length === 2 && /\b(est|sont|vous|votre|une?|le|la|les)\b/i.test(slash[1])) return slash[1];
@@ -576,4 +578,82 @@ export function currentLocale(): ErrLocale {
   } catch {
     return "fr";
   }
+}
+
+// ── Shopper-side sentences ────────────────────────────────────────────────────────────────────────────────────────
+// Sentences a SHOPPER (or a visitor of the sell-online page) can meet that the tables above did not list. They are
+// looked up last by `localizeApiError`, so an entry in EXACT / PATTERNS always wins. Found by comparing every English
+// sentence the API can throw with what the French tables cover.
+const SHOP_EXACT: Record<string, string> = {
+  // cart / orders
+  "Only customer accounts have a cart.": "Seuls les comptes clients ont un panier.",
+  "An order needs at least one item.": "Une commande doit contenir au moins un article.",
+  "You cannot buy your own listing.": "Vous ne pouvez pas acheter votre propre annonce.",
+  "Invalid item price.": "Prix de l'article invalide.",
+  "Unknown product. Refresh the catalogue and try again.": "Produit inconnu. Actualisez le catalogue et réessayez.",
+  "Order total must be greater than zero.": "Le total de la commande doit être supérieur à zéro.",
+  "Unknown order status.": "Statut de commande inconnu.",
+  "This order was just updated. Refresh and try again.": "Cette commande vient d'être mise à jour. Actualisez la page et réessayez.",
+  "Awaiting payment — this order cannot be fulfilled yet.": "En attente de paiement : cette commande ne peut pas encore être traitée.",
+  // payments and wallet
+  "Mobile money is not available yet. Please use another method.": "Le mobile money n'est pas encore disponible. Utilisez un autre moyen de paiement.",
+  "Mobile money is not configured.": "Le mobile money n'est pas configuré.",
+  "Card payments are not available.": "Les paiements par carte ne sont pas disponibles.",
+  "Unknown payment method.": "Moyen de paiement inconnu.",
+  "Enter a valid mobile-money phone number, e.g. +243 81 234 5678.": "Saisissez un numéro de mobile money valide, par exemple +243 81 234 5678.",
+  "You already have pending top-ups. Approve or wait for them to expire first.": "Vous avez déjà des recharges en attente. Validez-les ou attendez leur expiration.",
+  "This top-up reference was already used for a different top-up.": "Cette référence de recharge a déjà été utilisée pour une autre recharge.",
+  "You already have a pending plan payment. Approve it or wait for it to expire first.": "Vous avez déjà un paiement d'abonnement en attente. Validez-le ou attendez son expiration.",
+  "This payment is being processed right now.": "Ce paiement est en cours de traitement.",
+  "Payment not found.": "Paiement introuvable.",
+  "This payment is not waiting for a card.": "Ce paiement n'attend pas de carte.",
+  "Could not reach the card processor. Please try again.": "Impossible de joindre le service de paiement par carte. Réessayez.",
+  "Invalid top-up reference. Please try again.": "Référence de recharge invalide. Réessayez.",
+  "Amount must be a positive number.": "Le montant doit être un nombre positif.",
+  "Amount must be greater than zero.": "Le montant doit être supérieur à zéro.",
+  "Top-up must be positive.": "La recharge doit être positive.",
+  "Insufficient wallet balance.": "Solde du portefeuille insuffisant.",
+  "User not found.": "Utilisateur introuvable.",
+  "Verify your phone number or email address first: open Profile > Verification, confirm a code or link, then try again.":
+    "Vérifiez d'abord votre numéro de téléphone ou votre adresse e-mail : ouvrez Profil > Vérification, confirmez un code ou un lien, puis réessayez.",
+  // account, stores, messages
+  "Name must be 2–80 characters.": "Le nom doit comporter de 2 à 80 caractères.",
+  "Locale must be en or fr.": "La langue doit être « en » ou « fr ».",
+  "Invalid avatar URL.": "Adresse de la photo de profil invalide.",
+  "A valid device token is required.": "Un jeton d'appareil valide est requis.",
+  "Choose a store to follow.": "Choisissez une boutique à suivre.",
+  "This is your own store.": "C'est votre propre boutique.",
+  "Attachment is not a valid image.": "La pièce jointe n'est pas une image valide.",
+  "Message not found.": "Message introuvable.",
+  "Payload too large.": "Contenu trop volumineux.",
+  "Invalid payload: expected an object.": "Contenu invalide.",
+  "Invalid payload: not serialisable.": "Contenu invalide.",
+  "Your account is not active.": "Votre compte n'est pas actif.",
+  "Automatic translation is not available right now.": "La traduction automatique n'est pas disponible pour le moment.",
+  // categories and products a shopper may touch through search / filters
+  "That category does not exist.": "Cette catégorie n'existe pas.",
+  "Choose a category.": "Choisissez une catégorie.",
+  "Choose a category from the list.": "Choisissez une catégorie dans la liste.",
+  "Coupon not found.": "Coupon introuvable.",
+  "That code already exists.": "Ce code existe déjà.",
+  // opening a store (sell-online page)
+  "Only seller accounts can open a store.": "Seuls les comptes vendeur peuvent ouvrir une boutique.",
+  "Enter a valid phone number (for example +243 81 234 5678).": "Saisissez un numéro de téléphone valide (par exemple +243 81 234 5678).",
+  "You must accept the seller terms.": "Vous devez accepter les conditions vendeur.",
+  "Unknown plan.": "Offre inconnue.",
+  "This plan is arranged with our sales team — please contact us.": "Cette offre se négocie avec notre équipe commerciale : contactez-nous.",
+  "The free plan needs no payment.": "L'offre gratuite ne demande aucun paiement.",
+  "Your store is already approved.": "Votre boutique est déjà approuvée.",
+  "Your application is already under review.": "Votre demande est déjà en cours d'examen.",
+  "A suspended store cannot resubmit; contact support.": "Une boutique suspendue ne peut pas soumettre à nouveau sa demande ; contactez le support.",
+  "Your store is not active. Contact support.": "Votre boutique n'est pas active. Contactez le support.",
+  "Your store is not active.": "Votre boutique n'est pas active.",
+  "Seller not found.": "Vendeur introuvable.",
+  "Customer not found.": "Client introuvable.",
+  "Account not found.": "Compte introuvable.",
+};
+
+/** Looks the sentence up with the same normalisation `localizeApiError` uses. */
+function shopErrorFr(msg: string): string | null {
+  return SHOP_EXACT[msg] ?? SHOP_EXACT[msg.replace(/’/g, "'")] ?? null;
 }

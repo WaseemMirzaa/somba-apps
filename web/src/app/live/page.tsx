@@ -16,6 +16,8 @@ import {
   WifiOff,
 } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
+import { useLocale } from "@/context/locale-context";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { DEMO_MODE } from "@/lib/demo-mode";
 import type {
@@ -25,13 +27,22 @@ import type {
 } from "@/lib/realtime/types";
 
 const DEMO_ACCOUNTS = [
-  { label: "Customer", email: "customer@somba.app" },
-  { label: "Admin", email: "admin@somba.app" },
-  { label: "Warehouse", email: "warehouse@somba.app" },
-  { label: "Rider", email: "rider@somba.app" },
+  { label: "Customer", labelFr: "Client", email: "customer@somba.app" },
+  { label: "Admin", labelFr: "Admin", email: "admin@somba.app" },
+  { label: "Warehouse", labelFr: "Entrepôt", email: "warehouse@somba.app" },
+  { label: "Rider", labelFr: "Livreur", email: "rider@somba.app" },
 ];
 // Prefilled credentials and the quick sign-in row exist only in a demo build (lib/demo-mode).
 const DEMO_PASSWORD = DEMO_MODE ? "Somba@2026" : "";
+
+/** The `value` is what the server stores; the label follows the language. */
+const PRODUCT_CATEGORIES = [
+  { value: "Electronics", fr: "Électronique" },
+  { value: "Fashion", fr: "Mode" },
+  { value: "Jewelery", fr: "Bijoux" },
+  { value: "Home & Living", fr: "Maison et vie" },
+  { value: "Beauty", fr: "Beauté" },
+];
 
 const NEXT_ORDER_STATUS: Record<string, OrderStatus[]> = {
   pending: ["confirmed", "cancelled"],
@@ -47,7 +58,40 @@ const NEXT_DELIVERY_STATUS: Record<string, DeliveryStatus[]> = {
   in_transit: ["delivered", "failed"],
 };
 
+/** Order, delivery, payment, payout and dispute states, plus the account roles, as words in both languages. */
+const STATUS_FR: Record<string, string> = {
+  pending: "En attente",
+  confirmed: "Confirmée",
+  processing: "En préparation",
+  shipped: "Expédiée",
+  out_for_delivery: "En livraison",
+  delivered: "Livrée",
+  cancelled: "Annulée",
+  returned: "Retournée",
+  unassigned: "Non assignée",
+  assigned: "Assignée",
+  picked_up: "Collectée",
+  in_transit: "En transit",
+  failed: "Échec",
+  paid: "Payé",
+  completed: "Terminé",
+  requested: "Demandé",
+  approved: "Approuvé",
+  rejected: "Refusé",
+  open: "Ouvert",
+  resolved: "Résolu",
+  refunded: "Remboursé",
+  customer: "Client",
+  seller: "Vendeur",
+  rider: "Livreur",
+  admin: "Admin",
+  warehouse_staff: "Entrepôt",
+};
+/** "out_for_delivery" -> "En livraison" (French) / "out for delivery" (English). Unknown words stay readable. */
+const statusText = (status: string, fr: boolean) => (fr ? STATUS_FR[status] ?? status.replace(/_/g, " ") : status.replace(/_/g, " "));
+
 function StatusPill({ status }: { status: string }) {
+  const { locale } = useLocale();
   const tone =
     status === "delivered"
       ? "bg-emerald-100 text-emerald-700"
@@ -58,13 +102,15 @@ function StatusPill({ status }: { status: string }) {
           : "bg-sky-100 text-sky-700";
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}>
-      {status.replace(/_/g, " ")}
+      {statusText(status, locale === "fr")}
     </span>
   );
 }
 
 export default function LiveConsolePage() {
   const rt = useRealtime();
+  const { locale } = useLocale();
+  const fr = locale === "fr";
   const [email, setEmail] = useState(DEMO_MODE ? "customer@somba.app" : "");
   const [password, setPassword] = useState(DEMO_PASSWORD);
   const [busy, setBusy] = useState(false);
@@ -145,14 +191,14 @@ export default function LiveConsolePage() {
     async (orderId: string) => {
       setBusy(true);
       try {
-        await rt.openDispute(orderId, "return", "Item not as described");
+        await rt.openDispute(orderId, "return", fr ? "Article non conforme à la description" : "Item not as described");
       } catch (e) {
         alert((e as Error).message);
       } finally {
         setBusy(false);
       }
     },
-    [rt],
+    [rt, fr],
   );
 
   const publishProduct = useCallback(async () => {
@@ -191,13 +237,13 @@ export default function LiveConsolePage() {
 
   const connectionBadge = useMemo(() => {
     const map = {
-      connected: { icon: Wifi, text: "Live", cls: "text-emerald-600" },
-      connecting: { icon: Radio, text: "Connecting…", cls: "text-amber-600" },
-      disconnected: { icon: WifiOff, text: "Offline", cls: "text-slate-400" },
-      error: { icon: WifiOff, text: "Error", cls: "text-rose-600" },
+      connected: { icon: Wifi, text: fr ? "En direct" : "Live", cls: "text-emerald-600" },
+      connecting: { icon: Radio, text: fr ? "Connexion…" : "Connecting…", cls: "text-amber-600" },
+      disconnected: { icon: WifiOff, text: fr ? "Hors ligne" : "Offline", cls: "text-slate-400" },
+      error: { icon: WifiOff, text: fr ? "Erreur" : "Error", cls: "text-rose-600" },
     } as const;
     return map[rt.status];
-  }, [rt.status]);
+  }, [rt.status, fr]);
 
   // ---- Not signed in: login panel ----
   if (!rt.user) {
@@ -207,17 +253,18 @@ export default function LiveConsolePage() {
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-600 text-white">
             <Activity className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Realtime Console</h1>
+          <LanguageToggle className="absolute right-4 top-4" />
+          <h1 className="text-2xl font-bold text-slate-900">{fr ? "Console temps réel" : "Realtime Console"}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Live WebSocket link to the KOMORIKO backend. Sign in as any
-            role — orders, deliveries and notifications update instantly across
-            web and mobile.
+            {fr
+              ? "Lien WebSocket en direct avec le serveur KOMORIKO. Connectez-vous avec n'importe quel rôle : commandes, livraisons et notifications se mettent à jour instantanément sur le web et le mobile."
+              : "Live WebSocket link to the KOMORIKO backend. Sign in as any role — orders, deliveries and notifications update instantly across web and mobile."}
           </p>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <label className="mb-1 block text-xs font-semibold text-slate-600">
-            Email
+            {fr ? "E-mail" : "Email"}
           </label>
           <input
             value={email}
@@ -225,7 +272,7 @@ export default function LiveConsolePage() {
             className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
           />
           <label className="mb-1 block text-xs font-semibold text-slate-600">
-            Password
+            {fr ? "Mot de passe" : "Password"}
           </label>
           <input
             type="password"
@@ -238,7 +285,7 @@ export default function LiveConsolePage() {
             disabled={busy}
             className="w-full rounded-lg bg-sky-600 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? (fr ? "Connexion…" : "Signing in…") : fr ? "Se connecter" : "Sign in"}
           </button>
           {loginError && (
             <p className="mt-2 text-center text-xs text-rose-600">{loginError}</p>
@@ -246,7 +293,7 @@ export default function LiveConsolePage() {
           {DEMO_MODE && (
           <>
           <p className="mt-4 text-center text-xs text-slate-400">
-            Quick sign-in (password {DEMO_PASSWORD})
+            {fr ? "Connexion rapide (mot de passe" : "Quick sign-in (password"} {DEMO_PASSWORD})
           </p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {DEMO_ACCOUNTS.map((a) => (
@@ -259,7 +306,7 @@ export default function LiveConsolePage() {
                 disabled={busy}
                 className="rounded-lg border border-slate-200 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                {a.label}
+                {fr ? a.labelFr : a.label}
               </button>
             ))}
           </div>
@@ -300,7 +347,7 @@ export default function LiveConsolePage() {
             onClick={rt.logout}
             className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
           >
-            Sign out
+            {fr ? "Se déconnecter" : "Sign out"}
           </button>
         </div>
       </div>
@@ -313,7 +360,7 @@ export default function LiveConsolePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="flex items-center gap-1.5 text-xs font-medium text-sky-100">
-                    <Wallet className="h-4 w-4" /> Wallet balance
+                    <Wallet className="h-4 w-4" /> {fr ? "Solde du portefeuille" : "Wallet balance"}
                   </p>
                   <p className="mt-1 text-3xl font-bold">
                     ${rt.walletBalance.toFixed(2)}
@@ -324,7 +371,7 @@ export default function LiveConsolePage() {
                   disabled={busy}
                   className="rounded-lg bg-white/15 px-3 py-2 text-xs font-semibold backdrop-blur hover:bg-white/25 disabled:opacity-50"
                 >
-                  + Top up $50
+                  {fr ? "+ Recharger 50 $" : "+ Top up $50"}
                 </button>
               </div>
               {rt.walletTransactions.length > 0 && (
@@ -347,7 +394,7 @@ export default function LiveConsolePage() {
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-2 font-semibold text-slate-800">
-                  <Package className="h-4 w-4" /> Storefront
+                  <Package className="h-4 w-4" /> {fr ? "Boutique" : "Storefront"}
                 </h2>
                 <div className="flex gap-2">
                   <button
@@ -355,7 +402,7 @@ export default function LiveConsolePage() {
                     disabled={busy || !rt.products.length}
                     className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
-                    <Wallet className="h-3 w-3" /> Pay w/ wallet
+                    <Wallet className="h-3 w-3" /> {fr ? "Payer avec le portefeuille" : "Pay w/ wallet"}
                   </button>
                 </div>
               </div>
@@ -369,7 +416,7 @@ export default function LiveConsolePage() {
                       {p.name}
                     </p>
                     <p className="mt-1 text-slate-500">
-                      ${p.price} · stock {p.stock}
+                      ${p.price} · {fr ? "stock" : "stock"} {p.stock}
                     </p>
                   </div>
                 ))}
@@ -381,11 +428,11 @@ export default function LiveConsolePage() {
           {isSeller && (
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-800">
-                <Package className="h-4 w-4" /> Publish a product
+                <Package className="h-4 w-4" /> {fr ? "Publier un produit" : "Publish a product"}
               </h2>
               <div className="grid grid-cols-2 gap-2">
                 <input
-                  placeholder="Product name"
+                  placeholder={fr ? "Nom du produit" : "Product name"}
                   value={newProduct.name}
                   onChange={(e) =>
                     setNewProduct((p) => ({ ...p, name: e.target.value }))
@@ -393,7 +440,7 @@ export default function LiveConsolePage() {
                   className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
                 <input
-                  placeholder="Price (USD)"
+                  placeholder={fr ? "Prix (USD)" : "Price (USD)"}
                   type="number"
                   value={newProduct.price}
                   onChange={(e) =>
@@ -417,24 +464,22 @@ export default function LiveConsolePage() {
                   }
                   className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 >
-                  {["Electronics", "Fashion", "Jewelery", "Home & Living", "Beauty"].map(
-                    (c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ),
-                  )}
+                  {PRODUCT_CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {fr ? c.fr : c.value}
+                    </option>
+                  ))}
                 </select>
                 <button
                   onClick={publishProduct}
                   disabled={busy || !newProduct.name || !newProduct.price}
                   className="col-span-2 rounded-lg bg-sky-600 py-2 text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  Publish → live to all shoppers
+                  {fr ? "Publier → visible en direct par tous les acheteurs" : "Publish → live to all shoppers"}
                 </button>
               </div>
               <p className="mt-3 text-xs font-semibold text-slate-500">
-                My catalog ({rt.products.filter((p) => p.sellerName === rt.user?.name).length})
+                {fr ? "Mon catalogue" : "My catalog"} ({rt.products.filter((p) => p.sellerName === rt.user?.name).length})
               </p>
               <div className="mt-1 space-y-1">
                 {rt.products
@@ -455,19 +500,19 @@ export default function LiveConsolePage() {
 
               <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                  <Wallet className="h-4 w-4" /> Payouts
+                  <Wallet className="h-4 w-4" /> {fr ? "Versements" : "Payouts"}
                 </h3>
                 <button
                   onClick={requestPayout}
                   disabled={busy}
                   className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                 >
-                  Request $100 payout
+                  {fr ? "Demander un versement de 100 $" : "Request $100 payout"}
                 </button>
               </div>
               <div className="mt-2 space-y-1">
                 {rt.payouts.length === 0 && (
-                  <p className="text-xs text-slate-400">No payouts yet.</p>
+                  <p className="text-xs text-slate-400">{fr ? "Aucun versement pour le moment." : "No payouts yet."}</p>
                 )}
                 {rt.payouts.slice(0, 6).map((p) => (
                   <div
@@ -488,15 +533,15 @@ export default function LiveConsolePage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-800">
               <Activity className="h-4 w-4" />
-              {isCustomer ? "My orders" : "All orders"}
+              {isCustomer ? (fr ? "Mes commandes" : "My orders") : fr ? "Toutes les commandes" : "All orders"}
               <span className="ml-auto text-xs font-normal text-slate-400">
-                live
+                {fr ? "en direct" : "live"}
               </span>
             </h2>
             <div className="space-y-2">
               {rt.orders.length === 0 && (
                 <p className="py-6 text-center text-sm text-slate-400">
-                  No orders yet.
+                  {fr ? "Aucune commande pour le moment." : "No orders yet."}
                 </p>
               )}
               {rt.orders.map((o) => {
@@ -520,7 +565,7 @@ export default function LiveConsolePage() {
                     </div>
                     {loc && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-emerald-600">
-                        <MapPin className="h-3 w-3" /> rider @ {loc.lat.toFixed(3)},{" "}
+                        <MapPin className="h-3 w-3" /> {fr ? "livreur" : "rider"} @ {loc.lat.toFixed(3)},{" "}
                         {loc.lng.toFixed(3)}
                       </p>
                     )}
@@ -533,7 +578,7 @@ export default function LiveConsolePage() {
                           disabled={busy}
                           className="mt-2 flex items-center gap-1 rounded-md border border-amber-300 px-2 py-1 text-[11px] font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
                         >
-                          <RotateCcw className="h-3 w-3" /> Open return
+                          <RotateCcw className="h-3 w-3" /> {fr ? "Ouvrir un retour" : "Open return"}
                         </button>
                       )}
                     {isAdmin && (
@@ -544,7 +589,7 @@ export default function LiveConsolePage() {
                             onClick={() => rt.updateOrderStatus(o.id, s)}
                             className="rounded-md bg-slate-800 px-2 py-1 text-[11px] font-medium text-white hover:bg-slate-700"
                           >
-                            → {s.replace(/_/g, " ")}
+                            → {statusText(s, fr)}
                           </button>
                         ))}
                         {(canRefund) &&
@@ -554,7 +599,7 @@ export default function LiveConsolePage() {
                               onClick={() => rt.refundOrder(o.id, true)}
                               className="flex items-center gap-1 rounded-md border border-rose-300 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50"
                             >
-                              <RotateCcw className="h-3 w-3" /> Refund → wallet
+                              <RotateCcw className="h-3 w-3" /> {fr ? "Rembourser → portefeuille" : "Refund → wallet"}
                             </button>
                           )}
                       </div>
@@ -569,7 +614,7 @@ export default function LiveConsolePage() {
           {isRider && (
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="mb-3 flex items-center gap-2 font-semibold text-slate-800">
-                <Truck className="h-4 w-4" /> Deliveries
+                <Truck className="h-4 w-4" /> {fr ? "Livraisons" : "Deliveries"}
               </h2>
               {rt.deliveries.map((t) => (
                 <div
@@ -589,7 +634,7 @@ export default function LiveConsolePage() {
                         onClick={() => rt.updateDeliveryStatus(t.id, s)}
                         className="rounded-md bg-slate-800 px-2 py-1 font-medium text-white"
                       >
-                        → {s.replace(/_/g, " ")}
+                        → {statusText(s, fr)}
                       </button>
                     ))}
                     {(t.status === "assigned" ||
@@ -599,7 +644,7 @@ export default function LiveConsolePage() {
                         onClick={() => streamLocation(t)}
                         className="rounded-md border border-sky-300 px-2 py-1 font-medium text-sky-700"
                       >
-                        Stream GPS
+                        {fr ? "Diffuser le GPS" : "Stream GPS"}
                       </button>
                     )}
                   </div>
@@ -616,7 +661,7 @@ export default function LiveConsolePage() {
           </h2>
           {rt.notifications.length === 0 && (
             <p className="py-6 text-center text-sm text-slate-400">
-              Nothing yet.
+              {fr ? "Rien pour le moment." : "Nothing yet."}
             </p>
           )}
           {rt.notifications.slice(0, 20).map((n) => (
@@ -640,7 +685,7 @@ export default function LiveConsolePage() {
           {rt.payments.length > 0 && (
             <>
               <h2 className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 font-semibold text-slate-800">
-                <CreditCard className="h-4 w-4" /> Payments
+                <CreditCard className="h-4 w-4" /> {fr ? "Paiements" : "Payments"}
               </h2>
               {rt.payments.slice(0, 12).map((p) => (
                 <div
@@ -665,7 +710,7 @@ export default function LiveConsolePage() {
           {canRefund && rt.payouts.length > 0 && (
             <>
               <h2 className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 font-semibold text-slate-800">
-                <Wallet className="h-4 w-4" /> Payout requests
+                <Wallet className="h-4 w-4" /> {fr ? "Demandes de versement" : "Payout requests"}
               </h2>
               {rt.payouts.slice(0, 10).map((p) => (
                 <div
@@ -684,13 +729,13 @@ export default function LiveConsolePage() {
                         onClick={() => rt.approvePayout(p.id)}
                         className="rounded-md bg-emerald-600 px-2 py-1 font-medium text-white"
                       >
-                        Approve
+                        {fr ? "Approuver" : "Approve"}
                       </button>
                       <button
-                        onClick={() => rt.rejectPayout(p.id, "Declined")}
+                        onClick={() => rt.rejectPayout(p.id, fr ? "Refusé" : "Declined")}
                         className="rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600"
                       >
-                        Reject
+                        {fr ? "Refuser" : "Reject"}
                       </button>
                     </div>
                   )}
@@ -703,7 +748,7 @@ export default function LiveConsolePage() {
           {rt.disputes.length > 0 && (
             <>
               <h2 className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-3 font-semibold text-slate-800">
-                <RotateCcw className="h-4 w-4" /> Disputes / returns
+                <RotateCcw className="h-4 w-4" /> {fr ? "Litiges / retours" : "Disputes / returns"}
               </h2>
               {rt.disputes.slice(0, 10).map((d) => (
                 <div
@@ -723,13 +768,13 @@ export default function LiveConsolePage() {
                         onClick={() => rt.resolveDispute(d.id, true)}
                         className="rounded-md bg-emerald-600 px-2 py-1 font-medium text-white"
                       >
-                        Resolve + refund
+                        {fr ? "Résoudre + rembourser" : "Resolve + refund"}
                       </button>
                       <button
                         onClick={() => rt.resolveDispute(d.id, false)}
                         className="rounded-md border border-slate-200 px-2 py-1 font-medium text-slate-600"
                       >
-                        Resolve
+                        {fr ? "Résoudre" : "Resolve"}
                       </button>
                     </div>
                   )}

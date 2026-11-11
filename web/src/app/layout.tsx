@@ -9,6 +9,8 @@ import { MarketProvider } from "@/context/market-context";
 import { RealtimeProvider } from "@/context/realtime-context";
 import { LocaleAccountSync } from "@/components/layout/locale-account-sync";
 import { AlertsPrompt } from "@/components/layout/alerts-prompt";
+import { LocaleDocumentMeta } from "@/components/layout/locale-document-meta";
+import { SITE_META } from "@/lib/site-meta";
 
 // Fonts ship inside the app (npm packages @fontsource-variable/*), so a build or a deploy never depends on Google being reachable.
 const inter = localFont({
@@ -27,12 +29,13 @@ const jakarta = localFont({
 
 export const metadata: Metadata = {
   applicationName: "KOMORIKO",
-  title: "KOMORIKO — Shop, sell and deliver",
-  description: "KOMORIKO: shop products from verified sellers, pay with mobile money or your wallet and follow your delivery live.",
+  // French is the default language (the visitor's choice is read in the browser: see LocaleDocumentMeta).
+  title: SITE_META.fr.title,
+  description: SITE_META.fr.description,
   openGraph: {
     siteName: "KOMORIKO",
-    title: "KOMORIKO — Shop, sell and deliver",
-    description: "KOMORIKO: shop products from verified sellers, pay with mobile money or your wallet and follow your delivery live.",
+    title: SITE_META.fr.title,
+    description: SITE_META.fr.description,
     type: "website",
   },
   icons: {
@@ -45,7 +48,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jakarta.variable} h-full antialiased`}>
+    <html lang="fr" suppressHydrationWarning className={`${inter.variable} ${jakarta.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
         <LocaleProvider>
           <RealtimeProvider>
@@ -54,6 +57,7 @@ export default function RootLayout({
                                                             <ShopProvider>
                         <ToastProvider>
                           <LocaleAccountSync />
+                          <LocaleDocumentMeta />
                           <AlertsPrompt />
                           {children}
                         </ToastProvider>

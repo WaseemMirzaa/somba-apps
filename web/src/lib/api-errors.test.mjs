@@ -201,3 +201,10 @@ test("the delivery model's errors read in French", () => {
     assert.match(localizeApiError(en, "fr"), re, en);
   }
 });
+
+test("shopper-side sentences (cart, payments, wallet, store opening) map to French", () => {
+  assert.equal(localizeApiError("Insufficient wallet balance.", "fr"), "Solde du portefeuille insuffisant.");
+  assert.equal(localizeApiError("You cannot buy your own listing.", "fr"), "Vous ne pouvez pas acheter votre propre annonce.");
+  assert.equal(localizeApiError("Mobile money is not available yet. Please use another method.", "fr"), "Le mobile money n'est pas encore disponible. Utilisez un autre moyen de paiement.");
+  assert.equal(localizeApiError("Insufficient wallet balance.", "en"), "Insufficient wallet balance.");
+});
