@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { LocaleProvider } from "@/context/locale-context";
 import { AuthProvider } from "@/context/auth-context";
@@ -9,15 +9,19 @@ import { MarketProvider } from "@/context/market-context";
 import { RealtimeProvider } from "@/context/realtime-context";
 import { LocaleAccountSync } from "@/components/layout/locale-account-sync";
 
-const inter = Inter({
+// Fonts ship inside the app (npm packages @fontsource-variable/*), so a build or a deploy never depends on Google being reachable.
+const inter = localFont({
   variable: "--font-sans",
-  subsets: ["latin"],
+  src: "../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
+  weight: "100 900",
+  display: "swap",
 });
 
-const jakarta = Plus_Jakarta_Sans({
+const jakarta = localFont({
   variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  src: "../../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2",
+  weight: "200 800",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
