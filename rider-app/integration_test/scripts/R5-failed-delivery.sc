@@ -1,6 +1,6 @@
 # Clip R5 - a failed delivery: "Could not deliver" with a reason, and what happens next.
 act riderClear
-act rFixture stage=delivery commune=Gombe pay=cod product=Instant assign=false -> ord
+act rFixture stage=delivery commune=Gombe pay=wallet product=Instant assign=false -> ord
 include rsetup.sc
 flash
 say "A delivery is on the road and the customer cannot be reached||Une livraison est en route et le client est injoignable" 3.4

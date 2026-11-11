@@ -11,7 +11,7 @@ import '../widgets/ui.dart';
 /// answering `true`; if the save fails the sheet stays open with the reason, and offers to deliver without the proof. With
 /// nothing captured "Continue" just closes. Answers `false` / null when the rider cancels (the delivery is not completed).
 ///
-/// The delivery code, the cash and every other check of the completion stay where they were: this only adds the proof.
+/// The delivery code and every other check of the completion stay where they were: this only adds the proof.
 class DeliveryProofSheet extends StatefulWidget {
   const DeliveryProofSheet({super.key, required this.taskId, this.camera, this.uploader});
   final String taskId;

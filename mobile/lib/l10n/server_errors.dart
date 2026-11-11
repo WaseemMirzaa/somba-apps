@@ -124,7 +124,6 @@ final Map<String, String> _exactFr = {
   'Invalid delivery fee.': 'Frais de livraison invalides.',
   'Invalid item price.': 'Prix d’article invalide.',
   'Unknown payment method.': 'Moyen de paiement inconnu.',
-  'Cash on delivery is not available.': 'Le paiement à la livraison n’est pas disponible.',
   'Card payments are not available.': 'Les paiements par carte ne sont pas disponibles.',
   'This payment is not waiting for a card.': 'Ce paiement n’attend pas de carte.',
   'Mobile money is not available yet. Please use another method.': 'Le mobile money n’est pas encore disponible. Utilisez un autre moyen de paiement.',

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/strings.dart';
-import '../services/cod_visibility.dart';
 import '../services/history_filter.dart';
 import '../services/location_reporter.dart';
 import '../services/maps_config.dart';
@@ -156,12 +155,12 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
     return ok == true && mounted;
   }
 
-  Future<void> _askCode(DeliveryTaskDto t, {double? cashUsd}) async {
+  Future<void> _askCode(DeliveryTaskDto t, ) async {
     // The dialog keeps itself open and shows the server's error until the code is right.
     final done = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => DeliveryCodeDialog(onSubmit: (code) => store.advance(t.id, 'delivered', code: code, cashUsd: cashUsd)),
+      builder: (ctx) => DeliveryCodeDialog(onSubmit: (code) => store.advance(t.id, 'delivered', code: code)),
     );
     if (done == true && mounted) showSnack(context, Strings.of(context).doneDelivered);
   }
@@ -182,18 +181,9 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
       return;
     }
     if (to == 'delivered') {
-      // Cash on delivery: the rider confirms the amount they took; the server records it and refuses any other than the one due.
-      double? cashUsd;
-      if (showTaskCash(store.codEnabled, t)) {
-        cashUsd = await showDialog<double>(
-          context: context,
-          builder: (ctx) => CashCollectDialog(due: t.codAmountUsd, customer: t.customerName ?? s.theCustomer),
-        );
-        if (cashUsd == null || !mounted) return;
-      }
       if (t.collectOld && !await _confirm(s.collectOldTitle, s.collectOldBody(t.customerName ?? s.theCustomer))) return;
       // Optional proof at the door: a photo and the customer's signature, saved on the server before the leg is completed.
-      // The code and the cash below are checked exactly as before; the sheet only adds the proof.
+      // The code below is checked exactly as before; the sheet only adds the proof.
       if (t.takesProof && mounted) {
         final go = await showModalBottomSheet<bool>(
           context: context,
@@ -204,16 +194,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
         if (go != true || !mounted) return;
       }
       // The customer's code is asked on the customer delivery only (never on a hub-bound leg, a return or a replacement).
-      if (t.needsCode && store.requireDeliveryCode) return _askCode(t, cashUsd: cashUsd);
+      if (t.needsCode && store.requireDeliveryCode) return _askCode(t);
       try {
         setState(() => _busy = true);
-        await store.advance(t.id, 'delivered', cashUsd: cashUsd);
+        await store.advance(t.id, 'delivered');
         if (mounted) showSnack(context, s.doneDelivered);
       } catch (e) {
         // The setting was not known yet but the server wants the code: ask for it.
         if (e is ApiException && e.message.startsWith('Wrong delivery code') && mounted) {
           setState(() => _busy = false);
-          return _askCode(t, cashUsd: cashUsd);
+          return _askCode(t);
         }
         if (mounted) showSnack(context, Strings.current.errorText(e));
       } finally {
@@ -441,19 +431,6 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
               ),
             ]),
           ),
-        if (showTaskCash(store.codEnabled, t) && t.isActive)
-          Container(
-            margin: const EdgeInsets.only(top: 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(14)),
-            child: Row(children: [
-              const Icon(Icons.payments_rounded, color: Color(0xFF92610A)),
-              const SizedBox(width: 10),
-              Expanded(child: Text(s.collectCash(s.usd(t.codAmountUsd)), style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF92610A)))),
-            ]),
-          )
-        else if (showPrepaidNote(store.codEnabled, t))
-          Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.alreadyPaid, style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         if (t.isActive && t.needsCode && store.requireDeliveryCode && t.status != 'assigned')
           Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.codeHint, key: ValueKey('code-hint-${t.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         if (t.status == 'in_transit') _gpsRow(s, toCustomer: t.isCustomerLeg || t.kind == LegKind.replacementDelivery),
@@ -934,62 +911,6 @@ class _FailReasonSheetState extends State<FailReasonSheet> {
           ),
         ),
       ]),
-    );
-  }
-}
-
-/// Cash on delivery: the rider confirms how much cash they took at the door. The field starts at the amount due; the
-/// dialog answers with the amount entered (the server refuses anything but the amount due, and says so).
-class CashCollectDialog extends StatefulWidget {
-  final double due;
-  final String customer;
-  const CashCollectDialog({super.key, required this.due, required this.customer});
-  @override
-  State<CashCollectDialog> createState() => _CashCollectDialogState();
-}
-
-class _CashCollectDialogState extends State<CashCollectDialog> {
-  late final TextEditingController _ctrl = TextEditingController(text: widget.due.toStringAsFixed(2));
-  String? _error;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final v = double.tryParse(_ctrl.text.trim().replaceAll(',', '.'));
-    if (v == null || !v.isFinite || v <= 0 || (v * 100 - (v * 100).roundToDouble()).abs() > 1e-6) {
-      setState(() => _error = Strings.of(context).cashAmountErr);
-      return;
-    }
-    Navigator.pop(context, v);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Strings.of(context);
-    return AlertDialog(
-      title: Text(s.cashTitle),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(s.cashBody(s.usd(widget.due), widget.customer)),
-        const SizedBox(height: 12),
-        TextField(
-          key: const ValueKey('cash-amount-field'),
-          controller: _ctrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-          decoration: InputDecoration(labelText: s.cashAmountLabel, border: const OutlineInputBorder(), errorText: _error),
-          onChanged: (_) => _error == null ? null : setState(() => _error = null),
-          onSubmitted: (_) => _submit(),
-        ),
-      ]),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.notYet)),
-        FilledButton(key: const ValueKey('confirm-dialog'), onPressed: _submit, child: Text(s.yesCollected)),
-      ],
     );
   }
 }

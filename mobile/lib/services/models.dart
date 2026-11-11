@@ -579,7 +579,7 @@ class OrderPackage {
 String packageStatusOf(OrderDto o, List<OrderItemDto> items) {
   final live = items.where((i) => !i.isCancelled).toList();
   if (live.isEmpty || o.status == 'cancelled') return 'cancelled';
-  if (o.status == 'pending' && o.paymentMethod != 'cod') return 'pending';
+  if (o.status == 'pending') return 'pending';
   // A split order delivers part by part: this seller's package is delivered once all its lines reached the customer.
   if (live.every((i) => i.deliveredAt != null)) return 'delivered';
   if (live.every((i) => i.fulfilment == 'received')) {
@@ -703,7 +703,7 @@ class OrderDto {
 
   /// The order is not over: not unpaid (`pending`), cancelled, returned or delivered. A handover code may exist only then
   /// (a failed attempt sends the order back to `confirmed` and re-opens the leg with a new code).
-  bool get isLive => !const {'pending', 'cancelled', 'returned', 'delivered'}.contains(status) || (status == 'pending' && isCod);
+  bool get isLive => !const {'pending', 'cancelled', 'returned', 'delivered'}.contains(status);
 
   /// The latest failed delivery attempt on a live order, for "Delivery attempt 1 failed: ... We will try again" (null when
   /// none, or when the leg closed because the parcel went back to the seller or the order was refunded).
@@ -718,18 +718,11 @@ class OrderDto {
     return (attempt: last.attempts, reason: last.failureReason, retry: later.any((l) => l.status != 'failed'));
   }
 
-  /// Cash on delivery: the server keeps the order `pending` until the rider collects the money, but it is already
-  /// being prepared (nothing to approve on a phone), so the app treats it like a confirmed order.
-  bool get isCod => paymentMethod == 'cod';
-
-  /// Waiting for the customer to pay online (mobile money): `pending` and not cash on delivery.
-  bool get awaitsOnlinePayment => status == 'pending' && !isCod;
+  /// Waiting for the customer to pay (mobile money, card): still `pending`.
+  bool get awaitsOnlinePayment => status == 'pending';
 
   /// Paid with a bank card (Stripe): the customer confirms in the card sheet, not on a phone.
   bool get isCard => paymentMethod == 'stripe_card';
-
-  /// The status to show: a cash-on-delivery order that is still `pending` reads as confirmed.
-  String get shownStatus => status == 'pending' && isCod ? 'confirmed' : status;
 
   Map<String, dynamic>? get _shipping {
     final raw = shippingRaw;

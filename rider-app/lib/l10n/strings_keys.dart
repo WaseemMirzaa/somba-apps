@@ -56,7 +56,6 @@ extension StringsKeys on Strings {
   String get connOffline => t('conn_offline');
   String get emptyActive => t('empty_active');
   String get emptyDone => t('empty_done');
-  String codPill(Object? amount) => t('cod_pill', {'amount': amount});
   String collectAt(Object? address) => t('collect_at', {'address': address});
   String deliverTo(Object? address) => t('deliver_to', {'address': address});
   String get addressMissing => t('address_missing');
@@ -109,10 +108,6 @@ extension StringsKeys on Strings {
   String get actDelivered => t('act_delivered');
   String get couldNotDeliver => t('could_not_deliver');
   String failedWithReason(Object? reason) => t('failed_with_reason', {'reason': reason});
-  String collectCash(Object? amount) => t('collect_cash', {'amount': amount});
-  String get alreadyPaid => t('already_paid');
-  String get cashTitle => t('cash_title');
-  String cashBody(Object? amount, Object? name) => t('cash_body', {'amount': amount, 'name': name});
   String get theCustomer => t('the_customer');
   String get notYet => t('not_yet');
   String get yesCollected => t('yes_collected');
@@ -148,15 +143,6 @@ extension StringsKeys on Strings {
   String get workSalaryNote => t('work_salary_note');
   String get delivered => t('delivered');
   String get inProgress => t('in_progress');
-  String get cashCollected => t('cash_collected');
-  String get cashNote => t('cash_note');
-  String get cashAmountLabel => t('cash_amount_label');
-  String get cashAmountErr => t('cash_amount_err');
-  String get cashInHand => t('cash_in_hand');
-  String cashInHandSub(Object? collected, Object? handed) => t('cash_in_hand_sub', {'collected': collected, 'handed': handed});
-  String get cashHandovers => t('cash_handovers');
-  String cashHandoverLine(Object? amount, Object? name) => t('cash_handover_line', {'amount': amount, 'name': name});
-  String cashHandoverLeft(Object? amount) => t('cash_handover_left', {'amount': amount});
   String get notifications => t('notifications');
   String notificationsNew(Object? n) => t('notifications_new', {'n': n});
   String get notificationsNone => t('notifications_none');

@@ -1,7 +1,6 @@
 // The rider's work stats: riders are salaried, so the "My work" screen shows what they did (tasks completed today, this
 // week and all time; completed, in progress, failed, success rate; completed by type), the way the server's
-// `rider:workStats` answers (docs/contracts/logistics.md section 7), and no pay. The only dollar amounts on it are the
-// cash in hand card (the company's cash the rider holds).
+// `rider:workStats` answers (docs/contracts/logistics.md section 7), and no pay: no dollar amount is on it.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -22,7 +21,6 @@ const _serverAnswer = {
   'completedToday': 2,
   'completedLast7Days': 4,
   'successRate': 63,
-  'codCollectedUsd': 50,
   'byKind': [
     {'kind': 'pickup', 'count': 1},
     {'kind': 'transfer', 'count': 2},
@@ -42,8 +40,6 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() {
     RiderStore.instance.stats = const WorkStatsDto();
-    RiderStore.instance.cash = const CashDto();
-    RiderStore.instance.codEnabled = false;
   });
 
   Future<void> show(WidgetTester tester, String lang, {double width = 402, double textScale = 1.0}) async {
@@ -66,14 +62,14 @@ void main() {
     test('reads every count, the whole-percent success rate and the breakdown by type (counts only)', () {
       final e = WorkStatsDto.fromJson(_serverAnswer);
       expect((e.totalTasks, e.completed, e.active, e.failed), (9, 5, 1, 3));
-      expect((e.completedToday, e.completedLast7Days, e.successRate, e.codCollectedUsd), (2, 4, 63, 50.0));
+      expect((e.completedToday, e.completedLast7Days, e.successRate), (2, 4, 63));
       expect(e.byKind.map((k) => (k.kind, k.count)), [('pickup', 1), ('transfer', 2), ('delivery', 2)]);
       expect(e.byKind.fold<int>(0, (n, k) => n + k.count), e.completed);
     });
 
     test('a null success rate stays null; an answer from before work stats (`delivered`) still parses', () {
       expect(WorkStatsDto.fromJson({...Map.of(_serverAnswer), 'successRate': null}).successRate, isNull);
-      final e = WorkStatsDto.fromJson({'totalTasks': 3, 'delivered': 1, 'active': 2, 'codCollectedUsd': 0});
+      final e = WorkStatsDto.fromJson({'totalTasks': 3, 'delivered': 1, 'active': 2});
       expect(e.completed, 1);
       expect(e.failed, 0);
       expect(e.completedToday, 0);
@@ -116,18 +112,12 @@ void main() {
     });
 
     for (final lang in ['en', 'fr']) {
-      testWidgets('no pay on it: the only dollar amounts are on the cash card ($lang)', (tester) async {
-        final s = Strings(lang);
+      testWidgets('no pay on it: no dollar amount at all ($lang)', (tester) async {
         RiderStore.instance.stats = WorkStatsDto.fromJson(_serverAnswer);
-        RiderStore.instance.cash = const CashDto(heldUsd: 50, collectedUsd: 70, handedOverUsd: 20);
-        RiderStore.instance.codEnabled = true; // the cash card only exists while COD is on (see cod_hidden_test.dart)
         await show(tester, lang);
 
         final dollars = find.byWidgetPredicate((w) => w is Text && (w.data ?? '').contains('\$') && !(w.data ?? '').contains('{'));
-        // Every text with a "$" sits inside the cash-in-hand card: held, and the collected / handed-in line.
-        final texts = tester.widgetList<Text>(dollars).map((w) => w.data).toList();
-        expect(texts, unorderedEquals([s.usd(50), s.cashInHandSub(s.usd(70), s.usd(20))]));
-        expect(find.byKey(const ValueKey('cod-total')), findsOneWidget);
+        expect(dollars, findsNothing);
         // And none of the old pay copy is left.
         for (final word in lang == 'fr' ? ['gains', 'payée', 'payé '] : ['earn', 'pays ', 'per task', 'rate of']) {
           expect(find.textContaining(word, findRichText: true), findsNothing, reason: word);

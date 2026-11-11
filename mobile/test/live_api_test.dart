@@ -199,8 +199,8 @@ void main() {
       expect(
         () => store.placeOrder(items: [
           {'productId': productId, 'qty': 1},
-        ], paymentMethod: 'cod'),
-        throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('not available'))),
+        ], paymentMethod: 'bitcoin'),
+        throwsA(isA<ApiException>().having((e) => e.message, 'message', contains('payment method'))),
       );
       expect(
         () => store.placeOrder(items: [

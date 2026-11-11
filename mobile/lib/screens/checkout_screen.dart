@@ -243,12 +243,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return false;
       }
     }
-    if (payment == 'cod' && !store.codEnabled) {
-      // Switched off while the shopper was on this screen: say so, and go back to a method that works.
-      setState(() => payment = 'airtel_money');
-      _toast(s.serverError('Cash on delivery is not available.'));
-      return false;
-    }
     if (payment == 'wallet' && store.walletBalance + 0.001 < _subtotal + deliveryFee - shop.promoDiscount(_subtotal)) {
       _toast(s.checkoutWalletLow);
       return false;
@@ -488,16 +482,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           if (store.cardPaymentsEnabled) ...[
             if (isMobileMoney(payment)) const SizedBox(height: 10),
             _methodTile('stripe_card', Icons.credit_card_rounded, s.payStripeCard),
-          ],
-          // Below the mobile-money number field, which belongs to the mobile-money tiles above it.
-          if (store.codEnabled) ...[
-            if (isMobileMoney(payment) && !store.cardPaymentsEnabled) const SizedBox(height: 10),
-            _methodTile('cod', Icons.payments_rounded, s.payCod),
-            if (payment == 'cod')
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(s.payCodNote, key: const ValueKey('cod-note'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5, height: 1.35)),
-              ),
           ],
           const SizedBox(height: 18),
           _sectionTitle(s.promoHint),

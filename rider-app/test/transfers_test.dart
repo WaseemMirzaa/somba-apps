@@ -62,7 +62,7 @@ void main() {
         case 'rider:runs':
           return serverRuns;
         case 'rider:workStats':
-          return {'totalTasks': 3, 'completed': 1, 'active': 2, 'failed': 0, 'completedToday': 1, 'completedLast7Days': 1, 'successRate': 100, 'codCollectedUsd': 0, 'byKind': []};
+          return {'totalTasks': 3, 'completed': 1, 'active': 2, 'failed': 0, 'completedToday': 1, 'completedLast7Days': 1, 'successRate': 100, 'byKind': []};
         case 'notifications:list':
           return [];
         case 'settings:get':

@@ -59,14 +59,13 @@ void main() {
     await expectLater(store.login('rider@somba.app', 'wrong-password'), throwsA(anything));
     expect(store.isSignedIn, isFalse);
 
-    // COD is off by default; enable for this run, then the customer orders cash-on-delivery (pinned in Gombe).
-    await admin.call('settings:set', {'key': 'codEnabled', 'value': 'true'});
+    // The customer orders and pays by card (pinned in Gombe).
     final products = ((await customer.call('products:list')) as List).where((p) => ((p['stock'] as num?) ?? 0) > 5).toList();
     final order = await customer.call('orders:create', {
       'items': [
         {'productId': products.first['id'], 'qty': 1}
       ],
-      'paymentMethod': 'cod',
+      'paymentMethod': 'stripe_card',
       'shippingAddress': '{"city":"Kinshasa","line1":"12 Ave du Commerce","geo":{"lat":-4.3105,"lng":15.3136}}',
     });
 
@@ -104,8 +103,6 @@ void main() {
 
     await store.logout();
     expect(store.isSignedIn, isFalse);
-    // Leave the platform as we found it (COD off per the client scope).
-    await admin.call('settings:set', {'key': 'codEnabled', 'value': 'false'});
     admin.close();
     customer.close();
     staff.close();

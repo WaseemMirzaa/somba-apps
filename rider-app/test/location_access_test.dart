@@ -188,7 +188,6 @@ void main() {
           'rider:tasks' || 'notifications:list' || 'support:list' => <dynamic>[],
           'settings:get' => <String, dynamic>{},
           'rider:workStats' => {'totalTasks': 0, 'completed': 0, 'active': 0, 'failed': 0, 'completedToday': 0, 'completedLast7Days': 0, 'successRate': null, 'byKind': []},
-          'cash:mine' => {'collectedUsd': 0, 'handedOverUsd': 0, 'heldUsd': 0, 'openTasks': 0, 'handovers': []},
           _ => {'ok': true},
         };
       };

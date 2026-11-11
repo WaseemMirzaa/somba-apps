@@ -21,8 +21,7 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
   - **DR Congo (Production)** — Congolese Franc (`FC`), FX **≈ 2 850** USD→CDF,
     prefix `+243`. Zones: *Gombe* (Kinshasa, **$3**), *Limete* (Kinshasa,
     **$5**). In this market prices show **FC** with the **≈ $USD** line beneath.
-- **Payments:** Credit / Debit Card, Airtel Money, Orange Money, Vodacom M-Pesa.
-  *No cash-on-delivery, no wallet.*
+- **Payments:** wallet, mobile money (Airtel Money, Orange Money, Vodacom M-Pesa) and bank card. Payment is always up front.
 - **Promo codes** (`lib/data/promos.dart`): **SOMBA10** (10% off, min $50) ·
   **SAVE20** ($20 off, min $100) · **WELCOME5** ($5 off, min $0).
 - **Persistence** (`shared_preferences`): followed stores, read notifications,
@@ -430,7 +429,7 @@ panel (`shared/screens/registry.ts`, `shared/types/index.ts`).
   customer action maps to the matching admin record.
 - **Address** fields follow the shared `Address` shape; **zones** carry a
   `deliveryFeeUsd`; **seller badges** use the `SellerBadge` tiers.
-- Payments limited to card + mobile money (no COD/wallet).
+- Payments: wallet, mobile money and card; always paid up front.
 
 ## Related docs
 - `CUSTOMER_APP_GAP_ANALYSIS.md` — screen-level parity vs the registry.

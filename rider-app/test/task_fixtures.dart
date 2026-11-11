@@ -22,7 +22,6 @@ Map<String, dynamic> legJson(
   String kind, {
   String? id,
   String status = 'assigned',
-  double cod = 0,
   String? failure,
   int attempts = 1,
   bool withOrder = true,
@@ -49,7 +48,6 @@ Map<String, dynamic> legJson(
     'status': status,
     'riderId': riderId,
     'hubId': 'h2',
-    'codAmountUsd': cod,
     'address': meetsCustomer ? kCustomerAddress : (toHub?['address'] ?? 'Entrepôt'),
     'pickupAddress': kind == 'pickup' || kind == 'express' ? 'Boutique Les Merveilles de Kinshasa — 27, avenue Kasa-Vubu' : 'Entrepôt de Gombe, Boulevard du 30 Juin 8',
     'attempts': attempts,
@@ -84,7 +82,7 @@ Map<String, dynamic> legJson(
     json['order'] = {
       'reference': 'SOM-1042',
       'customerName': meetsCustomer ? 'Aline Kabila Mwamba' : 'Aline',
-      'paymentMethod': cod > 0 ? 'cod' : 'stripe_card',
+      'paymentMethod': 'stripe_card',
       'estimatedDeliveryDate': '2026-10-28',
       'totalUsd': 87.5,
       'shippingAddress': meetsCustomer ? kCustomerAddress : null,
@@ -99,8 +97,8 @@ Map<String, dynamic> legJson(
   return json;
 }
 
-DeliveryTaskDto leg(String kind, {String? id, String status = 'assigned', double cod = 0, String? failure, int attempts = 1, bool legacy = false, bool partial = false}) =>
-    DeliveryTaskDto.fromJson(legJson(kind, id: id, status: status, cod: cod, failure: failure, attempts: attempts, legacy: legacy, partial: partial));
+DeliveryTaskDto leg(String kind, {String? id, String status = 'assigned', String? failure, int attempts = 1, bool legacy = false, bool partial = false}) =>
+    DeliveryTaskDto.fromJson(legJson(kind, id: id, status: status, failure: failure, attempts: attempts, legacy: legacy, partial: partial));
 
 Map<String, dynamic> ticketJson(
   String id, {

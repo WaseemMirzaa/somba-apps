@@ -11,7 +11,7 @@ class AppColors {
   static const Color primaryDark = Color(0xFF0E1F5C); // logo dark
   static const Color teal = Color(0xFF2A52CF); // mid royal blue
   static const Color cyan = Color(0xFF3B82F6);
-  static const Color accent = Color(0xFFF59E0B); // COD / cash amber
+  static const Color accent = Color(0xFFF59E0B); // amber
   static const Color info = Color(0xFF0EA5E9); // navigate (sky)
   static const Color success = Color(0xFF16A34A); // delivered
   static const Color danger = Color(0xFFEF4444); // failed / return
@@ -31,11 +31,6 @@ class AppColors {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [Color(0xFF3258D8), Color(0xFF1A3AA8), Color(0xFF0E1F5C)],
-  );
-  static const LinearGradient cashGradient = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFFF59E0B), Color(0xFFEA580C)],
   );
 }
 

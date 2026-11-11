@@ -1,5 +1,5 @@
-// French dollar amounts need a thousands separator: a cash-on-delivery badge read "1202,00 $".
-// `Strings.usd` is the only money formatter of the app (cash in hand, cash to collect, the delivery pill).
+// French dollar amounts need a thousands separator: an amount read "1202,00 $".
+// `Strings.usd` is the only money formatter of the app.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:somba_rider/l10n/notification_text.dart';
 import 'package:somba_rider/l10n/strings.dart';
@@ -39,28 +39,14 @@ void main() {
     });
   });
 
-  group('the cash-on-delivery badge', () {
-    test(r'French: "Paiement à la livraison 1 202,00 $"', () {
-      expect(fr.codPill(fr.usd(1202)), 'Paiement à la livraison 1 202,00 \$');
-    });
-
-    test(r'English: "COD $1,202.00"', () {
-      expect(en.codPill(en.usd(1202)), 'COD \$1,202.00');
-    });
-  });
-
   group('amounts inside French notification texts (older servers, no French wording)', () {
-    test('a cash amount is grouped and uses the decimal comma', () {
-      expect(localizeNotification(fr, 'New delivery available', r'SOM-7 · collect $1202.00 cash. Open the app to accept it.').$2,
-          'SOM-7 · 1 202,00 \$ à encaisser. Ouvrez l’application pour l’accepter.');
-      expect(localizeNotification(fr, 'New delivery available', r'SOM-7 · collect $12.50 cash. Open the app to accept it.').$2,
-          'SOM-7 · 12,50 \$ à encaisser. Ouvrez l’application pour l’accepter.');
+    test('an amount is grouped and uses the decimal comma', () {
       expect(localizeNotification(fr, 'New order', r'SOM-8 · $1202.00 from Marie').$2, 'SOM-8 · 1 202,00 \$ de Marie');
     });
 
     test('English notices are shown as received', () {
-      const raw = r'SOM-7 · collect $1202.00 cash. Open the app to accept it.';
-      expect(localizeNotification(en, 'New delivery available', raw), ('New delivery available', raw));
+      const raw = r'SOM-7 · $1202.00 from Marie';
+      expect(localizeNotification(en, 'New order', raw), ('New order', raw));
     });
   });
 }

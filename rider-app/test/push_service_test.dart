@@ -65,7 +65,6 @@ DeliveryTaskDto _dto(String id, String status) => DeliveryTaskDto(
       orderId: 'o-$id',
       orderReference: 'SOM-$id',
       status: status,
-      codAmountUsd: 0,
       customerName: 'Marie Dubois',
     );
 

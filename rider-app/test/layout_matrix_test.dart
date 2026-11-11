@@ -29,7 +29,7 @@ import 'proof_fakes.dart';
 import 'task_fixtures.dart';
 
 /// What a screen is shown with.
-enum _Scenario { cards, single, empty, runs, noCod }
+enum _Scenario { cards, single, empty, runs }
 
 Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   SharedPreferences.setMockInitialValues({});
@@ -38,7 +38,6 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   store.user = BackendUser(id: 'r', email: 'rider@somba.app', name: 'Jean-Pierre Mukendi', role: 'rider', phone: '+243810000000');
   store.loaded = true;
   store.requireDeliveryCode = true;
-  store.codEnabled = scenario != _Scenario.noCod;
   MapsConfig.debugEnabledOverride = true; // the "Route map" button is on every active card
   store.stats = const WorkStatsDto(
     totalTasks: 128,
@@ -48,7 +47,6 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
     completedToday: 14,
     completedLast7Days: 86,
     successRate: 93,
-    codCollectedUsd: 4825.5,
     byKind: [
       WorkStatsKind(kind: 'delivery', count: 60),
       WorkStatsKind(kind: 'pickup', count: 31),
@@ -63,22 +61,22 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   store.myTasks.clear();
   store.debugResetSession();
   switch (scenario) {
-    case _Scenario.cards || _Scenario.noCod:
+    case _Scenario.cards:
       store.myTasks.addAll([
         leg('pickup', id: 'a1'),
         leg('transfer', id: 'a2', status: 'picked_up'),
-        leg('delivery', id: 'a3', status: 'in_transit', cod: 125.5),
+        leg('delivery', id: 'a3', status: 'in_transit'),
         leg('return_pickup', id: 'a4'),
         leg('return_transfer', id: 'a5', status: 'in_transit'),
         leg('return_to_seller', id: 'a6', status: 'picked_up'),
         leg('replacement_delivery', id: 'a7', status: 'in_transit'),
         leg('delivery', id: 'a8', attempts: 2),
         leg('delivery', id: 'd1', status: 'failed', failure: 'Client injoignable après trois appels'),
-        leg('delivery', id: 'd2', status: 'delivered', cod: 48),
+        leg('delivery', id: 'd2', status: 'delivered'),
         leg('pickup', id: 'd3', status: 'delivered'),
       ]);
     case _Scenario.single:
-      store.myTasks.add(leg('delivery', id: 'a3', status: 'in_transit', cod: 125.5));
+      store.myTasks.add(leg('delivery', id: 'a3', status: 'in_transit'));
     case _Scenario.empty:
       break;
     case _Scenario.runs:
@@ -144,7 +142,6 @@ void main() {
     store.notifications.clear();
     store.assignment = null;
     store.requireDeliveryCode = false;
-    store.codEnabled = false;
     MapsConfig.debugEnabledOverride = null;
     store.stats = const WorkStatsDto();
     resetSupport();
@@ -171,12 +168,10 @@ void main() {
     'deliveries: nothing assigned': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.empty),
     'profile': ((l) => Scaffold(body: ProfileScreen(locale: l, onLocaleChanged: (_) {})), null, _Scenario.cards),
     'my work': ((l) => const Scaffold(body: WorkScreen()), null, _Scenario.cards),
-    'deliveries: active cards, COD off': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.noCod),
-    'my work, COD off': ((l) => const Scaffold(body: WorkScreen()), null, _Scenario.noCod),
     'location access: why we ask': ((l) => LocationAccessScreen(reporter: FakeLocationReporter(LocationAccess.denied), initial: LocationAccess.denied), null, _Scenario.cards),
     'location access: turned off, open settings': ((l) => LocationAccessScreen(reporter: FakeLocationReporter(LocationAccess.deniedForever), initial: LocationAccess.deniedForever), null, _Scenario.cards),
     'location access: GPS off': ((l) => LocationAccessScreen(reporter: FakeLocationReporter(LocationAccess.serviceOff), initial: LocationAccess.serviceOff), null, _Scenario.cards),
-    'route map: stop, distance and straight-line note': ((l) => TaskRouteScreen(task: leg('delivery', id: 'a3', status: 'in_transit', cod: 125.5), mapBuilder: (c, d) => const ColoredBox(color: Color(0xFFDDE6F5)), routes: RouteService(apiKey: ''), positionOnce: () async => (lat: -4.3217, lng: 15.3125)), null, _Scenario.cards),
+    'route map: stop, distance and straight-line note': ((l) => TaskRouteScreen(task: leg('delivery', id: 'a3', status: 'in_transit'), mapBuilder: (c, d) => const ColoredBox(color: Color(0xFFDDE6F5)), routes: RouteService(apiKey: ''), positionOnce: () async => (lat: -4.3217, lng: 15.3125)), null, _Scenario.cards),
     'route map: no pin and no position': ((l) => TaskRouteScreen(task: leg('delivery', id: 'a3', status: 'in_transit', legacy: true), mapBuilder: (c, d) => const ColoredBox(color: Color(0xFFDDE6F5)), routes: RouteService(apiKey: ''), positionOnce: () async => null), null, _Scenario.cards),
     'sign in': ((l) => const RiderLoginScreen(), null, _Scenario.cards),
     'forgot password': ((l) => const ForgotPasswordScreen(), null, _Scenario.cards),

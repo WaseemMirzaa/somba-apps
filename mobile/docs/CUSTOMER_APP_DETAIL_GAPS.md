@@ -7,8 +7,8 @@ that the customer app should surface, so the two stay compatible.
 Sources: `web/src/app/shop/**`, `web/src/app/admin/**`, `shared/types/index.ts`,
 `shared/mock/entities.ts`, `shared/market-profiles.ts`, `web/src/lib/config.ts`.
 
-> **Product overrides that still apply:** COD and wallet were removed on request.
-> So COD, wallet balance and "pay with wallet" are **out of scope**; refunds use
+> **Product overrides that still apply:** The wallet was removed on request.
+> So wallet balance and "pay with wallet" are **out of scope**; refunds use
 > store credit / original payment / bank transfer, and payment methods are limited
 > to card + mobile money (Airtel / Orange / M-Pesa).
 
@@ -51,7 +51,7 @@ Sources: `web/src/app/shop/**`, `web/src/app/admin/**`, `shared/types/index.ts`,
   (Reorder, Review when delivered, Cancel when pending/processing).
 
 ### 6. Payments
-- Reference: card + Airtel + Orange Money + Vodacom M-Pesa (COD/wallet excluded here).
+- Reference: card + Airtel + Orange Money + Vodacom M-Pesa (wallet excluded here).
 - App had: card + Airtel only.
 - **Delta:** add Orange Money + M-Pesa.
 

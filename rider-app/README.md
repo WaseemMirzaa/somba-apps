@@ -2,7 +2,7 @@
 
 The rider/courier app for the KOMORIKO marketplace: work through the tasks your warehouse
 assigns (pickups, transfers, deliveries, returns, replacements), open turn-by-turn navigation in
-your maps app, collect cash on delivery, and see what you completed. Riders are salaried: the app
+your maps app, and see what you completed. Customers always pay up front, so there is nothing for a rider to collect. Riders are salaried: the app
 has no payout or withdrawal.
 
 ## Realtime backend connection
@@ -24,10 +24,9 @@ Seeded dev login (`npm run seed` in `api/` only): `rider@somba.app` / `Somba@202
 are created by the fleet team in the admin panel. The sign-in screen never pre-fills credentials and
 never lets anyone in offline.
 
-Tabs: **Deliveries** (Active / Done; picked up → in transit → delivered, with a cash-collected confirmation
-for COD and the customer's code on deliveries; legs that end at a warehouse are scanned in by its staff;
+Tabs: **Deliveries** (Active / Done; picked up → in transit → delivered, with the customer's code on deliveries; legs that end at a warehouse are scanned in by its staff;
 Done can be searched by order reference and narrowed to a range of days),
-**My work** (server-computed work stats: tasks completed today / this week / all time, success rate, completed by type, plus cash to hand over), **Profile** (edit name and phone,
+**My work** (server-computed work stats: tasks completed today / this week / all time, success rate, completed by type), **Profile** (edit name and phone,
 change password, home warehouse, **Support** tickets with photos, notifications, language, sign out). While a delivery is on the road the app streams the
 real GPS position (`geolocator`; permission declared in the Android manifest) as `delivery:location`.
 
@@ -51,15 +50,14 @@ flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
   as the account is active; to stop work, the desk stops assigning or an admin switches the account off (the app then
   signs the rider out).
 - **No pay per task.** Riders are salaried. *My work* shows their work (tasks done, failed, success rate), never money
-  earned; the only amount on it is the cash collected on delivery, which belongs to the company and is handed over at the
-  warehouse. Nothing is paid out or withdrawn through the platform.
+  earned. Nothing is paid out or withdrawn through the platform.
 
 ## Highlights
 
 - Royal-blue identity with a **floating capsule navigation** (animated expanding pill), **Plus Jakarta Sans** display
   headings paired with Inter body text. Bundled fonts: no runtime font fetching.
 - **Deliveries**: Active / Done tabs, task cards for every leg (pickup, transfer, delivery, return, replacement) with
-  COD chips, the parcel, from → to, and the next action as a label-only button; transfer runs are one card with the parcels
+  the parcel, from → to, and the next action as a label-only button; transfer runs are one card with the parcels
   inside. *Done* has a search by order reference (or run reference) and a date-range filter.
 - **Navigate**: opens turn-by-turn directions in your maps app. Android: Google Maps (the app when installed, else the
   browser). iPhone: **Apple Maps** straight away when Google Maps is not installed (no extra tap); when both are installed a
@@ -68,11 +66,8 @@ flutter test test/live_api_test.dart --dart-define=LIVE_TEST=true \
   Navigate leads to) and the route line on a Google map. Needs the Maps key (see *Maps key* below); without it the button is
   not offered and Navigate is all there is. With *Routes API* enabled on the key the line follows the roads, with the
   distance and time; otherwise it is a dashed straight line, and says so.
-- **Cash on delivery is hidden** unless the public setting `codEnabled` is `true` (it is `false` in production): no cash
-  card, receipts or note on *My work*, no "Collect $X" line, no cash prompt. It follows the setting live. The only exception
-  is an open task that still has cash due (placed while COD was on): the server will not complete it without the amount.
 - **My work**: tasks completed today, this week and all time; completed, in progress, failed and success rate; completed by
-  type (counts only); and the cash collected to hand over at the warehouse.
+  type (counts only).
 - **Profile**: edit name and phone, change password (the server signs every other phone out and this phone keeps working),
   home warehouse and the areas it covers, support tickets, notifications, EN/FR toggle, sign out. The e-mail, role and
   warehouse are changed by the fleet team or an admin only.

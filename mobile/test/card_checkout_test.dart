@@ -119,7 +119,6 @@ void main() {
     final store = RealtimeStore.instance;
     store.walletBalance = 1000;
     store.requirePinnedAddress = false;
-    store.codEnabled = false;
     store.cardPayments = 'stripe';
     store.payments.clear();
     store.debugCallRequest = gapCalls(extra: {'payments:card-sheet': _sheetAnswer});

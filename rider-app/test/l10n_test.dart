@@ -52,7 +52,7 @@ class _FakeReporter extends LocationReporter {
   }
 }
 
-DeliveryTaskDto _task(String id, String status) => DeliveryTaskDto(id: id, orderId: 'o-$id', orderReference: 'SOM-$id', status: status, codAmountUsd: 0);
+DeliveryTaskDto _task(String id, String status) => DeliveryTaskDto(id: id, orderId: 'o-$id', orderReference: 'SOM-$id', status: status);
 
 void main() {
   setUp(() async {
@@ -319,8 +319,6 @@ void main() {
       expect(ApiException.local('err_offline').toString(), contains('Impossible de joindre le serveur'));
       expect(Strings.current.errorText(StateError('boom')), Strings.current.errUnexpected);
       expect(localizeNotification(Strings.current, 'Parcel ready for pickup', 'SOM-7 is packed and ready.'), ('Colis prêt à récupérer', 'SOM-7 est emballé et prêt.'));
-      expect(localizeNotification(Strings.current, 'New delivery available', r'SOM-7 · collect $12.50 cash. Open the app to accept it.'),
-          ('Nouvelle livraison disponible', 'SOM-7 · 12,50\u00a0\$ à encaisser. Ouvrez l’application pour l’accepter.'));
       expect(localizeNotification(Strings.current, 'New delivery available', 'SOM-8. Open the app to accept it.').$2, 'SOM-8. Ouvrez l’application pour l’accepter.');
       expect(localizeNotification(Strings.current, '3 deliveries assigned to you', 'SOM-1, SOM-2, SOM-3 — collect them at the warehouse.'),
           ('3 livraisons pour vous', 'SOM-1, SOM-2, SOM-3 — à récupérer à l’entrepôt.'));

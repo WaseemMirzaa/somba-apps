@@ -52,7 +52,7 @@ void main() {
         case 'rider:tasks':
           return serverTasks;
         case 'rider:workStats':
-          return {'totalTasks': 3, 'completed': 1, 'active': 2, 'failed': 0, 'completedToday': 1, 'completedLast7Days': 1, 'successRate': 100, 'codCollectedUsd': 0, 'byKind': []};
+          return {'totalTasks': 3, 'completed': 1, 'active': 2, 'failed': 0, 'completedToday': 1, 'completedLast7Days': 1, 'successRate': 100, 'byKind': []};
         case 'notifications:list':
           return [];
         case 'settings:get':
@@ -102,13 +102,12 @@ void main() {
       expect(pickup.toHubId, 'h1');
       final transfer = leg('transfer');
       expect((transfer.fromHubName, transfer.toHubName), ('Entrepôt de Limete', 'Entrepôt de Gombe'));
-      final delivery = leg('delivery', cod: 12.5);
+      final delivery = leg('delivery');
       expect(delivery.fromHubName, 'Entrepôt de Gombe');
       expect(delivery.to!.isCustomer, isTrue);
       expect(delivery.customerName, 'Aline Kabila Mwamba');
       expect(delivery.phone, '+243812345678');
       expect(delivery.pin, (lat: -4.3101, lng: 15.3125));
-      expect(delivery.collectsCash, isTrue);
       expect(leg('return_to_seller').sellerLabel, 'Boutique Les Merveilles de Kinshasa');
       expect(leg('return_pickup').disputeId, 'd1');
       expect(leg('replacement_delivery').replacementId, 'rp1');
@@ -236,7 +235,7 @@ void main() {
         expect(find.text(s.handoverAt('Entrepôt de Limete')), findsOneWidget);
         expect(find.byKey(const ValueKey('waiting-scan-p')), findsNothing, reason: 'not on the road yet');
         expect(find.text(s.t('act_picked_up_seller')), findsOneWidget);
-        // no customer on a pickup: no code, no cash, no customer name
+        // no customer on a pickup: no code, no customer name
         expect(find.textContaining('Aline'), findsNothing);
         expectButtonRules(t);
       });
@@ -262,12 +261,11 @@ void main() {
         expect(find.text(s.t('act_in_transit_hub')), findsOneWidget);
       });
 
-      testWidgets('delivery: customer, address, phone, COD, fetch at the warehouse; the code hint once on the road ($lang)', (t) async {
-        await show(t, lang, [leg('delivery', id: 'd', cod: 20)], code: true);
+      testWidgets('delivery: customer, address, phone, fetch at the warehouse; the code hint once on the road ($lang)', (t) async {
+        await show(t, lang, [leg('delivery', id: 'd')], code: true);
         expect(find.text('Aline Kabila Mwamba'), findsOneWidget);
         expect(find.text(s.deliverTo('12, avenue du Commerce, près du marché central, Gombe, Kinshasa')), findsOneWidget);
         expect(find.text('+243812345678'), findsOneWidget);
-        expect(find.text(s.collectCash(s.usd(20))), findsOneWidget);
         expect(find.text(s.collectAt('Entrepôt de Gombe, Boulevard du 30 Juin 8, Gombe')), findsOneWidget);
         expect(find.byKey(const ValueKey('handover-d')), findsNothing);
         expect(find.byKey(const ValueKey('code-hint-d')), findsNothing, reason: 'not before the pickup');

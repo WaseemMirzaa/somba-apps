@@ -183,8 +183,7 @@ Future<void> _seed(String lang) async {
         'read': true,
       }),
     ]);
-  store.codEnabled = true; // the checkout offers cash on delivery
-  store.cardPayments = 'stripe'; // ...and the bank card (the longest list of payment tiles)
+  store.cardPayments = 'stripe'; // the bank card tile (the longest list of payment tiles)
   store.debugCallRequest = (event, [body]) async => switch (event) {
         'reviews:list' => [
             {
@@ -221,7 +220,6 @@ void main() {
       ..banners.clear()
       ..payments.clear()
       ..notifications.clear()
-      ..codEnabled = false
       ..cardPayments = 'off'
       ..riderLocations.clear();
     gapTearDown();

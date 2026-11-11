@@ -206,9 +206,8 @@ void main() {
       expect(statusOf('cancelled', ['open']), 'cancelled');
     });
 
-    test('an unpaid pending order that is not cash on delivery is pending', () {
+    test('an unpaid pending order is pending', () {
       expect(statusOf('pending', ['open']), 'pending');
-      expect(statusOf('pending', ['open'], method: 'cod'), 'to_pack');
     });
 
     test('open lines are to pack; ready and received mix is ready', () {

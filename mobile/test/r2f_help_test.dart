@@ -1,17 +1,12 @@
-// Help contact options (support ticket shortcut, phone, e-mail, WhatsApp from the platform settings) and "cash on
-// delivery shows nowhere while `codEnabled` is not true" (order page, receipt, payment names).
+// Help contact options (support ticket shortcut, phone, e-mail, WhatsApp from the platform settings).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:lipcart/l10n/strings.dart';
 import 'package:lipcart/screens/more/help_contact.dart';
-import 'package:lipcart/screens/more/order_after_sale.dart' show receiptText;
-import 'package:lipcart/screens/more/order_screens.dart';
 import 'package:lipcart/screens/more/support_extra.dart';
-import 'package:lipcart/services/models.dart';
 import 'package:lipcart/services/realtime_store.dart';
-import 'package:lipcart/util/payment_label.dart';
 
 import 'button_rules.dart';
 import 'engage_helpers.dart';
@@ -25,21 +20,6 @@ void _settings({String phone = '+243 970 000 000', String email = 'help@somba.ex
   // ignore: invalid_use_of_protected_member
   RealtimeStore.instance.notifyListeners();
 }
-
-OrderDto _order({String method = 'cod', String status = 'confirmed'}) => OrderDto.fromJson({
-      'id': 'o1',
-      'reference': 'SOM-2042',
-      'customerName': 'Aline Mbuyi',
-      'status': status,
-      'paymentMethod': method,
-      'subtotalUsd': 20,
-      'deliveryFeeUsd': 3,
-      'totalUsd': 23,
-      'createdAt': '2026-10-01T09:30:00',
-      'items': [
-        {'productId': 'p1', 'productName': 'Phone case', 'qty': 1, 'priceUsd': 20},
-      ],
-    });
 
 Future<void> _help(WidgetTester tester, {String lang = 'en', double scale = 1}) async {
   gapTallViewport(tester);
@@ -70,7 +50,7 @@ void main() {
     debugLaunch = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
     RealtimeStore.instance
-      ..applySettings({'supportPhone': '', 'supportEmail': '', 'supportWhatsapp': '', 'codEnabled': 'false'})
+      ..applySettings({'supportPhone': '', 'supportEmail': '', 'supportWhatsapp': ''})
       ..orders.clear();
     engageTearDown();
   });
@@ -158,59 +138,6 @@ void main() {
       expect(whatsappLink('+243 970 000 111').toString(), 'https://wa.me/243970000111');
       expect(whatsappLink('(0)970-000-111').toString(), 'https://wa.me/0970000111');
       expect(whatsappLink('12'), isNull);
-    });
-  });
-
-  group('cash on delivery is hidden while codEnabled is not true', () {
-    for (final lang in ['en', 'fr']) {
-      testWidgets('the order page names no cash method and no "pay on delivery" ($lang)', (tester) async {
-        await Strings.setLang(lang, persist: false);
-        final s = Strings(lang);
-        RealtimeStore.instance.codEnabled = false;
-        RealtimeStore.instance.orders.add(_order());
-        gapTallViewport(tester);
-        await tester.pumpWidget(gapApp(OrderDetailScreen(locale: Locale(lang), orderId: 'o1'), lang: lang));
-        await tester.pump(const Duration(milliseconds: 300));
-        expect(find.textContaining(s.payCod), findsNothing);
-        expect(find.textContaining(s.orderPayOnDelivery), findsNothing);
-        expect(find.textContaining(s.t('payment')), findsWidgets, reason: 'a plain "Payment" instead');
-      });
-
-      testWidgets('with the platform setting on it still reads as before ($lang)', (tester) async {
-        await Strings.setLang(lang, persist: false);
-        final s = Strings(lang);
-        RealtimeStore.instance.codEnabled = true;
-        RealtimeStore.instance.orders.add(_order(status: 'pending'));
-        RealtimeStore.instance.payments.add(PaymentDto(id: 'pay1', reference: 'PAY-1', orderId: 'o1', orderReference: 'SOM-2042', method: 'cod', amountUsd: 23, status: 'pending'));
-        addTearDown(RealtimeStore.instance.payments.clear);
-        gapTallViewport(tester);
-        await tester.pumpWidget(gapApp(OrderDetailScreen(locale: Locale(lang), orderId: 'o1'), lang: lang));
-        await tester.pump(const Duration(milliseconds: 300));
-        expect(find.text('${s.orderPayOnDelivery} · ${s.payCod}'), findsOneWidget);
-      });
-    }
-
-    test('the receipt and every payment name follow the same rule', () {
-      const en = Strings('en');
-      expect(receiptText(en, _order()), isNot(contains('Cash on Delivery')));
-      expect(receiptText(en, _order()), contains('Paid with: Payment'));
-      expect(receiptText(en, _order(method: 'airtel_money')), contains('Airtel Money'));
-      expect(shownPaymentLabel(en, 'cod', codEnabled: false), 'Payment');
-      expect(shownPaymentLabel(en, 'cod', codEnabled: true), 'Cash on Delivery');
-      expect(shownPaymentLabel(en, 'wallet', codEnabled: false), en.paymentLabel('wallet'));
-      expect(showsCod(true, codEnabled: false), isFalse);
-      expect(showsCod(true, codEnabled: true), isTrue);
-      expect(showsCod(false, codEnabled: true), isFalse);
-    });
-
-    test('nothing in the FAQ or the help text mentions cash', () {
-      for (final lang in ['en', 'fr']) {
-        final s = Strings(lang);
-        final text = [s.faqPayQ, s.faqPayA, s.faqFeesA, s.faqFailedA, s.faqContactA].join(' ').toLowerCase();
-        expect(text, isNot(contains('cash')));
-        expect(text, isNot(contains('espèces')));
-        expect(text, isNot(contains('à la livraison')));
-      }
     });
   });
 }

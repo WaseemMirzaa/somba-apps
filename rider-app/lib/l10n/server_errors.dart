@@ -1,4 +1,3 @@
-import 'package:intl/intl.dart';
 
 import 'shift_messages.dart' show kShiftServerErrorsFr;
 import 'compliance_messages.dart' show translateComplianceError;
@@ -148,8 +147,6 @@ final Map<String, String> _exactFr = {
   'This delivery code is not locked.': 'Ce code de livraison n’est pas verrouillé.',
   'This order has no delivery waiting for pickup.': 'Cette commande n’a aucune livraison en attente de ramassage.',
   'Invalid delivery status.': 'Statut de livraison invalide.',
-  'No cash is due on this delivery: it is already paid.': 'Aucun paiement en espèces n’est dû pour cette livraison : elle est déjà payée.',
-  'Enter the cash you collected as an amount in dollars.': 'Saisissez les espèces encaissées sous forme de montant en dollars.',
   'Choose an active rider.': 'Choisissez un livreur actif.',
   // tasks, legs and warehouses (docs/contracts/logistics.md section 10)
   'Your warehouse assigns your tasks. You cannot accept a task yourself.': 'Votre entrepôt vous assigne vos tâches. Vous ne pouvez pas en accepter une vous-même.',
@@ -207,23 +204,12 @@ final Map<String, String> _exactFr = {
   'Socket not connected.': 'Pas de connexion au serveur.',
 };
 
-/// A server amount like `$40.00` in French grouping (`40,00 $`).
-String _frUsd(String raw) {
-  final n = double.tryParse(raw.replaceAll(RegExp(r'[^0-9.]'), ''));
-  if (n == null) return raw;
-  return NumberFormat.currency(locale: 'fr', symbol: '\$', decimalDigits: 2).format(n).replaceAll('\u202f', '\u00a0');
-}
-
 final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
-  // cash on delivery: the cash record
+  // delivery code
   (RegExp(r'^Wrong delivery code\. Ask the customer for the 4-digit code shown in their app\. (\d+) tr(?:y|ies) left before this step locks\.$'),
       (m) => 'Code de livraison incorrect. Demandez au client le code à 4 chiffres affiché dans son application. Il vous reste ${m[1]} ${m[1] == '1' ? 'essai' : 'essais'} avant le verrouillage.'),
   (RegExp(r'^Too many wrong delivery codes\. The code step is locked for (\d+) minutes?\. Ask the customer to confirm the code in their app, or call the warehouse\.$'),
       (m) => 'Trop de codes de livraison erronés. La saisie du code est verrouillée pendant ${m[1]} ${m[1] == '1' ? 'minute' : 'minutes'}. Demandez au client de confirmer le code dans son application, ou appelez l’entrepôt.'),
-  (RegExp(r'^Confirm the cash you collected: (\$[\d.,]+) is due on this delivery\.$'), (m) => 'Confirmez les espèces encaissées : ${_frUsd(m[1]!)} sont dus pour cette livraison.'),
-  (RegExp(r'^The cash you entered \((\$[\d.,]+)\) is not the amount to collect \((\$[\d.,]+)\)\. Collect exactly (\$[\d.,]+), or ask the warehouse if the amount changed\.$'),
-      (m) => 'Les espèces saisies (${_frUsd(m[1]!)}) ne correspondent pas au montant à encaisser (${_frUsd(m[2]!)}). Encaissez exactement ${_frUsd(m[3]!)}, ou demandez à l’entrepôt si le montant a changé.'),
-  (RegExp(r'^This delivery is already complete with (\$[\d.,]+) collected\.$'), (m) => 'Cette livraison est déjà terminée avec ${_frUsd(m[1]!)} encaissés.'),
   (RegExp(r'^Parcel missing from run (.+)\.$'), (m) => 'Colis manquant dans la tournée ${m[1]}.'),
   // `{area}` is the area's official name, or `this area` when nothing could be matched
   (RegExp(r"^We don['’]t deliver to (.+) yet\.$"), (m) => m[1] == 'this area' ? 'Nous ne livrons pas encore dans cette zone.' : 'Nous ne livrons pas encore à ${m[1]}.'),
