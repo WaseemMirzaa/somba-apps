@@ -171,6 +171,8 @@ extension StringsKeys on Strings {
   String get routeYouMarker => t('route_you_marker');
   String get bgChannel => t('bg_channel');
   String get pushOpen => t('push_open');
+  String get soundTitle => t('sound_title');
+  String get soundSub => t('sound_sub');
   String get homeWarehouse => t('home_warehouse');
   String get noWarehouse => t('no_warehouse');
   String get warehouseAssigns => t('warehouse_assigns');

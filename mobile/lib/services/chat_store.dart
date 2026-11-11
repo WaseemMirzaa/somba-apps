@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'feature_hooks.dart';
 import 'models.dart' show pickLang;
+import 'notification_sound.dart';
 import 'realtime_store.dart';
 
 Map<String, dynamic> _asMap(dynamic d) => (d as Map).map((k, v) => MapEntry(k.toString(), v));
@@ -377,6 +378,8 @@ class ChatStore extends ChangeNotifier {
     _upsert(open && !message.mine ? conv.copyWith(unread: 0) : conv);
     if (!known) unawaited(refreshUnread().catchError((Object _) {}));
     _incoming.add(message);
+    // A message from the store chimes unless that thread is the one on screen.
+    if (!message.mine && !open) NotificationSound.instance.play();
     if (open && !message.mine) unawaited(markRead(conv.id));
   }
 

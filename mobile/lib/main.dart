@@ -12,6 +12,7 @@ import 'l10n/strings.dart';
 import 'screens/more/auth_screens.dart';
 import 'screens/notice_router.dart';
 import 'services/maps_config.dart';
+import 'services/notification_sound.dart';
 import 'services/push_service.dart';
 import 'services/realtime_store.dart';
 import 'theme/app_theme.dart';
@@ -53,6 +54,7 @@ class _SombaAppState extends State<SombaApp> {
     super.initState();
     Strings.langNotifier.addListener(_onLang);
     // A tapped notification opens its screen once the user is in and the data is loaded.
+    unawaited(NotificationSound.instance.load());
     PushService.instance.pendingTap.addListener(_openPendingTap);
     RealtimeStore.instance.addListener(_openPendingTap);
     _foregroundSub = PushService.instance.foreground.listen(_showForegroundPush);
@@ -101,6 +103,7 @@ class _SombaAppState extends State<SombaApp> {
   /// A push that arrives while the app is open: a banner with "Open" (the list refreshes on its own).
   void _showForegroundPush(PushMessage m) {
     if (!_authed || (m.title ?? '').isEmpty) return;
+    NotificationSound.instance.play();
     final s = Strings.current;
     final text = displayNotice(s, title: m.title ?? '', body: m.body ?? '', titleFr: m.titleFr, bodyFr: m.bodyFr);
     _messenger.currentState?.showSnackBar(SnackBar(

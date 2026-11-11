@@ -69,9 +69,10 @@ class FirebasePushBackend implements PushBackend {
     if (kIsWeb) return false; // web push needs its own VAPID setup: not used
     try {
       if (Firebase.apps.isEmpty) await Firebase.initializeApp(options: firebaseOptionsFromDefines());
-      // iOS: the app shows its own banner for pushes that arrive while it is
-      // open (see PushService.foreground), so the system only plays the sound.
-      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(alert: false, badge: true, sound: true);
+      // iOS: the app shows its own banner for pushes that arrive while it is open (see PushService.foreground) and
+      // plays its own chime there (NotificationSound: one per 2 s, honours the Sound switch), so the system shows
+      // no alert and plays no sound in the foreground (it would double the chime and ignore the switch).
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(alert: false, badge: true, sound: false);
       return true;
     } catch (e) {
       if (kDebugMode) debugPrint('Push disabled (Firebase is not configured in this build): $e');

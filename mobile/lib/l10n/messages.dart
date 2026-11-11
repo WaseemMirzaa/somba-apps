@@ -636,6 +636,8 @@ const Map<String, (String, String)> _kMessagesBase = {
   'orders_cancelled_one': ('1 item cancelled', '1 article annulé'),
   'orders_cancelled_many': ('{n} items cancelled', '{n} articles annulés'),
   'push_open': ('Open', 'Ouvrir'),
+  'sound_title': ('Notification sound', 'Son des notifications'),
+  'sound_sub': ('Play a sound when something new arrives while the app is open', "Jouer un son quand quelque chose de nouveau arrive, application ouverte"),
   'translated_auto': ('Translated automatically', 'Traduit automatiquement'),
   'see_translation': ('See translation', 'Voir la traduction'),
   'see_original': ('See original', 'Voir l’original'),

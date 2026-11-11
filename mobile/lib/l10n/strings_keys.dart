@@ -603,6 +603,8 @@ extension StringsKeys on Strings {
   String get ordersCancelledOne => t('orders_cancelled_one');
   String ordersCancelledMany(Object? n) => t('orders_cancelled_many', {'n': n});
   String get pushOpen => t('push_open');
+  String get soundTitle => t('sound_title');
+  String get soundSub => t('sound_sub');
   String get translatedAuto => t('translated_auto');
   String get seeTranslation => t('see_translation');
   String get seeOriginal => t('see_original');

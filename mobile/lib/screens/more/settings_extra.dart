@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/market_profiles.dart';
 import '../../l10n/strings.dart';
+import '../../services/notification_sound.dart';
 import '../../services/notify_prefs.dart';
 import '../../services/realtime_store.dart';
 import '../../theme/app_theme.dart';
@@ -19,7 +20,7 @@ class CustomerSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([RealtimeStore.instance, marketNotifier, NotifyPrefs.instance]),
+      listenable: Listenable.merge([RealtimeStore.instance, marketNotifier, NotifyPrefs.instance, NotificationSound.instance]),
       builder: (context, _) {
         final s = Strings.of(context);
         final store = RealtimeStore.instance;
@@ -31,6 +32,16 @@ class CustomerSettingsScreen extends StatelessWidget {
               _toggle(Icons.notifications_active_rounded, s.settingsPush, s.settingsPushSub, pref('push'), (v) => store.setPref('push', v)),
               _toggle(Icons.mail_outline_rounded, s.settingsEmail, s.settingsEmailSub, pref('email'), (v) => store.setPref('email', v)),
               _toggle(Icons.sms_outlined, s.settingsSms, s.settingsSmsSub, pref('sms'), (v) => store.setPref('sms', v)),
+              SwitchListTile(
+                key: const ValueKey('sound-switch'),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                activeThumbColor: AppColors.primary,
+                value: NotificationSound.instance.enabled,
+                onChanged: NotificationSound.instance.setEnabled,
+                secondary: _icon(NotificationSound.instance.enabled ? Icons.volume_up_rounded : Icons.volume_off_rounded),
+                title: Text(s.soundTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                subtitle: Text(s.soundSub, style: const TextStyle(fontSize: 12.5)),
+              ),
             ]),
             const SizedBox(height: 14),
             // Per-category push switches (me:setPrefs { notify: { order: false } }): a kind that is off still shows in the list.

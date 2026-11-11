@@ -181,6 +181,8 @@ const Map<String, (String, String)> kMessages = {
   'route_no_position': ('Your position is not available yet.', 'Votre position n’est pas encore disponible.'),
   'route_you_marker': ('Your position', 'Votre position'),
   'push_open': ('Open', 'Ouvrir'),
+  'sound_title': ('Notification sound', 'Son des notifications'),
+  'sound_sub': ('Play a sound when something new arrives while the app is open', "Jouer un son quand quelque chose de nouveau arrive, application ouverte"),
   'home_warehouse': ('Home warehouse', 'Entrepôt'),
   'no_warehouse': ('Not tied to a warehouse yet. Ask your administrator.', 'Aucun entrepôt pour le moment. Contactez votre administrateur.'),
   'warehouse_assigns': ('Your warehouse assigns your tasks.', 'Votre entrepôt vous assigne vos tâches.'),

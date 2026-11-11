@@ -66,7 +66,7 @@ describe('PushService scope and payload', () => {
     const { svc, sent } = make(rows);
     await svc.sendToUsers(['r1'], { title: 't', body: 'b', link: '/rider/tasks/k1', data: { type: 'task' } });
     expect(sent[0].data).toEqual({ type: 'task', link: '/rider/tasks/k1' });
-    expect(sent[0].android).toEqual({ priority: 'high', notification: { channelId: 'somba_default' } });
+    expect(sent[0].android).toEqual({ priority: 'high', notification: { channelId: 'somba_default', sound: 'default' } });
     expect(sent[0].webpush).toEqual({ fcmOptions: { link: 'https://shop.example.cd/rider/tasks/k1' } });
   });
 

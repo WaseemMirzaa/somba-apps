@@ -6,6 +6,7 @@ import 'auth_service.dart';
 import 'compliance_store.dart';
 import 'location_reporter.dart';
 import 'models.dart';
+import 'notification_sound.dart';
 import 'push_service.dart';
 import 'rider_focus.dart';
 import 'socket_service.dart';
@@ -393,6 +394,8 @@ class RiderStore extends ChangeNotifier {
     if (d is! Map) return;
     final n = NotificationDto.fromJson(_map(d));
     notifications.insert(0, n);
+    // Every notice type sounds here, task alerts included (new delivery available, task assigned or updated).
+    NotificationSound.instance.play();
     notifyListeners();
     if (isTaskUpdatedNotice(n.title)) _pushRefresh();
   }
@@ -435,6 +438,7 @@ class RiderStore extends ChangeNotifier {
       final fresh = DeliveryTaskDto.fromJson(m);
       if (i == -1) {
         myTasks.insert(0, fresh);
+        NotificationSound.instance.play(); // a task was assigned to this rider (its notice, if any, falls in the same 2 s)
       } else {
         myTasks[i] = fresh.withOrderFrom(myTasks[i]);
       }
@@ -460,6 +464,7 @@ class RiderStore extends ChangeNotifier {
       }
       if (i == -1) {
         runs.insert(0, run);
+        NotificationSound.instance.play(); // a transfer run was assigned to this driver
       } else {
         runs[i] = run;
       }

@@ -42,11 +42,20 @@ if (config.apiKey && config.projectId && config.messagingSenderId && config.appI
     `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-messaging-compat.js`,
   );
   self.firebase.initializeApp(config);
-  // Notification messages (title + body) are shown by Firebase itself; this only handles data-only ones.
+  // Notification messages (title + body) are shown by Firebase itself (with the browser's default sound, the API sets no
+  // `silent`); this only handles data-only ones.
   self.firebase.messaging().onBackgroundMessage((payload) => {
     if (payload.notification) return;
     const d = payload.data || {};
     if (!d.title) return;
-    self.registration.showNotification(d.title, { body: d.body || "", tag: d.notificationId, data: { link: d.link } });
+    // silent: false (the default) lets the browser / OS play its notification sound; renotify makes a second push
+    // with the same tag sound again instead of replacing the first one quietly.
+    self.registration.showNotification(d.title, {
+      body: d.body || "",
+      tag: d.notificationId,
+      renotify: !!d.notificationId,
+      silent: false,
+      data: { link: d.link },
+    });
   });
 }
