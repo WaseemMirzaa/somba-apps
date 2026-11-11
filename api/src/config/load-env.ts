@@ -1,4 +1,4 @@
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
@@ -8,7 +8,20 @@ import { join } from 'path';
  * config module loads `.env` later, so on a server where those variables are only in `.env` (pm2 does not pass them)
  * the API served `<cwd>/uploads` while the files lived in `UPLOAD_DIR`. Variables already set in the environment win.
  */
-const file = join(process.cwd(), '.env');
-if (existsSync(file) && typeof process.loadEnvFile === 'function') {
-  process.loadEnvFile(file);
+export function loadEnvFile(file: string, env: NodeJS.ProcessEnv = process.env): void {
+  if (!existsSync(file)) return;
+  for (const raw of readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 1) continue;
+    const key = line.slice(0, eq).trim().replace(/^export\s+/, '');
+    let value = line.slice(eq + 1).trim();
+    const quote = value[0];
+    if ((quote === '"' || quote === "'") && value.endsWith(quote) && value.length >= 2) value = value.slice(1, -1);
+    else value = value.replace(/\s+#.*$/, '');
+    if (env[key] === undefined) env[key] = value;
+  }
 }
+
+loadEnvFile(join(process.cwd(), '.env'));
