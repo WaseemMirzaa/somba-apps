@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../services/models.dart';
 import '../services/realtime_store.dart';
+import '../services/text_i18n.dart';
 import '../theme/app_theme.dart';
 
 /// Small "Translated automatically" caption shown under text a machine produced.
@@ -30,12 +31,18 @@ class MachineNote extends StatelessWidget {
 /// text). The link disappears when the server says the text is already in the shopper's language; a failure is
 /// announced in a snackbar and the original stays on screen.
 ///
+/// With [i18n] (the translations that ride in the payload next to the text) the shopper's language is shown at once, with
+/// no request, and a language switch swaps it at once: `i18n[lang]` is the text; when the author wrote in another language
+/// it is a machine translation (the note and a "See original" link, which sticks until the language changes), and when the
+/// author wrote in the app's language there is no note and no link. Without [i18n] (or without the app's language in it)
+/// the [auto] fetch below takes over.
+///
 /// With [auto] the translation is fetched by itself and shown at once, in the language the app is in now, and it follows
 /// the app's language: switching English <-> French fetches (or re-uses) the other translation without a tap. "See original"
 /// still gives the written text back (until the language changes again). A failure is silent here (nobody asked for it);
 /// the link stays so the shopper can try again.
 class TranslatableText extends StatefulWidget {
-  /// `review` | `review_reply` | `question` | `answer`.
+  /// `review` | `review_reply` | `question` | `answer` | `chat_message`.
   final String kind;
 
   /// The stored record: the review for `review` / `review_reply`, the question for `question` / `answer`.
@@ -46,7 +53,10 @@ class TranslatableText extends StatefulWidget {
   /// Translate into the app's language by itself (questions and answers), and follow a language switch.
   final bool auto;
 
-  const TranslatableText({super.key, required this.kind, required this.id, required this.text, this.style, this.auto = false});
+  /// The translations the server sent with the text (null when it sent none).
+  final TextI18n? i18n;
+
+  const TranslatableText({super.key, required this.kind, required this.id, required this.text, this.style, this.auto = false, this.i18n});
 
   @override
   State<TranslatableText> createState() => _TranslatableTextState();
@@ -64,10 +74,13 @@ class _TranslatableTextState extends State<TranslatableText> {
   /// The automatic attempt failed: do not retry by itself (the link is there to try again).
   bool _autoFailed = false;
 
+  /// The language in which the shopper asked for the written text over the payload's translation (null: none asked).
+  String? _payloadOriginalFor;
+
   @override
   void didUpdateWidget(covariant TranslatableText old) {
     super.didUpdateWidget(old);
-    if (old.text != widget.text || old.id != widget.id || old.kind != widget.kind) _reset();
+    if (old.text != widget.text || old.id != widget.id || old.kind != widget.kind || old.i18n != widget.i18n) _reset();
   }
 
   void _reset() {
@@ -77,6 +90,7 @@ class _TranslatableTextState extends State<TranslatableText> {
     _busy = false;
     _wantsOriginal = false;
     _autoFailed = false;
+    _payloadOriginalFor = null;
   }
 
   Future<void> _toggle(Strings s) async {
@@ -136,9 +150,44 @@ class _TranslatableTextState extends State<TranslatableText> {
     }
   }
 
+  /// The payload's text for the app's language, when it has one.
+  Widget _fromPayload(Strings s, String value) {
+    final src = widget.i18n!.sourceLang;
+    final sameAsWritten = value.trim() == widget.text.trim();
+    // Written in the app's language (or unknown and identical to what was written): nothing was translated.
+    final machine = src != null ? src != s.lang : !sameAsWritten;
+    if (_payloadOriginalFor != null && _payloadOriginalFor != s.lang) _payloadOriginalFor = null; // the language moved on
+    final showing = machine && _payloadOriginalFor != s.lang;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      Text(machine ? (showing ? value : widget.text) : value, key: ValueKey('tt-text-${widget.kind}-${widget.id}'), style: widget.style),
+      if (showing) const MachineNote(),
+      if (machine)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _link(s, showing ? s.seeOriginal : s.seeTranslation, () => setState(() => _payloadOriginalFor = showing ? s.lang : null)),
+        ),
+    ]);
+  }
+
+  Widget _link(Strings s, String label, VoidCallback? onPressed) => TextButton(
+        key: ValueKey('tt-link-${widget.kind}-${widget.id}'),
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        ),
+        // Size on the Text, not the button's textStyle (that would drop the theme font).
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: MachineNote._linkSize)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
+    final fromServer = widget.i18n?.forLang(s.lang);
+    if (fromServer != null) return _fromPayload(s, fromServer);
     // The language changed since the translation was fetched: start again from the original.
     if (_translation != null && _translatedFor != s.lang) _reset();
     final t = _translation;
@@ -155,23 +204,7 @@ class _TranslatableTextState extends State<TranslatableText> {
       Text(showing ? t.text : widget.text, key: ValueKey('tt-text-${widget.kind}-${widget.id}'), style: widget.style),
       if (showing) const MachineNote(),
       if (!hideLink)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            key: ValueKey('tt-link-${widget.kind}-${widget.id}'),
-            onPressed: _busy ? null : () => _toggle(s),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: VisualDensity.compact,
-            ),
-            // Size on the Text, not the button's textStyle (that would drop the theme font).
-            child: Text(_busy ? '…' : (showing ? s.seeOriginal : s.seeTranslation),
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: MachineNote._linkSize)),
-          ),
-        ),
+        Align(alignment: Alignment.centerLeft, child: _link(s, _busy ? '…' : (showing ? s.seeOriginal : s.seeTranslation), _busy ? null : () => _toggle(s))),
     ]);
   }
 }

@@ -3,6 +3,7 @@ import '../util/delivery_estimate.dart';
 import '../util/freshness.dart';
 import '../util/variants.dart';
 import 'geo_models.dart';
+import 'text_i18n.dart';
 // Lightweight DTOs mirroring the API payloads (api/src/database/entities).
 
 /// A non-empty, trimmed text field; null when missing, blank or not a string (old servers omit the new fields).
@@ -298,10 +299,13 @@ class ReviewDto {
   /// The seller's public answer to this review (null when none).
   final String? sellerReply;
 
+  /// The review text / the seller's reply in English and French, as the server already has them (null when it has none).
+  final TextI18n? textI18n, replyI18n;
+
   /// Up to 4 photos the customer attached (upload paths or URLs); empty when none.
   final List<String> photos;
 
-  ReviewDto({required this.id, required this.author, required this.rating, required this.text, this.helpful = 0, this.createdAt, this.sellerReply, this.photos = const []});
+  ReviewDto({required this.id, required this.author, required this.rating, required this.text, this.helpful = 0, this.createdAt, this.sellerReply, this.textI18n, this.replyI18n, this.photos = const []});
 
   factory ReviewDto.fromJson(Map<String, dynamic> j) => ReviewDto(
         id: j['id'] as String,
@@ -311,6 +315,8 @@ class ReviewDto {
         helpful: (j['helpful'] as num?)?.toInt() ?? 0,
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
         sellerReply: (j['sellerReply'] as String?)?.trim().isNotEmpty == true ? (j['sellerReply'] as String).trim() : null,
+        textI18n: TextI18n.tryParse(j['textI18n']),
+        replyI18n: TextI18n.tryParse(j['replyI18n']),
         photos: j['photos'] is List ? [for (final u in j['photos'] as List) if (u is String && u.isNotEmpty) u] : const [],
       );
 }
@@ -331,7 +337,10 @@ class QuestionDto {
   /// When the seller answered (null while unanswered, and on answers given before this was stored).
   final DateTime? answeredAt;
 
-  QuestionDto({required this.id, required this.question, this.answer, this.productId, this.askerId, this.sellerId, this.createdAt, this.answeredAt});
+  /// The question / the answer in English and French, as the server already has them (null when it has none).
+  final TextI18n? questionI18n, answerI18n;
+
+  QuestionDto({required this.id, required this.question, this.answer, this.productId, this.askerId, this.sellerId, this.createdAt, this.answeredAt, this.questionI18n, this.answerI18n});
 
   bool get isAnswered => (answer ?? '').trim().isNotEmpty;
 
@@ -344,6 +353,8 @@ class QuestionDto {
         sellerId: textOrNull(j['sellerId']),
         createdAt: j['createdAt'] is String ? DateTime.tryParse(j['createdAt'] as String)?.toLocal() : null,
         answeredAt: j['answeredAt'] is String ? DateTime.tryParse(j['answeredAt'] as String)?.toLocal() : null,
+        questionI18n: TextI18n.tryParse(j['questionI18n']),
+        answerI18n: TextI18n.tryParse(j['answerI18n']),
       );
 }
 

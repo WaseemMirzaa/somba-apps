@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'feature_hooks.dart';
 import 'models.dart' show pickLang;
 import 'notification_sound.dart';
+import 'text_i18n.dart';
 import 'realtime_store.dart';
 
 Map<String, dynamic> _asMap(dynamic d) => (d as Map).map((k, v) => MapEntry(k.toString(), v));
@@ -17,6 +18,8 @@ DateTime? _date(dynamic v) {
   if (v is! String || v.isEmpty) return null;
   return DateTime.tryParse(v)?.toLocal();
 }
+
+const Object _keep = Object();
 
 int _int(dynamic v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
 
@@ -39,6 +42,7 @@ class ChatConversation {
     this.orderReference,
     this.lastMessageAt,
     this.lastMessagePreview = '',
+    this.lastMessageI18n,
     this.unread = 0,
   });
 
@@ -61,7 +65,14 @@ class ChatConversation {
   final String? orderReference;
   final DateTime? lastMessageAt;
   final String lastMessagePreview;
+
+  /// The last message from the store in English and French, when the thread's push carried them (null otherwise).
+  /// Only ever the store's text: what the customer wrote is shown as written.
+  final TextI18n? lastMessageI18n;
   final int unread;
+
+  /// The inbox preview in [lang]: the payload's text for that language when it has one, else the preview as sent.
+  String previewFor(String lang) => lastMessageI18n?.forLang(lang) ?? lastMessagePreview;
 
   /// The product's name in [lang]: French when asked and present, else the other language. Null without a product.
   String? displayProductName(String lang) {
@@ -87,10 +98,12 @@ class ChatConversation {
         orderReference: _str(j['orderReference']),
         lastMessageAt: _date(j['lastMessageAt']),
         lastMessagePreview: j['lastMessagePreview']?.toString() ?? '',
+        lastMessageI18n: TextI18n.tryParse(j['lastMessageI18n']),
         unread: _int(j['unread']),
       );
 
-  ChatConversation copyWith({int? unread, String? lastMessagePreview, DateTime? lastMessageAt}) => ChatConversation(
+  /// [lastMessageI18n]: pass `null` explicitly to clear it (the preview moved on to a message without translations).
+  ChatConversation copyWith({int? unread, String? lastMessagePreview, DateTime? lastMessageAt, Object? lastMessageI18n = _keep}) => ChatConversation(
         id: id,
         side: side,
         buyerId: buyerId,
@@ -106,6 +119,7 @@ class ChatConversation {
         orderReference: orderReference,
         lastMessageAt: lastMessageAt ?? this.lastMessageAt,
         lastMessagePreview: lastMessagePreview ?? this.lastMessagePreview,
+        lastMessageI18n: identical(lastMessageI18n, _keep) ? this.lastMessageI18n : lastMessageI18n as TextI18n?,
         unread: unread ?? this.unread,
       );
 
@@ -132,6 +146,7 @@ class ChatMessage {
     this.text = '',
     this.attachments = const [],
     this.createdAt,
+    this.textI18n,
   });
 
   final String id;
@@ -144,6 +159,9 @@ class ChatMessage {
   final String text;
   final List<String> attachments;
   final DateTime? createdAt;
+
+  /// [text] in English and French, as the server already has them (null when it has none).
+  final TextI18n? textI18n;
 
   bool get mine => senderSide != 'seller';
 
@@ -158,6 +176,7 @@ class ChatMessage {
       text: j['text']?.toString() ?? '',
       attachments: raw is List ? [for (final u in raw) if (u is String && u.isNotEmpty) u] : const [],
       createdAt: _date(j['createdAt']),
+      textI18n: TextI18n.tryParse(j['textI18n']),
     );
   }
 }
@@ -340,6 +359,7 @@ class ChatStore extends ChangeNotifier {
       _conversations[i] = _conversations[i].copyWith(
         lastMessagePreview: text.trim().isNotEmpty ? text.trim() : '📷',
         lastMessageAt: message.createdAt ?? DateTime.now(),
+        lastMessageI18n: null, // what the customer wrote is shown as written
       );
       _sort();
       notifyListeners();
@@ -375,7 +395,9 @@ class ChatStore extends ChangeNotifier {
     final known = _conversations.any((c) => c.id == conv.id);
     final open = openConversationId == conv.id;
     // The thread on screen reads what arrives at once.
-    _upsert(open && !message.mine ? conv.copyWith(unread: 0) : conv);
+    // The store's text in both languages (when it came) lets the inbox preview follow the app language.
+    final withI18n = conv.copyWith(lastMessageI18n: message.mine ? null : (message.textI18n ?? conv.lastMessageI18n));
+    _upsert(open && !message.mine ? withI18n.copyWith(unread: 0) : withI18n);
     if (!known) unawaited(refreshUnread().catchError((Object _) {}));
     _incoming.add(message);
     // A message from the store chimes unless that thread is the one on screen.

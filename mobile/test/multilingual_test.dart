@@ -545,13 +545,9 @@ void main() {
     Finder text(String kind, String id) => find.byKey(ValueKey('tt-text-$kind-$id'));
     String shown(WidgetTester tester, String kind, String id) => tester.widget<Text>(text(kind, id)).data!;
 
-    testWidgets('toggles between the translation and the original, asking the server once', (tester) async {
+    testWidgets('a review is translated by itself; the link toggles between the translation and the original, asking the server once', (tester) async {
       final r = ReviewDto(id: 'r1', author: 'Jo', rating: 5, text: 'Super produit');
       await show(tester, reviewTile(r, const Strings('en')));
-      expect(shown(tester, 'review', 'r1'), 'Super produit');
-      expect(find.text('See translation'), findsOneWidget);
-
-      await tester.tap(link('review', 'r1'));
       await tester.pump();
       await tester.pump();
       expect(_asked, [
@@ -577,25 +573,24 @@ void main() {
       _answer = (_) async => {'text': 'Excellent produit', 'sourceLang': 'en', 'same': false};
       final r = ReviewDto(id: 'r2', author: 'Jo', rating: 4, text: 'Great product');
       await show(tester, reviewTile(r, const Strings('fr')), lang: 'fr');
-      expect(find.text('Voir la traduction'), findsOneWidget);
-      await tester.tap(link('review', 'r2'));
       await tester.pump();
       await tester.pump();
       expect(_asked.single['target'], 'fr');
       expect(find.text('Voir l’original'), findsOneWidget);
       expect(find.text('Traduit automatiquement'), findsOneWidget);
+      await tester.tap(link('review', 'r2'));
+      await tester.pump();
+      expect(find.text('Voir la traduction'), findsOneWidget);
     });
 
     testWidgets('the seller reply is translated as `review_reply`, by the review id', (tester) async {
       final r = ReviewDto(id: 'r3', author: 'Jo', rating: 5, text: 'Great', sellerReply: 'Merci beaucoup');
       _answer = (b) async => {'text': b['kind'] == 'review_reply' ? 'Thank you very much' : 'x', 'sourceLang': 'fr', 'same': false};
       await show(tester, reviewTile(r, const Strings('en')));
-      await tester.tap(link('review_reply', 'r3'));
       await tester.pump();
       await tester.pump();
-      expect(_asked.single, {'kind': 'review_reply', 'id': 'r3', 'target': 'en'});
+      expect(_asked.map((b) => '${b['kind']}:${b['id']}:${b['target']}'), containsAll(['review_reply:r3:en']));
       expect(shown(tester, 'review_reply', 'r3'), 'Thank you very much');
-      expect(shown(tester, 'review', 'r3'), 'Great', reason: 'the review itself is untouched');
     });
 
     testWidgets('questions and answers use their own kinds', (tester) async {

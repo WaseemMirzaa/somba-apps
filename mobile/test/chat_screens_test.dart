@@ -85,6 +85,31 @@ void main() {
       expect(ChatStore.instance.unread, 1);
     });
 
+    testWidgets('the inbox preview of a live store message follows the app language; your own message shows as written', (tester) async {
+      twoThreads();
+      await open(tester, const ChatInboxScreen());
+      RealtimeStore.instance.debugEmit('chat:message', {
+        'conversation': convJson(id: 'b', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'SOM-1042', unread: 1, preview: 'Livré, profitez-en', at: '2026-10-24T11:00:00Z'),
+        'message': {...msgJson('m9', convId: 'b', text: 'Livré, profitez-en'), 'textI18n': {'sourceLang': 'fr', 'en': 'Delivered, enjoy', 'fr': 'Livré, profitez-en'}},
+      });
+      await tester.pump();
+      expect(find.text('Delivered, enjoy'), findsOneWidget);
+      expect(find.text('Livré, profitez-en'), findsNothing);
+      await open(tester, const ChatInboxScreen(locale: Locale('fr')), lang: 'fr');
+      await tester.pump();
+      expect(find.text('Livré, profitez-en'), findsOneWidget);
+      expect(find.text('Delivered, enjoy'), findsNothing);
+
+      // A later message from the customer replaces the preview with what they wrote.
+      RealtimeStore.instance.debugEmit('chat:message', {
+        'conversation': convJson(id: 'b', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'SOM-1042', preview: 'Merci !', at: '2026-10-24T12:00:00Z'),
+        'message': {...msgJson('m10', convId: 'b', side: 'buyer', text: 'Merci !'), 'textI18n': {'sourceLang': 'fr', 'en': 'Thanks!', 'fr': 'Merci !'}},
+      });
+      await tester.pump();
+      expect(find.text('Merci !'), findsOneWidget);
+      expect(find.text('Thanks!'), findsNothing);
+    });
+
     testWidgets('an empty inbox explains how to start a conversation', (tester) async {
       server.handlers['chat:list'] = (_) => const <dynamic>[];
       await open(tester, const ChatInboxScreen());
@@ -334,7 +359,7 @@ void main() {
       expect(find.textContaining('vous pouvez lire les messages mais pas y répondre'), findsWidgets);
     });
 
-    testWidgets('translate: a link under the store\'s messages only, toggling original and translation', (tester) async {
+    testWidgets('translate: the store\'s messages are translated by themselves (yours are not), the link toggles original and translation', (tester) async {
       thread();
       final asked = <Map<String, dynamic>?>[];
       RealtimeStore.instance.debugTranslateRequest = (event, [body]) async {
@@ -342,12 +367,10 @@ void main() {
         return {'text': 'Hello, yes it is available.', 'sourceLang': 'fr', 'same': false};
       };
       await openThread(tester);
-      expect(find.byKey(const ValueKey('tt-link-chat_message-m3')), findsOneWidget);
-      expect(find.byKey(const ValueKey('tt-link-chat_message-m4')), findsNothing, reason: 'your own messages need no translation');
-      await tester.tap(find.byKey(const ValueKey('tt-link-chat_message-m3')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump();
       expect(asked.single, {'kind': 'chat_message', 'id': 'm3', 'target': 'en'});
+      expect(find.byKey(const ValueKey('tt-link-chat_message-m4')), findsNothing, reason: 'your own messages need no translation');
       expect(find.text('Hello, yes it is available.'), findsOneWidget);
       expect(find.text('Translated automatically'), findsOneWidget);
       expect(find.text('See original'), findsOneWidget);
@@ -355,12 +378,47 @@ void main() {
       await tester.pump();
       expect(find.text('Bonjour, oui il est disponible.'), findsOneWidget);
       expect(find.text('See translation'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('tt-link-chat_message-m3')));
+      await tester.pump();
+      expect(find.text('Hello, yes it is available.'), findsOneWidget);
+      expect(asked, hasLength(1));
     });
 
-    testWidgets('a translation that fails is a snackbar and the original stays', (tester) async {
+    testWidgets('a store message that arrives with its translations is shown in the app language at once, with no request', (tester) async {
+      final asked = <Map<String, dynamic>?>[];
+      RealtimeStore.instance.debugTranslateRequest = (event, [body]) async {
+        asked.add(body);
+        return {'text': 'never', 'sourceLang': 'fr', 'same': false};
+      };
+      thread(messages: [
+        {...msgJson('m3', text: 'Bonjour, oui il est disponible.'), 'textI18n': {'sourceLang': 'fr', 'en': 'Hello, yes it is available.', 'fr': 'Bonjour, oui il est disponible.'}},
+        {...msgJson('m5', text: 'Hello again'), 'textI18n': {'sourceLang': 'en', 'en': 'Hello again', 'fr': 'Rebonjour'}},
+        msgJson('m4', side: 'buyer', text: 'Great, do you deliver to Limete?'),
+      ]);
+      await openThread(tester);
+      await tester.pump();
+      expect(find.text('Hello, yes it is available.'), findsOneWidget);
+      expect(find.text('Hello again'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tt-link-chat_message-m5')), findsNothing, reason: 'written in the app language: no link');
+      expect(find.byKey(const ValueKey('tt-link-chat_message-m3')), findsOneWidget);
+      expect(find.text('Translated automatically'), findsOneWidget);
+      expect(asked, isEmpty);
+
+      await openThread(tester, lang: 'fr');
+      await tester.pump();
+      expect(find.text('Bonjour, oui il est disponible.'), findsOneWidget);
+      expect(find.text('Rebonjour'), findsOneWidget);
+      expect(asked, isEmpty);
+    });
+
+    testWidgets('a translation that fails by itself is silent and the original stays; the link tries again and then says why', (tester) async {
       thread();
       RealtimeStore.instance.debugTranslateRequest = (event, [body]) async => throw serverError('Nothing to translate.');
       await openThread(tester, lang: 'fr');
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(SnackBar), findsNothing, reason: 'nobody asked: stay quiet');
+      expect(find.text('Bonjour, oui il est disponible.'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('tt-link-chat_message-m3')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));

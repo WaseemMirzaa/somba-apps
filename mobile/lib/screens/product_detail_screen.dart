@@ -516,7 +516,7 @@ Widget reviewTile(ReviewDto r, Strings s) => Column(crossAxisAlignment: CrossAxi
         ),
       ]),
       const SizedBox(height: 8),
-      TranslatableText(kind: 'review', id: r.id, text: r.text, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
+      TranslatableText(kind: 'review', id: r.id, auto: true, i18n: r.textI18n, text: r.text, style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.inkSoft)),
       if (r.photos.isNotEmpty) ...[
         const SizedBox(height: 10),
         RemotePhotos(key: ValueKey('review-photos-${r.id}'), urls: r.photos, size: 64, semantic: s.rvPhotoAlt),
@@ -535,7 +535,7 @@ Widget reviewTile(ReviewDto r, Strings s) => Column(crossAxisAlignment: CrossAxi
             Text(s.reviewSellerReply, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: AppColors.primary)),
             const SizedBox(height: 3),
             TranslatableText(
-                kind: 'review_reply', id: r.id, text: r.sellerReply!, style: const TextStyle(fontSize: 13, height: 1.35, color: AppColors.inkSoft)),
+                kind: 'review_reply', id: r.id, auto: true, i18n: r.replyI18n, text: r.sellerReply!, style: const TextStyle(fontSize: 13, height: 1.35, color: AppColors.inkSoft)),
           ]),
         ),
     ]);

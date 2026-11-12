@@ -163,7 +163,7 @@ class ConversationTile extends StatelessWidget {
                     const SizedBox(height: 3),
                     Row(children: [
                       Expanded(
-                        child: Text(c.lastMessagePreview,
+                        child: Text(c.previewFor(s.lang),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: unread ? AppColors.ink : AppColors.muted, fontSize: 13, height: 1.3, fontWeight: unread ? FontWeight.w600 : FontWeight.w400)),
