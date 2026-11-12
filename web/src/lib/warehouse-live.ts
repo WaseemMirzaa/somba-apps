@@ -1,5 +1,6 @@
 "use client";
 
+import type { TextI18n } from "@/lib/text-i18n";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -180,6 +181,8 @@ export interface ExchangeRow {
   toName: string;
   priceDiffUsd: number;
   reason: string | null;
+  reasonI18n?: TextI18n | null;
+  sellerReasonI18n?: TextI18n | null;
   status: "requested" | "approved" | "received" | "ready" | "dispatched" | "delivered" | "rejected";
   qty?: number;
   fromVariant?: string | null;
@@ -203,6 +206,8 @@ export interface ReplacementRow {
   sku: string;
   productName: string;
   reason: string | null;
+  reasonI18n?: TextI18n | null;
+  sellerReasonI18n?: TextI18n | null;
   condition: string | null;
   status: "requested" | "approved" | "received" | "allocated" | "dispatched" | "delivered" | "rejected";
   dispatchStatus: string | null;

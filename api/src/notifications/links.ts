@@ -71,7 +71,7 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'review' || t === 'question') return pick(`/admin/reviews?focus=${id}`, '/admin/reviews');
       if (t === 'exchange') return pick(`/admin/exchanges/${id}`, '/admin/exchanges');
       if (t === 'replacement') return pick(`/admin/replacements/${id}`, '/admin/replacements');
-      if (t === 'policy') return pick(`/admin/sellers/${id}`, '/admin/sellers'); // a store policy waiting for approval: the store's page (entityId is the store)
+      if (t === 'policy') return pick(`/admin/policies?seller=${id}`, '/admin/policies'); // a store policy waiting for approval: the policy queue, filtered to the store (entityId is the store)
       return '/admin/notifications';
     }
     case 'warehouse':

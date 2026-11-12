@@ -17,7 +17,7 @@ type Outcome = "refund_full" | "refund_partial" | "replacement" | "reject";
 const OUTCOMES: { id: Outcome; en: string; fr: string; hintEn: string; hintFr: string; money: boolean }[] = [
   { id: "refund_full", en: "Refund in full", fr: "Rembourser en totalité", hintEn: "Everything still outstanding on the order goes back to the customer.", hintFr: "Tout ce qui reste à rembourser sur la commande retourne au client.", money: true },
   { id: "refund_partial", en: "Refund part", fr: "Rembourser en partie", hintEn: "Give back an amount you choose.", hintFr: "Rendez le montant de votre choix.", money: true },
-  { id: "replacement", en: "Send a replacement", fr: "Envoyer un remplacement", hintEn: "Creates a replacement request for the seller; stock comes from the seller.", hintFr: "Crée une demande de remplacement chez le vendeur ; le stock vient du vendeur.", money: false },
+  { id: "replacement", en: "Send a replacement", fr: "Envoyer un remplacement", hintEn: "Creates a replacement request; stock comes from the seller.", hintFr: "Crée une demande de remplacement ; le stock vient du vendeur.", money: false },
   { id: "reject", en: "Reject the request", fr: "Rejeter la demande", hintEn: "Closes it without a refund. The customer sees your reason.", hintFr: "Clôt sans remboursement. Le client voit votre motif.", money: false },
 ];
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { TextI18n } from "@/lib/text-i18n";
 import { httpErrorText, currentLocale } from "@/lib/api-errors";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -8,6 +9,7 @@ import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { authApi } from "@/lib/realtime/auth-api";
 import type { Dispute, Payment, Payout } from "@/lib/realtime/types";
+import { UNDECIDED_STAGES, WITH_SUPPORT } from "@/lib/support-stage";
 
 /**
  * Helpers for admin pages that talk to the server directly (request -> ack).
@@ -155,6 +157,8 @@ export interface SupportMessage {
   fromId?: string;
   role: string;
   text: string;
+  /** The text in both languages (docs/contracts/stored-text-i18n.md); absent when the server has nothing. */
+  textI18n?: TextI18n | null;
   at: string;
   attachments?: string[];
 }
@@ -166,6 +170,8 @@ export interface SupportTicketRow {
   /** The creator's role: customer, seller, rider... */
   role?: string;
   subject: string;
+  /** The subject in both languages. */
+  subjectI18n?: TextI18n | null;
   category: string;
   orderId: string | null;
   assigneeId?: string | null;
@@ -387,10 +393,12 @@ export function useLiveKey(): string {
 
 type L2 = { en: string; fr: string };
 export const DISPUTE_STAGE_LABEL: Record<string, L2> = {
-  awaiting_seller: { en: "Waiting for the seller", fr: "En attente du vendeur" },
-  seller_replied: { en: "Seller replied", fr: "Le vendeur a répondu" },
-  seller_rejected: { en: "Seller said no", fr: "Refusé par le vendeur" },
-  seller_timeout: { en: "Seller did not answer", fr: "Le vendeur n'a pas répondu" },
+  awaiting_support: { en: "Waiting for support", fr: "En attente du support" },
+  // Legacy seller stages (the server moved every open row to awaiting_support): they read as support's.
+  awaiting_seller: WITH_SUPPORT,
+  seller_replied: WITH_SUPPORT,
+  seller_rejected: WITH_SUPPORT,
+  seller_timeout: WITH_SUPPORT,
   escalated: { en: "With KOMORIKO support", fr: "Chez le support KOMORIKO" },
   approved: { en: "Approved, pickup being planned", fr: "Approuvé, collecte en préparation" },
   pickup: { en: "Pickup on its way", fr: "Collecte en cours" },
@@ -398,10 +406,11 @@ export const DISPUTE_STAGE_LABEL: Record<string, L2> = {
   closed: { en: "Closed", fr: "Clôturé" },
 };
 export const DISPUTE_STAGE_BADGE: Record<string, "success" | "warning" | "danger" | "info" | "default" | "purple"> = {
-  awaiting_seller: "warning",
-  seller_replied: "info",
-  seller_rejected: "danger",
-  seller_timeout: "danger",
+  awaiting_support: "warning",
+  awaiting_seller: "purple",
+  seller_replied: "purple",
+  seller_rejected: "purple",
+  seller_timeout: "purple",
   escalated: "purple",
   approved: "info",
   pickup: "info",
@@ -431,7 +440,7 @@ export const ITEM_CONDITION_LABEL: Record<string, L2> = {
   unsellable: { en: "Unsellable", fr: "Invendable" },
 };
 /** Stages in which nobody has decided a return yet (KOMORIKO support may approve or refuse). */
-export const RETURN_UNDECIDED = ["awaiting_seller", "seller_rejected", "seller_timeout", "escalated"];
+export const RETURN_UNDECIDED: readonly string[] = UNDECIDED_STAGES;
 export const lab = (m: Record<string, L2>, key: string | null | undefined, fr: boolean) => {
   const l = key ? m[key] : undefined;
   return l ? (fr ? l.fr : l.en) : (key ?? "—");

@@ -26,11 +26,14 @@ import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { pickText, productNameFor } from "@/lib/i18n-fields";
 import { planLabel, useSellerPlans } from "@/lib/shop-live";
 import { Ban } from "lucide-react";
+import { ExpressToggle } from "@/components/admin/express-toggle";
+import { canReviewPolicies } from "@/lib/admin-controls";
+import { useRole } from "@/lib/admin-live";
 
 const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", suspended: "Suspendu", rejected: "Rejeté" };
 const PRODUCT_STATUS_FR: Record<string, string> = { live: "En ligne", pending: "En attente", rejected: "Rejeté", removed: "Bloqué", draft: "Brouillon" };
 
-type SellerFull = Seller & { pickupAddress?: string | null; plan?: string; planExpiresAt?: string | null };
+type SellerFull = Seller & { pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; expressDelivery?: boolean; plan?: string; planExpiresAt?: string | null };
 
 /** Applications filed before KYC existed have none of this. */
 const hasKyc = (s: Seller) => !!(s.kycSubmittedAt || s.termsAcceptedAt || s.legalName || s.idNumber || (s.documentUrls?.length ?? 0) > 0);
@@ -43,6 +46,7 @@ export default function AdminSellerDetailPage() {
   const fr = locale === "fr";
   const { plans } = useSellerPlans();
   const rt = useRealtime();
+  const role = useRole();
   const [days, setDays] = useState<PeriodDays>(30);
   // One store with its KYC; re-read whenever a moderation decision / resubmission / edit is pushed.
   const [refresh, setRefresh] = useState(0);
@@ -120,6 +124,20 @@ export default function AdminSellerDetailPage() {
             { label: fr ? "Formule" : "Plan", value: `${planLabel(plans, seller.plan, fr)}${seller.planExpiresAt ? ` · ${fr ? "jusqu'au" : "until"} ${localDay(String(seller.planExpiresAt))}` : ""}` },
             { label: fr ? "Produits" : "Products", value: sellerProducts.length },
           ]} />
+        </DetailGridSection>
+
+        <DetailGridSection title={fr ? "Livraison express" : "Express delivery"}>
+          <ExpressToggle
+            sellerId={seller.id}
+            on={seller.expressDelivery === true}
+            pinned={seller.pickupLat != null && seller.pickupLng != null}
+            onChanged={() => setRefresh((n) => n + 1)}
+          />
+          {canReviewPolicies(role) && (
+            <Link href={`/admin/policies?seller=${seller.id}`} className="mt-4 inline-block text-sm font-medium text-[var(--primary)] hover:underline">
+              {fr ? "Politiques de la boutique →" : "Store policies →"}
+            </Link>
+          )}
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Décision de modération" : "Moderation decision"}>

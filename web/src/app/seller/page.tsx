@@ -325,7 +325,7 @@ export default function SellerDashboard() {
                 })}
                 {a.health.components.length > 0 && (
                   <p className="pt-1 text-[11px] text-slate-400">
-                    {fr ? "Calculé par la plateforme à partir de vos commandes, avis et retours." : "Computed by the platform from your orders, reviews and returns."}
+                    {fr ? "Calculé par la plateforme à partir de vos commandes et de vos avis." : "Computed by the platform from your orders and reviews."}
                   </p>
                 )}
               </CardContent>
@@ -341,8 +341,6 @@ export default function SellerDashboard() {
                   {[
                     { label: fr ? "Délai de préparation" : "Time to pack", value: formatHours(a.fulfilment.avgHoursToReady, fr) },
                     { label: fr ? "Délai de livraison" : "Time to deliver", value: formatHours(a.fulfilment.avgHoursToDelivered, fr) },
-                    { label: fr ? "Retours" : "Returns", value: a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.returnRatePct}%` : "—" },
-                    { label: fr ? "Litiges" : "Disputes", value: a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.disputeRatePct}%` : "—" },
                     { label: fr ? "Annulations" : "Cancellations", value: a.fulfilment.ordersPlaced > 0 ? `${a.fulfilment.cancelRatePct}%` : "—" },
                     { label: fr ? "Commandes ouvertes" : "Open orders", value: String(openShipments) },
                   ].map((m) => (

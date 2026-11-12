@@ -104,13 +104,9 @@ export function RequestForm({ orderId, mode }: { orderId: string; mode: "return"
           <p className="mt-2 text-sm text-slate-600">{fr ? "Référence" : "Reference"}: <strong>{result.reference}</strong></p>
           <p className="mt-1 text-sm text-slate-500">{stageText(result, fr)}</p>
           <p className="mt-3 text-xs text-slate-500">
-            {isReturn
-              ? fr
-                ? `Le vendeur a ${settings.sellerResponseHours} h pour répondre. S'il refuse ou ne répond pas, vous pourrez demander l'avis du support KOMORIKO.`
-                : `The seller has ${settings.sellerResponseHours} h to answer. If they decline or stay silent, you can ask KOMORIKO support to review.`
-              : fr
-                ? "Le vendeur peut répondre dans la discussion ; le support KOMORIKO décide ensuite."
-                : "The seller can reply in the thread; KOMORIKO support then decides."}
+            {fr
+              ? `Le support KOMORIKO examine votre demande et décide. Délai de réponse du support : ${settings.sellerResponseHours} h. Vous pouvez lui écrire dans la discussion.`
+              : `KOMORIKO support reviews your request and decides. Support response time: ${settings.sellerResponseHours} h. You can write to support in the thread.`}
           </p>
           {result.siblings && result.siblings.length > 0 && (
             <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">

@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { Button } from "@/components/ui/button";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
-import { PhotoPicker } from "@/components/shop/photo-picker";
+import { ChatClosedNote } from "@/components/shop/chat-closed-note";
 import { useChatThread, type ChatMessage } from "@/lib/shop-engage";
 import { useLocale } from "@/context/locale-context";
 import { localized } from "@/lib/i18n-fields";
-import { useToast } from "@/context/toast-context";
 import { TranslatableText } from "@/components/shop/translatable-text";
 
 /** One message: the other side's text shows in the page language by itself (the server's translations, else fetched). */
@@ -42,11 +40,7 @@ function Thread() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const { toast } = useToast();
-  const { conversation, messages, hasMore, loaded, error, send, loadOlder } = useChatThread(id);
-  const [text, setText] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const { conversation, messages, hasMore, loaded, error, loadOlder } = useChatThread(id);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,26 +56,11 @@ function Thread() {
     );
   }
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!text.trim() && photos.length === 0) return;
-    setBusy(true);
-    try {
-      await send(text.trim(), photos);
-      setText("");
-      setPhotos([]);
-    } catch (err) {
-      toast((err as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <PageHeader
         title={conversation.storeName}
-        subtitle={[conversation.productName ? localized(conversation, "productName", fr) : null, conversation.orderReference].filter(Boolean).join(" · ") || (fr ? "Conversation avec le vendeur" : "Conversation with the seller")}
+        subtitle={[conversation.productName ? localized(conversation, "productName", fr) : null, conversation.orderReference].filter(Boolean).join(" · ") || (fr ? "Ancienne conversation avec le vendeur" : "Old conversation with the seller")}
         backHref="/shop/messages"
         actions={
           <div className="flex gap-3 text-sm">
@@ -90,6 +69,7 @@ function Thread() {
           </div>
         }
       />
+      <ChatClosedNote fr={fr} orderId={conversation.orderId} productId={conversation.productId} productName={conversation.productName} />
       <div className="card-premium space-y-3 p-4" data-testid="chat-thread">
         {hasMore && (
           <button type="button" onClick={() => void loadOlder()} className="mx-auto block text-xs font-medium text-[var(--primary)] hover:underline">{fr ? "Messages précédents" : "Earlier messages"}</button>
@@ -99,11 +79,6 @@ function Thread() {
         ))}
         <div ref={bottom} />
       </div>
-      <form onSubmit={submit} className="card-premium space-y-3 p-4">
-        <textarea className="input-premium w-full px-3 py-2 text-sm" rows={2} maxLength={2000} aria-label={fr ? "Votre message" : "Your message"} placeholder={fr ? "Écrire un message…" : "Write a message…"} value={text} onChange={(e) => setText(e.target.value)} />
-        <PhotoPicker value={photos} onChange={setPhotos} max={4} fr={fr} />
-        <Button type="submit" disabled={busy || (!text.trim() && photos.length === 0)}>{busy ? "…" : fr ? "Envoyer" : "Send"}</Button>
-      </form>
     </div>
   );
 }

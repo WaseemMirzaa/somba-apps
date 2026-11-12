@@ -23,6 +23,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Returns, disputes, exchanges, replacements and messages are KOMORIKO support's business now (docs/contracts/admin-controls.md):
+  // a store has no such pages, so an old bookmark or notice link lands on the seller dashboard.
+  async redirects() {
+    return ["returns", "disputes", "exchanges", "replacements", "messages"].flatMap((page) => [
+      { source: `/seller/${page}`, destination: "/seller", permanent: false },
+      { source: `/seller/${page}/:path*`, destination: "/seller", permanent: false },
+    ]);
+  },
   images: {
     // Only when the API itself runs on localhost (local development) may the optimizer fetch from a loopback address.
     dangerouslyAllowLocalIP: !!apiOrigin && ["localhost", "127.0.0.1"].includes(apiOrigin.hostname),

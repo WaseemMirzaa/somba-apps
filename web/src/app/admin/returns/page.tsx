@@ -9,6 +9,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { applyListFilters } from "@/lib/list-filter-utils";
+import { shownText, type TextI18n } from "@/lib/text-i18n";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
@@ -27,7 +28,7 @@ export default function AdminReturnsPage() {
   const [filters, setFilters] = useState(EMPTY_LIST_FILTERS);
   const returns = (rt.disputes as DisputeRow[])
     .filter((d) => d.type === "return")
-    .map((d) => ({ ...d, date: localDay(d.createdAt), stageKey: d.status === "open" ? (d.stage ?? "awaiting_seller") : "closed" }));
+    .map((d) => ({ ...d, date: localDay(d.createdAt), stageKey: d.status === "open" ? (d.stage ?? "awaiting_support") : "closed" }));
 
   const filtered = useMemo(
     () =>
@@ -67,7 +68,7 @@ export default function AdminReturnsPage() {
                 <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderReference)}</Link>
               )},
               { key: "customerName", label: t("customer") },
-              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => <span className="line-clamp-2 max-w-[16rem] font-medium text-amber-700">{String(row.reason)}</span> },
+              { key: "reason", label: fr ? "Motif" : "Reason", render: (row) => <span className="line-clamp-2 max-w-[16rem] font-medium text-amber-700">{shownText(row.reasonI18n as TextI18n | null | undefined, locale, String(row.reason))}</span> },
               { key: "category", label: fr ? "Catégorie" : "Category", render: (row) => <span className="text-slate-600">{row.category ? lab(DISPUTE_CATEGORY_LABEL, String(row.category), fr) : "—"}</span> },
               { key: "stageKey", label: fr ? "Étape" : "Stage", render: (row) => (
                 <Badge variant={DISPUTE_STAGE_BADGE[String(row.stageKey)] ?? "default"}>{lab(DISPUTE_STAGE_LABEL, String(row.stageKey), fr)}</Badge>

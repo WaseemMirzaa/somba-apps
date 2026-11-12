@@ -30,17 +30,16 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { localized } from "@/lib/i18n-fields";
 import { formatCurrency } from "@/lib/utils";
 import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent, useSupportTickets, useVerificationStatus, isVerificationError } from "@/lib/shop-live";
-import { useChatUnread } from "@/lib/shop-engage";
 import type { BackendUser, Payment } from "@/lib/realtime/types";
 
 const menuItems = [
   { href: "/shop/orders", icon: Package, title: { en: "My orders", fr: "Mes commandes" }, desc: { en: "Track & manage orders", fr: "Suivre et gérer les commandes" } },
   { href: "/shop/returns", icon: RotateCcw, title: { en: "Returns & exchanges", fr: "Retours et échanges" }, desc: { en: "Returns, disputes, replacements and exchanges", fr: "Retours, litiges, remplacements et échanges" } },
-  { href: "/shop/messages", icon: MessageCircle, title: { en: "Messages", fr: "Messages" }, desc: { en: "Chat with sellers", fr: "Discuter avec les vendeurs" } },
+  { href: "/shop/messages", icon: MessageCircle, title: { en: "Past messages", fr: "Anciens messages" }, desc: { en: "Read-only history of your old chats with sellers", fr: "Historique en lecture seule de vos anciens échanges avec les vendeurs" } },
   { href: "/shop/wishlist", icon: Heart, title: { en: "Wishlist", fr: "Liste de souhaits" }, desc: { en: "Saved items", fr: "Articles enregistrés" } },
   { href: "/shop/account/addresses", icon: MapPin, title: { en: "Addresses", fr: "Adresses" }, desc: { en: "Your delivery addresses", fr: "Vos adresses de livraison" } },
   { href: "/shop/notifications", icon: Bell, title: { en: "Notifications", fr: "Notifications" }, desc: { en: "Order and account updates", fr: "Mises à jour de commandes et de compte" } },
-  { href: "/shop/support", icon: Headphones, title: { en: "Support", fr: "Support" }, desc: { en: "Open or follow a ticket", fr: "Ouvrir ou suivre un ticket" } },
+  { href: "/shop/support", icon: Headphones, title: { en: "Contact support", fr: "Contacter le support" }, desc: { en: "Open a ticket or follow one", fr: "Ouvrir un ticket ou en suivre un" } },
   { href: "/shop/help", icon: HelpCircle, title: { en: "Help", fr: "Aide" }, desc: { en: "FAQ & account deletion", fr: "FAQ et suppression de compte" } },
   { href: "/shop/deals", icon: Zap, title: { en: "Flash deals", fr: "Ventes flash" }, desc: { en: "Limited-time offers", fr: "Offres limitées" } },
   ];
@@ -221,7 +220,6 @@ function AccountContent() {
   const fr = locale === "fr";
   const { logout } = useAuth();
   const router = useRouter();
-  const chatUnread = useChatUnread();
   const { tickets } = useSupportTickets();
   const ticketUnread = tickets.reduce((n, tk) => n + (tk.userUnread ?? 0), 0);
 
@@ -241,7 +239,7 @@ function AccountContent() {
 
       <div className="grid gap-3">
         {menuItems.map((item) => {
-          const badge = item.href === "/shop/messages" ? chatUnread : item.href === "/shop/support" ? ticketUnread : 0;
+          const badge = item.href === "/shop/support" ? ticketUnread : 0;
           return (
           <Link
             key={item.href}

@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { StepList } from "@/components/shop/step-list";
-import { ContactSeller } from "@/components/shop/contact-seller";
+import { ContactSupport } from "@/components/shop/contact-support";
 import { useMyOrder, orderStatusLabel, useDeliveryCode } from "@/lib/orders";
 import { codeRefreshKey } from "@/lib/delivery-code";
 import { customerJourney } from "@/lib/order-journey";
@@ -48,7 +48,6 @@ function Tracking() {
   const steps = customerJourney(raw, hubs, fr);
   const riderOnRoad = !order.partiallyDelivered || !!openCustomerLeg(raw.tracking?.legs);
   const destHub = raw.destinationHubId ? hubs.get(raw.destinationHubId) : undefined;
-  const sellers = [...new Map((raw.items ?? []).filter((i) => i.sellerId).map((i) => [i.sellerId as string, i.sellerName ?? ""])).entries()];
 
   return (
     <div className="space-y-6">
@@ -139,13 +138,7 @@ function Tracking() {
             : { label: fr ? "Entrepôt de livraison" : "Delivery warehouse", value: destHub ? `${destHub.name} · ${destHub.city}` : "—" },
           { label: fr ? "Adresse" : "Address", value: order.customerAddress, full: true },
         ]} />
-        {sellers.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {sellers.map(([sid, name]) => (
-              <ContactSeller key={sid} sellerId={sid} orderId={order.id} fr={fr} label={fr ? `Écrire à ${name}` : `Message ${name}`} returnTo={`/shop/orders/${order.id}/tracking`} />
-            ))}
-          </div>
-        )}
+        <ContactSupport fr={fr} orderId={order.id} className="mt-4" />
         <Link href={`/shop/orders/${order.id}/dispute`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Un problème avec cette commande ?" : "Problem with this order?"}</Link>
       </DetailSection>
     </div>

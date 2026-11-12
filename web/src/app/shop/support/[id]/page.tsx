@@ -11,6 +11,8 @@ import { PhotoPicker } from "@/components/shop/photo-picker";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { StoredText } from "@/components/shop/translatable-text";
+import { shownText } from "@/lib/text-i18n";
 import { useSupportTickets, ticketMessages, ticketStatusLabel, type SupportTicketRow } from "@/lib/shop-live";
 
 function TicketThread() {
@@ -67,7 +69,7 @@ function TicketThread() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={ticket.subject} subtitle={ticket.reference} backHref="/shop/support" actions={<Badge variant={ticket.status === "resolved" || ticket.status === "closed" ? "success" : ticket.status === "pending" ? "info" : "warning"}>{ticketStatusLabel(ticket.status, fr)}</Badge>} />
+      <PageHeader title={shownText(ticket.subjectI18n, locale, ticket.subject)} subtitle={ticket.reference} backHref="/shop/support" actions={<Badge variant={ticket.status === "resolved" || ticket.status === "closed" ? "success" : ticket.status === "pending" ? "info" : "warning"}>{ticketStatusLabel(ticket.status, fr)}</Badge>} />
 
       {ticket.orderId && (
         <Link href={`/shop/orders/${ticket.orderId}`} className="text-sm text-[var(--primary)] hover:underline">
@@ -83,7 +85,7 @@ function TicketThread() {
               <p className="text-xs font-medium text-slate-400">
                 {mine ? (fr ? "Vous" : "You") : `${m.from} · ${fr ? "Support KOMORIKO" : "KOMORIKO support"}`} · {new Date(m.at).toLocaleString()}
               </p>
-              {m.text && <p className="mt-1 whitespace-pre-wrap text-slate-800">{m.text}</p>}
+              {m.text && (mine ? <p className="mt-1 whitespace-pre-wrap text-slate-800">{m.text}</p> : <StoredText kind="support_message" id={m.id} text={m.text} i18n={m.textI18n} className="mt-1 whitespace-pre-wrap text-slate-800" />)}
               {(m.attachments ?? []).length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(m.attachments ?? []).map((u) => (

@@ -109,6 +109,7 @@ const NOTICE_TYPES: Record<string, { en: string; fr: string }> = {
   support: { en: "Support", fr: "Support" },
   product: { en: "Product", fr: "Produit" },
   moderation: { en: "Moderation", fr: "Modération" },
+  policy: { en: "Store policy", fr: "Politique de boutique" },
   seller: { en: "Seller", fr: "Vendeur" },
   campaign: { en: "Campaign", fr: "Campagne" },
   marketing: { en: "Marketing", fr: "Marketing" },

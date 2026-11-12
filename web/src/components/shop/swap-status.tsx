@@ -9,6 +9,7 @@ import { SWAP_STATUS, swapSteps, type ExchangeRow, type ReplacementRow } from "@
 import { formatCurrency } from "@/lib/utils";
 import { useLocale } from "@/context/locale-context";
 import { pickText } from "@/lib/i18n-fields";
+import { TranslatableText } from "@/components/shop/translatable-text";
 import { replacementConditionLabel } from "@/lib/replacement-condition";
 
 export function SwapNotFound({ loaded }: { loaded: boolean }) {
@@ -40,7 +41,7 @@ export function ReplacementStatusView({ r }: { r: ReplacementRow }) {
         <DetailSection title={fr ? "Avancement" : "Progress"}>
           <StepList steps={steps} fr={fr} />
           {r.status !== "rejected" && r.status !== "delivered" && r.sellerDueAt && r.status === "requested" && (
-            <p className="mt-2 text-xs text-slate-500">{fr ? "Réponse du vendeur attendue avant le" : "The seller should answer by"} {new Date(r.sellerDueAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</p>
+            <p className="mt-2 text-xs text-slate-500">{fr ? "Le support KOMORIKO répond avant le" : "KOMORIKO support answers by"} {new Date(r.sellerDueAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</p>
           )}
         </DetailSection>
         <DetailSection title={fr ? "Détails" : "Details"}>
@@ -49,8 +50,8 @@ export function ReplacementStatusView({ r }: { r: ReplacementRow }) {
             ...(r.variant && r.variant !== "Default" ? [{ label: fr ? "Option" : "Option", value: r.variant }] : []),
             { label: fr ? "Demandé le" : "Requested", value: new Date(r.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB") },
             ...(r.condition ? [{ label: fr ? "État" : "Condition", value: replacementConditionLabel(r.condition, fr) }] : []),
-            ...(r.reason ? [{ label: fr ? "Motif" : "Reason", value: r.reason, full: true }] : []),
-            ...(r.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: r.sellerReason, full: true }] : []),
+            ...(r.reason ? [{ label: fr ? "Motif" : "Reason", value: <TranslatableText kind="replacement_reason" id={r.id} auto text={r.reason} i18n={r.reasonI18n} />, full: true }] : []),
+            ...(r.sellerReason ? [{ label: fr ? "Réponse du support KOMORIKO" : "KOMORIKO support's answer", value: <TranslatableText kind="replacement_reply" id={r.id} auto text={r.sellerReason} i18n={r.sellerReasonI18n} />, full: true }] : []),
             ...(r.status === "dispatched" ? [{ label: fr ? "Livraison" : "Delivery", value: fr ? "Un livreur vous apporte le nouvel article et reprend l'ancien." : "A rider is bringing the new item and will collect the old one.", full: true }] : []),
           ]} />
           <Link href={`/shop/orders/${r.orderId}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Voir la commande →" : "View order →"}</Link>
@@ -95,8 +96,8 @@ export function ExchangeStatusView({ r }: { r: ExchangeRow }) {
             },
             ...(diff > 0 ? [{ label: fr ? "Portefeuille" : "Wallet", value: r.status === "rejected" ? (fr ? "Montant retenu rendu à votre portefeuille." : "The held amount went back to your wallet.") : fr ? `${formatCurrency(r.heldUsd, locale)} retenus sur votre portefeuille à la demande.` : `${formatCurrency(r.heldUsd, locale)} held from your wallet when you asked.`, full: true }] : []),
             ...(diff < 0 ? [{ label: fr ? "Portefeuille" : "Wallet", value: r.status === "delivered" ? (fr ? "Remboursé sur votre portefeuille à la livraison." : "Refunded to your wallet on delivery.") : fr ? "Remboursé sur votre portefeuille à la livraison." : "Refunded to your wallet when delivered.", full: true }] : []),
-            ...(r.reason ? [{ label: fr ? "Motif" : "Reason", value: r.reason, full: true }] : []),
-            ...(r.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: r.sellerReason, full: true }] : []),
+            ...(r.reason ? [{ label: fr ? "Motif" : "Reason", value: <TranslatableText kind="exchange_reason" id={r.id} auto text={r.reason} i18n={r.reasonI18n} />, full: true }] : []),
+            ...(r.sellerReason ? [{ label: fr ? "Réponse du support KOMORIKO" : "KOMORIKO support's answer", value: <TranslatableText kind="exchange_reply" id={r.id} auto text={r.sellerReason} i18n={r.sellerReasonI18n} />, full: true }] : []),
           ]} />
           <Link href={`/shop/orders/${r.orderId}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Voir la commande →" : "View order →"}</Link>
         </DetailSection>

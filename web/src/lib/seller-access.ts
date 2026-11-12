@@ -29,9 +29,9 @@ export const TEAM_ROLE_LABEL: Record<TeamRole, { en: string; fr: string; descEn:
   owner: { en: "Owner", fr: "Propriétaire", descEn: "Everything, including the team and the plan.", descFr: "Tout, y compris l'équipe et la formule." },
   manager: { en: "Manager", fr: "Gestionnaire", descEn: "Everything except the team, the payout account and the plan.", descFr: "Tout sauf l'équipe, le compte de versement et la formule." },
   catalog: { en: "Catalogue", fr: "Catalogue", descEn: "Products, stock, campaigns, coupons and flash sales.", descFr: "Produits, stock, campagnes, coupons et ventes flash." },
-  orders: { en: "Orders", fr: "Commandes", descEn: "Orders, shipping, returns, disputes, replacements and exchanges.", descFr: "Commandes, expéditions, retours, litiges, remplacements et échanges." },
+  orders: { en: "Orders", fr: "Commandes", descEn: "Orders and shipping, including goods coming back to the store.", descFr: "Commandes et expéditions, y compris les marchandises qui reviennent à la boutique." },
   finance: { en: "Finance", fr: "Finance", descEn: "Earnings, statements, payouts and tax documents.", descFr: "Gains, relevés, versements et documents fiscaux." },
-  support: { en: "Support", fr: "Support", descEn: "Customer chat, questions, reviews and support tickets.", descFr: "Messages clients, questions, avis et tickets support." },
+  support: { en: "Support", fr: "Support", descEn: "Customer questions, reviews and support tickets.", descFr: "Questions clients, avis et tickets support." },
 };
 
 /** An owner (or an older server that sends no membership) can do everything. */

@@ -9,7 +9,23 @@ import { shouldAutoTranslate } from "@/lib/translate-auto";
 import { pickI18n, freshI18n, type TextI18n } from "@/lib/text-i18n";
 
 /** What the server can translate on demand: stored records only (the request carries an id, never free text). */
-export type TranslateKind = "review" | "review_reply" | "question" | "answer" | "chat_message";
+export type TranslateKind =
+  | "review"
+  | "review_reply"
+  | "question"
+  | "answer"
+  | "chat_message"
+  // Private kinds (docs/contracts/stored-text-i18n.md): only the people who may read the record are answered.
+  | "support_ticket"
+  | "support_message"
+  | "dispute_message"
+  | "dispute_reason"
+  | "dispute_reply"
+  | "dispute_resolution"
+  | "exchange_reason"
+  | "exchange_reply"
+  | "replacement_reason"
+  | "replacement_reply";
 
 interface TranslateResult {
   text: string;
@@ -43,7 +59,7 @@ async function fetchTranslation(key: string, kind: TranslateKind, id: string, ta
 type View = { key: string; busy: boolean; shown: boolean; same: boolean; text: string; failed?: boolean };
 
 /**
- * A piece of customer-written text (review, seller reply, question, answer, chat message), shown in the page's language
+ * A piece of stored, person-written text (review, seller reply, question, answer, chat message, support ticket, return / dispute / exchange / replacement text), shown in the page's language
  * by itself, no click.
  *
  * 1. The payload carries the translations (`i18n`, see lib/text-i18n.ts): the text for the page language is shown at once and
@@ -170,4 +186,25 @@ export function TranslatableText({
       )}
     </>
   );
+}
+
+/**
+ * Same as {@link TranslatableText} (in the page language by itself, `auto`), but a record without an id (an older server's
+ * support message) just shows its text: there is nothing to ask a translator about.
+ */
+export function StoredText({
+  kind,
+  id,
+  text,
+  i18n,
+  className,
+}: {
+  kind: TranslateKind;
+  id?: string | null;
+  text: string;
+  i18n?: TextI18n | null;
+  className?: string;
+}) {
+  if (!id) return text ? <p className={className}>{text}</p> : null;
+  return <TranslatableText kind={kind} id={id} auto text={text} i18n={i18n} className={className} />;
 }

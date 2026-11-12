@@ -342,14 +342,6 @@ export function useChatThread(conversationId: string | undefined) {
     setHasMore(!!r.hasMore);
   }, [conversationId, messages]);
 
-  const send = useCallback(
-    async (text: string, attachments: string[]) => {
-      if (!conversationId) return;
-      const r = await socketClient.request<{ message: ChatMessage }>("chat:send", { conversationId, text, ...(attachments.length ? { attachments } : {}) });
-      setMessages((cur) => (cur.some((m) => m.id === r.message.id) ? cur : [...cur, r.message]));
-    },
-    [conversationId],
-  );
-
-  return { conversation, messages, hasMore, loaded, error, send, loadOlder };
+  // Read-only: messaging sellers is closed (docs/contracts/admin-controls.md §3), so there is no `send`.
+  return { conversation, messages, hasMore, loaded, error, loadOlder };
 }

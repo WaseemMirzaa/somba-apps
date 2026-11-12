@@ -52,3 +52,38 @@ test("Support reaches the replacements and exchanges pages (it may answer them o
   assert.ok(hrefs("support").includes("/admin/exchanges") && hrefs("support").includes("/admin/replacements"));
   assert.equal(getAdminHome("support"), "/admin/support"); // the landing page did not move
 });
+
+test("Store policies belong to Moderation and the Super Admin only (server group storePolicy)", () => {
+  for (const p of ["/admin/policies", "/admin/policies?seller=s1"].map((x) => x.split("?")[0])) {
+    for (const d of ["super", "moderation"]) assert.equal(canAdminAccess(d, p), true, `${d} ${p}`);
+    for (const d of ["support", "finance", "operations", "marketing", "warehouse"]) assert.equal(canAdminAccess(d, p), false, `${d} ${p}`);
+  }
+  assert.ok(hrefs("moderation").includes("/admin/policies"));
+  assert.equal(getAdminHome("moderation"), "/admin/moderation"); // the landing page did not move
+  for (const d of ["support", "operations", "finance", "marketing", "warehouse"]) assert.ok(!hrefs(d).includes("/admin/policies"), d);
+});
+
+test("Chats (read-only) belong to Support and the Super Admin only (server group support)", () => {
+  for (const p of ["/admin/chats", "/admin/chats/c1"]) {
+    for (const d of ["super", "support"]) assert.equal(canAdminAccess(d, p), true, `${d} ${p}`);
+    for (const d of ["moderation", "finance", "operations", "marketing", "warehouse"]) assert.equal(canAdminAccess(d, p), false, `${d} ${p}`);
+  }
+  assert.ok(hrefs("support").includes("/admin/chats"));
+  assert.equal(getAdminHome("support"), "/admin/support");
+});
+
+test("Operations reaches the stores list and a store page, for the express toggle (server group logisticsDesk); Marketing and Warehouse do not", () => {
+  for (const p of ["/admin/sellers", "/admin/sellers/s1"]) {
+    for (const d of ["super", "operations", "moderation"]) assert.equal(canAdminAccess(d, p), true, `${d} ${p}`);
+    for (const d of ["marketing", "warehouse", "finance", "support"]) assert.equal(canAdminAccess(d, p), false, `${d} ${p}`);
+  }
+  assert.ok(hrefs("operations").includes("/admin/sellers"));
+  assert.equal(getAdminHome("operations"), "/admin/orders");
+  // the Super Admin lists the Stores page once (under Moderation)
+  assert.equal(hrefs("super").filter((h) => h === "/admin/sellers").length, 1);
+});
+
+test("the new menu labels exist in English and French", () => {
+  const i18n = readFileSync(new URL("./i18n.ts", import.meta.url), "utf8");
+  for (const key of ["storePolicies", "chatsReadOnly"]) assert.equal([...i18n.matchAll(new RegExp(`\\b${key}: "`, "g"))].length, 2, key);
+});

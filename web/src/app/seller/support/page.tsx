@@ -14,6 +14,7 @@ import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useSellerTickets } from "@/lib/seller";
+import { shownText } from "@/lib/text-i18n";
 import { TICKET_STATUS_OPTIONS, errMessage, ticketStatusLabel, ticketStatusVariant } from "@/lib/seller-labels";
 
 const CATEGORIES = [
@@ -47,7 +48,7 @@ export default function SellerSupportPage() {
         id: tk.id,
         reference: tk.reference,
         category: tk.category,
-        subject: tk.subject,
+        subject: shownText(tk.subjectI18n, locale, tk.subject),
         status: tk.status,
         orderId: tk.orderId,
         orderRef: refOf(tk.orderId),

@@ -7,8 +7,9 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { useSellerAccess, useSellerData } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
-import { usePublicSettings } from "@/lib/shop-live";
-import Link from "next/link";
+import { sellerRequest, useLiveQuery } from "@/lib/seller-api";
+import { POLICY_KEYS, POLICY_MAX, POLICY_MIN, effectivePolicy, policyPatch, policyStatusLabel, policyTextInvalid, revisionKeys, POLICY_FIELD_LABEL, type MyPolicy, type PolicyKey, type PolicyTemplate } from "@/lib/store-policy";
+import { Badge } from "@/components/ui/badge";
 
 const fieldClass = "input-premium w-full px-4 py-2 text-sm";
 
@@ -160,134 +161,59 @@ export function HandlingForm() {
   );
 }
 
+type DraftState = Record<PolicyKey, string>;
+const EMPTY_DRAFT: DraftState = { returnsPolicy: "", returnsPolicyFr: "", shippingPolicy: "", shippingPolicyFr: "" };
+
 /**
- * Express delivery: a rider goes straight from the store to the customer when both are in the same commune. Shown only while
- * the platform has express delivery switched on (`expressDeliveryEnabled`). The store needs a pinned pickup location: the server
- * says so when it is missing, and that message is shown as a notice (the same toast every other store setting uses).
+ * Returns and shipping policies in English and French. A change is a PROPOSAL: KOMORIKO approves it before it goes live
+ * (docs/contracts/admin-controls.md §5). The form starts from the pending proposal when there is one, else from the live text.
+ * Write one language: the other is translated automatically once it is live.
  */
-export function ExpressForm() {
+export function PoliciesForm() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
   const { seller, updateStore } = useSellerData();
   const access = useSellerAccess();
+  const mine = useLiveQuery<MyPolicy>("sellers:policy:mine", {}, { pushes: ["seller:policy", "seller:updated"] });
+  const [draft, setDraft] = useState<DraftState>(EMPTY_DRAFT);
+  const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canEdit = access.can("storefront") && !access.suspended;
-  const on = seller?.expressDelivery === true;
-  const pinned = seller?.pickupLat != null && seller?.pickupLng != null;
+  const pending = mine.data?.pending ?? null;
+  const last = mine.data?.lastDecided ?? null;
 
-  async function toggle() {
-    setBusy(true);
-    setError(null);
-    try {
-      const saved = await updateStore({ expressDelivery: !on });
-      // What the server says it saved (an older server does not send the field: then it is what was asked for).
-      const now = typeof (saved as { expressDelivery?: unknown }).expressDelivery === "boolean" ? (saved as { expressDelivery: boolean }).expressDelivery : !on;
-      toast(now ? (fr ? "Livraison express activée" : "Express delivery on") : fr ? "Livraison express désactivée" : "Express delivery off");
-    } catch (e) {
-      // The API's own sentence, e.g. "Pin your pickup location on the map (Store settings) before offering express delivery."
-      const msg = errMessage(e);
-      setError(msg);
-      toast(msg, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-4" data-testid="express-form">
-      <p className="text-sm text-slate-500">
-        {fr
-          ? "Quand votre boutique et le client sont dans la même commune, un livreur peut aller directement de chez vous chez le client, sans passer par un entrepôt. Le colis arrive plus vite ; vous le remettez au livreur dès qu'il est prêt."
-          : "When your store and the customer are in the same commune, a rider can go straight from your store to the customer, with no warehouse in between. The parcel arrives sooner; you hand it to the rider as soon as it is packed."}
-      </p>
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={on}
-          aria-label={fr ? "Livraison express" : "Express delivery"}
-          disabled={!canEdit || busy}
-          onClick={() => void toggle()}
-          className={`relative h-6 w-11 rounded-full transition-colors disabled:opacity-60 ${on ? "bg-emerald-500" : "bg-slate-300"}`}
-        >
-          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
-        </button>
-        <span className="text-sm text-slate-700">{on ? (fr ? "Activée" : "On") : fr ? "Désactivée" : "Off"}</span>
-      </div>
-      {!pinned && (
-        <p role="note" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          {fr ? "Placez d'abord votre lieu de collecte sur la carte (Informations de la boutique ci-dessus) : l'express en a besoin." : "Pin your pickup location on the map first (Store details above): express needs it."}
-        </p>
-      )}
-      {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-      <Link href="/seller/orders" className="inline-block text-xs text-[var(--primary)] hover:underline">{fr ? "Voir mes commandes express →" : "See my express orders →"}</Link>
-    </div>
-  );
-}
-
-/** The storefront card for {@link ExpressForm}: nothing at all while the platform has express delivery off. */
-export function ExpressSection() {
-  const { locale } = useLocale();
-  const fr = locale === "fr";
-  const settings = usePublicSettings();
-  if (!settings.expressDeliveryEnabled) return null;
-  return (
-    <div className="card-premium p-6">
-      <h2 className="mb-4 font-semibold">{fr ? "Livraison express" : "Express delivery"}</h2>
-      <ExpressForm />
-    </div>
-  );
-}
-
-type PolicyKey = "returnsPolicy" | "returnsPolicyFr" | "shippingPolicy" | "shippingPolicyFr";
-const POLICY_KEYS: PolicyKey[] = ["returnsPolicy", "returnsPolicyFr", "shippingPolicy", "shippingPolicyFr"];
-
-/** Returns and shipping policies in English and French. Write one language: the other is translated automatically. */
-export function PoliciesForm() {
-  const { locale } = useLocale();
-  const fr = locale === "fr";
-  const { toast } = useToast();
-  const { seller, updateStore, refresh } = useSellerData();
-  const access = useSellerAccess();
-  const [draft, setDraft] = useState<Record<PolicyKey, string>>({ returnsPolicy: "", returnsPolicyFr: "", shippingPolicy: "", shippingPolicyFr: "" });
-  // What the seller typed in this session (a language that is filled but was never typed is the translation).
-  const [typed, setTyped] = useState<Partial<Record<PolicyKey, boolean>>>({});
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const canEdit = access.can("storefront") && !access.suspended;
+  const live = {
+    returnsPolicy: seller?.returnsPolicy ?? "",
+    returnsPolicyFr: seller?.returnsPolicyFr ?? "",
+    shippingPolicy: (seller as { shippingPolicy?: string | null } | null)?.shippingPolicy ?? "",
+    shippingPolicyFr: (seller as { shippingPolicyFr?: string | null } | null)?.shippingPolicyFr ?? "",
+  };
+  // What the form is compared with: the proposal in review (or the live text when nothing is in review).
+  const base = effectivePolicy(live, pending);
+  const baseKey = POLICY_KEYS.map((k) => base[k]).join("\u0001");
 
   useEffect(() => {
-    if (!seller) return;
-    /* eslint-disable react-hooks/set-state-in-effect -- show the stored policies */
-    setDraft({
-      returnsPolicy: seller.returnsPolicy ?? "",
-      returnsPolicyFr: seller.returnsPolicyFr ?? "",
-      shippingPolicy: seller.shippingPolicy ?? "",
-      shippingPolicyFr: seller.shippingPolicyFr ?? "",
-    });
+    if (dirty) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- show the stored policies / the proposal in review */
+    setDraft(base);
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [seller?.returnsPolicy, seller?.returnsPolicyFr, seller?.shippingPolicy, seller?.shippingPolicyFr]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [baseKey, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const stored = (k: PolicyKey) => (seller?.[k] as string | null | undefined) ?? "";
-  const bad = (k: PolicyKey) => draft[k].trim() !== "" && (draft[k].trim().length < 10 || draft[k].trim().length > 2000);
-  const changed = POLICY_KEYS.filter((k) => draft[k].trim() !== stored(k).trim());
-  const invalid = POLICY_KEYS.some(bad);
+  const patch = policyPatch(draft, base);
+  const changed = Object.keys(patch) as PolicyKey[];
+  const invalid = POLICY_KEYS.some((k) => policyTextInvalid(draft[k]));
 
   async function save() {
     if (changed.length === 0 || invalid) return;
     setBusy(true);
     setError(null);
     try {
-      const patch: Record<string, string | null> = {};
-      for (const k of changed) patch[k] = draft[k].trim() === "" ? null : draft[k].trim();
-      await updateStore(patch);
-      setTyped({});
-      toast(fr ? "Politiques enregistrées" : "Policies saved");
-      // The other language is translated a moment after the save: read the store again to show it.
-      setTimeout(() => void refresh(), 2500);
-      setTimeout(() => void refresh(), 7000);
+      await updateStore(patch as Record<string, string | null>);
+      setDirty(false);
+      await mine.reload();
+      toast(fr ? "Proposition envoyée : elle sera en ligne après approbation par KOMORIKO" : "Proposal sent: it goes live once KOMORIKO approves it");
     } catch (e) {
       const msg = errMessage(e);
       setError(msg);
@@ -297,28 +223,42 @@ export function PoliciesForm() {
     }
   }
 
+  async function applyTemplate() {
+    setError(null);
+    try {
+      const tpl = await sellerRequest<PolicyTemplate>("sellers:policy:template", {});
+      setDraft((d) => ({ ...d, returnsPolicy: tpl.returnsPolicy.en, returnsPolicyFr: tpl.returnsPolicy.fr }));
+      setDirty(true);
+      toast(fr ? "Modèle inséré : modifiez-le puis envoyez-le" : "Template inserted: edit it, then submit it");
+    } catch (e) {
+      const msg = errMessage(e);
+      setError(msg);
+      toast(msg, "error");
+    }
+  }
+
   function box(k: PolicyKey, label: string) {
-    // A language that has text but that the seller never wrote in this session, while the other language was written, is machine text.
-    const machine = !typed[k] && stored(k).trim() !== "" && Boolean((seller as { machineTranslated?: string[] } | null)?.machineTranslated?.includes(k));
+    const bad = policyTextInvalid(draft[k]);
+    const machine = !dirty && base[k].trim() !== "" && Boolean((seller as { machineTranslated?: string[] } | null)?.machineTranslated?.includes(k));
     return (
       <div>
         <label className="mb-1 flex items-center justify-between text-xs font-medium text-slate-600">
           <span>{label}</span>
-          <span className={bad(k) ? "text-red-600" : "text-slate-400"}>{draft[k].trim().length}/2000</span>
+          <span className={bad ? "text-red-600" : "text-slate-400"}>{draft[k].trim().length}/{POLICY_MAX}</span>
         </label>
         <textarea
           className={fieldClass}
           rows={5}
           value={draft[k]}
-          maxLength={2000}
+          maxLength={POLICY_MAX}
           disabled={!canEdit}
           onChange={(e) => {
             setDraft((d) => ({ ...d, [k]: e.target.value }));
-            setTyped((t) => ({ ...t, [k]: true }));
+            setDirty(true);
           }}
           aria-label={label}
         />
-        {bad(k) && <p className="mt-1 text-xs text-red-600">{fr ? "10 à 2000 caractères, ou laissez vide." : "10 to 2000 characters, or leave empty."}</p>}
+        {bad && <p className="mt-1 text-xs text-red-600">{fr ? `${POLICY_MIN} à ${POLICY_MAX} caractères, ou laissez vide.` : `${POLICY_MIN} to ${POLICY_MAX} characters, or leave empty.`}</p>}
         {machine && (
           <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
             <Sparkles className="h-3 w-3" />
@@ -330,12 +270,52 @@ export function PoliciesForm() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-testid="policies-form">
       <p className="text-sm text-slate-500">
         {fr
-          ? "Affichées aux clients sur votre boutique. Rédigez une seule langue : laissez l'autre vide et nous la traduisons automatiquement."
-          : "Shown to shoppers on your store. Write one language: leave the other empty and we translate it automatically."}
+          ? "Affichées aux clients sur votre boutique après approbation par KOMORIKO. Rédigez une seule langue : laissez l'autre vide et nous la traduisons automatiquement."
+          : "Shown to shoppers on your store once KOMORIKO approves them. Write one language: leave the other empty and we translate it automatically."}
       </p>
+
+      {pending && (
+        <div role="status" data-testid="policy-pending" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="warning">{policyStatusLabel("pending", fr)}</Badge>
+            <span>
+              {fr
+                ? `Envoyée le ${fmtDate(pending.createdAt, fr)}. Votre boutique affiche toujours le texte actuel jusqu'à l'approbation.`
+                : `Sent on ${fmtDate(pending.createdAt, fr)}. Your store keeps showing the current text until it is approved.`}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-amber-800">
+            {fr ? "Modifiée : " : "Changes: "}
+            {revisionKeys(pending).map((k) => POLICY_FIELD_LABEL[k][fr ? "fr" : "en"]).join(", ")}
+          </p>
+        </div>
+      )}
+      {!pending && last?.status === "rejected" && (
+        <div role="alert" data-testid="policy-rejected" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          <Badge variant="danger">{policyStatusLabel("rejected", fr)}</Badge>
+          <p className="mt-1">{last.note || (fr ? "KOMORIKO n'a pas approuvé cette modification." : "KOMORIKO did not approve this change.")}</p>
+          <p className="mt-1 text-xs">{fr ? "Votre boutique affiche toujours le texte actuel. Corrigez et renvoyez." : "Your store still shows the current text. Edit it and send it again."}</p>
+        </div>
+      )}
+      {!pending && last?.status === "approved" && (
+        <p data-testid="policy-approved" className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <Badge variant="success">{policyStatusLabel("approved", fr)}</Badge>
+          {last.decidedAt ? fmtDate(last.decidedAt, fr) : ""}
+          {last.note ? ` · ${last.note}` : ""}
+        </p>
+      )}
+
+      {canEdit && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" variant="secondary" onClick={() => void applyTemplate()}>
+            {fr ? "Utiliser le modèle de politique de retour" : "Use the returns-policy template"}
+          </Button>
+          <span className="text-xs text-slate-500">{fr ? "Remplit la politique de retour en anglais et en français ; modifiez-la avant d'envoyer." : "Fills the returns policy in English and French; edit it before you send it."}</span>
+        </div>
+      )}
       <div>
         <h3 className="mb-2 text-sm font-semibold text-slate-900">{fr ? "Politique de retour" : "Returns policy"}</h3>
         <div className="grid gap-3 md:grid-cols-2">
@@ -353,7 +333,7 @@ export function PoliciesForm() {
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {canEdit && (
         <Button onClick={() => void save()} disabled={busy || invalid || changed.length === 0}>
-          {fr ? "Enregistrer les politiques" : "Save policies"}
+          {fr ? "Envoyer pour approbation" : "Submit for approval"}
         </Button>
       )}
     </div>
