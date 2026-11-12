@@ -997,25 +997,61 @@ export class RealtimeGateway
     }
   }
 
-  /** The labels of the seller's package (code, box number, order, store, destination area) to print or reprint until it is delivered. */
+  /** The labels of the seller's package (code, box number, store, destination area, every product x qty) to print or reprint until it is delivered. `groupId` = a whole box set. */
   @SubscribeMessage('orders:sellerLabels')
-  async ordersSellerLabels(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderId: string }) {
+  async ordersSellerLabels(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderId?: string; groupId?: string }) {
     try {
       const user = this.requireUser(client);
       const ctx = await this.kit.ctx.resolve(user, 'orders');
-      return ok(await this.orders.sellerLabels(ctx.actor, String(body?.orderId ?? '')));
+      return ok(await this.orders.sellerLabels(ctx.actor, String(body?.orderId ?? ''), body?.groupId ? String(body.groupId) : undefined));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
-  /** The seller changes the box count of a ready package (1 to 20) before the first pickup scan: the old labels are void, new ones are made. */
+  /** The seller changes the box count of a ready package (1 to 20) before the first pickup scan: the old labels are void, new ones are made. `groupId` = a whole box set. */
   @SubscribeMessage('orders:sellerBoxes')
-  async ordersSellerBoxes(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderId: string; boxCount: number }) {
+  async ordersSellerBoxes(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderId?: string; boxCount: number; groupId?: string }) {
     try {
       const user = this.requireUser(client);
       const ctx = await this.kit.ctx.resolve(user, 'orders');
-      return ok(await this.orders.sellerBoxes(ctx.actor, String(body?.orderId ?? ''), body?.boxCount));
+      return ok(await this.orders.sellerBoxes(ctx.actor, String(body?.orderId ?? ''), body?.boxCount, body?.groupId ? String(body.groupId) : undefined));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** `orders:sellerGroups { limit?, offset?, q? }`: the seller's candidate clusters of same-day orders (server-paged). */
+  @SubscribeMessage('orders:sellerGroups')
+  async ordersSellerGroups(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { limit?: number; offset?: number; q?: string }) {
+    try {
+      const user = this.requireUser(client);
+      const ctx = await this.kit.ctx.resolve(user, 'orders');
+      return ok(await this.orders.sellerGroups(ctx.actor, body ?? {}));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** `orders:sellerPack { orderIds[], boxCount? }`: mark the orders ready and make ONE box set for all of them. */
+  @SubscribeMessage('orders:sellerPack')
+  async ordersSellerPack(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderIds: string[]; boxCount?: number }) {
+    try {
+      const user = this.requireUser(client);
+      const ctx = await this.kit.ctx.resolve(user, 'orders');
+      return ok(await this.orders.sellerPack(ctx.actor, body?.orderIds, body?.boxCount));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** `orders:sellerGroupEdit { groupId, add?[], remove?[], boxCount? }`: change a box set before the first pickup scan. */
+  @SubscribeMessage('orders:sellerGroupEdit')
+  async ordersSellerGroupEdit(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { groupId: string; add?: string[]; remove?: string[]; boxCount?: number }) {
+    try {
+      const user = this.requireUser(client);
+      const ctx = await this.kit.ctx.resolve(user, 'orders');
+      return ok(await this.orders.sellerGroupEdit(ctx.actor, body ?? ({} as never)));
     } catch (e) {
       return fail((e as Error).message);
     }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeftRight, ChevronDown, ChevronUp, CircleAlert, Navigation, PackageCheck, PackageOpen, Route, Truck, Warehouse } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { RiderParcelPanel, useLiveBoxes } from "@/components/warehouse/rider-parcel-panel";
-import { mergeBoxes } from "@/lib/parcel-scan";
+import { mergeBoxes, mergeContents } from "@/lib/parcel-scan";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { mapsLinkTo } from "@/lib/google-maps";
@@ -148,7 +148,7 @@ export function RiderRunCard({
 
       {boxes.length > 0 && isActiveRun(run) && (
         <div className="mt-3">
-          <RiderParcelPanel target={{ runId: run.id }} stage={scanStage} boxes={boxes} onChecklist={apply} />
+          <RiderParcelPanel target={{ runId: run.id }} stage={scanStage} boxes={boxes} contents={mergeContents(parcels)} onChecklist={apply} />
         </div>
       )}
       {run.status === "planned" && (

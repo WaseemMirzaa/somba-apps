@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { paymentMethodLabel } from "@/lib/payment-methods";
+import type { ParcelContentLine } from "@/lib/parcel-labels";
 import { isPartialLeg, isHubBound, legItemsText, type Endpoint, type LegItem, type LegKind, type ParcelLine, type TaskView } from "@/lib/logistics";
 
 /**
@@ -145,6 +146,9 @@ function toRiderTask(row: RiderQueueRow) {
     pickupComplete: row.pickupComplete ?? true,
     dropoffComplete: row.dropoffComplete ?? true,
     scanRequired: !!row.scanRequired,
+    /** What is in those boxes (every product x qty with its options, of every order packed into them) and which orders. */
+    parcelContents: (row.parcelContents ?? []) as ParcelContentLine[],
+    parcelOrders: (row.parcelOrders ?? []) as { orderId: string; reference: string }[],
     sellerName: row.sellerName,
     products: items.map((it) => ({
       productId: it.productId,

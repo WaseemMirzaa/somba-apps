@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
 import { ActivityTimeline } from "@/components/ui/timeline";
+import { ParcelContents } from "@/components/parcel/parcel-contents";
 import { RiderGpsPanel } from "@/components/warehouse/rider-gps-panel";
 import { RIDER_STATUS_LABEL, riderStatusVariant } from "@/components/warehouse/rider-task-card";
 import { TaskActions } from "@/components/warehouse/rider-task-actions";
@@ -134,7 +135,7 @@ export default function RiderTaskDetailPage() {
             { label: fr ? "N° commande" : "Order ID", value: task.orderId },
             { label: fr ? "Paiement" : "Payment", value: task.paymentMethod ? paymentMethodLabel(task.paymentMethod, fr) : task.paymentType },
             { label: fr ? "Montant" : "Amount", value: task.amount ? formatCurrency(task.amount, locale) : "—" },
-            { label: fr ? "Articles" : "Items", value: task.items },
+            { label: fr ? "Articles" : "Items", value: task.legItemsText(fr) !== "—" ? task.legItemsText(fr) : task.items, full: true },
             { label: fr ? "Tentatives" : "Attempts", value: task.attempts },
           ]}
         />
@@ -157,6 +158,12 @@ export default function RiderTaskDetailPage() {
           ]}
         />
       </DetailSection>
+
+      {task.parcelContents.length > 0 && (
+        <DetailSection title={fr ? "Dans les cartons" : "In the boxes"}>
+          <ParcelContents contents={task.parcelContents} orders={task.parcelOrders} />
+        </DetailSection>
+      )}
 
       <DetailSection title={fr ? "Produits" : "Products"}>
         {task.products.length === 0 ? (

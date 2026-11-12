@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import { ENTITIES } from '../database/entities';
-import { withOrderLock } from './order-lock';
+import { withOrderLock, withOrderLocks } from './order-lock';
 
 describe('withOrderLock', () => {
   let ds: DataSource;
@@ -45,5 +45,18 @@ describe('withOrderLock', () => {
       }),
     ).rejects.toThrow('stop');
     expect(await ds.query("SELECT COUNT(*) AS n FROM hubs WHERE id = 'x'")).toEqual([{ n: 0 }]);
+  });
+
+  it('several orders at once: every one of them is held, and callers naming the same orders in another order queue instead of crossing', async () => {
+    const log: string[] = [];
+    const job = (name: string, ids: string[], ms: number) =>
+      withOrderLocks(ds.manager, ids, async () => {
+        log.push(`${name}:start`);
+        await tick(ms);
+        log.push(`${name}:end`);
+      });
+    await Promise.all([job('a', ['x', 'y'], 15), job('b', ['y', 'x'], 1), job('c', ['x'], 1)]);
+    expect(log.indexOf('a:end')).toBeLessThan(log.indexOf('b:start'));
+    expect(log.indexOf('b:end')).toBeLessThan(log.indexOf('c:start'));
   });
 });

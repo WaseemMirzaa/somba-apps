@@ -18,6 +18,7 @@ import type { EstimateLine } from './order-estimate';
 import { handlingDaysOf } from '../common/delivery/estimate';
 import { MAX_HANDLING_DAYS } from '../sellers/storefront';
 import { DESK_ADMINS_ONLY, isDeskAdmin, tierAllows } from './tiers';
+import { sellerContext } from '../sellers/seller-context';
 
 type AuthedSocket = Socket & { data: { user?: { id: string; role: string; name: string } } };
 
@@ -432,6 +433,44 @@ export class LogisticsGateway {
     try {
       const u = this.signedIn(client);
       return ok(await this.parcels.returnParcelFor(u, String(body?.returnId ?? body?.disputeId ?? '')));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * `parcels:resolve { code }`: what a scanned box is: its number, store, the products in it (with sizes / options), the orders it
+   * serves and where it goes. Role-scoped: a rider reads the boxes of their own legs (the street and phone only on a customer
+   * delivery); warehouse staff the boxes on legs at their warehouse; admins any (the address only where they read orders in full);
+   * a seller their own (the destination AREA only, never the street or the phone). Anything else is the same "Parcel not found."
+   */
+  @SubscribeMessage('parcels:resolve')
+  async parcelResolve(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { code?: string }) {
+    try {
+      const u = this.signedIn(client);
+      if (u.role === 'rider') return ok(await this.parcels.resolve({ id: u.id, role: 'rider' }, body?.code));
+      if (u.role === 'warehouse_staff') {
+        const row = await this.users.findOne({ where: { id: u.id }, select: ['id', 'hubId', 'warehouseTier'] });
+        return ok(await this.parcels.resolve({ id: u.id, role: u.role, hubId: row?.hubId ?? null, tier: row?.warehouseTier ?? 'operator' }, body?.code));
+      }
+      if (u.role.startsWith('admin')) return ok(await this.parcels.resolve({ id: u.id, role: u.role }, body?.code));
+      if (u.role === 'seller') {
+        const ctx = await sellerContext(u as never, 'orders', { write: false });
+        return ok(await this.parcels.resolve({ id: ctx.actor.id, role: 'seller' }, body?.code));
+      }
+      return fail('Not allowed.');
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** `parcels:forOrder { orderId }`: the box sets of an order with their boxes, scans and contents (admin order page, warehouse desk). */
+  @SubscribeMessage('parcels:forOrder')
+  async parcelsForOrder(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { orderId?: string }) {
+    try {
+      const u = this.signedIn(client);
+      const hubId = u.role === 'warehouse_staff' ? ((await this.users.findOne({ where: { id: u.id }, select: ['id', 'hubId'] }))?.hubId ?? null) : null;
+      return ok(await this.parcels.forOrder({ id: u.id, role: u.role, hubId }, String(body?.orderId ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }

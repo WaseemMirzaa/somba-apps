@@ -74,6 +74,8 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
   const verified = (await req(admin.sock, 'settings:get')).data?.requireVerifiedForCheckout;
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' });
+  // This suite is about split packages, not box scanning (parcel-scan-smoke covers that): riders collect without scanning here.
+  await req(admin.sock, 'settings:set', { key: 'requireParcelScan', value: 'false' });
 
   const makeSeller = async (label, pickup) => {
     const u = await register(label, 'seller');

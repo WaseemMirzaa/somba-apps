@@ -6,7 +6,7 @@ import ts from "typescript";
 
 const src = readFileSync(new URL("./leg-items.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-const { legItemName, legItemsText } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+const { legItemName, legItemsText, legItemVariant } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
 const cargo = [
   { orderItemId: "i1", name: "Blue Cotton T-Shirt", nameFr: "T-shirt bleu en coton", qty: 1 },
@@ -41,4 +41,18 @@ test("an empty or blank French name falls back to the base name", () => {
 test("no cargo is a dash", () => {
   assert.equal(legItemsText([], true), "—");
   assert.equal(legItemsText(undefined, false), "—");
+});
+
+test("the size / option the customer chose is shown with the product (a rider packing the van sees WHICH one)", () => {
+  const lines = [
+    { name: "Blue T-Shirt", nameFr: "T-shirt bleu", qty: 2, variant: "L / Blue", variantFr: "L / Bleu" },
+    { name: "Lamp", qty: 1, variant: "Default" },
+    { name: "Shoes", qty: 1, variant: null },
+    { name: "Cap", qty: 1, variant: "One size" },
+  ];
+  assert.equal(legItemsText(lines, false), "2 × Blue T-Shirt (L / Blue), 1 × Lamp, 1 × Shoes, 1 × Cap (One size)");
+  assert.equal(legItemsText(lines, true), "2 × T-shirt bleu (L / Bleu), 1 × Lamp, 1 × Shoes, 1 × Cap (One size)");
+  assert.equal(legItemVariant({ variant: " M " }, false), "M");
+  assert.equal(legItemVariant({ variant: "Default" }, true), "");
+  assert.equal(legItemVariant({ variant: "Red", variantFr: "" }, true), "Red");
 });

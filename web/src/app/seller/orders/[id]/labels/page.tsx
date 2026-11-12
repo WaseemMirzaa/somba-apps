@@ -1,19 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { ParcelQr } from "@/components/parcel/parcel-qr";
+import { LabelSheet, usePrintReady } from "@/components/parcel/label-sheet";
 import { useSellerData } from "@/lib/seller";
+import { useSellerOrder } from "@/lib/seller-order-lookup";
 import { errMessage } from "@/lib/seller-labels";
 import {
   DEFAULT_PAPER,
   PAPERS,
   PAPER_ORDER,
   PAPER_STORAGE_KEY,
-  PRINT_ROOT_CLASS,
-  boxText,
   boxesPhrase,
   orderedLabels,
   pageCount,
@@ -58,17 +57,20 @@ function rememberPaper(p: PaperId) {
 
 export default function SellerParcelLabelsPage() {
   const { id } = useParams<{ id: string }>();
+  // `?group=<id>`: the labels of a whole box set (several same-day orders packed together), not of this order alone.
+  const groupId = useSearchParams().get("group");
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerOrder, sellerLabels, load } = useSellerData();
-  const order = getSellerOrder(id);
+  const { sellerLabels } = useSellerData();
+  const { order, load } = useSellerOrder(id);
   // The orders arrive after the page opens: the labels are asked for with the server's order id, never with the reference in the address.
   const orderId = order?.orderId ?? null;
   const [pack, setPack] = useState<ParcelLabelPack | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
+
   const userRetry = useRef(false);
   const paper = useSyncExternalStore(subscribePaper, currentPaper, () => DEFAULT_PAPER);
 
@@ -81,7 +83,7 @@ export default function SellerParcelLabelsPage() {
   useEffect(() => {
     if (!orderId) return;
     let live = true;
-    api.current.sellerLabels(orderId).then(
+    api.current.sellerLabels(orderId, groupId).then(
       (p) => {
         if (!live) return;
         setPack(p);
@@ -100,7 +102,7 @@ export default function SellerParcelLabelsPage() {
     return () => {
       live = false;
     };
-  }, [orderId, attempt]);
+  }, [orderId, groupId, attempt]);
 
   function retry() {
     userRetry.current = true;
@@ -110,7 +112,9 @@ export default function SellerParcelLabelsPage() {
   }
 
   const back = `/seller/orders/${encodeURIComponent(id)}`;
-  const labels = pack ? orderedLabels(pack.labels) : [];
+  const labels = useMemo(() => (pack ? orderedLabels(pack.labels) : []), [pack]);
+  // Print waits until every QR of the printable sheet has loaded (a QR still drawing would print as a blank square).
+  const sheet = usePrintReady(labels);
 
   function print() {
     try {
@@ -121,18 +125,19 @@ export default function SellerParcelLabelsPage() {
   }
 
   if (!order) return <MissingRecord load={load} label="Order not found" labelFr="Commande introuvable" />;
+  const refs = pack?.orders?.map((o) => o.reference) ?? [];
 
   return (
     <div className="space-y-6">
       <style>{paperCss(paper)}</style>
       <PageHeader
         title={fr ? "Étiquettes du colis" : "Parcel labels"}
-        subtitle={order ? order.id : undefined}
+        subtitle={refs.length > 1 ? refs.join(", ") : order.id}
         backHref={back}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link href={back} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700">{fr ? "Retour à la commande" : "Back to the order"}</Link>
-            <button type="button" onClick={print} disabled={loading || labels.length === 0} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50">
+            <button type="button" onClick={print} disabled={loading || labels.length === 0 || !sheet.ready} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50" data-testid="print-button">
               {fr ? "Imprimer" : "Print"}
             </button>
           </div>
@@ -172,26 +177,17 @@ export default function SellerParcelLabelsPage() {
         <p className="text-sm text-slate-500">{fr ? "Aucune étiquette pour cette commande." : "There are no labels for this order."}</p>
       )}
 
-      {labels.length > 0 && (
-        <div className={PRINT_ROOT_CLASS} data-testid="label-sheet" data-paper={paper}>
-          {labels.map((l) => (
-            <article
-              key={l.code}
-              className="parcel-label flex flex-col items-center justify-between rounded-md border border-slate-300 bg-white p-[5mm] text-center text-black"
-            >
-              <p className="text-[5mm] font-bold tracking-[0.3em]">KOMORIKO</p>
-              <ParcelQr code={l.code} boxNo={l.boxNo} boxCount={l.boxCount} fr={fr} className="h-[66mm] w-[66mm]" />
-              <p className="font-mono text-[7mm] font-bold leading-none tracking-wide">{l.code}</p>
-              <p className="text-[8mm] font-bold leading-none">{boxText(l.boxNo, l.boxCount, fr)}</p>
-              <div className="space-y-[1mm] text-[4mm] leading-tight">
-                <p><span className="text-slate-600">{fr ? "Commande" : "Order"}</span> <strong>{l.orderReference}</strong></p>
-                {l.storeName && <p>{l.storeName}</p>}
-                {l.destinationArea && <p><span className="text-slate-600">{fr ? "Destination" : "To"}</span> <strong>{l.destinationArea}</strong></p>}
-              </div>
-            </article>
-          ))}
-        </div>
+      {labels.length > 0 && !sheet.ready && (
+        <p className="text-xs text-slate-500" role="status" data-testid="qr-drawing">{fr ? "Préparation des codes QR…" : "Drawing the QR codes…"}</p>
       )}
+      {sheet.failed > 0 && (
+        <p role="alert" className="text-xs text-amber-700">{fr ? "Certains codes QR n'ont pas pu être dessinés : le code écrit reste lisible sur l'étiquette." : "Some QR codes could not be drawn: the written code is still readable on the label."}</p>
+      )}
+      {(pack?.contentsRev ?? 0) > 0 && (
+        <p role="note" className="text-xs text-amber-700">{fr ? "Le contenu de ces cartons a changé depuis la première impression : réimprimez les étiquettes." : "The contents of these boxes changed after the first print: print the labels again."}</p>
+      )}
+
+      {labels.length > 0 && <LabelSheet labels={labels} paper={paper} fr={fr} onSettled={sheet.onSettled} />}
     </div>
   );
 }

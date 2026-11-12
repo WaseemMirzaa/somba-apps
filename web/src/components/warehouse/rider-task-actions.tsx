@@ -229,7 +229,7 @@ export function TaskActions({ task, onChanged }: { task: RiderTask; onChanged: (
   return (
     <div className="space-y-3">
       {boxes.length > 0 && stage && (
-        <RiderParcelPanel target={{ taskId: task.id }} stage={stage} boxes={boxes} onChecklist={apply} onChanged={onChanged} />
+        <RiderParcelPanel target={{ taskId: task.id }} stage={stage} boxes={boxes} contents={task.parcelContents} orders={task.parcelOrders} onChecklist={apply} onChanged={onChanged} />
       )}
       {next === "picked_up" && (
         <>

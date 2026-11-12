@@ -1,7 +1,9 @@
 import { DataSource } from 'typeorm';
+import { ParcelGroup, ParcelGroupOrder } from '../database/entities';
 import { AuditLog, DeliveryKind, DeliveryStatus, DeliveryTask, ENTITIES, Hub, Order, OrderItem, Parcel, ParcelScan, Product, Seller, TransferRun, User, WarehouseException } from '../database/entities';
 import { DeliveryService } from '../delivery/delivery.service';
 import { recordingEmitter } from '../testing/test-db';
+import { withOrderLocks } from '../common/order-lock';
 import { Actor, LogisticsService } from './logistics.service';
 import { ParcelsService } from './parcels.service';
 import { RunsService } from './runs.service';
@@ -325,6 +327,193 @@ describe('parcels', () => {
       expect(bare).toMatchObject({ parcels: [], pickupComplete: true, dropoffComplete: true });
       setting = 'false';
       expect((await logistics.view(t)).scanRequired).toBe(false);
+    });
+  });
+
+  describe('parcel groups: one box set for several same-day orders', () => {
+    const ADDR = JSON.stringify({ line1: '12 Avenue du Commerce', commune: 'Gombe', city: 'Kinshasa', phone: '+243 811 111 111', geo: { lat: -4.3031, lng: 15.3033 } });
+    let n = 0;
+    const mkOrder = async (over: Partial<Order> = {}, lines: { name: string; variant?: string; qty: number; sellerId?: string; fulfilment?: OrderItem['fulfilment'] }[] = [{ name: 'Lamp', qty: 1 }]) => {
+      const k = ++n;
+      return ds.getRepository(Order).save(
+        ds.getRepository(Order).create({
+          reference: `SOM-G${k}`,
+          customerId: 'cust1',
+          customerName: 'Marie Dubois',
+          status: 'processing',
+          paymentMethod: 'stripe_card',
+          totalUsd: 10,
+          shippingAddress: ADDR,
+          destinationHubId: hubB.id,
+          items: lines.map((l) => Object.assign(new OrderItem(), { productId: `p-${l.name}`, productName: l.name, variant: l.variant ?? 'Default', qty: l.qty, priceUsd: 5, sellerId: l.sellerId ?? 's1', sellerName: 'Store', fulfilment: l.fulfilment ?? 'ready' })),
+          ...over,
+        }),
+      );
+    };
+    const pack = (ids: string[], count?: number) => withOrderLocks(ds.manager, ids, (m) => parcels.packGroup(m, ids, 's1', count));
+    const groupsOf = async () => ds.getRepository(ParcelGroup).find();
+
+    it('double clicks and a second tab get the first one\'s boxes: never a second set', async () => {
+      const o = await mkOrder();
+      const results = await Promise.all([parcels.ensureBoxes(o.id, 's1', 2), parcels.ensureBoxes(o.id, 's1', 2), parcels.ensureBoxes(o.id, 's1', 2)]);
+      expect(new Set(results.map((r) => r.map((p) => p.code).join())).size).toBe(1);
+      expect(await ds.getRepository(Parcel).count({ where: { orderId: o.id } })).toBe(2);
+      expect(await groupsOf()).toHaveLength(1);
+    });
+    it('the data layer refuses a second live box in a slot, and a void box frees the slot', async () => {
+      const o = await mkOrder();
+      const [a] = await parcels.ensureBoxes(o.id, 's1', 1);
+      const dup = ds.getRepository(Parcel).create({ orderId: o.id, groupId: a.groupId, sellerId: 's1', returnId: null, code: 'PKG-DUPDUPD2', boxNo: 1, boxCount: 1, voidedAt: null, liveSlot: a.liveSlot });
+      await expect(ds.getRepository(Parcel).save(dup)).rejects.toThrow(/UNIQUE|constraint/i);
+      await parcels.ensureBoxes(o.id, 's1', 2); // voids box 1 (slot freed) and makes 2 new ones
+      expect((await ds.getRepository(Parcel).findOneByOrFail({ id: a.id })).liveSlot).toBeNull();
+    });
+    it('packs two same-day orders into ONE set: one code per box, every order listed on the label', async () => {
+      const a = await mkOrder({}, [{ name: 'Lamp', qty: 1 }]);
+      const b = await mkOrder({}, [{ name: 'T-shirt', variant: 'L / Blue', qty: 2 }]);
+      const { group, boxes } = await pack([a.id, b.id], 2);
+      expect(boxes).toHaveLength(2);
+      expect(await ds.getRepository(ParcelGroupOrder).count({ where: { groupId: group.id } })).toBe(2);
+      const set = await parcels.labelsFor(b.id, ['s1']);
+      expect(set.labels).toHaveLength(2);
+      expect(set.labels[0].orderRefs).toEqual([a.reference, b.reference]);
+      expect(set.labels[0].contents.map((c) => `${c.qty} x ${c.name}${c.variant ? ` (${c.variant})` : ''} ${c.orderReference}`)).toEqual([`1 x Lamp ${a.reference}`, `2 x T-shirt (L / Blue) ${b.reference}`]);
+      expect(set.labels[0].destinationArea).toBe('Gombe, Kinshasa');
+      expect(JSON.stringify(set)).not.toMatch(/811 111 111|12 Avenue/);
+      // asking by either order gives the same boxes
+      expect((await parcels.activeFor(a.id, ['s1'])).map((p) => p.code)).toEqual((await parcels.activeFor(b.id, ['s1'])).map((p) => p.code));
+    });
+    it('keeps a different address, a different customer and a different day apart', async () => {
+      const a = await mkOrder();
+      const far = await mkOrder({ shippingAddress: JSON.stringify({ line1: '5 Rue X', commune: 'Limete', city: 'Kinshasa' }) });
+      const other = await mkOrder({ customerId: 'cust2' });
+      const old = await mkOrder({ createdAt: new Date(Date.now() - 3 * 86_400_000) });
+      for (const x of [far, other, old]) await expect(pack([a.id, x.id])).rejects.toThrow(/cannot share a label/);
+      expect(await groupsOf()).toHaveLength(0); // nothing half done
+    });
+    it('does not merge a multi-seller order', async () => {
+      const a = await mkOrder();
+      const multi = await mkOrder({}, [{ name: 'Lamp', qty: 1 }, { name: 'Cup', qty: 1, sellerId: 's2' }]);
+      await expect(pack([a.id, multi.id])).rejects.toThrow(/several sellers/);
+    });
+    it('locks at the first pickup scan: the orders cannot change, a later same-day order gets a new set', async () => {
+      const a = await mkOrder();
+      const b = await mkOrder();
+      const c = await mkOrder();
+      const { group, boxes } = await pack([a.id, b.id], 1);
+      await scan((await mkTask({ orderId: a.id })).id, boxes[0].code);
+      expect((await ds.getRepository(ParcelGroup).findOneByOrFail({ id: group.id })).lockedAt).not.toBeNull();
+      await expect(pack([a.id, c.id])).rejects.toThrow(/already collected/);
+      const next = await pack([c.id]);
+      expect(next.group.id).not.toBe(group.id);
+      expect(next.group.daySeq).toBeGreaterThan(group.daySeq - 1);
+      await expect(parcels.ensureBoxes(a.id, 's1', 3)).rejects.toThrow(BOXES_LOCKED);
+    });
+    it('moving an order into another set voids its old boxes and deletes an emptied set; a count change replaces boxes before pickup', async () => {
+      const a = await mkOrder();
+      const b = await mkOrder();
+      const soloA = await pack([a.id], 1);
+      const soloB = await pack([b.id], 1);
+      const oldBox = soloB.boxes[0];
+      const merged = await pack([a.id, b.id], 2);
+      expect(merged.group.id).toBe(soloA.group.id); // the oldest unlocked set with the same key is the target
+      expect((await ds.getRepository(Parcel).findOneByOrFail({ id: oldBox.id })).voidedAt).not.toBeNull();
+      expect((await ds.getRepository(Parcel).findOneByOrFail({ id: oldBox.id })).liveSlot).toBeNull();
+      expect(await ds.getRepository(ParcelGroup).findOne({ where: { id: soloB.group.id } })).toBeNull(); // emptied: gone
+      expect(merged.boxes).toHaveLength(2);
+      const again = await pack([a.id, b.id], 2);
+      expect(again.boxes.map((p) => p.code)).toEqual(merged.boxes.map((p) => p.code)); // same count: the same boxes
+    });
+    it('taking an order out gives it a set of its own and bumps the reprint counter of the one it left', async () => {
+      const a = await mkOrder();
+      const b = await mkOrder();
+      const { group } = await pack([a.id, b.id], 1);
+      const out = await withOrderLocks(ds.manager, [a.id, b.id], (m) => parcels.detachOrder(m, b.id, 's1'));
+      expect(out.group.id).not.toBe(group.id);
+      expect(out.boxes).toHaveLength(1);
+      expect((await ds.getRepository(ParcelGroup).findOneByOrFail({ id: group.id })).contentsRev).toBeGreaterThan(0);
+      expect(await parcels.siblingOrderIds(a.id)).toEqual([]);
+    });
+    it('a cancelled order leaves a shared set without voiding the others\' boxes', async () => {
+      const a = await mkOrder();
+      const b = await mkOrder();
+      const { boxes } = await pack([a.id, b.id], 1);
+      await parcels.voidFor(b.id);
+      expect((await ds.getRepository(Parcel).findOneByOrFail({ id: boxes[0].id })).voidedAt).toBeNull();
+      expect(await parcels.siblingOrderIds(a.id)).toEqual([]);
+      await parcels.voidFor(a.id);
+      expect((await ds.getRepository(Parcel).findOneByOrFail({ id: boxes[0].id })).voidedAt).not.toBeNull();
+    });
+    it('one scan serves every sibling leg, and the checklist of each lists the whole set\'s contents', async () => {
+      const a = await mkOrder({}, [{ name: 'Lamp', qty: 1 }]);
+      const b = await mkOrder({}, [{ name: 'Cap', variant: 'One size', qty: 3 }]);
+      const { boxes } = await pack([a.id, b.id], 2);
+      const ta = await mkTask({ orderId: a.id, orderReference: a.reference });
+      const tb = await mkTask({ orderId: b.id, orderReference: b.reference });
+      const r = await scan(ta.id, boxes[0].code);
+      expect(r.scanned).toBe(1);
+      const lists = await parcels.checklists([ta, tb]);
+      for (const t of [ta, tb]) {
+        expect(lists.get(t.id)!.parcels.map((p) => !!p.pickupScannedAt)).toEqual([true, false]);
+        expect(lists.get(t.id)!.contents.map((c) => c.name)).toEqual(['Lamp', 'Cap']);
+        expect(lists.get(t.id)!.orders.map((o) => o.reference)).toEqual([a.reference, b.reference]);
+      }
+      await scan(ta.id, boxes[1].code);
+      setting = 'true';
+      await expect(parcels.assertComplete([ta, tb], 'pickup')).resolves.toBeUndefined(); // the sibling needs no scan of its own
+    });
+    it('does not fan out to a sibling leg of another rider', async () => {
+      const a = await mkOrder();
+      const b = await mkOrder();
+      const { boxes } = await pack([a.id, b.id], 1);
+      const ta = await mkTask({ orderId: a.id });
+      const tb = await mkTask({ orderId: b.id, riderId: rider2.id });
+      await scan(ta.id, boxes[0].code);
+      expect((await parcels.checklist(tb)).pickupComplete).toBe(false);
+    });
+    it('resolves a box by role: a rider their own legs, staff their hub, an admin all, a seller never the street or phone', async () => {
+      const a = await mkOrder({}, [{ name: 'Lamp', qty: 1 }]);
+      const b = await mkOrder({}, [{ name: 'Cap', qty: 2 }]);
+      const { boxes } = await pack([a.id, b.id], 1);
+      const code = boxes[0].code;
+      const leg = await mkTask({ orderId: a.id, orderReference: a.reference, kind: 'delivery' as DeliveryKind, sellerIds: ['s1'], sellerId: null, hubId: hubA.id, fromHubId: hubA.id });
+      const r = await parcels.resolve({ id: rider.id, role: 'rider' }, code);
+      expect(r.contents).toHaveLength(2);
+      expect(r.orders).toHaveLength(2);
+      expect(r.destination).toMatchObject({ area: 'Gombe, Kinshasa', address: '12 Avenue du Commerce, Gombe, Kinshasa', phone: '+243 811 111 111' });
+      expect(r.legs.map((l) => l.id)).toEqual([leg.id]);
+      await expect(parcels.resolve({ id: rider2.id, role: 'rider' }, code)).rejects.toThrow('Parcel not found.');
+      expect((await parcels.resolve({ id: op.id, role: 'warehouse_staff', hubId: hubA.id }, code)).destination.address).toContain('12 Avenue');
+      await expect(parcels.resolve({ id: 'x', role: 'warehouse_staff', hubId: hubB.id }, code)).rejects.toThrow('Parcel not found.');
+      expect((await parcels.resolve({ id: 'adm', role: 'admin' }, code)).destination.phone).toBe('+243 811 111 111');
+      expect((await parcels.resolve({ id: 'fin', role: 'admin_finance' }, code)).destination.address).toBeNull();
+      await expect(parcels.resolve({ id: 'mk', role: 'admin_marketing' }, code)).rejects.toThrow(/cannot read orders/);
+      const seller = await parcels.resolve({ id: 's1', role: 'seller' }, code);
+      expect(seller.destination).toMatchObject({ area: 'Gombe, Kinshasa', address: null, phone: null, recipient: null });
+      expect(JSON.stringify(seller)).not.toMatch(/811 111 111|12 Avenue/);
+      await expect(parcels.resolve({ id: 's9', role: 'seller' }, code)).rejects.toThrow('Parcel not found.');
+      await expect(parcels.resolve({ id: 'c', role: 'customer' }, code)).rejects.toThrow('Parcel not found.');
+      await expect(parcels.resolve({ id: rider.id, role: 'rider' }, 'PKG-ZZZZZZZZ')).rejects.toThrow('Parcel not found.');
+    });
+    it('shows a rider only the area on a pickup leg', async () => {
+      const a = await mkOrder();
+      const { boxes } = await pack([a.id], 1);
+      await mkTask({ orderId: a.id, kind: 'pickup' as DeliveryKind });
+      const r = await parcels.resolve({ id: rider.id, role: 'rider' }, boxes[0].code);
+      expect(r.destination).toMatchObject({ area: 'Gombe, Kinshasa', address: null, phone: null });
+    });
+    it('lists an order\'s sets and boxes with scans for the admin order page', async () => {
+      const a = await mkOrder();
+      const b = await mkOrder();
+      const { boxes } = await pack([a.id, b.id], 2);
+      const ta = await mkTask({ orderId: a.id });
+      await scan(ta.id, boxes[0].code);
+      const r = await parcels.forOrder({ id: 'adm', role: 'admin' }, b.id);
+      expect(r.sets).toHaveLength(1);
+      expect(r.sets[0].orders).toHaveLength(2);
+      expect(r.sets[0].boxes.map((x) => [x.boxNo, x.pickupScans])).toEqual([[1, 1], [2, 0]]);
+      await expect(parcels.forOrder({ id: 'c', role: 'customer' }, b.id)).rejects.toThrow('Order not found.');
+      expect((await parcels.forOrder({ id: 'adm', role: 'admin' }, 'nope')).sets).toEqual([]);
     });
   });
 });

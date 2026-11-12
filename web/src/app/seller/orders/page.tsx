@@ -9,6 +9,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { PageHeader } from "@/components/ui/page-header";
 import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { LoadError, SectionLoader } from "@/components/seller/data-state";
+import { PackSeveral } from "@/components/seller/pack-several";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { sellerRequest, useLiveQuery } from "@/lib/seller-api";
@@ -156,6 +157,8 @@ export default function SellerOrdersPage() {
       />
 
       {orders.error && <LoadError message={orders.error} onRetry={orders.reload} />}
+
+      <PackSeveral />
 
       <ListFilters
         values={filters}

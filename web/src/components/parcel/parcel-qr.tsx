@@ -14,12 +14,15 @@ export function ParcelQr({
   boxCount = 1,
   fr,
   className,
+  onSettled,
 }: {
   code: string;
   boxNo?: number;
   boxCount?: number;
   fr: boolean;
   className?: string;
+  /** Called once the image has LOADED (the QR is really on the page) or the drawing was given up on (the written code is shown): the print button waits for it. */
+  onSettled?: (code: string, drawn: boolean) => void;
 }) {
   const [svg, setSvg] = useState<{ code: string; url: string | null } | null>(null);
 
@@ -38,6 +41,11 @@ export function ParcelQr({
   }, [code]);
 
   const ready = svg && svg.code === code;
+  const failed = !!ready && !svg.url;
+  useEffect(() => {
+    if (failed) onSettled?.(code, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [failed, code]);
   if (ready && !svg.url) {
     return (
       <div role="img" aria-label={qrAlt({ code, boxNo, boxCount }, fr)} className={`flex items-center justify-center border border-dashed border-slate-400 text-center text-xs text-slate-600 ${className ?? ""}`}>
@@ -47,5 +55,13 @@ export function ParcelQr({
   }
   if (!ready) return <div aria-hidden className={`animate-pulse bg-slate-100 ${className ?? ""}`} />;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={svg.url!} alt={qrAlt({ code, boxNo, boxCount }, fr)} className={className} />;
+  return (
+    <img
+      src={svg.url!}
+      alt={qrAlt({ code, boxNo, boxCount }, fr)}
+      className={className}
+      onLoad={() => onSettled?.(code, true)}
+      onError={() => onSettled?.(code, false)}
+    />
+  );
 }

@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, Circle } from "lucide-react";
 import { CameraScanPanel, type ScanReply } from "@/components/warehouse/camera-scanner";
+import { ParcelContents } from "@/components/parcel/parcel-contents";
+import type { ParcelContentLine } from "@/lib/parcel-labels";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import type { ParcelChecklist } from "@/lib/logistics";
@@ -79,12 +81,17 @@ export function RiderParcelPanel({
   target,
   stage,
   boxes,
+  contents,
+  orders,
   onChecklist,
   onChanged,
 }: {
   target: { taskId: string } | { runId: string };
   stage: ScanStage;
   boxes: BoxLine[];
+  /** What is in the boxes (every product x qty with its options) and which orders, so the rider knows what each box holds. */
+  contents?: readonly ParcelContentLine[] | null;
+  orders?: readonly { orderId: string; reference: string }[] | null;
   onChecklist: (list: BoxLine[]) => void;
   /** After a scan the server acknowledged: refresh the leg. */
   onChanged?: () => void;
@@ -140,6 +147,7 @@ export function RiderParcelPanel({
         </span>
       </div>
       <BoxList boxes={boxes} stage={stage} />
+      <ParcelContents contents={contents} orders={orders} />
       <div aria-live="polite" className="min-h-5 text-sm">
         {reply && <p className={reply.error ? "font-medium text-red-600" : "font-medium text-emerald-700"}>{reply.text}</p>}
       </div>

@@ -10,6 +10,7 @@ import {
   OrderRequest,
   OrderStatus,
   PaymentMethod,
+  Product,
   Seller,
   User,
 } from '../database/entities';
@@ -42,7 +43,9 @@ import type { EstimateLine } from '../logistics/order-estimate';
 import { linesBySeller, sellerUserId } from './order-sellers';
 import { paymentMethodLabel } from '../common/payment-method';
 import { LogisticsService } from '../logistics/logistics.service';
-import { LabelData, ParcelsService } from '../logistics/parcels.service';
+import { GROUP_MISMATCH, GROUP_SINGLE_SELLER, LabelData, LabelSet, ParcelsService } from '../logistics/parcels.service';
+import { areaOf, groupHint, planFor, variantLabel } from '../logistics/parcel-groups';
+import { withOrderLocks } from '../common/order-lock';
 import { RoutingService } from '../logistics/routing.service';
 import type { Route } from '../logistics/routing.service';
 import { CUSTOMER_KINDS, isCustomerKind, isOrderFlow } from '../logistics/leg-rules';
@@ -117,6 +120,10 @@ export class OrderStillProcessingException extends BadRequestException {
     super(STILL_PROCESSING);
   }
 }
+
+/** The most orders one "pack together" action takes, and the most candidate orders the clustering reads. */
+const MAX_PACK_ORDERS = 30;
+const MAX_GROUP_CANDIDATES = 300;
 
 const isDuplicateKey = (e: unknown): boolean =>
   e instanceof QueryFailedError && /UNIQUE|Duplicate entry|ER_DUP_ENTRY|SQLITE_CONSTRAINT/i.test(String((e as Error).message));
@@ -901,73 +908,221 @@ export class OrdersService {
    * The seller confirms the parcel is packed and ready for the rider, in `boxCount` boxes (1 to 20, default 1): each box gets its
    * own KOMORIKO label (the code never changes from the seller to the customer). Calling it again with another count before the
    * first pickup scan replaces the labels; after a pickup scan the count is locked. Answers the task and the labels to print.
+   * C-parcel-ready: the lines are marked ready and the boxes are made in ONE transaction under the order's lock, so a failure
+   * leaves nothing half done (and is reported), and a double click gets the first click's boxes.
    */
-  async sellerReady(user: { id: string }, orderId: string, boxCount?: unknown): Promise<DeliveryTask & { labels?: LabelData[]; boxCount?: number; boxesLocked?: boolean }> {
-    const order = await this.orders.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Order not found.');
-    const keys = await this.sellerKeys(user.id);
-    const groups = await this.linesBySeller(order);
-    const mine = [...groups].filter(([sellerId]) => keys.has(sellerId)).flatMap(([, items]) => items);
-    if (!mine.length) throw new NotFoundException('Order not found.');
-    if (!OrdersService.fulfillable(order)) {
-      throw new BadRequestException(`An order that is ${order.status.replace(/_/g, ' ')} cannot be marked ready.`);
-    }
-    const open = mine.filter((i) => i.fulfilment === 'open');
-    if (!open.length && mine.every((i) => i.fulfilment === 'cancelled')) {
-      throw new BadRequestException('You cancelled every item of this order: there is nothing to pack.');
-    }
-    if (open.length) {
-      const now = new Date();
-      await this.orders.manager.update(OrderItem, { id: In(open.map((i) => i.id)) }, { fulfilment: 'ready', readyAt: now });
-    }
-    const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
-    // This seller's pickup is ready for the warehouse's rider; the other sellers' pickups are independent.
-    const live = (saved.items ?? []).filter((i) => i.fulfilment !== 'cancelled' && !i.productId.startsWith('ext:'));
-    const allReady = live.every((i) => i.fulfilment !== 'open');
-    const task = await this.logistics.markSellerReady(orderId, [...keys]);
-    if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
-    // C-parcel-boxes: the labels carry the same seller key as the pickup leg; a count the seller can no longer change (a rider
-    // scanned a box) is refused here, and the data layer refuses it too.
-    const packed = this.parcelsSvc ? await this.parcelsSvc.ensureBoxes(orderId, task.sellerId ?? mine[0]?.sellerId ?? user.id, boxCount) : [];
-    const labelled = packed.length ? await this.parcelsSvc!.labelsFor(orderId, [packed[0].sellerId as string]).catch(() => null) : null;
-    const sellersLeft = new Set(live.filter((i) => i.fulfilment === 'open').map((i) => i.sellerName ?? i.sellerId ?? 'Seller')).size;
-    this.emitter.toUser(saved.customerId, 'order:updated', saved);
-    pushOrderToOps(this.emitter, 'order:updated', saved);
-    await this.notifications.toAdmins({
-      title: allReady ? 'Parcel ready for pickup' : 'Seller package ready',
-      body: allReady
-        ? `${order.reference} is packed and ready.`
-        : `${order.reference}: one seller's package is ready, waiting for ${sellersLeft} more seller${sellersLeft > 1 ? 's' : ''}.`,
-      type: 'delivery',
-      entityId: order.id,
-    }, 'logisticsDesk');
-    return Object.assign(task, labelled ? { labels: labelled.labels, boxCount: labelled.boxCount, boxesLocked: labelled.locked } : {});
+  async sellerReady(user: { id: string }, orderId: string, boxCount?: unknown): Promise<DeliveryTask & { labels?: LabelData[]; boxCount?: number; boxesLocked?: boolean; groupId?: string | null; orders?: { orderId: string; reference: string }[]; contentsRev?: number }> {
+    const r = await this.packOrders(user, [orderId], boxCount, {});
+    const set = r.set;
+    return Object.assign(r.tasks[0], set ? { labels: set.labels, boxCount: set.boxCount, boxesLocked: set.locked, groupId: set.groupId, orders: set.orders, contentsRev: set.contentsRev } : {});
   }
 
-  /** The seller's own labels for an order (to print or reprint until it is delivered), with whether the box count can still change. */
-  async sellerLabels(user: { id: string }, orderId: string): Promise<{ labels: LabelData[]; boxCount: number; locked: boolean }> {
+  /**
+   * "Pack and label several orders": the seller marks the chosen orders ready and gets ONE box set for all of them (one code per
+   * box, every order's products listed on the label). Same seller, customer, day, address and delivery mode only (see
+   * `ParcelsService.packGroup`); single-seller orders in phase 1.
+   */
+  async sellerPack(user: { id: string }, orderIds: unknown, boxCount?: unknown): Promise<LabelSet & { tasks: { orderId: string; taskId: string }[] }> {
+    const ids = Array.isArray(orderIds) ? orderIds.map((x) => String(x ?? '')).filter(Boolean) : [];
+    if (!ids.length) throw new BadRequestException('Choose at least one order to pack.');
+    const r = await this.packOrders(user, ids, boxCount, { together: true });
+    if (!r.set) throw new BadRequestException('Labels are not available.');
+    return { ...r.set, tasks: r.tasks.map((t) => ({ orderId: t.orderId, taskId: t.id })) };
+  }
+
+  /** The seller changes a box set before the first pickup scan: add orders, take orders out (each gets its own set), and/or change the box count. */
+  async sellerGroupEdit(user: { id: string }, input: { groupId?: unknown; add?: unknown; remove?: unknown; boxCount?: unknown }): Promise<LabelSet> {
+    if (!this.parcelsSvc) throw new BadRequestException('Labels are not available.');
+    const keys = await this.sellerKeys(user.id);
+    const info = await this.ownedGroup(keys, String(input.groupId ?? ''));
+    const list = (v: unknown) => (Array.isArray(v) ? [...new Set(v.map((x) => String(x ?? '')).filter(Boolean))] : []);
+    const add = list(input.add);
+    const remove = list(input.remove);
+    if (remove.some((id) => !info.orderIds.includes(id))) throw new BadRequestException('Order not found.');
+    const next = [...info.orderIds.filter((id) => !remove.includes(id)), ...add.filter((id) => !info.orderIds.includes(id))];
+    if (!next.length) throw new BadRequestException('A label set needs at least one order.');
+    const r = await this.packOrders(user, next, input.boxCount, { together: next.length > 1, detach: remove, lockExtra: info.orderIds });
+    const keep = r.set;
+    if (!keep) throw new BadRequestException('Labels are not available.');
+    return keep;
+  }
+
+  /** The group of boxes a seller owns (404 for anyone else's), with its orders. */
+  private async ownedGroup(keys: Set<string>, groupId: string): Promise<{ groupId: string; sellerKey: string; orderIds: string[] }> {
+    const info = this.parcelsSvc ? await this.parcelsSvc.groupInfo(groupId) : null;
+    if (!info) throw new NotFoundException('Order not found.');
+    const sellerKey = info.group.sellerKey && keys.has(info.group.sellerKey) ? info.group.sellerKey : null;
+    if (!sellerKey) throw new NotFoundException('Order not found.');
+    return { groupId, sellerKey, orderIds: info.orderIds };
+  }
+
+  /**
+   * The one place a package becomes ready: validates every order, then in one transaction (all the orders' locks, in id order)
+   * marks the seller's open lines ready and makes / joins the box set; afterwards (after the commit) the pickup legs are told,
+   * the customer and the desk are notified.
+   */
+  private async packOrders(
+    user: { id: string },
+    orderIds: string[],
+    boxCountRaw: unknown,
+    opts: { together?: boolean; detach?: string[]; lockExtra?: string[] },
+  ): Promise<{ tasks: DeliveryTask[]; set: LabelSet | null }> {
+    const ids = [...new Set(orderIds)];
+    if (ids.length > MAX_PACK_ORDERS) throw new BadRequestException(`Pack at most ${MAX_PACK_ORDERS} orders at once.`);
+    const keys = await this.sellerKeys(user.id);
+    const prepared = await withOrderLocks(this.orders.manager, [...ids, ...(opts.lockExtra ?? [])], async (m) => {
+      const preps: { order: Order; mine: OrderItem[]; open: OrderItem[]; sellerKey: string }[] = [];
+      for (const id of ids) {
+        const order = await m.findOne(Order, { where: { id } });
+        if (!order) throw new NotFoundException('Order not found.');
+        const groups = await this.linesBySeller(order);
+        const mine = [...groups].filter(([sellerId]) => keys.has(sellerId)).flatMap(([, items]) => items);
+        if (!mine.length) throw new NotFoundException('Order not found.');
+        if (!OrdersService.fulfillable(order)) throw new BadRequestException(`An order that is ${order.status.replace(/_/g, ' ')} cannot be marked ready.`);
+        const open = mine.filter((i) => i.fulfilment === 'open');
+        if (!open.length && mine.every((i) => i.fulfilment === 'cancelled')) throw new BadRequestException('You cancelled every item of this order: there is nothing to pack.');
+        if (opts.together && groups.size > 1) throw new BadRequestException(GROUP_SINGLE_SELLER);
+        const pickup = await this.logistics.sellerPickup(order.id, [...keys]);
+        if (!pickup) throw new BadRequestException('This order has no delivery waiting for pickup.');
+        preps.push({ order, mine, open, sellerKey: pickup.sellerId ?? mine[0]?.sellerId ?? user.id });
+      }
+      const sellerKey = preps[0].sellerKey;
+      if (preps.some((p) => p.sellerKey !== sellerKey)) throw new BadRequestException(GROUP_MISMATCH);
+      if (opts.detach?.length && this.parcelsSvc) for (const d of opts.detach) await this.parcelsSvc.detachOrder(m, d, sellerKey);
+      const packed = this.parcelsSvc ? await this.parcelsSvc.packGroup(m, ids, sellerKey, boxCountRaw) : null;
+      // The boxes exist: only now are the lines ready (a failure above leaves the order exactly as it was).
+      const now = new Date();
+      for (const p of preps) if (p.open.length) await m.update(OrderItem, { id: In(p.open.map((i) => i.id)) }, { fulfilment: 'ready', readyAt: now });
+      return { preps, packed, sellerKey };
+    });
+
+    const tasks: DeliveryTask[] = [];
+    for (const { order } of prepared.preps) {
+      const saved = (await this.orders.findOne({ where: { id: order.id } }))!;
+      // This seller's pickup is ready for the warehouse's rider; the other sellers' pickups are independent.
+      const live = (saved.items ?? []).filter((i) => i.fulfilment !== 'cancelled' && !i.productId.startsWith('ext:'));
+      const allReady = live.every((i) => i.fulfilment !== 'open');
+      const task = await this.logistics.markSellerReady(order.id, [...keys]);
+      if (!task) throw new BadRequestException('This order has no delivery waiting for pickup.');
+      tasks.push(task);
+      const sellersLeft = new Set(live.filter((i) => i.fulfilment === 'open').map((i) => i.sellerName ?? i.sellerId ?? 'Seller')).size;
+      this.emitter.toUser(saved.customerId, 'order:updated', saved);
+      pushOrderToOps(this.emitter, 'order:updated', saved);
+      await this.notifications.toAdmins({
+        title: allReady ? 'Parcel ready for pickup' : 'Seller package ready',
+        body: allReady
+          ? `${order.reference} is packed and ready.`
+          : `${order.reference}: one seller's package is ready, waiting for ${sellersLeft} more seller${sellersLeft > 1 ? 's' : ''}.`,
+        type: 'delivery',
+        entityId: order.id,
+      }, 'logisticsDesk');
+    }
+    // Errors here surface to the seller (the boxes exist, so pressing the button again just reads them back).
+    const set = prepared.packed && this.parcelsSvc ? await this.parcelsSvc.labelsForGroup(prepared.packed.group.id, [...keys]) : null;
+    return { tasks, set };
+  }
+
+  /** The seller's own labels for an order (to print or reprint until it is delivered), or for a whole box set (`groupId`), with whether the box count can still change. */
+  async sellerLabels(user: { id: string }, orderId: string, groupId?: string): Promise<LabelSet> {
+    const keys = await this.sellerKeys(user.id);
+    if (!this.parcelsSvc) throw new BadRequestException('Labels are not available.');
+    if (groupId) {
+      const g = await this.ownedGroup(keys, groupId);
+      return this.parcelsSvc.labelsForGroup(g.groupId, [...keys]);
+    }
     const order = await this.orders.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('Order not found.');
-    const keys = await this.sellerKeys(user.id);
     const mine = [...(await this.linesBySeller(order))].filter(([sellerId]) => keys.has(sellerId));
     if (!mine.length) throw new NotFoundException('Order not found.');
-    if (!this.parcelsSvc) throw new BadRequestException('Labels are not available.');
     return this.parcelsSvc.labelsFor(orderId, [...keys]);
   }
 
-  /** The seller changes the box count of a package that is already ready (before the first pickup scan); the labels are replaced. */
-  async sellerBoxes(user: { id: string }, orderId: string, boxCount: unknown): Promise<{ labels: LabelData[]; boxCount: number; locked: boolean }> {
-    const order = await this.orders.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('Order not found.');
+  /** The seller changes the box count of a package that is already ready (before the first pickup scan); the labels are replaced. For a box set (`groupId`) it changes the whole set. */
+  async sellerBoxes(user: { id: string }, orderId: string, boxCount: unknown, groupId?: string): Promise<LabelSet> {
     const keys = await this.sellerKeys(user.id);
-    const mine = [...(await this.linesBySeller(order))].filter(([sellerId]) => keys.has(sellerId)).flatMap(([, items]) => items);
-    if (!mine.length) throw new NotFoundException('Order not found.');
     if (!this.parcelsSvc) throw new BadRequestException('Labels are not available.');
-    if (!mine.some((i) => i.fulfilment === 'ready' || i.fulfilment === 'received')) throw new BadRequestException('Mark the package ready first: the labels are made then.');
-    if (mine.filter((i) => i.fulfilment !== 'cancelled').every((i) => i.deliveredAt)) throw new BadRequestException('This package was delivered: its labels can no longer be printed.');
-    const key = (await this.parcelsSvc.activeFor(orderId, [...keys]))[0]?.sellerId ?? mine[0].sellerId ?? user.id;
-    await this.parcelsSvc.ensureBoxes(orderId, key, boxCount === undefined || boxCount === null || boxCount === '' ? 1 : boxCount);
-    return this.parcelsSvc.labelsFor(orderId, [...keys]);
+    let anchor = orderId;
+    if (groupId) {
+      const g = await this.ownedGroup(keys, groupId);
+      anchor = g.orderIds[0];
+    } else {
+      const order = await this.orders.findOne({ where: { id: orderId } });
+      if (!order) throw new NotFoundException('Order not found.');
+      const mine = [...(await this.linesBySeller(order))].filter(([sellerId]) => keys.has(sellerId)).flatMap(([, items]) => items);
+      if (!mine.length) throw new NotFoundException('Order not found.');
+      if (!mine.some((i) => i.fulfilment === 'ready' || i.fulfilment === 'received')) throw new BadRequestException('Mark the package ready first: the labels are made then.');
+      if (mine.filter((i) => i.fulfilment !== 'cancelled').every((i) => i.deliveredAt)) throw new BadRequestException('This package was delivered: its labels can no longer be printed.');
+    }
+    // The key comes from the boxes themselves: never another seller's, never a guess from the first line.
+    const key = (await this.parcelsSvc.activeFor(anchor, [...keys]))[0]?.sellerId;
+    if (!key) throw new BadRequestException('Mark the package ready first: the labels are made then.');
+    await this.parcelsSvc.ensureBoxes(anchor, key, boxCount === undefined || boxCount === null || boxCount === '' ? 1 : boxCount);
+    return this.parcelsSvc.labelsFor(anchor, [...keys]);
+  }
+
+  /**
+   * `orders:sellerGroups`: the seller's orders still to hand over, clustered by what lets them share a label set (customer, day,
+   * address, delivery mode; single-seller orders), newest first and PAGED ON THE SERVER by cluster (`limit` default 10, up to 50;
+   * `offset`; `q` = reference, product or the customer's first name). Only clusters of two or more orders are candidates. Never
+   * the street or the phone: the cluster names the destination area, and its `key` is an opaque hash.
+   */
+  async sellerGroups(user: { id: string }, query: { limit?: unknown; offset?: unknown; q?: unknown } = {}) {
+    const keys = await this.sellerKeys(user.id);
+    const take = Math.min(50, Math.max(1, Math.floor(Number(query.limit) || 10)));
+    const skip = Math.max(0, Math.floor(Number(query.offset) || 0));
+    const needle = typeof query.q === 'string' ? query.q.trim().slice(0, 80).toLowerCase() : '';
+    const ids = (
+      await this.orders
+        .createQueryBuilder('o')
+        .innerJoin('o.items', 'i')
+        .innerJoin(Product, 'p', 'p.id = i.productId')
+        .where('p.sellerId IN (:...keys)', { keys: [...keys] })
+        .andWhere("o.status IN ('confirmed','processing')")
+        .andWhere("i.fulfilment IN ('open','ready')")
+        .select('o.id', 'id')
+        .addSelect('o.createdAt', 'createdAt')
+        .groupBy('o.id')
+        .addGroupBy('o.createdAt')
+        .orderBy('o.createdAt', 'DESC')
+        .limit(MAX_GROUP_CANDIDATES)
+        .getRawMany<{ id: string }>()
+    ).map((r) => r.id);
+    const rows = ids.length ? await this.orders.find({ where: { id: In(ids) }, order: { createdAt: 'DESC' } }) : [];
+    const secret = process.env.DATA_ENCRYPTION_KEY ?? 'komoriko';
+    type Entry = { order: Order; lines: OrderItem[]; plan: ReturnType<typeof planFor>; groupId: string | null };
+    const clusters = new Map<string, Entry[]>();
+    for (const order of rows) {
+      const groups = await this.linesBySeller(order);
+      if (groups.size !== 1) continue; // several sellers: its own labels
+      const [[sellerKey, all]] = [...groups];
+      if (!keys.has(sellerKey)) continue;
+      const lines = all.filter((i) => i.fulfilment !== 'cancelled');
+      if (!lines.length) continue;
+      const group = this.parcelsSvc ? await this.parcelsSvc.groupOf(order.id) : null;
+      if (group?.lockedAt) continue; // a rider already collected it
+      const plan = planFor(order, sellerKey);
+      clusters.set(plan.groupKey, [...(clusters.get(plan.groupKey) ?? []), { order, lines, plan, groupId: group?.id ?? null }]);
+    }
+    const first = (v: string | null | undefined) => (v ?? '').trim().split(/\s+/)[0] || null;
+    const view = [...clusters.values()]
+      .filter((c) => c.length > 1)
+      .map((c) => ({
+        key: groupHint(c[0].plan.groupKey, secret),
+        dayKey: c[0].plan.dayKey,
+        area: areaOf(c[0].order.shippingAddress),
+        deliveryMode: c[0].plan.deliveryMode,
+        orders: c.map((e) => ({
+          id: e.order.id,
+          reference: e.order.reference,
+          createdAt: e.order.createdAt,
+          customerFirstName: first(e.order.customerName),
+          packageStatus: e.lines.every((i) => i.fulfilment === 'open') ? 'to_pack' : e.lines.some((i) => i.fulfilment === 'open') ? 'partly_ready' : 'ready',
+          groupId: e.groupId,
+          items: e.lines.map((i) => ({ name: i.productName, nameFr: i.productNameFr ?? null, variant: variantLabel(i.variant), variantFr: i.variantFr ?? null, qty: i.qty })),
+        })),
+      }))
+      .filter((c) => !needle || c.orders.some((o) => o.reference.toLowerCase().includes(needle) || (o.customerFirstName ?? '').toLowerCase().startsWith(needle) || o.items.some((i) => i.name.toLowerCase().includes(needle))));
+    return { clusters: view.slice(skip, skip + take), total: view.length, limit: take, offset: skip };
   }
 
   /**
@@ -1077,6 +1232,8 @@ export class OrdersService {
       return true;
     });
     if (!done) return { done, refund, prepaid };
+    // A line left the boxes' contents: the seller's label page says "reprint".
+    await this.parcelsSvc?.touchContents(order.id).catch(() => undefined);
     if (order.deliveryMode === 'express') await this.logistics.refreshOpenLegCargo(order.id);
     for (const i of targets) {
       if (!i.productId.startsWith('ext:')) await this.products.restock(i.productId, i.qty, { variant: i.variant, orderId: order.id, reason: 'cancel_restock' });

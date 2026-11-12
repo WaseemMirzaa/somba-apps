@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorNote, Modal } from "@/components/admin/modal";
 import { RefundDialog } from "@/components/admin/refund-dialog";
 import { OrderRouting } from "@/components/admin/order-routing";
+import { OrderParcels } from "@/components/parcel/order-parcels";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -363,6 +364,12 @@ export default function AdminOrderDetailPage() {
         {mayAct && (
         <DetailGridSection title={fr ? "Acheminement par les entrepôts" : "Routing through the warehouses"} span={3}>
           <OrderRouting order={live} sellers={sellerList.items} />
+        </DetailGridSection>
+        )}
+
+        {mayAct && (
+        <DetailGridSection title={fr ? "Colis" : "Parcels"} span={3}>
+          <OrderParcels orderId={live.id} />
         </DetailGridSection>
         )}
 

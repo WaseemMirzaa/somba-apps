@@ -20,22 +20,31 @@ const queues = new Map<string, Promise<unknown>>();
  * it again for the same order from inside `fn`: the queue would wait for itself.
  */
 export function withOrderLock<T>(manager: EntityManager, orderId: string, fn: (m: EntityManager) => Promise<T>): Promise<T> {
-  const before = queues.get(orderId) ?? Promise.resolve();
+  return withOrderLocks(manager, [orderId], fn);
+}
+
+/**
+ * The same for several orders at once (packing a group of orders): the turns are taken in sorted id order, in one transaction,
+ * so two callers that name the same orders in any order can never wait for each other.
+ */
+export function withOrderLocks<T>(manager: EntityManager, orderIds: string[], fn: (m: EntityManager) => Promise<T>): Promise<T> {
+  const ids = [...new Set(orderIds)].sort();
+  const before = Promise.all(ids.map((id) => queues.get(id) ?? Promise.resolve()));
   const run = before.then(
     () => manager.transaction(async (m) => {
-      await lockOrder(m, orderId);
+      for (const id of ids) await lockOrder(m, id);
       return fn(m);
     }),
     () => undefined as never,
   );
-  // The queue entry never rejects (the next in line starts whether this one worked or not) and cleans itself up.
+  // The queue entries never reject (the next in line starts whether this one worked or not) and clean themselves up.
   const tail = run.then(
     () => undefined,
     () => undefined,
   );
-  queues.set(orderId, tail);
+  for (const id of ids) queues.set(id, tail);
   void tail.then(() => {
-    if (queues.get(orderId) === tail) queues.delete(orderId);
+    for (const id of ids) if (queues.get(id) === tail) queues.delete(id);
   });
   return run;
 }

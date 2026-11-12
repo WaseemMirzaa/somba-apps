@@ -5,6 +5,18 @@
  * No imports: `npm test` loads this file on its own.
  */
 
+/** One product line in a box set, as the API answers it (`contents` of a label, a checklist or `parcels:resolve`). */
+export interface ParcelContentLine {
+  name: string;
+  nameFr?: string | null;
+  /** The size / option label ("L / Blue"); null for a product without options. */
+  variant: string | null;
+  variantFr?: string | null;
+  qty: number;
+  /** The order the line belongs to (a set of several orders lists every order's lines). */
+  orderReference: string;
+}
+
 /** One label = one box, as the API answers (`orders:sellerLabels`, `orders:sellerReady`, `parcels:forReturn`). */
 export interface ParcelLabel {
   code: string;
@@ -14,6 +26,12 @@ export interface ParcelLabel {
   storeName?: string;
   /** The destination AREA only: never a phone number or a street. */
   destinationArea?: string;
+  /** Every product x qty (with options) in the whole box set. Absent on an old server. */
+  contents?: ParcelContentLine[];
+  /** The references of every order in the set (the first is `orderReference`). */
+  orderRefs?: string[];
+  groupId?: string | null;
+  contentsRev?: number;
 }
 
 /** What the seller endpoints answer: the labels, how many boxes, and whether a rider already scanned one (count locked). */
@@ -21,7 +39,41 @@ export interface ParcelLabelPack {
   labels: ParcelLabel[];
   boxCount: number;
   locked: boolean;
+  /** The box set these labels belong to (one or several same-day orders). */
+  groupId?: string | null;
+  orders?: { orderId: string; reference: string }[];
+  contentsRev?: number;
 }
+
+/** "2 × Blue T-shirt (L / Blue)": one line of a label or a checklist, in the reader's language. */
+export function contentLineText(c: Pick<ParcelContentLine, "name" | "nameFr" | "variant" | "variantFr" | "qty">, fr: boolean): string {
+  const name = fr && typeof c.nameFr === "string" && c.nameFr.trim() ? c.nameFr.trim() : c.name;
+  const variant = fr && typeof c.variantFr === "string" && c.variantFr.trim() ? c.variantFr.trim() : (c.variant ?? "").trim();
+  return `${c.qty} × ${name}${variant ? ` (${variant})` : ""}`;
+}
+
+/** All the lines of a box set on one line of text: "2 × Blue T-shirt (L), 1 × Lamp". Empty when there are none. */
+export function contentsSummary(contents: readonly ParcelContentLine[] | undefined, fr: boolean): string {
+  return (contents ?? []).map((c) => contentLineText(c, fr)).join(", ");
+}
+
+/**
+ * The lines printed on a label: as many as fit the label height, then "+ N more line(s)" so the QR and the code are never pushed off
+ * the page. The seller still sees every line on screen.
+ */
+export const LABEL_CONTENT_LINES = 9;
+export function labelContents(contents: readonly ParcelContentLine[] | undefined, fr: boolean, max = LABEL_CONTENT_LINES): { lines: { key: string; text: string }[]; more: string | null } {
+  const all = contents ?? [];
+  const shown = all.length > max ? all.slice(0, max - 1) : all;
+  const rest = all.length - shown.length;
+  return {
+    lines: shown.map((c, i) => ({ key: `${i}-${c.orderReference}-${c.name}-${c.variant ?? ""}`, text: contentLineText(c, fr) })),
+    more: rest > 0 ? (fr ? `+ ${rest} autre(s) ligne(s)` : `+ ${rest} more line(s)`) : null,
+  };
+}
+
+/** True when the box set holds products of more than one order (the label lists the references). */
+export const isSharedSet = (l: Pick<ParcelLabel, "orderRefs">): boolean => (l.orderRefs?.length ?? 0) > 1;
 
 export const MIN_BOXES = 1;
 export const MAX_BOXES = 20;
@@ -139,36 +191,52 @@ export function orderedLabels(labels: ParcelLabel[]): ParcelLabel[] {
     .filter((l) => (seen.has(l.code) ? false : (seen.add(l.code), true)));
 }
 
-/** The class of the printable block: everything else on the page is hidden when printing. */
+/** The class of the on-screen preview block. */
+export const PREVIEW_ROOT_CLASS = "parcel-preview";
+/** The class of the printable copy: a direct child of <body> that only shows when printing. */
 export const PRINT_ROOT_CLASS = "parcel-sheet";
+/** The class of the host element the printable copy is rendered into (appended to <body>). */
+export const PRINT_HOST_CLASS = "parcel-print-host";
 
 /**
- * The CSS injected on the print page: the label size on screen and on paper, the `@page` rule, one label per page (A6) or a
- * 2-column grid (A4), and the hiding of the app chrome (sidebar, header, toolbar: every element that is neither the sheet,
- * inside it, nor one of its ancestors).
+ * The CSS injected on the print page. NO `:has()`: the printable copy of the sheet is rendered into a host that is a direct child of
+ * <body> (`PRINT_HOST_CLASS`), so printing is just "hide every other child of <body>, show the host": it works in every engine that
+ * prints at all (an engine without `:has()` used to print the app chrome, or only the first label). The on-screen preview is hidden
+ * when printing; the printable copy is hidden on screen.
  */
 export function paperCss(paper: PaperId): string {
   const p = PAPERS[paper];
-  const root = `.${PRINT_ROOT_CLASS}`;
+  const sheet = `.${PRINT_ROOT_CLASS}`;
+  const host = `.${PRINT_HOST_CLASS}`;
+  const preview = `.${PREVIEW_ROOT_CLASS}`;
   const a6 = paper === "a6";
   return [
     `@page { size: ${p.pageSize}; margin: ${p.pageMargin} }`,
-    `${root} { display: flex; flex-wrap: wrap; gap: 16px; }`,
-    `${root} .parcel-label { width: ${p.labelWidthMm}mm; height: ${p.labelHeightMm}mm; box-sizing: border-box; }`,
+    `${preview} { display: flex; flex-wrap: wrap; gap: 16px; }`,
+    `${preview} .parcel-label, ${sheet} .parcel-label { width: ${p.labelWidthMm}mm; height: ${p.labelHeightMm}mm; box-sizing: border-box; overflow: hidden; }`,
+    `${host} { display: none; }`,
     `@media print {`,
     `  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; height: auto !important; overflow: visible !important; }`,
-    `  body :not(${root}):not(:has(${root})):not(${root} *) { display: none !important; }`,
-    `  :has(${root}) { display: block !important; position: static !important; overflow: visible !important; height: auto !important; min-height: 0 !important; max-width: none !important; width: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; box-shadow: none !important; transform: none !important; }`,
+    `  body > *:not(${host}) { display: none !important; }`,
+    `  ${host} { display: block !important; position: static !important; }`,
     a6
-      ? `  ${root} { display: block !important; }`
-      : `  ${root} { display: grid !important; grid-template-columns: repeat(${p.cols}, ${p.labelWidthMm}mm); gap: 0 !important; }`,
-    `  ${root} .parcel-label { break-inside: avoid; page-break-inside: avoid; ${a6 ? "border: 0 !important;" : "border: 0.2mm dashed #888 !important;"} }`,
+      ? `  ${sheet} { display: block !important; }`
+      : `  ${sheet} { display: grid !important; grid-template-columns: repeat(${p.cols}, ${p.labelWidthMm}mm); gap: 0 !important; }`,
+    `  ${sheet} .parcel-label { break-inside: avoid; page-break-inside: avoid; ${a6 ? "border: 0 !important;" : "border: 0.2mm dashed #888 !important;"} }`,
     // 150 mm of label on a 150 mm page can spill a blank page by a rounding hair: print it a touch shorter.
-    a6 ? `  ${root} .parcel-label { height: 149mm; }` : "",
-    a6 ? `  ${root} .parcel-label { break-after: page; page-break-after: always; }` : "",
-    a6 ? `  ${root} .parcel-label:last-child { break-after: auto; page-break-after: auto; }` : "",
+    a6 ? `  ${sheet} .parcel-label { height: 149mm; }` : "",
+    a6 ? `  ${sheet} .parcel-label { break-after: page; page-break-after: always; }` : "",
+    a6 ? `  ${sheet} .parcel-label:last-child { break-after: auto; page-break-after: auto; }` : "",
     `}`,
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * May the Print button work? Only once every QR image of the sheet has loaded (or been given up on, with its written code shown).
+ * `settled` = the codes whose image finished; `labels` = the codes on the sheet.
+ */
+export function printReady(labels: readonly Pick<ParcelLabel, "code">[], settled: ReadonlySet<string>): boolean {
+  return labels.length > 0 && labels.every((l) => settled.has(l.code));
 }

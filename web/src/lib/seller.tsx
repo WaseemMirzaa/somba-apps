@@ -312,11 +312,18 @@ function request<T>(event: string, body?: unknown): Promise<T> {
 }
 
 /** The label payloads the server sends (`locked` on labels / boxes, `boxesLocked` on ready). */
-type RawLabelPack = { labels: ParcelLabel[]; boxCount?: number; locked?: boolean; boxesLocked?: boolean };
+type RawLabelPack = { labels: ParcelLabel[]; boxCount?: number; locked?: boolean; boxesLocked?: boolean; groupId?: string | null; orders?: { orderId: string; reference: string }[]; contentsRev?: number };
 
 function toLabelPack(raw: Partial<RawLabelPack>): ParcelLabelPack {
   const labels = Array.isArray(raw.labels) ? raw.labels : [];
-  return { labels, boxCount: raw.boxCount ?? labels.length, locked: Boolean(raw.locked ?? raw.boxesLocked) };
+  return {
+    labels,
+    boxCount: raw.boxCount ?? labels.length,
+    locked: Boolean(raw.locked ?? raw.boxesLocked),
+    groupId: raw.groupId ?? labels[0]?.groupId ?? null,
+    orders: Array.isArray(raw.orders) ? raw.orders : undefined,
+    contentsRev: raw.contentsRev ?? labels[0]?.contentsRev ?? 0,
+  };
 }
 
 function upsert<T extends { id: string }>(list: T[], item: T): T[] {
@@ -1139,10 +1146,16 @@ interface Actions {
    * task is only released once EVERY seller of the order is ready, so a null `readyAt` is normal.
    */
   sellerReady: (orderId: string, boxCount?: number) => Promise<ParcelLabelPack | null>;
-  /** orders:sellerLabels — the labels of a package that is ready (reprint until delivery) and whether the box count is locked. */
-  sellerLabels: (orderId: string) => Promise<ParcelLabelPack>;
-  /** orders:sellerBoxes — changes the box count of a package already ready (old labels void, new ones made). */
-  sellerBoxes: (orderId: string, boxCount: number) => Promise<ParcelLabelPack>;
+  /** orders:sellerLabels — the labels of a package that is ready (reprint until delivery) and whether the box count is locked. `{ groupId }` = a whole box set of several orders. */
+  sellerLabels: (orderId: string, groupId?: string | null) => Promise<ParcelLabelPack>;
+  /** orders:sellerBoxes — changes the box count of a package already ready (old labels void, new ones made). `groupId` = the whole set. */
+  sellerBoxes: (orderId: string, boxCount: number, groupId?: string | null) => Promise<ParcelLabelPack>;
+  /** orders:sellerPack — marks several same-day orders ready and makes ONE box set for all of them. */
+  sellerPack: (orderIds: string[], boxCount: number) => Promise<ParcelLabelPack>;
+  /** orders:sellerGroupEdit — add orders to / take orders out of a box set before the first pickup scan, or change its box count. */
+  sellerGroupEdit: (groupId: string, edit: { add?: string[]; remove?: string[]; boxCount?: number }) => Promise<ParcelLabelPack>;
+  /** orders:sellerList { id } — reads ONE order from the server (an order that is not in the list the page loaded); true when it exists. */
+  lookupSellerOrder: (idOrReference: string) => Promise<boolean>;
   /**
    * orders:sellerCancel — cancels only this seller's lines (all open/ready ones, or just `itemIds`).
    * The customer is refunded for those lines; the order continues with the other sellers.
@@ -1228,6 +1241,8 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const [reviews, setReviews] = useState<SellerReview[]>([]);
   const [ownProducts, setOwnProducts] = useState<SellerProductRow[] | null>(null);
   const [ordersRaw, setOrdersRaw] = useState<SellerOrderView[] | null>(null);
+  // Orders read one by one from the server (a detail or label page for an order that is not in the list above): kept beside the list, which a refresh replaces.
+  const [extraOrders, setExtraOrders] = useState<SellerOrderView[]>([]);
   const [available, setAvailable] = useState<PayoutAvailability | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -1570,8 +1585,27 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         void refreshOrders();
         return res && Array.isArray(res.labels) ? toLabelPack(res) : null;
       },
-      sellerLabels: async (orderId) => toLabelPack(await request<RawLabelPack>("orders:sellerLabels", { orderId })),
-      sellerBoxes: async (orderId, boxCount) => toLabelPack(await request<RawLabelPack>("orders:sellerBoxes", { orderId, boxCount })),
+      sellerLabels: async (orderId, groupId) => toLabelPack(await request<RawLabelPack>("orders:sellerLabels", groupId ? { orderId, groupId } : { orderId })),
+      sellerBoxes: async (orderId, boxCount, groupId) => toLabelPack(await request<RawLabelPack>("orders:sellerBoxes", { orderId, boxCount, ...(groupId ? { groupId } : {}) })),
+      sellerPack: async (orderIds, boxCount) => {
+        const res = await request<RawLabelPack>("orders:sellerPack", { orderIds, boxCount });
+        const now = new Date().toISOString();
+        setOrdersRaw((cur) => (cur ?? []).map((o) => (orderIds.includes(o.id) ? applySellerReady(o, now) : o)));
+        void refreshOrders();
+        return toLabelPack(res);
+      },
+      sellerGroupEdit: async (groupId, edit) => {
+        const res = await request<RawLabelPack>("orders:sellerGroupEdit", { groupId, ...edit });
+        void refreshOrders();
+        return toLabelPack(res);
+      },
+      lookupSellerOrder: async (idOrReference) => {
+        const res = await request<{ items?: SellerOrderView[] }>("orders:sellerList", { id: idOrReference, limit: 1 });
+        const found = res?.items?.[0];
+        if (!found) return false;
+        setExtraOrders((cur) => upsert(cur, found));
+        return true;
+      },
       sellerCancel: async (orderId, reason, itemIds) => {
         const view = await request<SellerOrderView>("orders:sellerCancel", {
           orderId,
@@ -1614,12 +1648,16 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     return { loading: !firstLoadDone, error: failed ? errors[failed] : null, retry: refresh };
   }, [firstLoadDone, errors, refresh]);
 
+  const allOrders = useMemo(
+    () => (ordersRaw && extraOrders.length ? [...ordersRaw, ...extraOrders.filter((x) => !ordersRaw.some((o) => o.id === x.id))] : ordersRaw),
+    [ordersRaw, extraOrders],
+  );
   const value = useMemo<SellerCtx>(
     () => ({
-      seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, ordersRaw, available,
+      seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, ordersRaw: allOrders, available,
       campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions,
     }),
-    [seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, ordersRaw, available, campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions],
+    [seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, allOrders, available, campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions],
   );
 
   return <SellerContext.Provider value={value}>{children}</SellerContext.Provider>;

@@ -70,6 +70,8 @@ export { HubLane } from './hub-lane.entity';
 export { TransferRun } from './transfer-run.entity';
 export { Parcel } from './parcel.entity';
 export { ParcelScan } from './parcel-scan.entity';
+export { ParcelGroup } from './parcel-group.entity';
+export { ParcelGroupOrder } from './parcel-group-order.entity';
 export type { ParcelScanStage } from './parcel-scan.entity';
 export type { TransferRunStatus } from './transfer-run.entity';
 export { WarehouseBatch } from './warehouse-batch.entity';
@@ -160,6 +162,8 @@ import { HubLane } from './hub-lane.entity';
 import { TransferRun } from './transfer-run.entity';
 import { Parcel } from './parcel.entity';
 import { ParcelScan } from './parcel-scan.entity';
+import { ParcelGroup } from './parcel-group.entity';
+import { ParcelGroupOrder } from './parcel-group-order.entity';
 import { WarehouseBatch } from './warehouse-batch.entity';
 import { StockTransfer } from './stock-transfer.entity';
 import { Campaign } from './campaign.entity';
@@ -237,6 +241,8 @@ export const ENTITIES = [
   TransferRun,
   Parcel,
   ParcelScan,
+  ParcelGroup,
+  ParcelGroupOrder,
   WarehouseBatch,
   StockTransfer,
   Campaign,

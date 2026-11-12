@@ -5,6 +5,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import type { TaskView } from "@/lib/logistics";
+import { ParcelContents } from "@/components/parcel/parcel-contents";
 import { parcelErrorWithHint } from "@/lib/parcel-errors";
 import { boxText, handMarkStage, reasonValid, scanCounterText, stageCounts, type BoxLine, type ScanStage } from "@/lib/parcel-scan";
 import { deskActions, useHubScope } from "@/lib/warehouse";
@@ -99,7 +100,7 @@ export function BoxChecklist({
   stage,
   compact = false,
 }: {
-  task: Pick<TaskView, "id" | "status" | "parcels">;
+  task: Pick<TaskView, "id" | "status" | "parcels"> & Partial<Pick<TaskView, "parcelContents" | "parcelOrders">>;
   onChanged?: (res?: { task?: TaskView }) => void;
   /** Which stage the counter and the hand-mark are about; defaults to the one the leg is waiting for. */
   stage?: ScanStage | null;
@@ -138,6 +139,7 @@ export function BoxChecklist({
           );
         })}
       </ul>
+      <ParcelContents contents={task.parcelContents} orders={task.parcelOrders} compact={compact} />
       {marking && markStage && (
         <MarkByHandDialog
           code={marking}
