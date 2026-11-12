@@ -432,7 +432,7 @@ If you built the server by hand with steps 1 to 11 above instead (code in `~/som
 
 | Symptom | Fix |
 |--------|-----|
-| Socket stuck "connecting" | nginx `/socket.io/` block missing the `Upgrade`/`Connection` headers, or you're on HTTP while the site is HTTPS. |
+| Socket stuck "connecting" | `/socket.io/` is not reaching the API (the web shop falls back to long-polling when the websocket upgrade is refused, so a missing `Upgrade`/`Connection` header only costs the upgrade, but a missing `/socket.io/` block breaks everything), or you're on HTTP while the site is HTTPS. Check `curl -s 'http://YOUR-SITE/socket.io/?EIO=4&transport=polling'` answers `0{"sid":...}`. |
 | `NEXT_PUBLIC_*` changes ignored | They're baked at build time — rerun `npm run build` then `pm2 restart somba-web`. |
 | API won't boot | Check `pm2 logs somba-api`; usually MySQL creds in `api/.env` or `DATA_ENCRYPTION_KEY` not 64 hex chars. |
 | `ER_ACCESS_DENIED` | Recheck the MySQL user/grant in Step 4 and `DB_*` in `api/.env`. |

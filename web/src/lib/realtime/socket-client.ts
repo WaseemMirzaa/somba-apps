@@ -4,6 +4,7 @@ import { currentLocale, frenchRefusals, localizeApiError, serverFrenchError } fr
 import { localizeParcelError } from "../parcel-errors";
 import { PASSWORD_CHANGE_EVENT, PASSWORD_CHANGE_REQUIRED } from "../password-change";
 import { authApi } from "./auth-api";
+import { SOCKET_TRANSPORT_OPTIONS } from "./transports";
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_SOCKET_URL ??
@@ -28,7 +29,7 @@ class SocketClient {
       // Read on every (re)connect: after the tokens rotated (`reauth`, a refresh in another tab) a reconnect sends the
       // newest access token, not the one this socket was first opened with.
       auth: token ? (cb) => cb({ token: authApi.getAccess() || token }) : {},
-      transports: ["websocket"],
+      ...SOCKET_TRANSPORT_OPTIONS,
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,

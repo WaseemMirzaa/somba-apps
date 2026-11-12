@@ -9,6 +9,7 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { AddressMapPicker } from "@/components/shop/address-map-picker";
 import { AreaPicker, type AreaSelection } from "@/components/geo/area-picker";
+import { areaCentre } from "@/lib/area-centre";
 import { addressTextFromChain, chainText, type AreaHint } from "@/lib/areas";
 import type { AddressGeo, PickedMeta, PickedParts } from "@/lib/google-maps";
 import { addressCountryCode, addressLine } from "@/lib/countries";
@@ -101,7 +102,7 @@ export default function ShopAddressesPage() {
 
       {(showAdd || editingId !== null) && (
         <div className="card-premium space-y-3 p-6">
-          <AddressMapPicker key={editingId ?? "new"} value={form.geo} onPick={applyPick} fr={fr} />
+          <AddressMapPicker key={editingId ?? "new"} value={form.geo} onPick={applyPick} fr={fr} areaCentre={areaCentre(area?.chain, fr)} />
           <AreaPicker key={`area-${editingId ?? "new"}`} fr={fr} hint={hint} initialChain={editChain} onChange={setArea} />
           <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
           <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse (rue, numéro)" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} required />
