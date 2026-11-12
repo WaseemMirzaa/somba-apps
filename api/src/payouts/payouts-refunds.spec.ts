@@ -2,7 +2,8 @@ import { DataSource } from 'typeorm';
 import { DeliveryTask, Order, OrderItem, Payment, Payout, PayoutStatementLine, Product, User, WalletTransaction } from '../database/entities';
 import { PartialRefundService } from '../disputes/partial-refund.service';
 import { PaymentsService } from '../payments/payments.service';
-import { recordingEmitter, testDb } from '../testing/test-db';
+import { recordingEmitter, testDb, testTranslations } from '../testing/test-db';
+import { OrderItemTranslationSubscriber } from '../translation/order-item-translation.subscriber';
 import { WalletService } from '../wallet/wallet.service';
 import { PayoutsService } from './payouts.service';
 
@@ -131,7 +132,25 @@ describe('SL-01: a partial refund on a delivered order comes off the seller', ()
     const st = await statementOf(p.id);
     expect(st.lines).toHaveLength(1);
     expect(st.lines[0]).toMatchObject({ kind: 'sale', orderId: o.order.id, grossUsd: 60, commissionUsd: 7.2, refundUsd: 35.2, netUsd: 17.6 });
+    // Each line also carries the French name and option of the product (null where it has none: clients show `productName` / `variant`).
+    expect(st.lines[0]).toHaveProperty('productNameFr');
+    expect(st.lines[0]).toHaveProperty('variantFr');
     expect(st.totals).toMatchObject({ grossUsd: 60, commissionUsd: 7.2, refundsUsd: 35.2, netUsd: 17.6, amountUsd: 17.6 });
+  });
+
+  it('a statement line names the product in French when the order line has a French name', async () => {
+    const tr = testTranslations(ds);
+    new OrderItemTranslationSubscriber(ds, tr); // registers itself, like TranslationModule does
+    const o = await sell(20, 1);
+    await ds.getRepository(OrderItem).update({ id: o.item.id }, { variant: 'Colour: Blue' });
+    await tr.snapshot(ds.manager, [
+      { entityId: o.item.id, field: 'productName', locale: 'fr', value: 'Lampe' },
+      { entityId: o.item.id, field: 'variant', locale: 'fr', value: 'Couleur : Bleu' },
+    ]);
+    const p = await svc.request(SELLER, 10, 'wallet');
+    const st = await statementOf(p.id);
+    expect(st.lines[0]).toMatchObject({ productName: 'Lamp', productNameFr: 'Lampe' });
+    expect(st.lines[0].variantFr).toBe('Couleur : Bleu');
   });
 
   it('a refund AFTER the payout: the balance goes negative by what was overpaid, and the next statement deducts it once', async () => {

@@ -22,6 +22,8 @@ interface AuditRow {
   entity: string;
   entityId: string;
   detail?: string | null;
+  /** The French wording of `detail` (null where the detail is only data). */
+  detailFr?: string | null;
   timestamp?: string;
   createdAt?: string;
 }
@@ -170,7 +172,7 @@ export default function AdminAuditPage() {
               <p className="mt-2 break-words text-sm">
                 <strong>{log.actor}</strong> <span className="text-slate-400">({auditRoleLabel(log.role, fr)})</span> · {auditEntityLabel(log.entity, fr)}{" "}
                 <code className="break-all text-[var(--primary)]">{log.entityId}</code>
-                {log.detail ? <span className="text-slate-500"> · {log.detail}</span> : null}
+                {log.detail ? <span className="text-slate-500"> · {fr && log.detailFr ? log.detailFr : log.detail}</span> : null}
               </p>
             </CardContent>
           </Card>

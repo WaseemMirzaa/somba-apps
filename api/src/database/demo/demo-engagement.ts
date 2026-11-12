@@ -408,7 +408,7 @@ async function tickets(ctx: DemoCtx): Promise<void> {
     'customer.full',
     'Where is my order of honey and oil?',
     'I ordered honey and hair oil this morning and I would like to know when the rider will come.',
-    { orderOf: ['customer.full', 'MK-HNY'], category: 'order' },
+    { orderOf: ['customer.full', 'MK-HNY'], category: 'orders' },
     async (id) => {
       await support.reply(
         id,

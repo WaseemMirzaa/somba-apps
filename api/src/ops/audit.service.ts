@@ -78,7 +78,7 @@ export class AuditService {
     if (to) qb.andWhere('a.createdAt <= :to', { to });
     if (q) {
       qb.andWhere(
-        "(a.actor LIKE :q ESCAPE '!' OR a.action LIKE :q ESCAPE '!' OR a.entityId LIKE :q ESCAPE '!' OR a.detail LIKE :q ESCAPE '!')",
+        "(a.actor LIKE :q ESCAPE '!' OR a.action LIKE :q ESCAPE '!' OR a.entityId LIKE :q ESCAPE '!' OR a.detail LIKE :q ESCAPE '!' OR a.detailFr LIKE :q ESCAPE '!')",
         { q: likeOf(q) },
       );
     }

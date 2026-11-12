@@ -177,3 +177,19 @@ sweeper. Never an error. `autoRun = false` (tests) only queues. Admin retries an
 
 It reuses the rows written at save (same `sourceHash`): asking for the other language is a cache hit, and asking for the source
 language answers `same: true`, both without calling the provider. Private kinds are described above.
+
+## Server-written text in French: statement lines, transactions, audit log (additions only)
+
+- **Payout statements** (`payouts:statement`): every item of `lines` carries `productNameFr` and `variantFr` next to `productName` and
+  `variant` (the French name and option of the buyer's order line; `null` where it has none: show the English one).
+- **Seller transactions** (`finance:transactions`): a payout line keeps the bare method key in `description` (`bank`, `mobile_money`,
+  `wallet`) and now carries `descriptionFr` (`Virement bancaire`, `Mobile money`, `Portefeuille KOMORIKO`). The English CSV writes the
+  English label instead of the key.
+- **Wallet history** (`wallet:transactions`, the `wallet:transaction` event, the admin customer wallet): `descriptionFr` on every line
+  (already served; `api/src/notifications/wallet-coverage.spec.ts` fails on a description with no French).
+- **Audit log** (`audit:list`, `audit:created`): `detailFr` next to `detail` (`api/src/common/audit-detail-fr.ts`). It is filled when the row is
+  inserted (`AuditLog.fillDetailFr`, so every writer gets it), `null` where the detail is only data (a reference, a name): readers show
+  `detailFr ?? detail`. `audit:list`'s `q` searches both. Migration `1793520000001-AuditLogDetailFr` adds the column and back-fills it.
+  `api/src/ops/audit-detail-fr.spec.ts` fails on a new English detail sentence with no French.
+- **Notices**: `api/src/notifications/notice-coverage.spec.ts` also reads the wording passed to `tellSuperAdmin(...)` (payout notices to the
+  super admin) and fails on a `{ title, body }` shorthand in a notifier call outside the listed forwarders, so no notice escapes the scan.
