@@ -1,4 +1,4 @@
-// The chat, support and notification-preference screens at two phone widths (360 and 402 pt), in English and French,
+// The (read-only) old chat, support (Contact support) and notification-preference screens at two phone widths (360 and 402 pt), in English and French,
 // at text scale 1.0 and 1.3, with the app's real fonts and long names. Fails on any overflow or layout error, a button
 // label that wraps or is cut, or text drawn over other text; each screen is also held to the button rules.
 import 'package:flutter/material.dart';
@@ -6,11 +6,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:lipcart/screens/account_screen.dart';
-import 'package:lipcart/screens/more/chat_compose.dart';
-import 'package:lipcart/screens/more/chat_entry.dart';
 import 'package:lipcart/screens/more/chat_inbox.dart';
 import 'package:lipcart/screens/more/chat_thread.dart';
 import 'package:lipcart/screens/more/settings_extra.dart';
+import 'package:lipcart/screens/more/support_entry.dart';
 import 'package:lipcart/screens/more/support_extra.dart';
 import 'package:lipcart/services/chat_store.dart';
 import 'package:lipcart/services/models.dart';
@@ -60,7 +59,7 @@ Future<FakeServer> _seed(String lang) async {
         ticketJson('t2', subject: 'Remboursement', reference: 'TKT-2', status: 'resolved', category: 'return', updatedAt: '2026-10-23T10:00:00Z'),
         ticketJson('t0', subject: 'Ancien ticket', reference: 'TKT-0', legacy: true, updatedAt: '2026-10-01T10:00:00Z'),
       ];
-  await ChatStore.instance.refresh();
+  await ChatStore.instance.loadConversations();
   await SupportStore.instance.load();
   return server;
 }
@@ -85,9 +84,9 @@ void main() {
     'chat inbox': (l) => ChatInboxScreen(locale: l),
     'chat thread (product context, photos, paging)': (l) => ChatThreadScreen(conversation: ChatConversation.fromJson(convJson(id: 'a', storeName: _longStore, productId: 'p1', productName: _longProduct)), locale: l),
     'chat thread (order context)': (l) => ChatThreadScreen(conversation: ChatConversation.fromJson(convJson(id: 'a', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'SOM-1042')), locale: l),
-    'chat compose (product)': (l) => ChatComposeScreen(sellerId: 's1', storeName: _longStore, productId: 'p1', locale: l),
-    'chat compose (order)': (l) => ChatComposeScreen(sellerId: 's1', storeName: 'Kin Tech', orderId: 'o1', locale: l),
-    'message-the-seller button': (l) => Scaffold(body: Padding(padding: const EdgeInsets.all(16), child: MessageSellerButton(sellerId: 's1', storeName: _longStore, locale: l))),
+    'contact-support button (order)': (l) => Scaffold(body: Padding(padding: const EdgeInsets.all(16), child: ContactSupportButton(orderId: 'o1', locale: l))),
+    'contact-support button (long product name)': (l) => Scaffold(body: Padding(padding: const EdgeInsets.all(16), child: ContactSupportButton(about: _longProduct, locale: l))),
+    'new ticket (about a product, subject prefilled)': (l) => NewTicketScreen(initialSubject: 'About: $_longProduct', locale: l),
     'support list': (l) => SupportListScreen(locale: l),
     'ticket (open, staff reply with photos)': (l) => SupportTicketDetailScreen(ticket: _ticket('t1', unread: 0), locale: l),
     'ticket (closed)': (l) => SupportTicketDetailScreen(ticket: _ticket('t2', status: 'resolved'), locale: l),
@@ -95,7 +94,7 @@ void main() {
     'new ticket': (l) => NewTicketScreen(locale: l),
     'new ticket (from a closed one)': (l) => NewTicketScreen(orderId: 'o1', category: 'delivery', locale: l),
     'settings (notification categories)': (l) => CustomerSettingsScreen(locale: l),
-    'account (unread badges)': (l) => AccountScreen(locale: l, onLocaleChanged: (_) {}),
+    'account (no Messages entry, support unread badge)': (l) => AccountScreen(locale: l, onLocaleChanged: (_) {}),
   };
 
   for (final e in screens.entries) {

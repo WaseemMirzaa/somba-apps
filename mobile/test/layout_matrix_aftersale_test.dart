@@ -75,7 +75,7 @@ Future<AsFake> _seed(String lang) async {
         {'itemId': 'oi3', 'productId': 'p3', 'productName': 'Dress', 'variant': 'Default', 'qty': 2, 'remaining': 0, 'unitPriceUsd': 35},
       ]);
   server.handlers['disputes:list'] = (_) => [
-        disputeJson(id: 'a', reference: 'RET-10000001', stage: 'seller_rejected', canEscalate: true, canCancel: true, items: _items(), createdAt: '2026-10-24T09:30:00Z'),
+        disputeJson(id: 'a', reference: 'RET-10000001', stage: 'seller_rejected', canCancel: true, items: _items(), createdAt: '2026-10-24T09:30:00Z'),
         disputeJson(id: 'b', reference: 'DP-20000002', type: 'dispute', stage: 'seller_replied', category: 'missing', createdAt: '2026-10-23T09:30:00Z'),
         disputeJson(id: 'c', reference: 'RET-30000003', status: 'resolved', stage: 'closed', refundUsd: 1202.5, refundTo: 'phone', items: _items(), createdAt: '2026-10-20T09:30:00Z'),
         disputeJson(id: 'd', reference: 'RET-40000004', status: 'rejected', stage: 'closed', resolution: 'Cancelled by the customer', createdAt: '2026-10-19T09:30:00Z'),
@@ -144,12 +144,11 @@ void main() {
     'hub: nothing yet': _c((l) => ReturnsListScreen(locale: l), tweak: (s) {
       s.handlers['disputes:list'] = (_) => [];
     }),
-    'request: waiting for the seller (deadline, photos, long thread)':
+    'request: with support (deadline, photos, long thread)':
         _req(disputeJson(attachments: manyPhotos, sellerDueAt: soon, items: _items(), reason: _longText, messages: _thread())),
-    'request: seller declined (escalate and cancel)': _req(disputeJson(
-        stage: 'seller_rejected', canEscalate: true, canCancel: true, sellerReason: _longText, sellerRespondedAt: '2026-10-25T09:30:00Z', items: _items(), messages: _thread())),
+    'request: an old seller stage with the store\'s earlier answer (cancel)': _req(disputeJson(
+        stage: 'seller_rejected', canCancel: true, sellerReason: _longText, sellerRespondedAt: '2026-10-25T09:30:00Z', items: _items(), messages: _thread())),
     // The dialogs are checked on their own (the overlap check does not tell a dialog from the page under it).
-    'dialog: ask support to decide': _c((l) => Scaffold(body: Center(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24), child: const EscalateDialog())))),
     'dialog: cancel the request': _c((l) => Scaffold(body: Center(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24), child: const CancelRequestDialog())))),
     'request: pickup in progress':
         _req(disputeJson(stage: 'pickup', pickupTaskId: 't1', sellerRespondedAt: '2026-10-25T09:30:00Z', items: _items(), messages: _thread())),

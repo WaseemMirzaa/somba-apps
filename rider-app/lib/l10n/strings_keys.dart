@@ -256,6 +256,9 @@ extension StringsKeys on Strings {
   String get photoAttach => t('photo_attach');
   String photoLimit(Object? n) => t('photo_limit', {'n': n});
   String get photoAlt => t('photo_alt');
+  String get translatedAuto => t('translated_auto');
+  String get seeOriginal => t('see_original');
+  String get seeTranslation => t('see_translation');
   String get photoUnavailable => t('photo_unavailable');
   String get errPhotoTooBig => t('err_photo_too_big');
   String get errPhotoPick => t('err_photo_pick');

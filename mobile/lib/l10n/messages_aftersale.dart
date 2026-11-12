@@ -27,42 +27,34 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_report_problem': ('Report a problem', 'Signaler un problème'),
 
   // ---- stage badges and banners ----
-  'as_sb_awaiting': ('Waiting for seller', 'Attente du vendeur'),
-  'as_sb_replied': ('Seller replied', 'Vendeur a répondu'),
-  'as_sb_rejected': ('Seller declined', 'Refusé par le vendeur'),
-  'as_sb_timeout': ('No answer', 'Sans réponse'),
-  'as_sb_escalated': ('With support', 'Chez le support'),
+  'as_sb_awaiting': (
+    'With support',
+    'Chez le support'
+  ),
   'as_sb_approved': ('Accepted', 'Accepté'),
   'as_sb_pickup': ('Pickup', 'Collecte'),
   'as_sb_received': ('Received', 'Reçu'),
   'as_sb_cancelled': ('Cancelled', 'Annulé'),
-  'as_st_awaiting_title': ('Waiting for the seller', 'En attente du vendeur'),
-  'as_st_awaiting_return_due': (
-    'The seller has until {when} to accept or decline your return.',
-    'Le vendeur a jusqu’au {when} pour accepter ou refuser votre retour.'
+  'as_st_awaiting_title': (
+    'With KOMORIKO support',
+    'Chez le support KOMORIKO'
   ),
-  'as_st_awaiting_return': ('The seller will accept or decline your return soon.', 'Le vendeur va bientôt accepter ou refuser votre retour.'),
+  'as_st_awaiting_return_due': (
+    'KOMORIKO support will decide on your return by {when}.',
+    'Le support KOMORIKO se prononcera sur votre retour d’ici le {when}.'
+  ),
+  'as_st_awaiting_return': (
+    'KOMORIKO support is reviewing your return and will decide soon.',
+    'Le support KOMORIKO examine votre retour et tranchera bientôt.'
+  ),
   'as_st_awaiting_late': (
-    'The seller’s time to answer has passed. You will soon be able to ask KOMORIKO support to decide.',
-    'Le délai de réponse du vendeur est dépassé. Vous pourrez bientôt demander au support KOMORIKO de trancher.'
+    'KOMORIKO support is taking longer than usual. Our team has been alerted and will decide as soon as possible.',
+    'Le support KOMORIKO met plus de temps que d’habitude. Notre équipe a été alertée et tranchera dès que possible.'
   ),
   'as_st_awaiting_dispute': (
-    'The seller can reply to your report. Add details or photos below if you like.',
-    'Le vendeur peut répondre à votre signalement. Ajoutez des détails ou des photos ci-dessous si vous le souhaitez.'
+    'KOMORIKO support is reviewing your report and will decide. Add details or photos below if you like.',
+    'Le support KOMORIKO examine votre signalement et tranchera. Ajoutez des détails ou des photos ci-dessous si vous le souhaitez.'
   ),
-  'as_st_replied_title': ('The seller replied', 'Le vendeur a répondu'),
-  'as_st_replied': (
-    'KOMORIKO support will review the conversation and decide. You can keep adding details below.',
-    'Le support KOMORIKO examinera l’échange et tranchera. Vous pouvez continuer à ajouter des détails ci-dessous.'
-  ),
-  'as_st_rejected_title': ('The seller declined your return', 'Le vendeur a refusé votre retour'),
-  'as_st_timeout_title': ('The seller did not answer in time', 'Le vendeur n’a pas répondu à temps'),
-  'as_st_next_steps': (
-    'You can ask KOMORIKO support to decide, or cancel your request.',
-    'Vous pouvez demander au support KOMORIKO de trancher, ou annuler votre demande.'
-  ),
-  'as_st_escalated_title': ('With KOMORIKO support', 'Chez le support KOMORIKO'),
-  'as_st_escalated': ('Our team is reviewing your request and will decide soon.', 'Notre équipe examine votre demande et tranchera bientôt.'),
   'as_st_approved_title': ('Return accepted', 'Retour accepté'),
   'as_st_approved': (
     'The warehouse will arrange to collect the items from you. We will keep you posted here.',
@@ -83,7 +75,10 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   ),
   'as_st_cancelled_title': ('Request cancelled', 'Demande annulée'),
   'as_st_cancelled': ('You cancelled this request.', 'Vous avez annulé cette demande.'),
-  'as_st_declined_body': ('No refund was made for this request.', 'Aucun remboursement n’a été effectué pour cette demande.'),
+  'as_st_declined_body': (
+    'No refund was made for this request.',
+    'Aucun remboursement n’a été effectué pour cette demande.'
+  ),
   'as_refund_wallet': ('{amount} refunded to your wallet', '{amount} remboursés sur votre portefeuille'),
   'as_refund_phone': ('{amount} sent back to your mobile-money number', '{amount} renvoyés sur votre numéro mobile money'),
   'as_decision': ('Decision', 'Décision'),
@@ -100,11 +95,11 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_item_refund': ('Refund {amount}', 'Remboursement {amount}'),
   'as_item_value': ('Worth up to {amount}', 'Jusqu’à {amount}'),
   'as_sec_photos': ('Your photos', 'Vos photos'),
-  'as_sec_seller': ('The seller’s answer', 'La réponse du vendeur'),
+  'as_sec_seller': (
+    'Earlier answer',
+    'Réponse précédente'
+  ),
   'as_seller_reason': ('Reason given', 'Motif donné'),
-  'as_seller_due': ('Answer due: {when}', 'Réponse attendue : {when}'),
-  'as_seller_accepted': ('The seller accepted your return.', 'Le vendeur a accepté votre retour.'),
-  'as_seller_answered': ('Answered {when}', 'Répondu {when}'),
   'as_sec_thread': ('Conversation', 'Conversation'),
   'as_thread_empty': ('No messages yet. Write the first one below.', 'Aucun message pour le moment. Écrivez le premier ci-dessous.'),
   'as_thread_you': ('You', 'Vous'),
@@ -126,15 +121,6 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_pk_collect_sub': ('A warehouse rider will collect it.', 'Un livreur de l’entrepôt viendra le récupérer.'),
   'as_pk_received': ('Received at the warehouse', 'Reçu à l’entrepôt'),
   'as_pk_refund': ('Refund issued', 'Remboursement effectué'),
-  'as_escalate': ('Ask KOMORIKO support to decide', 'Demander au support KOMORIKO de trancher'),
-  'as_escalate_title': ('Ask KOMORIKO support to decide?', 'Demander au support KOMORIKO de trancher ?'),
-  'as_escalate_body': (
-    'KOMORIKO support will look at this return and make the final decision.',
-    'Le support KOMORIKO examinera ce retour et prendra la décision finale.'
-  ),
-  'as_escalate_note': ('Add a note (optional)', 'Ajouter une note (facultatif)'),
-  'as_escalate_confirm': ('Send to support', 'Envoyer au support'),
-  'as_escalate_done': ('Sent to KOMORIKO support.', 'Transmis au support KOMORIKO.'),
   'as_cancel_request': ('Cancel this request', 'Annuler cette demande'),
   'as_cancel_title': ('Cancel this request?', 'Annuler cette demande ?'),
   'as_cancel_body': (
@@ -146,8 +132,8 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_cancel_done': ('Request cancelled.', 'Demande annulée.'),
   'as_siblings_title': ('Several requests were created', 'Plusieurs demandes ont été créées'),
   'as_siblings_body': (
-    '{n} requests were created, one per store, because your items come from several stores. Each store answers its own request.',
-    '{n} demandes ont été créées, une par boutique, car vos articles viennent de plusieurs boutiques. Chaque boutique répond à sa demande.'
+    '{n} requests were created, one per store, because your items come from several stores. KOMORIKO support reviews each one.',
+    '{n} demandes ont été créées, une par boutique, car vos articles viennent de plusieurs boutiques. Le support KOMORIKO examine chacune d’elles.'
   ),
   'as_siblings_this': ('This request', 'Cette demande'),
 
@@ -194,8 +180,8 @@ const Map<String, (String, String)> kMessagesAfterSale = {
 
   // ---- dispute form ----
   'as_dp_intro': (
-    'Tell us what went wrong with order {ref}. The seller replies first; KOMORIKO support steps in if needed.',
-    'Dites-nous ce qui s’est mal passé avec la commande {ref}. Le vendeur répond d’abord ; le support KOMORIKO intervient si besoin.'
+    'Tell us what went wrong with order {ref}. KOMORIKO support reviews your report and decides.',
+    'Dites-nous ce qui s’est mal passé avec la commande {ref}. Le support KOMORIKO examine votre signalement et tranche.'
   ),
   'as_dp_category': ('What happened?', 'Que s’est-il passé ?'),
   'as_dp_items': ('Which items? (optional)', 'Quels articles ? (facultatif)'),
@@ -236,8 +222,14 @@ const Map<String, (String, String)> kMessagesAfterSale = {
   'as_rs_rejected': ('Declined', 'Refusé'),
   'as_rp_progress': ('Progress', 'Avancement'),
   'as_rp_requested': ('Request sent', 'Demande envoyée'),
-  'as_rp_due': ('Answer expected: {when}', 'Réponse attendue : {when}'),
-  'as_rp_approved': ('Approved by the seller', 'Accepté par le vendeur'),
+  'as_rp_due': (
+    'Support answer expected: {when}',
+    'Réponse du support attendue : {when}'
+  ),
+  'as_rp_approved': (
+    'Approved by KOMORIKO support',
+    'Accepté par le support KOMORIKO'
+  ),
   'as_rp_approved_sub': ('Your new item is being prepared.', 'Votre nouvel article est en préparation.'),
   'as_rp_dispatched': ('On its way', 'En route'),
   'as_rp_rider': ('A rider will bring the new item and collect the old one.', 'Un livreur apportera le nouvel article et récupérera l’ancien.'),

@@ -8,7 +8,8 @@ import '../../theme/app_theme.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
 import 'aftersale_widgets.dart';
-import 'chat_entry.dart';
+import '../../widgets/translatable_text.dart';
+import 'support_entry.dart';
 
 /// Badge text for a replacement or exchange status (`received`, `allocated` and `ready` are warehouse steps: "being prepared").
 String transferStatusLabel(Strings s, String status) => switch (status) {
@@ -94,7 +95,7 @@ List<(String, String, bool)> transferSteps(
       'delivered' => (title: s.asRsDelivered, body: '', icon: Icons.check_circle_rounded),
       'dispatched' => (title: s.asRsDispatched, body: s.asRpRider, icon: Icons.local_shipping_outlined),
       'approved' || 'received' || 'allocated' || 'ready' => (title: transferStatusLabel(s, status), body: s.asRpApprovedSub, icon: Icons.check_circle_outline_rounded),
-      _ => (title: s.asStAwaitingTitle, body: due != null ? s.asRpDue(s.when(due)) : '', icon: Icons.hourglass_top_rounded),
+      _ => (title: s.asStAwaitingTitle, body: due != null ? s.asRpDue(s.when(due)) : '', icon: Icons.support_agent_rounded),
     };
 
 Widget _statusBanner(({String title, String body, IconData icon}) t, ({Color color, Color text}) c) => Container(
@@ -173,14 +174,14 @@ class _ReplacementDetailScreenState extends State<ReplacementDetailScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                _statusBanner(_bannerText(s, r.status, reason: r.sellerReason, due: r.sellerDueAt), c),
+                _statusBanner(_bannerText(s, r.status, reason: storedText(s, r.sellerReason, r.sellerReasonI18n), due: r.sellerDueAt), c),
                 const SizedBox(height: AppSpace.lg),
                 Panel(
                   key: const ValueKey('transfer-progress'),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     SectionTitle(s.asRpProgress),
                     StatusTimeline(transferSteps(s,
-                        status: r.status, createdAt: r.createdAt, sellerDueAt: r.sellerDueAt, deliveredAt: r.deliveredAt, deliveryTaskId: r.deliveryTaskId, sellerReason: r.sellerReason)),
+                        status: r.status, createdAt: r.createdAt, sellerDueAt: r.sellerDueAt, deliveredAt: r.deliveredAt, deliveryTaskId: r.deliveryTaskId, sellerReason: storedText(s, r.sellerReason, r.sellerReasonI18n))),
                   ]),
                 ),
                 const SizedBox(height: AppSpace.lg),
@@ -201,7 +202,14 @@ class _ReplacementDetailScreenState extends State<ReplacementDetailScreen> {
                       const Divider(height: 22),
                       Text(s.yourMessage, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       const SizedBox(height: 4),
-                      Text(r.reason, key: const ValueKey('transfer-reason'), style: const TextStyle(fontSize: 13.5, height: 1.4)),
+                      TranslatableText(
+                          kind: 'replacement_reason',
+                          id: r.id,
+                          auto: true,
+                          i18n: r.reasonI18n,
+                          text: r.reason,
+                          style: const TextStyle(fontSize: 13.5, height: 1.4),
+                          key: const ValueKey('transfer-reason')),
                     ],
                     if (r.attachments.isNotEmpty) ...[
                       const SizedBox(height: AppSpace.md),
@@ -209,10 +217,8 @@ class _ReplacementDetailScreenState extends State<ReplacementDetailScreen> {
                     ],
                   ]),
                 ),
-                if (r.sellerId != null) ...[
-                  const SizedBox(height: AppSpace.sm),
-                  MessageSellerButton(sellerId: r.sellerId!, orderId: r.orderId, locale: widget.locale),
-                ],
+                const SizedBox(height: AppSpace.sm),
+                ContactSupportButton(orderId: r.orderId, locale: widget.locale),
               ],
             ),
           ),
@@ -281,14 +287,14 @@ class _ExchangeDetailScreenState extends State<ExchangeDetailScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                _statusBanner(_bannerText(s, x.status, reason: x.sellerReason, due: x.sellerDueAt), c),
+                _statusBanner(_bannerText(s, x.status, reason: storedText(s, x.sellerReason, x.sellerReasonI18n), due: x.sellerDueAt), c),
                 const SizedBox(height: AppSpace.lg),
                 Panel(
                   key: const ValueKey('transfer-progress'),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     SectionTitle(s.asRpProgress),
                     StatusTimeline(transferSteps(s,
-                        status: x.status, createdAt: x.createdAt, sellerDueAt: x.sellerDueAt, deliveredAt: x.deliveredAt, deliveryTaskId: x.deliveryTaskId, sellerReason: x.sellerReason)),
+                        status: x.status, createdAt: x.createdAt, sellerDueAt: x.sellerDueAt, deliveredAt: x.deliveredAt, deliveryTaskId: x.deliveryTaskId, sellerReason: storedText(s, x.sellerReason, x.sellerReasonI18n))),
                   ]),
                 ),
                 const SizedBox(height: AppSpace.lg),
@@ -307,7 +313,14 @@ class _ExchangeDetailScreenState extends State<ExchangeDetailScreen> {
                       const Divider(height: 22),
                       Text(s.yourMessage, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
                       const SizedBox(height: 4),
-                      Text(x.reason, key: const ValueKey('transfer-reason'), style: const TextStyle(fontSize: 13.5, height: 1.4)),
+                      TranslatableText(
+                          kind: 'exchange_reason',
+                          id: x.id,
+                          auto: true,
+                          i18n: x.reasonI18n,
+                          text: x.reason,
+                          style: const TextStyle(fontSize: 13.5, height: 1.4),
+                          key: const ValueKey('transfer-reason')),
                     ],
                   ]),
                 ),
@@ -319,10 +332,8 @@ class _ExchangeDetailScreenState extends State<ExchangeDetailScreen> {
                     Text(exchangeMoneyText(s, x), key: const ValueKey('exchange-money-text'), style: const TextStyle(fontSize: 13.5, height: 1.4)),
                   ]),
                 ),
-                if (x.sellerId != null) ...[
-                  const SizedBox(height: AppSpace.sm),
-                  MessageSellerButton(sellerId: x.sellerId!, orderId: x.orderId, locale: widget.locale),
-                ],
+                const SizedBox(height: AppSpace.sm),
+                ContactSupportButton(orderId: x.orderId, locale: widget.locale),
               ],
             ),
           ),

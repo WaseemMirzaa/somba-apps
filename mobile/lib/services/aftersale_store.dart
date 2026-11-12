@@ -208,15 +208,6 @@ class AfterSaleStore extends ChangeNotifier {
     return m;
   }
 
-  Future<DisputeView> escalate(String id, {String? note}) async {
-    final d = DisputeView.fromJson(asStringMap(await _call('disputes:escalate', {
-      'id': id,
-      if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
-    })));
-    _remember(d);
-    return d;
-  }
-
   Future<DisputeView> cancel(String id) async {
     final d = DisputeView.fromJson(asStringMap(await _call('disputes:cancel', {'id': id})));
     _remember(d);

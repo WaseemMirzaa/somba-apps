@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../l10n/notice_rules.dart' show translateResolution;
 import '../../l10n/strings.dart';
 import '../../services/aftersale_models.dart';
 import '../../services/env.dart';
+import '../../services/text_i18n.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
 import '../../widgets/kit.dart';
@@ -41,8 +43,7 @@ class StatusBadge extends StatelessWidget {
     return d.status == 'resolved' ? (color: AppColors.success, text: AppColors.success) : (color: AppColors.danger, text: AppColors.dangerStrong);
   }
   return switch (d.stage) {
-    'seller_rejected' || 'seller_timeout' => (color: AppColors.danger, text: AppColors.dangerStrong),
-    'approved' || 'pickup' || 'received' || 'escalated' => (color: AppColors.primary, text: AppColors.primaryDark),
+    'approved' || 'pickup' || 'received' => (color: AppColors.primary, text: AppColors.primaryDark),
     _ => (color: AppColors.amber, text: kAmberText),
   };
 }
@@ -55,15 +56,23 @@ String stageLabel(Strings s, DisputeView d) {
   }
   if (!d.hasStage) return s.returnOpen;
   return switch (d.stage) {
-    'seller_replied' => s.asSbReplied,
-    'seller_rejected' => s.asSbRejected,
-    'seller_timeout' => s.asSbTimeout,
-    'escalated' => s.asSbEscalated,
     'approved' => s.asSbApproved,
     'pickup' => s.asSbPickup,
     'received' => s.asSbReceived,
     _ => s.asSbAwaiting,
   };
+}
+
+/// A text the server stores (a reason, a note) in the reader's language: the translation that came with it, else the text as written.
+String storedText(Strings s, String? text, TextI18n? i18n) => i18n?.forLang(s.lang) ?? text ?? '';
+
+/// What support wrote when it closed a request, in the reader's language. Without a translation from the server the
+/// fixed wording the server writes itself ("Refund approved…") is put into French here when the app is in French.
+String resolutionText(Strings s, DisputeView d) {
+  final r = d.resolution ?? '';
+  final t = d.resolutionI18n?.forLang(s.lang);
+  if (t != null) return t;
+  return s.isFr && r.isNotEmpty ? translateResolution(r) : r;
 }
 
 /// "$12.50 refunded to your wallet" (empty when nothing was refunded).
@@ -102,20 +111,12 @@ StageBanner stageBanner(Strings s, DisputeView d) {
     if (d.status == 'resolved') {
       if (d.outcome == 'replacement') return b(s.asStReplacementTitle, s.asStReplacement, Icons.autorenew_rounded);
       if (d.hasRefund) return b(s.asStRefundTitle, refundText(s, d), Icons.check_circle_rounded);
-      return b(s.returnResolved, (d.resolution ?? '').isNotEmpty ? d.resolution! : '', Icons.check_circle_rounded);
+      return b(s.returnResolved, (d.resolution ?? '').isNotEmpty ? resolutionText(s, d) : '', Icons.check_circle_rounded);
     }
-    return b(s.returnRejected, (d.resolution ?? '').isNotEmpty ? d.resolution! : s.asStDeclinedBody, Icons.cancel_rounded);
+    return b(s.returnRejected, (d.resolution ?? '').isNotEmpty ? resolutionText(s, d) : s.asStDeclinedBody, Icons.cancel_rounded);
   }
   if (!d.hasStage) return b(s.returnOpen, s.returnReviewing, Icons.hourglass_top_rounded);
   switch (d.stage) {
-    case 'seller_replied':
-      return b(s.asStRepliedTitle, s.asStReplied, Icons.mark_chat_read_outlined);
-    case 'seller_rejected':
-      return b(s.asStRejectedTitle, s.asStNextSteps, Icons.thumb_down_alt_outlined);
-    case 'seller_timeout':
-      return b(s.asStTimeoutTitle, s.asStNextSteps, Icons.timer_off_outlined);
-    case 'escalated':
-      return b(s.asStEscalatedTitle, s.asStEscalated, Icons.support_agent_rounded);
     case 'approved':
       return b(s.asStApprovedTitle, s.asStApproved, Icons.check_circle_outline_rounded);
     case 'pickup':
@@ -131,7 +132,7 @@ StageBanner stageBanner(Strings s, DisputeView d) {
               : due.isAfter(DateTime.now())
                   ? s.asStAwaitingReturnDue(s.when(due))
                   : s.asStAwaitingLate;
-      return b(s.asStAwaitingTitle, body, Icons.hourglass_top_rounded);
+      return b(s.asStAwaitingTitle, body, Icons.support_agent_rounded);
   }
 }
 

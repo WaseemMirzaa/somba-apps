@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../data/shop_state.dart';
-import '../services/chat_store.dart';
 import '../services/realtime_store.dart';
 import '../services/support_store.dart';
 import '../util/format.dart';
@@ -9,7 +8,6 @@ import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import 'orders_screen.dart';
 import 'more/account_more.dart';
-import 'more/chat_inbox.dart';
 import 'more/chat_widgets.dart' show CountBadge;
 import 'more/support_extra.dart';
 import 'more/settings_extra.dart';
@@ -29,7 +27,7 @@ class AccountScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Strings.of(context);
 
-    return ListenableBuilder(listenable: Listenable.merge([RealtimeStore.instance, ChatStore.instance, SupportStore.instance]), builder: (context, _) => Scaffold(
+    return ListenableBuilder(listenable: Listenable.merge([RealtimeStore.instance, SupportStore.instance]), builder: (context, _) => Scaffold(
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -59,9 +57,6 @@ class AccountScreen extends StatelessWidget {
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => CustomerEditProfileScreen(locale: locale)))),
             _MenuItem(Icons.notifications_none_rounded, s.notifications, AppColors.primary,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationsScreen(locale: locale)))),
-            _MenuItem(Icons.chat_bubble_outline_rounded, s.chatInboxTitle, AppColors.mint,
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => ChatInboxScreen(locale: locale))),
-                badge: ChatStore.instance.unread, key: 'menu-messages'),
             _MenuItem(Icons.confirmation_number_outlined, s.support, AppColors.royalBlue,
                 () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportListScreen(locale: locale))),
                 badge: SupportStore.instance.unread, key: 'menu-support'),

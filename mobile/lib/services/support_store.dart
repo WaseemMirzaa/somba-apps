@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'feature_hooks.dart';
 import 'realtime_store.dart';
+import 'text_i18n.dart';
 
 Map<String, dynamic> _asMap(dynamic d) => (d as Map).map((k, v) => MapEntry(k.toString(), v));
 
@@ -12,7 +13,7 @@ DateTime? _date(dynamic v) => v is String && v.isNotEmpty ? DateTime.tryParse(v)
 
 /// One message of a support ticket (an entry of the ticket's `messages` JSON array).
 class TicketMessage {
-  const TicketMessage({this.id = '', this.from = '', this.fromId = '', this.role = '', this.text = '', this.at, this.attachments = const []});
+  const TicketMessage({this.id = '', this.from = '', this.fromId = '', this.role = '', this.text = '', this.at, this.attachments = const [], this.textI18n});
 
   final String id;
   final String from;
@@ -23,6 +24,9 @@ class TicketMessage {
   final String text;
   final DateTime? at;
   final List<String> attachments;
+
+  /// [text] in English and French, as the server already has them (null when it has none).
+  final TextI18n? textI18n;
 
   bool get fromStaff => role.startsWith('admin');
 
@@ -36,6 +40,7 @@ class TicketMessage {
       text: j['text']?.toString() ?? '',
       at: _date(j['at']),
       attachments: raw is List ? [for (final u in raw) if (u is String && u.isNotEmpty) u] : const [],
+      textI18n: TextI18n.tryParse(j['textI18n']),
     );
   }
 }
@@ -47,6 +52,7 @@ class TicketView {
     required this.id,
     this.reference = '',
     this.subject = '',
+    this.subjectI18n,
     this.status = 'open',
     this.category = 'general',
     this.orderId,
@@ -59,6 +65,12 @@ class TicketView {
   final String id;
   final String reference;
   final String subject;
+
+  /// [subject] in English and French, as the server already has them (null when it has none).
+  final TextI18n? subjectI18n;
+
+  /// The subject in [lang]: the translation that came with it, else as written.
+  String subjectFor(String lang) => subjectI18n?.forLang(lang) ?? subject;
 
   /// `open` | `pending` | `resolved` | `closed`.
   final String status;
@@ -89,6 +101,7 @@ class TicketView {
       id: j['id']?.toString() ?? '',
       reference: j['reference']?.toString() ?? '',
       subject: j['subject']?.toString() ?? '',
+      subjectI18n: TextI18n.tryParse(j['subjectI18n']),
       status: (j['status']?.toString() ?? '').isEmpty ? 'open' : j['status'].toString(),
       category: (j['category']?.toString() ?? '').isEmpty ? 'general' : j['category'].toString(),
       orderId: order.isEmpty ? null : order,
@@ -269,6 +282,7 @@ class SupportStore extends ChangeNotifier {
         id: t.id,
         reference: t.reference,
         subject: t.subject,
+        subjectI18n: t.subjectI18n,
         status: t.status,
         category: t.category,
         orderId: t.orderId,

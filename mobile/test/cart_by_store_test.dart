@@ -346,12 +346,13 @@ void main() {
         _expectNoOverflow();
       });
 
-      testWidgets('the store page keeps its follow and message-the-seller buttons', (tester) async {
+      testWidgets('the store page keeps its follow button and has Contact support instead of Message the seller', (tester) async {
         await _show(tester, StoreScreen(locale: Locale(lang), sellerId: 's1', sellerName: 'Boutique Kin'), lang: lang);
         expect(find.byKey(const ValueKey('follow-store')), findsOneWidget);
         expect(find.descendant(of: find.byKey(const ValueKey('follow-store')), matching: find.text(s.follow)), findsOneWidget);
-        expect(find.byKey(const ValueKey('message-seller')), findsOneWidget);
-        expect(find.descendant(of: find.byKey(const ValueKey('message-seller')), matching: find.text(s.chatMessageSeller)), findsOneWidget);
+        expect(find.byKey(const ValueKey('message-seller')), findsNothing);
+        expect(find.byKey(const ValueKey('contact-support')), findsOneWidget);
+        expect(find.descendant(of: find.byKey(const ValueKey('contact-support')), matching: find.text(s.contactSupport)), findsOneWidget);
       });
 
       testWidgets('a store with no products shows no search box', (tester) async {

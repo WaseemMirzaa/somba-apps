@@ -1,21 +1,17 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
-import '../../services/auth_service.dart' show ApiException;
 import '../../services/chat_store.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
-import '../../widgets/photo_picker.dart';
 import '../../widgets/translatable_text.dart';
 import 'chat_inbox.dart' show chatContextLine, chatStoreName;
 import 'chat_widgets.dart';
+import 'support_screens.dart' show NewTicketScreen;
 
-/// A chat can carry up to 4 photos per message (the API's limit).
-const int kChatMaxPhotos = 4;
-
-/// One conversation with a store: the messages (older pages on request), live arrivals, a composer with photos, and a
-/// translate link under each message from the store.
+/// One OLD conversation with a store, read-only: messaging stores is closed, so there is no composer. The messages (older
+/// pages on request) show with the translation of the store's text, and a note says why nothing can be sent, with
+/// "Contact support" (a new ticket linked to the same order) for anything new.
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({super.key, required this.conversation, this.locale = const Locale('en')});
   final ChatConversation conversation;
@@ -27,49 +23,17 @@ class ChatThreadScreen extends StatefulWidget {
 
 class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _store = ChatStore.instance;
-  final _ctrl = TextEditingController();
-  final _attachments = PhotoAttachments(max: kChatMaxPhotos);
   late ChatConversation _conv = widget.conversation;
   List<ChatMessage> _messages = [];
-  final List<ChatMessage> _arrivedWhileLoading = [];
-  StreamSubscription<ChatMessage>? _sub;
   bool _loading = true;
   bool _hasMore = false;
   bool _loadingOlder = false;
-  bool _sending = false;
-  bool _readOnly = false;
   Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _store.openConversationId = _conv.id;
-    _sub = _store.incoming.listen(_onIncoming);
     _load();
-  }
-
-  @override
-  void dispose() {
-    if (_store.openConversationId == _conv.id) _store.openConversationId = null;
-    _sub?.cancel();
-    _ctrl.dispose();
-    _attachments.dispose();
-    super.dispose();
-  }
-
-  void _onIncoming(ChatMessage m) {
-    if (m.conversationId != _conv.id || !mounted) return;
-    if (_loading) {
-      _arrivedWhileLoading.add(m);
-      return;
-    }
-    setState(() => _add(m));
-  }
-
-  /// Appends a message unless it is already there (a sent message also comes back as a live push).
-  void _add(ChatMessage m) {
-    if (_messages.any((x) => x.id == m.id)) return;
-    _messages = [..._messages, m];
   }
 
   Future<void> _load() async {
@@ -85,13 +49,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
         _hasMore = page.hasMore;
         _conv = page.conversation ?? _conv;
         _loading = false;
-        for (final m in _arrivedWhileLoading) {
-          _add(m);
-        }
-        _arrivedWhileLoading.clear();
       });
-      // Opening the thread reads it: the unread count goes to zero for the customer (and the store sees it).
-      if ((page.conversation?.unread ?? _conv.unread) > 0) unawaited(_store.markRead(_conv.id));
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -120,34 +78,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     }
   }
 
-  Future<void> _send() async {
-    if (_sending) return;
-    final s = Strings.of(context);
-    final text = _ctrl.text.trim();
-    if (_attachments.busy) {
-      showSnack(context, s.photoWait);
-      return;
-    }
-    final urls = _attachments.urls;
-    if (text.isEmpty && urls.isEmpty) {
-      showSnack(context, s.chatComposeRequired);
-      return;
-    }
-    setState(() => _sending = true);
-    try {
-      final m = await _store.send(_conv.id, text: text, attachments: urls);
-      if (!mounted) return;
-      setState(() => _add(m));
-      _ctrl.clear();
-      _attachments.clear();
-      showSnack(context, s.chatSent);
-    } catch (e) {
-      if (!mounted) return;
-      if (e is ApiException && e.message.contains('you can read messages but not reply')) setState(() => _readOnly = true);
-      showError(context, e);
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
+  /// "Contact support" from the closed chat: a new ticket about the same order or product.
+  void _contactSupport(Strings s) {
+    final name = _conv.displayProductName(s.lang);
+    final about = (_conv.orderId ?? '').isEmpty && name != null ? s.supportAboutProduct(name) : null;
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => NewTicketScreen(orderId: _conv.orderId, category: (_conv.orderId ?? '').isEmpty ? null : 'order', initialSubject: about, locale: widget.locale),
+      ),
+    );
   }
 
   @override
@@ -156,11 +96,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final ctx = chatContextLine(s, _conv);
     return Scaffold(
       appBar: backAppBar(context, chatStoreName(s, _conv)),
-      bottomNavigationBar: _error != null || _loading
-          ? null
-          : _readOnly
-              ? NoteBar(text: s.chatReadOnly, key: const ValueKey('chat-read-only'))
-              : MessageComposer(controller: _ctrl, attachments: _attachments, onSend: _send, sending: _sending, maxLength: 2000),
+      bottomNavigationBar: NoteBar(
+        key: const ValueKey('chat-closed-note'),
+        text: s.chatClosedNote,
+        children: [FilledButton(key: const ValueKey('chat-contact-support'), onPressed: () => _contactSupport(s), child: ButtonLabel(s.contactSupport))],
+      ),
       body: Column(children: [
         if (ctx != null) _ContextHeader(conversation: _conv, line: ctx),
         Expanded(child: _body(s)),

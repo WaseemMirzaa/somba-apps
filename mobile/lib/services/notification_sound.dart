@@ -68,7 +68,6 @@ class NotificationSound extends ChangeNotifier {
   }
 }
 
-/// Whether a live notice stays silent. Only one case does: a chat notice for the conversation open on screen (the
-/// message is read at once). The decision never looks at any other `type`: every kind of notice sounds.
-bool shouldMuteNotice(String type, String? entityId, String? openChatId) =>
-    type == 'chat' && openChatId != null && entityId != null && entityId == openChatId;
+/// Whether a live notice stays silent. Only chat notices do: customer <-> store messaging is closed (admin-controls contract
+/// section 3), so a notice of that type is never news. Every other kind of notice sounds.
+bool isSilentNotice(String type) => type == 'chat';

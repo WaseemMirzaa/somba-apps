@@ -318,11 +318,11 @@ void main() {
 
     String bannerOf(WidgetTester tester) => tester.widget<Text>(find.byKey(const ValueKey('transfer-status'))).data!;
 
-    testWidgets('requested: waiting for the seller, with the answer date', (tester) async {
+    testWidgets('requested: with KOMORIKO support, with the answer date', (tester) async {
       await openReplacement(tester, replacementJson());
-      expect(bannerOf(tester), 'Waiting for the seller');
+      expect(bannerOf(tester), 'With KOMORIKO support');
       expect(find.byKey(const ValueKey('transfer-progress')), findsOneWidget);
-      expect(find.textContaining('Answer expected:'), findsWidgets);
+      expect(find.textContaining('Support answer expected:'), findsWidgets);
       expect(find.text('One shoe is torn'), findsOneWidget);
     });
 
@@ -367,7 +367,7 @@ void main() {
       expect(find.text('Replacement not found.'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('as-retry')));
       await asSettle(tester);
-      expect(bannerOf(tester), 'Waiting for the seller');
+      expect(bannerOf(tester), 'With KOMORIKO support');
       expect(server.bodiesOf('replacements:get').first, {'id': 'r1'});
     });
 
@@ -424,7 +424,7 @@ void main() {
 
     setUp(() {
       server.handlers['disputes:list'] = (_) => [
-            disputeJson(id: 'd1', reference: 'RET-1001', stage: 'seller_rejected', canEscalate: true, createdAt: '2026-10-24T09:30:00Z'),
+            disputeJson(id: 'd1', reference: 'RET-1001', stage: 'seller_rejected', createdAt: '2026-10-24T09:30:00Z'),
             disputeJson(id: 'd2', reference: 'DP-2002', type: 'dispute', status: 'resolved', stage: 'closed', refundUsd: 15, createdAt: '2026-10-22T09:30:00Z'),
           ];
       server.handlers['replacements:mine'] = (_) => [replacementJson(), replacementJson(id: 'r2', reference: 'REP-2002', status: 'delivered')];
@@ -439,7 +439,7 @@ void main() {
       expect(find.text('Exchanges'), findsOneWidget);
       expect(find.byKey(const ValueKey('request-d1')), findsOneWidget);
       expect(find.byKey(const ValueKey('request-d2')), findsOneWidget);
-      expect(find.text('Seller declined'), findsOneWidget);
+      expect(find.text('With support'), findsOneWidget, reason: 'an old seller stage reads as with support');
       expect(find.text(r'$15.00 refunded to your wallet'), findsOneWidget);
       expect(tester.getTopLeft(find.byKey(const ValueKey('request-d1'))).dy, lessThan(tester.getTopLeft(find.byKey(const ValueKey('request-d2'))).dy));
     });
@@ -490,10 +490,10 @@ void main() {
 
     testWidgets('a tap opens the request, the replacement, the exchange', (tester) async {
       await openHub(tester);
-      server.handlers['disputes:get'] = (_) => disputeJson(stage: 'seller_rejected', canEscalate: true, messages: []);
+      server.handlers['disputes:get'] = (_) => disputeJson(stage: 'seller_rejected', messages: []);
       await tester.tap(find.byKey(const ValueKey('request-d1')));
       await asSettle(tester);
-      expect(find.text('The seller declined your return'), findsOneWidget);
+      expect(find.text('With KOMORIKO support'), findsOneWidget, reason: 'an old seller stage reads as with support');
       await tester.tap(find.byIcon(Icons.arrow_back_rounded).last);
       await asSettle(tester);
       await tester.tap(find.text('Replacements'));
@@ -515,9 +515,9 @@ void main() {
       RealtimeStore.instance.debugEmit('dispute:created', disputeJson(id: 'd3', reference: 'RET-3003', createdAt: '2026-10-26T09:30:00Z'));
       await tester.pump();
       expect(find.byKey(const ValueKey('request-d3')), findsOneWidget);
-      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(id: 'd1', stage: 'escalated', createdAt: '2026-10-24T09:30:00Z', updatedAt: '2026-10-27T00:00:00Z'));
+      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(id: 'd1', stage: 'approved', createdAt: '2026-10-24T09:30:00Z', updatedAt: '2026-10-27T00:00:00Z'));
       await tester.pump();
-      expect(find.text('With support'), findsOneWidget);
+      expect(find.text('Accepted'), findsOneWidget);
       await tester.tap(find.text('Replacements'));
       await asSettle(tester);
       RealtimeStore.instance.debugEmit('replacement:updated', replacementJson(status: 'dispatched', updatedAt: '2026-10-27T00:00:00Z'));
@@ -544,7 +544,7 @@ void main() {
       await openHub(tester, lang: 'fr');
       expect(find.text('Retours et échanges'), findsOneWidget);
       expect(find.text('Remplacements'), findsOneWidget);
-      expect(find.text('Refusé par le vendeur'), findsOneWidget);
+      expect(find.text('Chez le support'), findsOneWidget);
       expectButtonRules(tester);
     });
   });

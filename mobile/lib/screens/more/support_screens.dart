@@ -9,6 +9,9 @@ import '../../widgets/common.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/photo_picker.dart';
+import '../../widgets/translatable_text.dart';
+import '../../services/chat_store.dart';
+import 'chat_inbox.dart' show ChatInboxScreen;
 import 'chat_widgets.dart';
 
 export '../../services/support_store.dart' show TicketView, TicketMessage;
@@ -51,6 +54,8 @@ class _SupportListScreenState extends State<SupportListScreen> {
   void initState() {
     super.initState();
     _load();
+    // Old store chats stay readable: look for them quietly (nobody asked), and offer the link only when there are some.
+    ChatStore.instance.loadConversations().catchError((Object _) {});
   }
 
   /// A failure on an empty screen is shown in place with a retry button; on a list already on screen it is a snackbar.
@@ -86,7 +91,7 @@ class _SupportListScreenState extends State<SupportListScreen> {
               ),
             ),
       body: ListenableBuilder(
-        listenable: _store,
+        listenable: Listenable.merge([_store, ChatStore.instance]),
         builder: (context, _) {
           if (_error != null && _store.tickets.isEmpty) {
             return LoadFailed(error: _error!, onRetry: () {
@@ -110,6 +115,15 @@ class _SupportListScreenState extends State<SupportListScreen> {
                       ticket: t,
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SupportTicketDetailScreen(ticket: t, locale: widget.locale))),
                     ),
+                  ),
+                if (ChatStore.instance.conversations.isNotEmpty)
+                  ListTile(
+                    key: const ValueKey('earlier-chats'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.history_rounded, color: AppColors.muted),
+                    title: Text(s.supportEarlierChats, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),
+                    onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => ChatInboxScreen(locale: widget.locale))),
                   ),
               ],
             ),
@@ -158,7 +172,8 @@ class TicketTile extends StatelessWidget {
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(
-                        child: Text(t.subject,
+                        child: Text(t.subjectFor(s.lang),
+                            key: ValueKey('ticket-subject-${t.id}'),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontWeight: unread ? FontWeight.w800 : FontWeight.w700, fontSize: 14)),
@@ -286,7 +301,16 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Expanded(child: Text(t.subject, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+                  Expanded(
+                    child: TranslatableText(
+                      kind: 'support_ticket',
+                      id: t.id,
+                      auto: true,
+                      i18n: t.subjectI18n,
+                      text: t.subject,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                    ),
+                  ),
                   const SizedBox(width: AppSpace.sm),
                   Pill(_statusLabel(s, t.status), key: const ValueKey('ticket-status'), color: color.withValues(alpha: 0.14), textColor: color, fontSize: 10.5),
                 ]),
@@ -345,7 +369,17 @@ class TicketBubble extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 2),
                   child: Text(s.supportStaff, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted, fontSize: 11.5, fontWeight: FontWeight.w700)),
                 ),
-              if (m.text.isNotEmpty) Text(m.text, style: TextStyle(color: mine ? Colors.white : AppColors.ink, fontSize: 13.5, height: 1.35)),
+              if (m.text.isNotEmpty)
+                mine
+                    ? Text(m.text, style: const TextStyle(color: Colors.white, fontSize: 13.5, height: 1.35))
+                    : TranslatableText(
+                        kind: 'support_message',
+                        id: m.id,
+                        auto: true,
+                        i18n: m.textI18n,
+                        text: m.text,
+                        style: const TextStyle(color: AppColors.ink, fontSize: 13.5, height: 1.35),
+                      ),
               if (m.attachments.isNotEmpty)
                 Padding(
                   padding: EdgeInsets.only(top: m.text.isEmpty ? 0 : AppSpace.sm),
@@ -367,9 +401,12 @@ class TicketBubble extends StatelessWidget {
 /// Open a ticket: category, subject, message, an optional order and photos. [orderId] / [category] pre-fill the form
 /// (opening a new ticket from a closed one keeps its order).
 class NewTicketScreen extends StatefulWidget {
-  const NewTicketScreen({super.key, this.orderId, this.category, this.locale = const Locale('en')});
+  const NewTicketScreen({super.key, this.orderId, this.category, this.initialSubject, this.locale = const Locale('en')});
   final String? orderId;
   final String? category;
+
+  /// A subject to start from (the product the shopper is asking about); the shopper can edit it.
+  final String? initialSubject;
   final Locale locale;
 
   @override
@@ -377,7 +414,7 @@ class NewTicketScreen extends StatefulWidget {
 }
 
 class _NewTicketScreenState extends State<NewTicketScreen> {
-  final _subject = TextEditingController();
+  late final _subject = TextEditingController(text: widget.initialSubject ?? '');
   final _message = TextEditingController();
   final _attachments = PhotoAttachments(max: kTicketMaxPhotos);
   late String _category = kTicketCategories.contains(widget.category) ? widget.category! : 'other';

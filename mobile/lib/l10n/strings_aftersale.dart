@@ -17,10 +17,6 @@ extension StringsAfterSale on Strings {
   String get asLoadFailed => t('as_load_failed');
   String get asReportProblem => t('as_report_problem');
   String get asSbAwaiting => t('as_sb_awaiting');
-  String get asSbReplied => t('as_sb_replied');
-  String get asSbRejected => t('as_sb_rejected');
-  String get asSbTimeout => t('as_sb_timeout');
-  String get asSbEscalated => t('as_sb_escalated');
   String get asSbApproved => t('as_sb_approved');
   String get asSbPickup => t('as_sb_pickup');
   String get asSbReceived => t('as_sb_received');
@@ -30,13 +26,6 @@ extension StringsAfterSale on Strings {
   String get asStAwaitingReturn => t('as_st_awaiting_return');
   String get asStAwaitingLate => t('as_st_awaiting_late');
   String get asStAwaitingDispute => t('as_st_awaiting_dispute');
-  String get asStRepliedTitle => t('as_st_replied_title');
-  String get asStReplied => t('as_st_replied');
-  String get asStRejectedTitle => t('as_st_rejected_title');
-  String get asStTimeoutTitle => t('as_st_timeout_title');
-  String get asStNextSteps => t('as_st_next_steps');
-  String get asStEscalatedTitle => t('as_st_escalated_title');
-  String get asStEscalated => t('as_st_escalated');
   String get asStApprovedTitle => t('as_st_approved_title');
   String get asStApproved => t('as_st_approved');
   String get asStPickupTitle => t('as_st_pickup_title');
@@ -65,9 +54,6 @@ extension StringsAfterSale on Strings {
   String get asSecPhotos => t('as_sec_photos');
   String get asSecSeller => t('as_sec_seller');
   String get asSellerReason => t('as_seller_reason');
-  String asSellerDue(Object? when) => t('as_seller_due', {'when': when});
-  String get asSellerAccepted => t('as_seller_accepted');
-  String asSellerAnswered(Object? when) => t('as_seller_answered', {'when': when});
   String get asSecThread => t('as_sec_thread');
   String get asThreadEmpty => t('as_thread_empty');
   String get asThreadYou => t('as_thread_you');
@@ -86,12 +72,6 @@ extension StringsAfterSale on Strings {
   String get asPkCollectSub => t('as_pk_collect_sub');
   String get asPkReceived => t('as_pk_received');
   String get asPkRefund => t('as_pk_refund');
-  String get asEscalate => t('as_escalate');
-  String get asEscalateTitle => t('as_escalate_title');
-  String get asEscalateBody => t('as_escalate_body');
-  String get asEscalateNote => t('as_escalate_note');
-  String get asEscalateConfirm => t('as_escalate_confirm');
-  String get asEscalateDone => t('as_escalate_done');
   String get asCancelRequest => t('as_cancel_request');
   String get asCancelTitle => t('as_cancel_title');
   String get asCancelBody => t('as_cancel_body');

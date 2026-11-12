@@ -499,4 +499,75 @@ void main() {
       expectButtonRules(t);
     });
   });
+
+  // docs/contracts/stored-text-i18n.md: `subjectI18n` and `messages[].textI18n` are shown in the rider's language with no tap.
+  group('translations that come with a ticket', () {
+    final i18nMessages = [
+      {'id': 'm1', 'from': 'Jean-Pierre Mukendi', 'fromId': 'r', 'role': 'rider', 'text': 'Le client ne répond pas.', 'at': '2026-10-25T09:00:00.000Z', 'attachments': <String>[]},
+      {
+        'id': 'm2',
+        'from': 'Marie Support',
+        'fromId': 'a1',
+        'role': 'admin_support',
+        'text': 'We are calling the customer now.',
+        'textI18n': {'sourceLang': 'en', 'en': 'We are calling the customer now.', 'fr': 'Nous appelons le client maintenant.'},
+        'at': '2026-10-25T09:10:00.000Z',
+        'attachments': <String>[],
+      },
+    ];
+    Map<String, dynamic> withSubject() => ticketJson('1', subject: 'Customer unreachable', messages: i18nMessages)
+      ..['subjectI18n'] = {'sourceLang': 'en', 'en': 'Customer unreachable', 'fr': 'Client injoignable'};
+
+    test('the models parse the translations; a missing or empty object means none', () {
+      final t = SupportTicket.fromJson(withSubject());
+      expect(t.subjectI18n!.forLang('fr'), 'Client injoignable');
+      expect(t.messages[1].textI18n!.sourceLang, 'en');
+      expect(t.messages[0].textI18n, isNull);
+      expect(SupportTicket.fromJson({'id': 'x', 'subjectI18n': {}}).subjectI18n, isNull);
+      expect(SupportTicket.fromJson({'id': 'x', 'subjectI18n': 'junk'}).subjectI18n, isNull);
+      expect(t.withUnread(2).subjectI18n, t.subjectI18n, reason: 'a copy keeps the translations');
+    });
+
+    testWidgets('French: the list row, the subject and the support message show in French with the note, and no request is made', (t) async {
+      final fakes = fakeSupport(tickets: [SupportTicket.fromJson(withSubject())]);
+      await pumpApp(t, 'fr', const SupportScreen());
+      expect(t.widget<Text>(find.byKey(const ValueKey('ticket-subject-1'))).data, 'Client injoignable');
+      await t.tap(find.byKey(const ValueKey('ticket-1')));
+      await t.pumpAndSettle();
+      expect(t.widget<Text>(find.byKey(const ValueKey('tt-text-subject-1'))).data, 'Client injoignable');
+      expect(t.widget<Text>(find.byKey(const ValueKey('tt-text-msg-m2'))).data, 'Nous appelons le client maintenant.');
+      expect(find.text(const Strings('fr').translatedAuto), findsNWidgets(2));
+      expect(find.text(const Strings('fr').seeOriginal), findsNWidgets(2));
+      expect(find.text('Le client ne répond pas.'), findsOneWidget, reason: 'the rider\'s own message shows as written');
+      expect(fakes.api.calls.where((c) => c.startsWith('translate')), isEmpty);
+    });
+
+    testWidgets('English: text written in the rider\'s language has no note and no link; "See original" gives the written text back', (t) async {
+      fakeSupport(tickets: [SupportTicket.fromJson(withSubject())]);
+      await pumpApp(t, 'en', const SupportThreadScreen(ticketId: '1'));
+      expect(t.widget<Text>(find.byKey(const ValueKey('tt-text-msg-m2'))).data, 'We are calling the customer now.');
+      expect(find.byKey(const ValueKey('tt-link-msg-m2')), findsNothing, reason: 'written in English: nothing was translated');
+      expect(find.byKey(const ValueKey('tt-link-subject-1')), findsNothing);
+      expect(find.text(const Strings('en').translatedAuto), findsNothing);
+
+      // A French-written ticket read in English: translation at once, original on request.
+      final fr = ticketJson('2', subject: 'Colis abîmé', messages: i18nMessages)
+        ..['subjectI18n'] = {'sourceLang': 'fr', 'en': 'Damaged parcel', 'fr': 'Colis abîmé'};
+      fakeSupport(tickets: [SupportTicket.fromJson(fr)]);
+      await pumpApp(t, 'en', const SupportThreadScreen(ticketId: '2'));
+      expect(t.widget<Text>(find.byKey(const ValueKey('tt-text-subject-2'))).data, 'Damaged parcel');
+      await t.tap(find.byKey(const ValueKey('tt-link-subject-2')));
+      await t.pump();
+      expect(t.widget<Text>(find.byKey(const ValueKey('tt-text-subject-2'))).data, 'Colis abîmé');
+      expect(find.text(const Strings('en').seeTranslation), findsOneWidget);
+    });
+
+    testWidgets('a ticket from an older server (no translations) shows as written, with no link', (t) async {
+      fakeSupport(tickets: [ticket('3', subject: 'Colis abîmé')]);
+      await pumpApp(t, 'en', const SupportThreadScreen(ticketId: '3'));
+      expect(t.widget<Text>(find.byKey(const ValueKey('tt-text-subject-3'))).data, 'Colis abîmé');
+      expect(find.byKey(const ValueKey('tt-link-subject-3')), findsNothing);
+      expect(find.text(const Strings('en').seeOriginal), findsNothing);
+    });
+  });
 }

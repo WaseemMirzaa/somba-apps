@@ -1,5 +1,6 @@
 import '../util/variant_words.dart';
 import 'models.dart' show pickLang;
+import 'text_i18n.dart';
 
 /// Models for returns, disputes, replacements and exchanges (`docs/contracts/after-sale.md` §2 and §3).
 /// Every parser is tolerant: an OLD payload (only id / reference / orderId / type / reason / status / resolution)
@@ -80,7 +81,7 @@ class DisputeItemView {
 
 /// A message in a request's thread.
 class DisputeMessageView {
-  const DisputeMessageView({required this.id, this.authorName = '', this.role = 'customer', this.text = '', this.attachments = const [], this.createdAt});
+  const DisputeMessageView({required this.id, this.authorName = '', this.role = 'customer', this.text = '', this.attachments = const [], this.createdAt, this.textI18n});
 
   final String id;
   final String authorName;
@@ -90,6 +91,9 @@ class DisputeMessageView {
   final String text;
   final List<String> attachments;
   final DateTime? createdAt;
+
+  /// [text] in English and French, as the server already has them (null when it has none).
+  final TextI18n? textI18n;
 
   bool get isCustomer => role == 'customer';
   bool get isSeller => role == 'seller';
@@ -101,8 +105,12 @@ class DisputeMessageView {
         text: _str(j['text']),
         attachments: _strings(j['attachments']),
         createdAt: _date(j['createdAt']),
+        textI18n: TextI18n.tryParse(j['textI18n']),
       );
 }
+
+/// The stages that only exist on rows from before KOMORIKO support decided everything: they all read as "With support".
+const Set<String> kLegacySupportStages = {'awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated'};
 
 /// A return or dispute request.
 class DisputeView {
@@ -124,13 +132,15 @@ class DisputeView {
     this.sellerReason,
     this.escalatedAt,
     this.resolution,
+    this.reasonI18n,
+    this.sellerReasonI18n,
+    this.resolutionI18n,
     this.outcome,
     this.refundUsd = 0,
     this.refundTo = 'wallet',
     this.receivedAt,
     this.gradedAt,
     this.pickupTaskId,
-    this.canEscalate = false,
     this.canCancel = false,
     this.createdAt,
     this.updatedAt,
@@ -160,6 +170,9 @@ class DisputeView {
   final DateTime? escalatedAt;
   final String? resolution;
 
+  /// [reason], [sellerReason] (rows from before support decided) and [resolution] in both languages (null when the server has none).
+  final TextI18n? reasonI18n, sellerReasonI18n, resolutionI18n;
+
   /// `refund_full` | `refund_partial` | `replacement` | `reject` | `return_refund` | null.
   final String? outcome;
   final double refundUsd;
@@ -169,7 +182,6 @@ class DisputeView {
   final DateTime? receivedAt;
   final DateTime? gradedAt;
   final String? pickupTaskId;
-  final bool canEscalate;
   final bool canCancel;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -185,11 +197,13 @@ class DisputeView {
   bool get isClosed => status != 'open' || _stage == 'closed';
   bool get isOpen => !isClosed;
 
-  /// Where the request stands. Old payloads have no stage: an open one waits for the seller, the rest is closed.
+  /// Where the request stands. KOMORIKO support decides, so an open request waits with support: a payload with no stage, and
+  /// every stage of the old seller flow (`awaiting_seller`, `seller_replied`, `seller_rejected`, `seller_timeout`, `escalated`),
+  /// is `awaiting_support`.
   String get stage {
     if (isClosed) return 'closed';
     final s = _stage;
-    return s == null || s.isEmpty ? 'awaiting_seller' : s;
+    return s == null || s.isEmpty || kLegacySupportStages.contains(s) ? 'awaiting_support' : s;
   }
 
   /// A cancelled request is `rejected` with this resolution (contract §2.1).
@@ -224,13 +238,15 @@ class DisputeView {
       sellerReason: _strOrNull(j['sellerReason']),
       escalatedAt: _date(j['escalatedAt']),
       resolution: _strOrNull(j['resolution']),
+      reasonI18n: TextI18n.tryParse(j['reasonI18n']),
+      sellerReasonI18n: TextI18n.tryParse(j['sellerReasonI18n']),
+      resolutionI18n: TextI18n.tryParse(j['resolutionI18n']),
       outcome: _strOrNull(j['outcome']),
       refundUsd: _num(j['refundUsd']),
       refundTo: _str(j['refundTo']) == 'phone' ? 'phone' : 'wallet',
       receivedAt: _date(j['receivedAt']),
       gradedAt: _date(j['gradedAt']),
       pickupTaskId: _strOrNull(j['pickupTaskId']),
-      canEscalate: j['canEscalate'] == true,
       canCancel: j['canCancel'] == true,
       createdAt: _date(j['createdAt']),
       updatedAt: _date(j['updatedAt']),
@@ -261,13 +277,15 @@ class DisputeView {
         sellerReason: sellerReason,
         escalatedAt: escalatedAt,
         resolution: resolution,
+        reasonI18n: reasonI18n,
+        sellerReasonI18n: sellerReasonI18n,
+        resolutionI18n: resolutionI18n,
         outcome: outcome,
         refundUsd: refundUsd,
         refundTo: refundTo,
         receivedAt: receivedAt,
         gradedAt: gradedAt,
         pickupTaskId: pickupTaskId,
-        canEscalate: canEscalate,
         canCancel: canCancel,
         createdAt: createdAt,
         updatedAt: updatedAt,
@@ -360,6 +378,8 @@ class ReplacementView {
     this.sellerDueAt,
     this.sellerRespondedAt,
     this.sellerReason,
+    this.reasonI18n,
+    this.sellerReasonI18n,
     this.deliveryTaskId,
     this.deliveredAt,
     this.disputeId,
@@ -387,6 +407,9 @@ class ReplacementView {
   final DateTime? sellerDueAt;
   final DateTime? sellerRespondedAt;
   final String? sellerReason;
+
+  /// [reason] and [sellerReason] (the decision note of support) in both languages (null when the server has none).
+  final TextI18n? reasonI18n, sellerReasonI18n;
   final String? deliveryTaskId;
   final DateTime? deliveredAt;
   final String? disputeId;
@@ -417,6 +440,8 @@ class ReplacementView {
         sellerDueAt: _date(j['sellerDueAt']),
         sellerRespondedAt: _date(j['sellerRespondedAt']),
         sellerReason: _strOrNull(j['sellerReason']),
+        reasonI18n: TextI18n.tryParse(j['reasonI18n']),
+        sellerReasonI18n: TextI18n.tryParse(j['sellerReasonI18n']),
         deliveryTaskId: _strOrNull(j['deliveryTaskId']),
         deliveredAt: _date(j['deliveredAt']),
         disputeId: _strOrNull(j['disputeId']),
@@ -449,6 +474,8 @@ class ExchangeView {
     this.sellerDueAt,
     this.sellerRespondedAt,
     this.sellerReason,
+    this.reasonI18n,
+    this.sellerReasonI18n,
     this.deliveryTaskId,
     this.deliveredAt,
     this.createdAt,
@@ -480,6 +507,9 @@ class ExchangeView {
   final DateTime? sellerDueAt;
   final DateTime? sellerRespondedAt;
   final String? sellerReason;
+
+  /// [reason] and [sellerReason] (the decision note of support) in both languages (null when the server has none).
+  final TextI18n? reasonI18n, sellerReasonI18n;
   final String? deliveryTaskId;
   final DateTime? deliveredAt;
   final DateTime? createdAt;
@@ -513,6 +543,8 @@ class ExchangeView {
         sellerDueAt: _date(j['sellerDueAt']),
         sellerRespondedAt: _date(j['sellerRespondedAt']),
         sellerReason: _strOrNull(j['sellerReason']),
+        reasonI18n: TextI18n.tryParse(j['reasonI18n']),
+        sellerReasonI18n: TextI18n.tryParse(j['sellerReasonI18n']),
         deliveryTaskId: _strOrNull(j['deliveryTaskId']),
         deliveredAt: _date(j['deliveredAt']),
         createdAt: _date(j['createdAt']),
