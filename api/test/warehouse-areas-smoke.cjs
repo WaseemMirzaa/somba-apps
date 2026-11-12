@@ -41,7 +41,10 @@ const connect = (token) => new Promise((resolve, reject) => {
   s.on('connect_error', reject);
   setTimeout(() => reject(new Error('socket timeout')), 8000);
 });
-const req = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+const rawReq = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+// Parcel scanning is on by default: each move that needs the boxes scanned first gets them (journey.cjs `withScans`); parcel-scan-smoke.cjs tests the scanning itself.
+const scanOpts = {};
+const req = require('./journey.cjs').withScans(rawReq, scanOpts);
 const until = async (fn, ms = 6000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
 const login = async (email, pw = PW) => {
   for (let i = 0; i < 4; i++) {
@@ -78,6 +81,7 @@ const KIKWIT_PIN = { lat: -5.0412, lng: 18.8162 };
 (async () => {
   const guest = { sock: await connect(null) };
   const admin = await login('admin@somba.app');
+  scanOpts.admin = admin; // desk admin: marks a run's boxes in by hand when a run is received
   const cust = await login('customer@somba.app');
   const mgrK = await login('warehouse@somba.app'); // Entrepôt Kinshasa, manager
   const opK = await login('operator@somba.app'); // Entrepôt Kinshasa, operator

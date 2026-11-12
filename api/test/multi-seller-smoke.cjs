@@ -33,7 +33,10 @@ const connect = (token) => new Promise((resolve, reject) => {
   s.on('connect_error', reject);
   setTimeout(() => reject(new Error('socket timeout')), 8000);
 });
-const req = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+const rawReq = (s, ev, b = {}) => new Promise((r) => s.emit(ev, b, r));
+// Parcel scanning is on by default: each move that needs the boxes scanned first gets them (journey.cjs `withScans`); parcel-scan-smoke.cjs tests the scanning itself.
+const scanOpts = {};
+const req = require('./journey.cjs').withScans(rawReq, scanOpts);
 const until = async (fn, ms = 6000) => { const t = Date.now(); while (Date.now() - t < ms) { const v = await fn(); if (v) return v; await sleep(150); } return null; };
 const login = async (email, pw = PW) => {
   const r = await rest('/api/v1/auth/login', { email, password: pw });
@@ -58,6 +61,7 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
 
 (async () => {
   const admin = await login('admin@somba.app', process.env.ADMIN_PW ?? PW);
+  scanOpts.admin = admin; // desk admin: marks a run's boxes in by hand when a run is received
   const warehouse = await staffLogin(admin, 'warehouse@somba.app', process.env.WAREHOUSE_PW, 'warehouse_staff');
   const demoRider = await login('rider@somba.app');
   /** A parcel nobody collected cannot be scanned in: the demo rider is assigned and collects it first. */
@@ -74,8 +78,6 @@ const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
   const verified = (await req(admin.sock, 'settings:get')).data?.requireVerifiedForCheckout;
   await req(admin.sock, 'settings:set', { key: 'productModeration', value: 'false' });
   await req(admin.sock, 'settings:set', { key: 'requireVerifiedForCheckout', value: 'false' });
-  // This suite is about split packages, not box scanning (parcel-scan-smoke covers that): riders collect without scanning here.
-  await req(admin.sock, 'settings:set', { key: 'requireParcelScan', value: 'false' });
 
   const makeSeller = async (label, pickup) => {
     const u = await register(label, 'seller');
