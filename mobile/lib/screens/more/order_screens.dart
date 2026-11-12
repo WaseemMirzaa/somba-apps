@@ -141,7 +141,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
                     ),
                   const SizedBox(height: 8),
-                  _row(o.isExpress ? s.deliveryExpressRow : s.delivery, o.deliveryFeeUsd == 0 ? s.free : money(o.deliveryFeeUsd), key: o.isExpress ? const ValueKey('order-delivery-express-row') : null),
+                  _row(s.platformFee, o.platformFeeUsd == 0 ? s.free : money(o.platformFeeUsd), key: o.isExpress ? const ValueKey('order-delivery-express-row') : null),
                   if (dayLabel(o.estimatedDeliveryDate, s.lang) != null) ...[
                     const SizedBox(height: 6),
                     _row(s.estimatedDelivery, dayLabel(o.estimatedDeliveryDate, s.lang)!, key: const ValueKey('order-estimate-row')),

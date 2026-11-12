@@ -20,4 +20,11 @@ export class Category {
 
   @Column({ type: 'int', default: 0 })
   sortOrder: number;
+
+  /**
+   * Seller commission (%) for listings in this category; NULL = the global default (`settings.commissionPct`). 0 is a real
+   * rate. Never shown to customers or guests (stripped from `categories:list` / `categories:updated` for them).
+   */
+  @Column({ type: 'float', nullable: true })
+  commissionPct: number | null;
 }

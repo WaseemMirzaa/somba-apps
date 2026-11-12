@@ -14,6 +14,7 @@ import { Actor, LogisticsService } from './logistics.service';
 import { ParcelsService } from './parcels.service';
 import { RoutingService } from './routing.service';
 import { estimateOrder } from './order-estimate';
+import { quoteFor } from './quote-view';
 import type { EstimateLine } from './order-estimate';
 import { handlingDaysOf } from '../common/delivery/estimate';
 import { MAX_HANDLING_DAYS } from '../sellers/storefront';
@@ -103,7 +104,8 @@ export class LogisticsGateway {
       // The same numbers `orders:create` stamps: seller preparation + handling + the platform's route days, slowest seller wins.
       const est = estimateOrder(r, estimateLines);
       const perOrigin = new Map(est.sellers.map((s) => [s.sellerId, s]));
-      return ok({
+      // Role-aware: staff and admins get the breakdown; customers and guests get `platformFeeUsd` (one number) and the estimate.
+      return ok(quoteFor({
         feeUsd: r.feeUsd,
         deliveryUsd: r.deliveryUsd,
         transferUsd: r.transferUsd,
@@ -135,7 +137,7 @@ export class LogisticsGateway {
         estimateDays: est.estimateDays,
         estimatedDeliveryDate: est.estimatedDeliveryDate,
         splitAfterHours: await this.routing.splitAfterHours(),
-      });
+      }, client.data.user?.role ?? 'guest'));
     } catch (e) {
       // A refusal for an area nobody serves also carries { areaId, areaName, areaNameEn, servedCities } for the client to render.
       return { ...fail((e as Error).message), ...notServedFields(e) };

@@ -142,6 +142,7 @@ export class FinanceService {
     const hold = await this.payoutsSvc.holdHours();
     return {
       currency: 'USD',
+      // The DEFAULT seller rate (Settings). A category can set its own, and every order line keeps the rate stored when it was placed.
       commissionPct: Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12) || 0)),
       minPayoutUsd: Number((await this.settings.get('minPayoutUsd')) ?? 10),
       payoutClearanceHours: hold,

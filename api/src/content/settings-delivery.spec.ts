@@ -1,6 +1,6 @@
-import { PUBLIC_SETTINGS, SettingsService } from './settings.service';
+import { FEE_SETTINGS, PUBLIC_SETTINGS, SettingsService } from './settings.service';
 
-/** The delivery fee numbers are public, validated settings; zones are no longer writable. */
+/** The delivery fee numbers are validated, staff-only settings (customers see one platform-commission line); zones are no longer writable. */
 describe('delivery settings', () => {
   const rows: Record<string, string> = {};
   const repo = {
@@ -30,11 +30,19 @@ describe('delivery settings', () => {
     await expect(svc.set('deliveryTransferUsd', 101)).rejects.toThrow();
   });
 
-  it('makes them public to shoppers while the zones key can no longer be written', async () => {
+  it('keeps them away from shoppers (staff read them) while the zones key can no longer be written', async () => {
     await svc.set('deliveryBaseUsd', 3);
+    await svc.set('deliveryTransferUsd', 1.5);
     await svc.set('commissionPct', 12);
-    expect(await svc.publicView()).toEqual({ deliveryBaseUsd: '3' });
+    expect(await svc.publicView()).toEqual({});
+    expect(await svc.clientView()).not.toHaveProperty('deliveryBaseUsd');
+    expect(await svc.staffView()).toMatchObject({ deliveryBaseUsd: '3', deliveryTransferUsd: '1.5' });
+    expect(await svc.staffView()).not.toHaveProperty('commissionPct');
     await expect(svc.set('deliveryZones', '[]')).rejects.toThrow('Unknown setting.');
+  });
+
+  it('no price key is in the public list', () => {
+    for (const k of FEE_SETTINGS) expect(PUBLIC_SETTINGS as readonly string[]).not.toContain(k);
   });
 
   it('the pin switches are true/false flags', async () => {
@@ -128,13 +136,14 @@ describe('delivery time and express settings', () => {
     await expect(svc.set('expressDeliveryEnabled', true)).resolves.toBeDefined(); // String(true) = 'true'
   });
 
-  it('every key is public (shoppers and apps read it) and writable by admins', async () => {
+  it('the timing keys are public (shoppers and apps read them), the express prices are staff-only, all writable by admins', async () => {
     for (const [k, v] of [['localDeliveryDays', '1'], ['splitDeliveryAfterHours', '24'], ['expressDeliveryEnabled', 'false'], ['expressDeliveryDays', '0'], ['expressBaseUsd', '2'], ['expressPerKmUsd', '0.5'], ['expressMaxUsd', '15'], ['expressMaxKm', '0']] as const) {
       await svc.set(k, v);
     }
     await svc.set('commissionPct', 12); // not public
     const pub = await svc.publicView();
-    expect(Object.keys(pub).sort()).toEqual(['expressBaseUsd', 'expressDeliveryDays', 'expressDeliveryEnabled', 'expressMaxKm', 'expressMaxUsd', 'expressPerKmUsd', 'localDeliveryDays', 'splitDeliveryAfterHours']);
+    expect(Object.keys(pub).sort()).toEqual(['expressDeliveryDays', 'expressDeliveryEnabled', 'expressMaxKm', 'localDeliveryDays', 'splitDeliveryAfterHours']);
     expect(PUBLIC_SETTINGS).toEqual(expect.arrayContaining(Object.keys(pub)));
+    expect(await svc.staffView()).toMatchObject({ expressBaseUsd: '2', expressPerKmUsd: '0.5', expressMaxUsd: '15' });
   });
 });

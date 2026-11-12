@@ -9,15 +9,14 @@ import 'geo_models.dart';
 import 'models.dart';
 import 'realtime_store.dart';
 
-/// The delivery fee the server will charge (`delivery:quote`): base + per-km from the destination warehouse to the
-/// customer's pin, plus a transfer fee per hop a parcel travels between warehouses. Cart and checkout show this
-/// number and `orders:create` charges exactly it.
+/// What the server will charge on top of the goods (`delivery:quote`) and how the parcels travel. The customer sees ONE
+/// fee line, "Platform commission" ([platformFeeUsd]: the sum of every fee they pay, delivery included); the server sends
+/// customers no breakdown (no distance part, transfer, lane prices), so none is modelled here. Cart and checkout show
+/// this number and `orders:create` charges exactly it.
 class DeliveryQuote {
   const DeliveryQuote({
     required this.feeUsd,
-    this.deliveryUsd = 0,
-    this.transferUsd = 0,
-    this.distanceKm = 0,
+    double? platformFeeUsd,
     this.destinationHubId,
     this.destinationHubName,
     this.destinationHubCity,
@@ -31,7 +30,6 @@ class DeliveryQuote {
     this.destinationArea,
     this.destinationAreaChain = const [],
     this.origins = const [],
-    this.feeOverrideUsd,
     this.interCity = false,
     this.interCityDays = 0,
     this.transitHours = 0,
@@ -43,12 +41,13 @@ class DeliveryQuote {
     this.estimateDays,
     this.estimatedDeliveryDate,
     this.splitAfterHours,
-  });
+  }) : platformFeeUsd = platformFeeUsd ?? feeUsd;
 
+  /// The total fee (the same number as [platformFeeUsd]; older servers send only this one).
   final double feeUsd;
-  final double deliveryUsd;
-  final double transferUsd;
-  final double distanceKm;
+
+  /// The ONE fee line the customer sees: "Platform commission".
+  final double platformFeeUsd;
   final String? destinationHubId;
   final String? destinationHubName;
   final String? destinationHubCity;
@@ -81,9 +80,6 @@ class DeliveryQuote {
   /// Where each seller's parcels start from.
   final List<QuoteOrigin> origins;
 
-  /// The flat delivery fee of the area's coverage row, when one applied (it replaces base + per km).
-  final double? feeOverrideUsd;
-
   /// The seller's pickup and the customer's address are in different cities, and the extra days the setting allows for
   /// it ([interCityDays], used when no lane gives a transit time).
   final bool interCity;
@@ -95,7 +91,7 @@ class DeliveryQuote {
   /// Days the server adds to the delivery estimate for the transfers (null on older servers).
   final int? extraDays;
 
-  /// `standard` | `express`. Express goes straight from the store to the customer: no warehouse, no transfer fee.
+  /// `standard` | `express`. Express goes straight from the store to the customer: no warehouse stop.
   final String deliveryMode;
   final bool express;
 
@@ -158,28 +154,13 @@ class DeliveryQuote {
     ];
   }
 
-  /// What one hop costs: the lane's own cost when it has one, else the standard transfer fee. That fee is not sent on
-  /// its own, so it is what is left of [transferUsd] once the lanes' own costs are taken off, shared by the hops
-  /// without one. Null when it cannot be told (nothing left to share).
-  double? hopFeeUsd(QuoteHop hop) {
-    final own = hop.costUsd;
-    if (own != null) return own;
-    final hops = distinctHops;
-    final plain = hops.where((h) => h.costUsd == null).length;
-    if (plain == 0) return null;
-    final left = transferUsd - hops.fold(0.0, (sum, h) => sum + (h.costUsd ?? 0));
-    if (left <= 0.004) return null;
-    return (left / plain * 100).round() / 100;
-  }
-
   factory DeliveryQuote.fromJson(Map<String, dynamic> j) {
     final hub = j['destinationHub'];
     final chain = AreaDto.listFrom(j['destinationAreaChain']);
     return DeliveryQuote(
       feeUsd: _num(j['feeUsd']),
-      deliveryUsd: _num(j['deliveryUsd']),
-      transferUsd: _num(j['transferUsd']),
-      distanceKm: _num(j['distanceKm']),
+      // An older server sends only `feeUsd`: then it is the platform fee.
+      platformFeeUsd: j['platformFeeUsd'] is num ? (j['platformFeeUsd'] as num).toDouble() : null,
       destinationHubId: textOrNull(j['destinationHubId']) ?? (hub is Map ? textOrNull(hub['id']) : null),
       destinationHubName: textOrNull(j['destinationHubName']) ?? (hub is Map ? textOrNull(hub['name']) : null),
       destinationHubCity: hub is Map ? textOrNull(hub['city']) : null,
@@ -193,7 +174,6 @@ class DeliveryQuote {
       destinationArea: j['destinationArea'] is Map ? AreaDto.fromJson(_map(j['destinationArea'])) : (chain.isEmpty ? null : chain.last),
       destinationAreaChain: chain,
       origins: j['origins'] is List ? [for (final o in j['origins'] as List) if (o is Map) QuoteOrigin.fromJson(_map(o))] : const [],
-      feeOverrideUsd: j['feeOverrideUsd'] is num ? (j['feeOverrideUsd'] as num).toDouble() : null,
       interCity: j['interCity'] == true,
       interCityDays: j['interCityDays'] is num ? (j['interCityDays'] as num).toInt() : 0,
       transitHours: _num(j['transitHours']),
@@ -282,16 +262,13 @@ class QuoteOrigin {
       );
 }
 
-/// One hop of a route between two warehouses: the lane's transit time and its own cost.
+/// One hop of a route between two warehouses: the lane's transit time (its price is staff-only and never sent to customers).
 class QuoteHop {
-  const QuoteHop({this.fromHubId, this.fromHubName, this.toHubId, this.toHubName, this.transitHours = 0, this.costUsd});
+  const QuoteHop({this.fromHubId, this.fromHubName, this.toHubId, this.toHubName, this.transitHours = 0});
   final String? fromHubId, fromHubName, toHubId, toHubName;
 
   /// Hours the lane takes; 0 when it has no transit time (a direct transfer with no lane).
   final double transitHours;
-
-  /// The lane's own cost; null means the standard transfer fee applies.
-  final double? costUsd;
 
   /// Identifies the hop (the same lane from two sellers is one hop).
   String get key => '${fromHubId ?? fromHubName ?? ''}>${toHubId ?? toHubName ?? ''}';
@@ -302,7 +279,6 @@ class QuoteHop {
         toHubId: textOrNull(j['toHubId']),
         toHubName: textOrNull(j['toHubName']),
         transitHours: _num(j['transitHours']),
-        costUsd: j['costUsd'] is num ? (j['costUsd'] as num).toDouble() : null,
       );
 }
 
@@ -314,8 +290,8 @@ class QuoteRoute {
   /// The warehouse names along the chain (empty strings where the server gave none).
   List<String> get names => [hops.first.fromHubName ?? '', for (final h in hops) h.toHubName ?? ''];
 
-  /// Some hop has a transit time or a cost of its own worth showing.
-  bool get hasHopDetails => hops.any((h) => h.transitHours > 0 || h.costUsd != null);
+  /// Some hop has a transit time worth showing.
+  bool get hasHopDetails => hops.any((h) => h.transitHours > 0);
 }
 
 /// How many served cities a not-served notice lists before it says "+N more".

@@ -3,7 +3,7 @@ import { Category, Product, Translation } from '../database/entities';
 import { addCategory, addProduct, recordingEmitter, testDb, testTranslations } from '../testing/test-db';
 import { FakeTranslator } from '../translation/fake.translator';
 import type { TranslationService } from '../translation/translation.service';
-import { CategoriesService, categoryInUseMessage } from './categories.service';
+import { CategoriesService, categoryInUseMessage, seesCategoryRates } from './categories.service';
 
 let ds: DataSource;
 let translations: TranslationService;
@@ -26,9 +26,9 @@ describe('writing categories', () => {
     await translations.runJob('category', c.id);
     const list = (await svc.list()).find((x) => x.id === c.id)!;
     expect(list).toMatchObject({ name: 'Gadgets', nameFr: '[fr] Gadgets', machineTranslated: ['nameFr'], translationStatus: 'done' });
-    const pushed = emitter.sent.find((e) => e.event === 'categories:updated');
-    expect(pushed?.to.split(',')).toEqual(expect.arrayContaining(['customer', 'guest', 'admin']));
-    expect((pushed?.payload as { nameFr: string }[]).find((x) => x.nameFr === '[fr] Gadgets')).toBeTruthy();
+    const pushed = emitter.sent.filter((e) => e.event === 'categories:updated');
+    expect(pushed.flatMap((e) => e.to.split(','))).toEqual(expect.arrayContaining(['customer', 'guest', 'seller', 'admin']));
+    expect((pushed[0].payload as { nameFr: string }[]).find((x) => x.nameFr === '[fr] Gadgets')).toBeTruthy();
   });
 
   it('French only: the French is the source and English follows', async () => {
@@ -65,6 +65,47 @@ describe('writing categories', () => {
     const u = await svc.update(c.id, { icon: '📦', sortOrder: 4 });
     expect(u).toMatchObject({ icon: '📦', sortOrder: 4, nameFr: 'Bidules' });
     expect(await svc.update('missing', { icon: 'x' })).toBeNull();
+  });
+});
+
+describe('seller commission per category', () => {
+  it('is NULL (use the default) until an admin sets it; blank clears it; 0 is a real rate', async () => {
+    const c = await svc.create({ name: 'Gadgets', nameFr: 'Bidules' });
+    expect(c.commissionPct).toBeNull();
+    expect((await svc.update(c.id, { commissionPct: 7.5 }))!.commissionPct).toBe(7.5);
+    expect((await svc.update(c.id, { commissionPct: '0' }))!.commissionPct).toBe(0);
+    expect((await ds.getRepository(Category).findOneByOrFail({ id: c.id })).commissionPct).toBe(0);
+    expect((await svc.update(c.id, { commissionPct: '' }))!.commissionPct).toBeNull();
+    expect((await svc.update(c.id, { commissionPct: 9 }))!.commissionPct).toBe(9);
+    expect((await svc.update(c.id, { commissionPct: null }))!.commissionPct).toBeNull();
+    expect((await svc.update(c.id, { icon: 'x' }))!.commissionPct).toBeNull(); // an unrelated edit leaves it alone
+  });
+
+  it('can be set when the category is created', async () => {
+    expect((await svc.create({ name: 'Free', commissionPct: 0 })).commissionPct).toBe(0);
+  });
+
+  it('must be 0 to 60', async () => {
+    const c = await svc.create({ name: 'Gadgets' });
+    for (const bad of [-1, 60.5, 61, 'lots', NaN]) await expect(svc.update(c.id, { commissionPct: bad })).rejects.toThrow('Seller commission must be a number between 0 and 60.');
+    expect((await svc.update(c.id, { commissionPct: 60 }))!.commissionPct).toBe(60);
+  });
+
+  it('is stripped for customers and guests (list and broadcast), shown to sellers and staff', async () => {
+    const c = await svc.create({ name: 'Gadgets', commissionPct: 8 });
+    expect(await svc.list()).toHaveLength(1);
+    expect(await svc.list()).not.toEqual([expect.objectContaining({ commissionPct: expect.anything() })]);
+    expect(Object.keys((await svc.list())[0])).not.toContain('commissionPct');
+    expect((await svc.list({ withRates: true }))[0].commissionPct).toBe(8);
+    expect(seesCategoryRates('customer')).toBe(false);
+    expect(seesCategoryRates('guest')).toBe(false);
+    expect(seesCategoryRates(undefined)).toBe(false);
+    for (const r of ['seller', 'admin', 'admin_finance', 'warehouse_staff']) expect(seesCategoryRates(r)).toBe(true);
+    emitter.sent.length = 0;
+    await svc.update(c.id, { commissionPct: 11 });
+    const byAudience = (role: string) => emitter.sent.find((e) => e.event === 'categories:updated' && e.to.split(',').includes(role))!.payload as { commissionPct?: number }[];
+    for (const role of ['customer', 'guest']) expect(byAudience(role).every((x) => !('commissionPct' in x))).toBe(true);
+    for (const role of ['seller', 'admin', 'admin_finance']) expect(byAudience(role)[0].commissionPct).toBe(11);
   });
 });
 

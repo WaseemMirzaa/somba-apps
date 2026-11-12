@@ -21,7 +21,7 @@ import { useToast } from "@/context/toast-context";
 import { useShop } from "@/context/shop-context";
 import { isMobileMoneyMethod } from "@/lib/shop-live";
 import { refundedTotal } from "@/lib/shop-packages";
-import { deliveryLineLabel } from "@/lib/quote-text";
+import { platformFeeLabel } from "@/lib/quote-text";
 import { dayLabel } from "@/lib/delivery-estimate";
 import { ExpressBadge, FailedAttemptNotice, PartialDelivery, panelLines } from "@/components/shop/partial-delivery";
 import { openCustomerLeg } from "@/lib/split-delivery";
@@ -108,7 +108,6 @@ function OrderDetail() {
   // Split delivery: once a part is delivered the rider belongs to that part; show them again only while another leg is on the road.
   const riderOnRoad = !order.partiallyDelivered || !!openCustomerLeg(raw?.tracking?.legs);
   const steps = raw ? customerJourney(raw, hubs, fr) : [];
-  const destHub = raw?.destinationHubId ? hubs.get(raw.destinationHubId) : undefined;
   const requests = rt.disputes.filter((d) => d.orderId === order.id);
   const sellers = [...new Map(rawItems.filter((i) => i.sellerId).map((i) => [i.sellerId as string, i.sellerName ?? ""])).entries()];
   const reportable = ["shipped", "out_for_delivery", "delivered"].includes(order.status);
@@ -216,7 +215,7 @@ function OrderDetail() {
             {order.discount > 0 && (
               <div className="flex justify-between text-emerald-700"><dt>{fr ? "Code promo" : "Promo code"}</dt><dd>-{formatCurrency(order.discount, locale)}</dd></div>
             )}
-            <div className="flex justify-between"><dt>{deliveryLineLabel(order.deliveryMode, destHub?.name, fr)}</dt><dd>{order.deliveryFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.deliveryFee, locale)}</dd></div>
+            <div className="flex justify-between"><dt>{platformFeeLabel(fr)}</dt><dd>{order.platformFee === 0 ? (fr ? "Gratuite" : "Free") : formatCurrency(order.platformFee, locale)}</dd></div>
             <div className="flex justify-between border-t border-[var(--border)] pt-1 font-semibold"><dt>Total</dt><dd>{formatCurrency(order.amount, locale)}</dd></div>
             {refunded > 0 && (
               <div className="flex justify-between text-emerald-700"><dt>{fr ? "Remboursé" : "Refunded"}</dt><dd>-{formatCurrency(refunded, locale)}</dd></div>

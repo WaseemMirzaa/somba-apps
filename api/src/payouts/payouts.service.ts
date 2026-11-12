@@ -164,6 +164,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
     const seller = await this.sellers.findOne({ where: { userId } });
     const sellerIds = [userId, ...(seller ? [seller.id] : [])];
     const mine = new Set((await this.products.find({ where: { sellerId: In(sellerIds) }, select: { id: true } })).map((p) => p.id));
+    // The DEFAULT seller rate, shown as such: a category can set its own, and the amounts below are the sums stored on the lines.
     const commissionPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12)));
     const holdHours = await this.holdHours();
     const minPayoutUsd = Number((await this.settings.get('minPayoutUsd')) ?? 10);

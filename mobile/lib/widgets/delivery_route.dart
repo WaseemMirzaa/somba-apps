@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../services/delivery_quote.dart';
 import '../theme/app_theme.dart';
-import '../util/format.dart';
 
 /// What the delivery quote says about where the parcels come from and how they travel, as the small grey lines under
-/// the delivery fee at checkout: the delivering warehouse, a warehouse without riders and who stands in, each route
-/// between warehouses with the transit time and cost of its hops, the total transit time and the transfer fee.
+/// the platform commission at checkout: the delivering warehouse, a warehouse without riders and who stands in, each route
+/// between warehouses with the transit time of its hops, and the total transit time. No price here: the customer pays one
+/// "Platform commission" line and is never told how it is made up.
 class DeliveryRouteLines extends StatelessWidget {
   const DeliveryRouteLines({super.key, required this.quote});
 
@@ -44,8 +44,8 @@ class DeliveryRouteLines extends StatelessWidget {
     return out;
   }
 
-  /// One route between warehouses: the chain of names (when parcels are relayed) and, when the hops have a transit time
-  /// or a cost of their own, a line per hop.
+  /// One route between warehouses: the chain of names (when parcels are relayed) and, when the hops have a transit time,
+  /// a line per hop.
   List<Widget> _routeLines(Strings s, int i, QuoteRoute route) {
     final names = route.names;
     return [
@@ -56,21 +56,17 @@ class DeliveryRouteLines extends StatelessWidget {
   }
 
   String _hopText(Strings s, QuoteHop hop, String from, String to) {
-    final fee = quote.hopFeeUsd(hop);
     return [
       '$from → $to',
       if (hop.transitHours > 0) s.checkoutHopTransit(hop.transitHours),
-      if (fee != null) money(fee),
     ].join(' · ');
   }
 
   @override
   Widget build(BuildContext context) {
     final s = Strings.of(context);
-    // Express goes straight from the store to the customer: no warehouse, no transfer. Say so, with the fee.
-    if (quote.isExpress) {
-      return _line('checkout-express', s.checkoutExpress(quote.feeUsd == 0 ? s.free : money(quote.feeUsd)));
-    }
+    // Express goes straight from the store to the customer: no warehouse. Say so (the fee is the one commission line).
+    if (quote.isExpress) return _line('checkout-express', s.orderExpressNote);
     final chains = quote.routeChains;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if ((quote.destinationHubName ?? '').isNotEmpty) _line('checkout-hub', s.checkoutFromHub(quote.destinationHubName)),
@@ -78,7 +74,6 @@ class DeliveryRouteLines extends StatelessWidget {
       for (var i = 0; i < chains.length; i++) ..._routeLines(s, i, chains[i]),
       if (quote.transitHours > 0) _line('checkout-transit', s.checkoutTransit(quote.transitHours)),
       if (quote.interCity && quote.transitHours <= 0 && quote.interCityDays > 0) _line('checkout-intercity', s.checkoutInterCity(quote.interCityDays)),
-      if (quote.transferUsd > 0) _line('checkout-transfer', s.checkoutTransferFee(money(quote.transferUsd))),
     ]);
   }
 }

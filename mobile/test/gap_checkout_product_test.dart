@@ -122,7 +122,8 @@ void main() {
           await open(tester, lang: lang);
           expect(find.textContaining('Gombe · Kinshasa'), findsNothing, reason: 'no zone list');
           expect(find.text(lang == 'en' ? 'Delivery zone' : 'Zone de livraison'), findsNothing);
-          expect(find.text(s.delivery), findsOneWidget, reason: 'the summary row says "Delivery"');
+          expect(find.text(s.platformFee), findsOneWidget, reason: 'the summary row is the one "Platform commission" line');
+          expect(find.text(s.delivery), findsNothing);
           expect(find.text(s.checkoutFromHub('Kinshasa Hub')), findsOneWidget);
           expect(find.byKey(const ValueKey('address-needs-pin')), findsNothing);
           await place(tester);

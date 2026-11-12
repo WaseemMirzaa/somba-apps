@@ -35,7 +35,7 @@ export function campaignApplies(c: { status: string; discount: number; startDate
   return true;
 }
 
-/** What the discount does to each covered product: shopper price, and what the seller keeps after commission. */
+/** What the discount does to each covered product: shopper price, and what the seller keeps after commission (at the DEFAULT rate: a category can set its own). */
 export function CampaignEffectTable({
   products,
   discount,
@@ -52,6 +52,7 @@ export function CampaignEffectTable({
     return { id: p.id, name: p.name, image: p.image, price: p.price, now, net: Math.round(now * (1 - commissionPct / 100) * 100) / 100 };
   });
   return (
+    <>
     <DataTable
       emptyMessage={fr ? "Aucun produit." : "No products."}
       columns={[
@@ -72,9 +73,15 @@ export function CampaignEffectTable({
           label: fr ? `Prix à -${discount} %` : `Price at -${discount}%`,
           render: (r) => <span className="font-semibold text-emerald-700">{formatCurrency(r.now as number, locale)}</span>,
         },
-        { key: "net", label: fr ? `Vous gardez (après ${commissionPct} %)` : `You keep (after ${commissionPct}%)`, render: (r) => formatCurrency(r.net as number, locale) },
+        { key: "net", label: fr ? `Vous gardez (après ${commissionPct} %, taux par défaut)` : `You keep (after ${commissionPct}%, default rate)`, render: (r) => formatCurrency(r.net as number, locale) },
       ]}
       data={rows as unknown as Record<string, unknown>[]}
     />
+    <p className="mt-2 text-xs text-slate-500" data-testid="campaign-rate-note">
+      {fr
+        ? `Calculé au taux de commission par défaut (${commissionPct} %). Une catégorie peut avoir un taux différent ; chaque commande garde le taux de sa création.`
+        : `Worked out at the default commission rate (${commissionPct}%). A category can have a different rate; each order keeps the rate stored when it was placed.`}
+    </p>
+    </>
   );
 }

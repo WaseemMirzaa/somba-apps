@@ -696,7 +696,7 @@ export function ProductWizard({ product }: { product?: SellerProductRow | null }
             </p>
           )}
           <p className="mt-3 text-xs text-slate-500">
-            {fr ? "Commission de la plateforme déduite de chaque vente : voir la page Finance." : "Platform commission is deducted from each sale: see the Finance page."}
+            {fr ? "La commission vendeur (taux par défaut, ou celui de la catégorie) est déduite de chaque vente : voir la page Finance." : "The seller commission (the default rate, or your category's own) is deducted from each sale: see the Finance page."}
           </p>
         </DetailSection>
       )}

@@ -31,6 +31,8 @@ export interface OrderDetail {
   amount: number;
   subtotal: number;
   deliveryFee: number;
+  /** The ONE fee line a customer sees ("Platform commission"): `platformFeeUsd`, else the delivery fee an older server sends. */
+  platformFee: number;
   /** Promo-code discount already deducted. */
   discount: number;
   /** Campaign discount already deducted from the subtotal. */
@@ -119,6 +121,7 @@ export function toOrderDetail(o: Order, payment?: Payment): OrderDetail {
     amount: o.totalUsd,
     subtotal: o.subtotalUsd,
     deliveryFee: o.deliveryFeeUsd,
+    platformFee: o.platformFeeUsd ?? o.deliveryFeeUsd,
     discount: o.discountUsd ?? 0,
     campaignDiscount: o.campaignDiscountUsd ?? 0,
     paymentMethodId: o.paymentMethod,

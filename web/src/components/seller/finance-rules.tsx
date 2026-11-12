@@ -19,9 +19,9 @@ export function FinanceRules({ balance, stack = false }: { balance: Pick<Finance
   const items = [
     {
       icon: Percent,
-      label: fr ? "Commission sur les nouvelles commandes" : "Commission on new orders",
+      label: fr ? "Commission vendeur (taux par défaut)" : "Seller commission (default rate)",
       value: `${balance.commissionPct} %`,
-      note: fr ? "Chaque commande garde le taux de sa création." : "Each order keeps the rate stored when it was placed.",
+      note: fr ? "Une catégorie peut avoir un taux différent. Chaque commande garde le taux de sa création." : "A category can have a different rate. Each order keeps the rate stored when it was placed.",
     },
     {
       icon: Wallet,

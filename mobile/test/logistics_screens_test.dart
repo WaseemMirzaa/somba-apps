@@ -70,7 +70,7 @@ void main() {
     test('parses the quote, with the hub, the transfer and the fallback', () {
       final q = DeliveryQuote.fromJson(gapQuoteJson(fee: 4.5, transfer: 1.5, hub: 'Limete Hub', pinned: false, fallback: 'city'));
       expect(q.feeUsd, 4.5);
-      expect(q.transferUsd, 1.5);
+      expect(q.platformFeeUsd, 4.5);
       expect(q.transfer, isTrue);
       expect(q.destinationHubName, 'Limete Hub');
       expect(q.destinationHubId, 'hub-kin');

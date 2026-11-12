@@ -16,8 +16,17 @@ import type { Category } from "@/lib/realtime/types";
 import Link from "next/link";
 import { Pencil, Trash2, ImageIcon, X } from "lucide-react";
 
-type Form = { name: string; nameFr: string; icon: string; image: string; sortOrder: string };
-const EMPTY: Form = { name: "", nameFr: "", icon: "🏷️", image: "", sortOrder: "0" };
+/** `commissionPct`: the seller commission (%) of this category; blank = the default rate (Settings). 0 is a real rate. */
+type Form = { name: string; nameFr: string; icon: string; image: string; sortOrder: string; commissionPct: string };
+const EMPTY: Form = { name: "", nameFr: "", icon: "🏷️", image: "", sortOrder: "0", commissionPct: "" };
+
+/** The commission box as the server wants it: null for blank (use the default), else the number; NaN when it is not a number from 0 to 60. */
+const commissionOf = (raw: string): number | null => {
+  const t = raw.trim().replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 && n <= 60 ? n : Number.NaN;
+};
 
 /** The French name a form should show: the API serves the English name there until a translation exists. */
 const frOf = (c: Category) => frInForm(c.name, c.nameFr);
@@ -63,7 +72,7 @@ export default function AdminCategoriesPage() {
 
   function openEdit(c: Category) {
     setEditing(c);
-    setForm({ name: c.name, nameFr: frOf(c), icon: c.icon ?? "", image: c.image ?? "", sortOrder: String(c.sortOrder ?? 0) });
+    setForm({ name: c.name, nameFr: frOf(c), icon: c.icon ?? "", image: c.image ?? "", sortOrder: String(c.sortOrder ?? 0), commissionPct: c.commissionPct == null ? "" : String(c.commissionPct) });
     setError(null);
     setOpen(true);
   }
@@ -72,6 +81,13 @@ export default function AdminCategoriesPage() {
     // A name in English or French is enough; the other language is translated automatically.
     if (!form.name.trim() && !form.nameFr.trim()) {
       const msg = fr ? "Saisissez un nom de catégorie en anglais ou en français." : "Enter a category name in English or French.";
+      setError(msg);
+      toast(msg, "error");
+      return;
+    }
+    const rate = commissionOf(form.commissionPct);
+    if (Number.isNaN(rate)) {
+      const msg = fr ? "La commission vendeur doit être un nombre entre 0 et 60 (laissez vide pour le taux par défaut)." : "Seller commission must be a number between 0 and 60 (leave it blank for the default rate).";
       setError(msg);
       toast(msg, "error");
       return;
@@ -86,6 +102,8 @@ export default function AdminCategoriesPage() {
       icon: form.icon.trim() || undefined,
       image: form.image.trim() || undefined,
       sortOrder: Number(form.sortOrder) || 0,
+      // null = back to the default rate (the server reads blank and null the same way).
+      commissionPct: rate,
     };
     try {
       if (editing) await socketClient.request("categories:update", { id: editing.id, patch: payload });
@@ -166,6 +184,13 @@ export default function AdminCategoriesPage() {
                 <p className="break-words font-semibold text-slate-900">{c.name}</p>
                 <p className="break-words text-xs text-slate-500">{frOf(c) || (fr ? "Français : traduction automatique" : "French: automatic translation")}</p>
               </div>
+              <span
+                className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800"
+                data-testid="category-commission"
+                title={fr ? "Commission vendeur" : "Seller commission"}
+              >
+                {c.commissionPct == null ? (fr ? "Taux par défaut" : "Default rate") : `${c.commissionPct}%`}
+              </span>
               {typeof (c.usedBy ?? c.productCount) === "number" && (
                 <Link
                   href="/admin/products"
@@ -210,6 +235,22 @@ export default function AdminCategoriesPage() {
                   <label className="mb-1 block text-sm font-medium text-slate-700">{fr ? "Ordre" : "Sort order"}</label>
                   <input className="input-premium w-24 px-3 py-2 text-sm" inputMode="numeric" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
                 </div>
+              </div>
+              <div>
+                <label htmlFor="category-commission" className="mb-1 block text-sm font-medium text-slate-700">{fr ? "Commission vendeur (%)" : "Seller commission (%)"}</label>
+                <input
+                  id="category-commission"
+                  className="input-premium w-32 px-3 py-2 text-sm"
+                  inputMode="decimal"
+                  value={form.commissionPct}
+                  onChange={(e) => setForm((f) => ({ ...f, commissionPct: e.target.value }))}
+                  placeholder={fr ? "Par défaut" : "Default"}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {fr
+                    ? "Entre 0 et 60. Laissez vide pour utiliser le taux par défaut (Paramètres). 0 est un vrai taux : aucune commission sur cette catégorie. Ne s'applique qu'aux nouvelles commandes ; les clients ne le voient jamais."
+                    : "Between 0 and 60. Leave blank to use the default rate (Settings). 0 is a real rate: no commission on this category. Applies to new orders only; customers never see it."}
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">{fr ? "URL de l'image" : "Image URL"}</label>

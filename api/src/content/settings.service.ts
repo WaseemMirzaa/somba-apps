@@ -12,7 +12,13 @@ import { translationMode } from '../translation/translation-mode';
 import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
-export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'deliveryZones', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'] as const;
+export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'deliveryZones', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressMaxKm'] as const;
+/**
+ * The delivery price numbers (base, per km, cap, warehouse transfer, express). Staff-only: a customer sees one "Platform
+ * commission" line per order, never how it is built, so the numbers it is built from are not sent to customers, guests,
+ * sellers or riders. Warehouse staff and every admin role read them (`staffView`); the Super Admin reads everything.
+ */
+export const FEE_SETTINGS = ['deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd'] as const;
 /**
  * How shoppers reach KOMORIKO from Help (support phone, e-mail and a WhatsApp number). Blank = not offered. Public like
  * the rest of the shopper settings; written by admins only (see `WRITABLE`).
@@ -49,6 +55,12 @@ export class SettingsService {
   async publicView(): Promise<Record<string, string>> {
     const all = await this.all();
     return Object.fromEntries(Object.entries(all).filter(([k]) => (PUBLIC_SETTINGS as readonly string[]).includes(k) || isContactKey(k)));
+  }
+
+  /** The public settings plus the delivery price numbers: what warehouse staff and the admin roles without full config read. */
+  async staffView(): Promise<Record<string, string>> {
+    const all = await this.all();
+    return { ...(await this.clientView()), ...Object.fromEntries(Object.entries(all).filter(([k]) => (FEE_SETTINGS as readonly string[]).includes(k))) };
   }
 
   /**
@@ -153,7 +165,8 @@ export class SettingsService {
     // Super Admin, whose Settings page is the one screen that reads it; every other admin role follows the public subset
     // (the exchange rate...) like the apps do.
     const view = await this.clientView();
-    this.emitter.toRoles(['customer', 'guest', 'seller', 'rider', 'warehouse_staff', ...ADMIN_ROLES.filter((r) => r !== 'admin')], 'settings:updated', view);
+    this.emitter.toRoles(['customer', 'guest', 'seller', 'rider'], 'settings:updated', view);
+    this.emitter.toRoles(['warehouse_staff', ...ADMIN_ROLES.filter((r) => r !== 'admin')], 'settings:updated', await this.staffView());
     this.emitter.toRoles(['admin'], 'settings:updated', all);
     return all;
   }

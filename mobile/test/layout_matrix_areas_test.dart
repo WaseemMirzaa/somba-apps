@@ -122,8 +122,8 @@ Map<String, dynamic> _fallbackQuote() => {
           'fallback': 'city',
           'coveringHubName': 'Entrepôt de Limete – Mont-Amba',
           'hops': [
-            {'fromHubName': 'Entrepôt de Kinshasa – Gombe', 'toHubName': 'Entrepôt de Limete – Mont-Amba', 'transitHours': 4, 'costUsd': 3.5},
-            {'fromHubName': 'Entrepôt de Limete – Mont-Amba', 'toHubName': 'Entrepôt de Kikwit – Centre-ville', 'transitHours': 48, 'costUsd': null},
+            {'fromHubName': 'Entrepôt de Kinshasa – Gombe', 'toHubName': 'Entrepôt de Limete – Mont-Amba', 'transitHours': 4},
+            {'fromHubName': 'Entrepôt de Limete – Mont-Amba', 'toHubName': 'Entrepôt de Kikwit – Centre-ville', 'transitHours': 48},
           ],
         },
       ],

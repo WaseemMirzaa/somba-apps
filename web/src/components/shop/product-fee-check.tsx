@@ -6,12 +6,12 @@ import { LocateFixed } from "lucide-react";
 import { useRealtime } from "@/context/realtime-context";
 import { addressPin, useDeliveryQuote, type DeliveryQuote } from "@/lib/logistics";
 import { NotServedNotice } from "@/components/shop/delivery-quote";
-import { feeOriginText, quoteFallbackNote } from "@/lib/quote-text";
+import { feeOriginText, platformFee, platformFeeLabel, quoteFallbackNote } from "@/lib/quote-text";
 import { formatCurrency } from "@/lib/utils";
 import { addressLabelText } from "@/lib/address-label";
 
 /**
- * "What would delivery cost me?" on the product page: the server quotes it (the warehouse of the area + distance) for one of
+ * "What is my platform commission?" on the product page: the server quotes it (one number, the sum of every fee) for one of
  * the shopper's pinned addresses, or for the device location when nobody is signed in.
  */
 export function ProductFeeCheck({ productId, fr, locale, onQuote }: { productId: string; fr: boolean; locale: string; /** The server's quote for this address (its `estimatedDeliveryDate` is the date to show), or null while there is none. */ onQuote?: (q: DeliveryQuote | null) => void }) {
@@ -54,7 +54,7 @@ export function ProductFeeCheck({ productId, fr, locale, onQuote }: { productId:
 
   return (
     <div className="space-y-2" data-testid="fee-check">
-      <p className="text-sm font-medium text-slate-800">{fr ? "Frais de livraison jusqu'à chez vous" : "Delivery fee to your door"}</p>
+      <p className="text-sm font-medium text-slate-800">{platformFeeLabel(fr)}</p>
       <div className="flex flex-wrap items-center gap-2">
         {pinned.length > 0 && (
           <select
@@ -88,10 +88,8 @@ export function ProductFeeCheck({ productId, fr, locale, onQuote }: { productId:
       {error && !quote && !notServed && <p role="alert" className="text-xs text-red-700">{error}</p>}
       {quote && (
         <p className="text-xs text-emerald-800" data-testid="fee-check-result">
-          {quote.feeUsd === 0 ? (fr ? "Livraison gratuite" : "Free delivery") : formatCurrency(quote.feeUsd, locale)}
+          {platformFee(quote) === 0 ? (fr ? "Gratuit" : "Free") : formatCurrency(platformFee(quote), locale)}
           {feeOriginText(quote, fr) ? ` · ${feeOriginText(quote, fr)}` : ""}
-          {quote.pinned && quote.distanceKm > 0 ? ` · ${quote.distanceKm.toLocaleString(fr ? "fr-FR" : "en-GB", { maximumFractionDigits: 1 })} km` : ""}
-          {quote.transfer ? (fr ? " (transfert entre entrepôts inclus)" : " (includes a warehouse transfer)") : ""}
         </p>
       )}
       {quote && quoteFallbackNote(quote, fr) && (

@@ -15,7 +15,6 @@ import 'package:lipcart/services/delivery_quote.dart';
 import 'package:lipcart/services/models.dart';
 import 'package:lipcart/services/realtime_store.dart';
 import 'package:lipcart/util/delivery_estimate.dart';
-import 'package:lipcart/util/format.dart';
 
 import 'areas_helpers.dart';
 import 'gap_helpers.dart';
@@ -87,7 +86,7 @@ void main() {
     test('an old quote (none of the new fields) reads with their defaults', () {
       final q = DeliveryQuote.fromJson(gapQuoteJson(fee: 5, transfer: 2));
       expect((q.fallback, q.coveringHubName, q.coveringHubId, q.hasFallback, q.standsIn), (null, null, null, false, false));
-      expect((q.feeOverrideUsd, q.interCity, q.interCityDays, q.extraDays), (null, false, 0, null));
+      expect((q.interCity, q.interCityDays, q.extraDays), (false, 0, null));
       expect(q.destinationArea, isNull);
       expect(q.destinationAreaChain, isEmpty);
       expect(q.origins, isEmpty);
@@ -96,9 +95,9 @@ void main() {
       expect(q.distinctHops, isEmpty);
     });
 
-    test('an old hop has no transit time and no cost of its own', () {
+    test('an old hop has no transit time', () {
       final h = QuoteHop.fromJson(_hop('A', 'B'));
-      expect((h.transitHours, h.costUsd), (0, null));
+      expect(h.transitHours, 0);
       expect(QuoteRoute([h]).hasHopDetails, isFalse);
       final o = QuoteOrigin.fromJson({'sellerId': 's1', 'hubName': 'Entrepôt A', 'areaName': 'Gombe'});
       expect((o.areaNameEn, o.fallback, o.coveringHubName, o.transitHours, o.hasFallback, o.areaNameFor('en'), o.areaNameFor('fr')), (null, null, null, 0, false, 'Gombe', 'Gombe'));
@@ -113,7 +112,6 @@ void main() {
         'fallback': 'city',
         'coveringHubId': 'h-Limete',
         'coveringHubName': 'Entrepôt Limete',
-        'feeOverrideUsd': 6.5,
         'interCity': true,
         'interCityDays': 3,
         'transitHours': 30,
@@ -124,7 +122,7 @@ void main() {
         ],
       });
       expect((q.fallback, q.coveringHubId, q.coveringHubName, q.hasFallback, q.standsIn), ('city', 'h-Limete', 'Entrepôt Limete', true, true));
-      expect((q.feeOverrideUsd, q.interCity, q.interCityDays, q.extraDays, q.transitHours), (6.5, true, 3, 2, 30));
+      expect((q.interCity, q.interCityDays, q.extraDays, q.transitHours), (true, 3, 2, 30));
       expect(q.destinationAreaChain.map((a) => a.id), ['cd', 'p-kin', 'c-kin', 'd-luk', 'm-gombe']);
       expect(q.destinationArea!.id, 'm-gombe', reason: 'the chain\'s last area when the area itself is not sent');
       final o = q.origins.single;
@@ -132,19 +130,24 @@ void main() {
       expect(o.areaNameFor('en'), 'Limete Town');
       expect(o.areaNameFor('fr'), 'Limete');
       expect(o.standsIn, isTrue);
-      expect(o.hops.map((h) => (h.transitHours, h.costUsd)), [(6.0, 1.5), (24.0, null)]);
+      expect(o.hops.map((h) => h.transitHours), [6.0, 24.0]);
       expect(q.routes, [
         ['Entrepôt Limete', 'Entrepôt Kinshasa', 'Entrepôt Kikwit']
       ]);
       expect(q.routeChains.single.hasHopDetails, isTrue);
     });
 
-    test('a hop\'s cost is a number, or null for the standard transfer fee; odd values are ignored', () {
-      expect(QuoteHop.fromJson(_hop('A', 'B', cost: 0)).costUsd, 0);
-      expect(QuoteHop.fromJson(_hop('A', 'B', cost: 2.25)).costUsd, 2.25);
-      expect(QuoteHop.fromJson(_hop('A', 'B', cost: null)).costUsd, isNull);
-      expect(QuoteHop.fromJson(_hop('A', 'B', cost: 'two')).costUsd, isNull);
-      expect(QuoteHop.fromJson(_hop('A', 'B', transit: 4.5)).transitHours, 4.5);
+    test('a hop reads its names and its transit time; a price (only a staff quote carries one) is not modelled', () {
+      expect(QuoteHop.fromJson(_hop('A', 'B', transit: 4.5, cost: 2.25)).transitHours, 4.5);
+      expect(QuoteHop.fromJson(_hop('A', 'B', cost: 2.25)).transitHours, 0);
+      expect(QuoteHop.fromJson(_hop('A', 'B')).key, 'h-A>h-B');
+    });
+
+    test('one fee: platformFeeUsd, else the total an older server sends as feeUsd; nothing of the breakdown is read', () {
+      expect(DeliveryQuote.fromJson({...gapQuoteJson(fee: 6), 'platformFeeUsd': 6.5}).platformFeeUsd, 6.5);
+      expect(DeliveryQuote.fromJson({'feeUsd': 4}).platformFeeUsd, 4);
+      expect(DeliveryQuote.fromJson({'feeUsd': 4, 'platformFeeUsd': 0}).platformFeeUsd, 0, reason: 'free is a real answer');
+      expect(DeliveryQuote.fromJson(gapQuoteJson(fee: 3)).feeUsd, 3);
     });
 
     test('"no riders" is a fallback where nobody else delivers: the covering warehouse keeps the order', () {
@@ -163,29 +166,16 @@ void main() {
       expect(q({'extraDays': 0, 'interCity': true, 'interCityDays': 3}).estimateExtraDays, 0, reason: 'the server\'s own number, even zero');
     });
 
-    test('a shared hop is one hop; its fee is its own cost, else what is left of the transfer fee shared by the standard ones', () {
+    test('a shared hop is one hop', () {
       final q = DeliveryQuote.fromJson({
         ...gapQuoteJson(fee: 12, transfer: 7),
         'origins': [
-          _origin('s1', [_hop('Limete', 'Kinshasa', cost: 3), _hop('Kinshasa', 'Kikwit', cost: null), _hop('Kikwit', 'Idiofa', cost: null)]),
-          _origin('s2', [_hop('Limete', 'Kinshasa', cost: 3)]),
+          _origin('s1', [_hop('Limete', 'Kinshasa'), _hop('Kinshasa', 'Kikwit'), _hop('Kikwit', 'Idiofa')]),
+          _origin('s2', [_hop('Limete', 'Kinshasa')]),
         ],
       });
       expect(q.distinctHops.map((h) => h.key), ['h-Limete>h-Kinshasa', 'h-Kinshasa>h-Kikwit', 'h-Kikwit>h-Idiofa']);
-      expect(q.hopFeeUsd(q.distinctHops[0]), 3);
-      expect(q.hopFeeUsd(q.distinctHops[1]), 2, reason: '(7 - 3) / 2 standard hops');
-      expect(q.hopFeeUsd(q.distinctHops[2]), 2);
       expect(q.routes, hasLength(2), reason: 'two distinct chains');
-    });
-
-    test('the fee of a hop is unknown when nothing is left to share', () {
-      final q = DeliveryQuote.fromJson({
-        ...gapQuoteJson(fee: 3, transfer: 0),
-        'origins': [
-          _origin('s1', [_hop('A', 'B', cost: null)])
-        ],
-      });
-      expect(q.hopFeeUsd(q.distinctHops.single), isNull);
     });
   });
 
@@ -443,24 +433,24 @@ void main() {
                 : 'Entrepôt Limete n’a aucun livreur disponible pour le moment — les colis de Nord-Kivu sont ramassés par Entrepôt Kinshasa');
       });
 
-      testWidgets('a relayed route: the chain, then each hop with its transit time and its cost (the standard fee where the lane has none)', (t) async {
+      testWidgets('a relayed route: the chain, then each hop with its transit time (no price anywhere)', (t) async {
         await openCheckout(t, {
           ...gapQuoteJson(fee: 9, transfer: 5, hub: 'Entrepôt Kikwit'),
           'transitHours': 28,
           'extraDays': 2,
           'estimatedDeliveryDate': '2026-12-24',
           'origins': [
-            _origin('s1', [_hop('Limete', 'Kinshasa', transit: 4, cost: 3), _hop('Kinshasa', 'Kikwit', transit: 24, cost: null)]),
-            _origin('s2', [_hop('Limete', 'Kinshasa', transit: 4, cost: 3), _hop('Kinshasa', 'Kikwit', transit: 24, cost: null)]),
+            _origin('s1', [_hop('Limete', 'Kinshasa', transit: 4), _hop('Kinshasa', 'Kikwit', transit: 24)]),
+            _origin('s2', [_hop('Limete', 'Kinshasa', transit: 4), _hop('Kinshasa', 'Kikwit', transit: 24)]),
           ],
         });
         expect(shown(t, 'checkout-route-0'), s.checkoutRoute('Entrepôt Limete → Entrepôt Kinshasa → Entrepôt Kikwit'));
         expect(find.byKey(const ValueKey('checkout-route-1')), findsNothing, reason: 'one route, however many sellers take it');
-        expect(shown(t, 'checkout-hop-0-0'), 'Entrepôt Limete → Entrepôt Kinshasa · ${s.checkoutHopTransit(4)} · ${money(3)}');
-        expect(shown(t, 'checkout-hop-0-1'), 'Entrepôt Kinshasa → Entrepôt Kikwit · ${s.checkoutHopTransit(24)} · ${money(2)}', reason: '5 - 3 left for the one standard hop');
+        expect(shown(t, 'checkout-hop-0-0'), 'Entrepôt Limete → Entrepôt Kinshasa · ${s.checkoutHopTransit(4)}');
+        expect(shown(t, 'checkout-hop-0-1'), 'Entrepôt Kinshasa → Entrepôt Kikwit · ${s.checkoutHopTransit(24)}');
         expect(find.byKey(const ValueKey('checkout-hop-0-2')), findsNothing);
         expect(shown(t, 'checkout-transit'), s.checkoutTransit(28));
-        expect(shown(t, 'checkout-transfer'), s.checkoutTransferFee(money(5)));
+        expect(find.byKey(const ValueKey('checkout-transfer')), findsNothing, reason: 'the customer is never told the transfer fee');
         expect(shown(t, 'delivery-estimate'), dayLabel('2026-12-24', lang), reason: 'the server\'s own day, not the days added up on the phone');
       });
 
@@ -469,14 +459,14 @@ void main() {
           ...gapQuoteJson(fee: 6, transfer: 2, hub: 'Entrepôt Kinshasa'),
           'transitHours': 6,
           'origins': [
-            _origin('s1', [_hop('Limete', 'Kinshasa', transit: 6, cost: null)])
+            _origin('s1', [_hop('Limete', 'Kinshasa', transit: 6)])
           ],
         });
         expect(find.byKey(const ValueKey('checkout-route-0')), findsNothing);
-        expect(shown(t, 'checkout-hop-0-0'), 'Entrepôt Limete → Entrepôt Kinshasa · ${s.checkoutHopTransit(6)} · ${money(2)}');
+        expect(shown(t, 'checkout-hop-0-0'), 'Entrepôt Limete → Entrepôt Kinshasa · ${s.checkoutHopTransit(6)}');
       });
 
-      testWidgets('hops without a transit time or a cost of their own (an older server) show no hop rows', (t) async {
+      testWidgets('hops without a transit time (an older server) show no hop rows, and no transfer fee line either', (t) async {
         await openCheckout(t, {
           ...gapQuoteJson(fee: 6, transfer: 2),
           'origins': [
@@ -485,7 +475,7 @@ void main() {
         });
         expect(find.byKey(const ValueKey('checkout-hop-0-0')), findsNothing);
         expect(find.byKey(const ValueKey('checkout-route-0')), findsNothing);
-        expect(find.byKey(const ValueKey('checkout-transfer')), findsOneWidget);
+        expect(find.byKey(const ValueKey('checkout-transfer')), findsNothing);
       });
 
       testWidgets('delivery between cities with no lane: the allowance in days; with a lane the transit line says it', (t) async {

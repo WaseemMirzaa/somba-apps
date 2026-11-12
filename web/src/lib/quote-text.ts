@@ -1,6 +1,9 @@
 /**
  * Wording and shape helpers for the delivery quote card (`delivery:quote`, docs/contracts/areas.md): the fallback
- * note when the covering warehouse has no rider, and the route between warehouses with per-hop transit and cost.
+ * note when the covering warehouse has no rider, and the route between warehouses with per-hop transit time.
+ *
+ * Customers see ONE fee line, "Platform commission" ({@link platformFee}, {@link platformFeeLabel}); the server no longer
+ * sends them how it is made up (no hop costs, transfer, distance part), so nothing here prices a hop.
  *
  * No imports: `npm test` loads this file on its own.
  */
@@ -14,8 +17,6 @@ export interface HopLike {
   toHubName?: string | null;
   /** How long the lane takes (hours). Absent on an old server. */
   transitHours?: number | null;
-  /** The lane's own cost; null = the standard transfer fee. Absent on an old server. */
-  costUsd?: number | null;
 }
 
 export interface OriginLike {
@@ -32,7 +33,6 @@ export interface OriginLike {
 }
 
 export interface QuoteLike {
-  transferUsd?: number | null;
   fallback?: QuoteFallback | string | null;
   coveringHubName?: string | null;
   destinationHubName?: string | null;
@@ -59,12 +59,6 @@ export function formatTransit(hours: number | null | undefined, fr: boolean): st
 export function hopTransitText(hours: number | null | undefined, fr: boolean): string | null {
   if (hours == null || !Number.isFinite(hours) || hours <= 0) return null;
   return `~${formatTransit(hours, fr)}`;
-}
-
-/** What a hop line shows on its right: the transit time when it is known and above 0, then the cost ("Free" for 0), joined by " · ". */
-export function hopFigures(h: { transitHours?: number | null; costUsd?: number | null }, fr: boolean, money: (usd: number) => string): string {
-  const cost = h.costUsd == null || !Number.isFinite(h.costUsd) ? null : h.costUsd === 0 ? (fr ? "Gratuit" : "Free") : money(h.costUsd);
-  return [hopTransitText(h.transitHours, fr), cost].filter((x): x is string => x !== null).join(" · ");
 }
 
 const hasName = (s: string | null | undefined): s is string => typeof s === "string" && s.trim() !== "";
@@ -118,10 +112,6 @@ export interface HopRow {
   to: string;
   /** Hours the lane takes; null when the server did not say (old server). */
   transitHours: number | null;
-  /** What this hop costs: the lane's own cost, else the standard transfer fee when it can be worked out. */
-  costUsd: number | null;
-  /** True when `costUsd` is the standard transfer fee rather than a lane's own cost. */
-  standardFee: boolean;
 }
 
 export interface RouteRow {
@@ -132,26 +122,6 @@ export interface RouteRow {
   transitHours: number | null;
 }
 
-const hopKey = (h: HopLike) => `${h.fromHubId || h.fromHubName || ""}>${h.toHubId || h.toHubName || ""}`;
-
-/**
- * The fee of a hop with no lane cost. The quote does not send the `deliveryTransferUsd` setting, so it is worked out
- * from the total: `transferUsd` is paid once per DISTINCT hop, minus what the lanes with their own cost take.
- * Null when it cannot be worked out.
- */
-export function standardHopFee(q: QuoteLike | null | undefined): number | null {
-  if (!q || q.transferUsd == null || !Number.isFinite(q.transferUsd)) return null;
-  const distinct = new Map<string, HopLike>();
-  for (const chain of chainsOf(q)) for (const h of chain.hops) distinct.set(hopKey(h), h);
-  const rows = [...distinct.values()];
-  const standard = rows.filter((h) => h.costUsd == null);
-  if (standard.length === 0) return null;
-  const custom = rows.reduce((n, h) => n + (h.costUsd ?? 0), 0);
-  const left = q.transferUsd - custom;
-  if (!Number.isFinite(left) || left < -0.005) return null;
-  return Math.round((Math.max(0, left) / standard.length) * 100) / 100;
-}
-
 function chainsOf(q: QuoteLike): { label: OriginLike | null; hops: HopLike[]; transitHours: number | null }[] {
   const origins = (q.origins ?? []).filter((o) => (o.hops ?? []).length > 0);
   if (origins.length > 0) return origins.map((o) => ({ label: o, hops: o.hops ?? [], transitHours: o.transitHours ?? null }));
@@ -159,18 +129,15 @@ function chainsOf(q: QuoteLike): { label: OriginLike | null; hops: HopLike[]; tr
   return [];
 }
 
-/** One route per seller that travels (or the quote's single chain on an older server), each hop with transit and cost. */
+/** One route per seller that travels (or the quote's single chain on an older server), each hop with its transit time. */
 export function quoteRoutes(q: QuoteLike | null | undefined, fr: boolean): RouteRow[] {
   if (!q) return [];
   const chains = chainsOf(q);
-  const fee = standardHopFee(q);
   return chains.map((c) => {
     const hops: HopRow[] = c.hops.map((h) => ({
       from: h.fromHubName ?? "",
       to: h.toHubName ?? "",
       transitHours: h.transitHours != null && Number.isFinite(h.transitHours) ? h.transitHours : null,
-      costUsd: h.costUsd != null ? h.costUsd : fee,
-      standardFee: h.costUsd == null && fee != null,
     }));
     const sum = hops.every((h) => h.transitHours != null) ? hops.reduce((n, h) => n + (h.transitHours ?? 0), 0) : null;
     return {
@@ -181,10 +148,17 @@ export function quoteRoutes(q: QuoteLike | null | undefined, fr: boolean): Route
   });
 }
 
-/** The delivery row of a totals list: "Delivery (Hub)", or "Express delivery (straight from the store)" for an express order, which touches no warehouse. */
-export function deliveryLineLabel(mode: string | null | undefined, hubName: string | null | undefined, fr: boolean): string {
-  if (mode === "express") return fr ? "Livraison express (directement depuis la boutique)" : "Express delivery (straight from the store)";
-  return `${fr ? "Livraison" : "Delivery"}${hasName(hubName) ? ` (${hubName})` : ""}`;
+/** The ONE fee row of every customer totals list (cart, checkout, payment, order): the sum of every fee the customer pays, delivery included. */
+export const platformFeeLabel = (fr: boolean): string => (fr ? "Commission de la plateforme" : "Platform commission");
+
+/**
+ * The fee to show for a quote or an order: `platformFeeUsd` (what the server sums for customers), else the total fee an
+ * older server sends (`feeUsd` on a quote, `deliveryFee` / `deliveryFeeUsd` on an order). 0 when there is none.
+ */
+export function platformFee(x: { platformFeeUsd?: number | null; feeUsd?: number | null; deliveryFeeUsd?: number | null; deliveryFee?: number | null } | null | undefined): number {
+  if (!x) return 0;
+  for (const v of [x.platformFeeUsd, x.feeUsd, x.deliveryFeeUsd, x.deliveryFee]) if (typeof v === "number" && Number.isFinite(v)) return v;
+  return 0;
 }
 
 /** Where the parcel comes from, in the short fee check on a product page: "Express · straight from the store" or "from Hub". Empty when unknown. */

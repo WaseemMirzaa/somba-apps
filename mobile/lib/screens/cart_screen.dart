@@ -451,7 +451,7 @@ class _CartScreenState extends State<CartScreen> {
   Widget _summaryBar(Strings s) {
     final quote = _quote.quote;
     final address = shop.deliveryAddress;
-    final deliveryFee = quote?.feeUsd ?? 0;
+    final deliveryFee = quote?.platformFeeUsd ?? 0;
     final discount = shop.promoDiscount(shop.subtotal);
     final total = shop.subtotal + deliveryFee - discount;
     final notServed = _quote.notice(s, address);
@@ -506,7 +506,7 @@ class _CartScreenState extends State<CartScreen> {
             ),
           const SizedBox(height: 6),
           _row(
-              s.delivery,
+              s.platformFee,
               quote == null
                   ? (address == null || _quote.error != null ? s.cartDeliveryLater : '…')
                   : deliveryFee == 0
@@ -555,11 +555,15 @@ class _CartScreenState extends State<CartScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: TextStyle(
-                fontSize: bold ? 16 : 14,
-                fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
-                color: bold ? AppColors.ink : AppColors.muted)),
+        // The long French "Commission de la plateforme" must wrap, not overflow, on a small phone.
+        Flexible(
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: bold ? 16 : 14,
+                  fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+                  color: bold ? AppColors.ink : AppColors.muted)),
+        ),
+        const SizedBox(width: 8),
         Text(value,
             style: TextStyle(
                 fontSize: bold ? 18 : 14,

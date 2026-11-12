@@ -3,13 +3,10 @@
 import Link from "next/link";
 import { BRAND, LEGAL_LINKS } from "@/lib/config";
 import { useLocale } from "@/context/locale-context";
-import { usePublicSettings } from "@/lib/shop-live";
 
 export default function ShippingPolicyPage() {
   const { locale } = useLocale();
   const fr = locale === "fr";
-  const s = usePublicSettings();
-  const usd = (n: number) => `$${n.toLocaleString(fr ? "fr-FR" : "en-GB", { maximumFractionDigits: 2 })}`;
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 prose prose-slate">
       <h1>{fr ? "Politique d'expédition" : "Shipping Policy"}</h1>
@@ -25,10 +22,10 @@ export default function ShippingPolicyPage() {
       <p>{fr
         ? "Pour trouver votre zone, calculer le trajet et les frais, votre adresse de livraison doit être placée sur la carte. Sans épingle, la commande ne peut pas être passée."
         : "To find your area and work out the route and the fee, your delivery address must be pinned on the map. Without a pin the order cannot be placed."}</p>
-      <h2>{fr ? "3. Frais de livraison" : "3. Delivery fees"}</h2>
+      <h2>{fr ? "3. Commission de la plateforme" : "3. Platform commission"}</h2>
       <p>{fr
-        ? `Les frais se composent d'un montant de base (${usd(s.deliveryBaseUsd)}) plus ${usd(s.deliveryPerKmUsd)} par kilomètre entre l'entrepôt de livraison et votre adresse, plafonnés à ${usd(s.deliveryMaxUsd)}. Lorsqu'un colis doit voyager d'un entrepôt à un autre, un supplément de transfert de ${usd(s.deliveryTransferUsd)} s'ajoute. Le montant exact est calculé et affiché avant le paiement, et c'est celui qui est facturé.`
-        : `The fee is a base amount (${usd(s.deliveryBaseUsd)}) plus ${usd(s.deliveryPerKmUsd)} per kilometre between the delivery warehouse and your address, capped at ${usd(s.deliveryMaxUsd)}. When a parcel has to travel from one warehouse to another, a transfer surcharge of ${usd(s.deliveryTransferUsd)} is added. The exact amount is worked out and shown before you pay, and that is what you are charged.`}</p>
+        ? "Vous ne payez qu'une seule ligne en plus de vos articles : la « Commission de la plateforme ». Elle regroupe tous les frais que vous payez, livraison comprise, et dépend de votre adresse et de la route du colis. Le montant exact est calculé et affiché avant le paiement, et c'est celui qui est facturé."
+        : "You pay a single line on top of your items: the “Platform commission”. It covers every fee you pay, delivery included, and depends on your address and the parcel's route. The exact amount is worked out and shown before you pay, and that is what you are charged."}</p>
       <h2>{fr ? "4. Délais" : "4. Delivery times"}</h2>
       <p>{fr
         ? "Le délai estimé est indiqué sur chaque fiche produit : il comprend le délai de livraison du vendeur et son délai de préparation. Il court à partir de la confirmation du paiement. Une boutique en vacances ne prend pas de nouvelles commandes jusqu'à son retour."

@@ -60,7 +60,7 @@ export default function SellerRevenueAnalyticsPage() {
               <StatTile
                 title={fr ? "Net après commission" : "Net after commission"}
                 value={formatCurrency(net, locale)}
-                hint={fr ? `Commission au taux de chaque commande (${commissionPct} % pour les nouvelles)` : `Commission at each order's own rate (${commissionPct}% for new orders)`}
+                hint={fr ? `Commission au taux de chaque commande (taux par défaut ${commissionPct} % ; une catégorie peut en avoir un autre)` : `Commission at each order's own rate (default rate ${commissionPct}%; a category can have another)`}
                 icon={Wallet}
               />
               <StatTile title={fr ? "Panier moyen" : "Avg. order value"} value={a.orders > 0 ? formatCurrency(a.aov, locale) : "—"} hint={fr ? `${a.orders} commandes` : `${a.orders} orders`} icon={Target} />

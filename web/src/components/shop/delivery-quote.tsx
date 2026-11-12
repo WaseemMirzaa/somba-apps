@@ -5,8 +5,7 @@ import { DualCurrency } from "@/components/ui/dual-currency";
 import { formatTransit, type DeliveryQuote } from "@/lib/logistics";
 import { areaName, notServedArea, notServedCityNames, notServedText, servedCityNames, useFootprint, type Area, type NotServedInfo } from "@/lib/areas";
 import { englishAreaName } from "@/lib/not-served";
-import { hopFigures, originAreaName, originFallbackNote, quoteFallbackNote, quoteRoutes } from "@/lib/quote-text";
-import { formatCurrency } from "@/lib/utils";
+import { hopTransitText, originAreaName, originFallbackNote, platformFee, quoteFallbackNote, quoteRoutes } from "@/lib/quote-text";
 
 export type NotServed = NotServedInfo | null;
 
@@ -61,7 +60,10 @@ export function SellerAreaNotice({ fr }: { fr: boolean }) {
   );
 }
 
-/** The quoted delivery fee as one row of a totals list: "FREE", the amount, or why there is none yet. */
+/**
+ * The ONE fee row of a totals list ("Platform commission": the sum of every fee the customer pays, delivery included):
+ * "FREE", the amount, or why there is none yet. The customer never sees how it is made up.
+ */
 export function QuoteFeeValue({
   quote,
   loading,
@@ -80,33 +82,35 @@ export function QuoteFeeValue({
   notServed?: NotServed;
 }) {
   if (notServed) return <span className="font-medium text-amber-800">{fr ? "Zone non desservie" : "Not served yet"}</span>;
-  if (quote) return quote.feeUsd === 0 ? <span>{fr ? "GRATUIT" : "FREE"}</span> : <DualCurrency amount={quote.feeUsd} />;
+  if (quote) return platformFee(quote) === 0 ? <span>{fr ? "GRATUIT" : "FREE"}</span> : <DualCurrency amount={platformFee(quote)} />;
   if (loading) return <span className="text-slate-500">{fr ? "Calcul…" : "Calculating…"}</span>;
   if (error) return <span className="text-red-600">{fr ? "Indisponible" : "Unavailable"}</span>;
   return <span className="text-slate-500">{missing ?? (fr ? "Choisissez une adresse" : "Choose an address")}</span>;
 }
 
-/** How the parcel gets to the customer: the warehouse, the distance and the fee parts. */
+/**
+ * How the parcel gets to the customer: the area, the warehouse, the route and the notes. It carries NO price: the fee is
+ * the single "Platform commission" row of the totals next to it (the server sends customers no breakdown to show).
+ */
 export function DeliveryQuoteCard({
   quote,
   loading,
   error,
   fr,
-  locale,
   notServed,
 }: {
   quote: DeliveryQuote | null;
   loading: boolean;
   error: string | null;
   fr: boolean;
-  locale: string;
+  /** Kept so call sites need not change; the card shows no money. */
+  locale?: string;
   notServed?: NotServed;
 }) {
   if (notServed) return <NotServedNotice notServed={notServed} fr={fr} />;
   if (!quote && !loading && !error) return null;
   // Multi-hop routes: one per seller that travels (or one for the whole quote on an old server), hop by hop.
   const routes = quoteRoutes(quote, fr);
-  const hopCount = routes.reduce((n, r) => Math.max(n, r.hops.length), 0);
   const fallbackNote = quoteFallbackNote(quote, fr);
   return (
     <div className="rounded-xl border border-[var(--border)] bg-slate-50/60 p-4 text-sm" data-testid="delivery-quote">
@@ -116,7 +120,7 @@ export function DeliveryQuoteCard({
           ? fr ? "Livraison express : directement depuis le vendeur" : "Express delivery: straight from the seller"
           : fr ? "Livraison depuis l'entrepôt de votre zone" : "Delivered from your area's warehouse"}
       </p>
-      {loading && !quote && <p className="text-slate-500">{fr ? "Calcul des frais de livraison…" : "Working out your delivery fee…"}</p>}
+      {loading && !quote && <p className="text-slate-500">{fr ? "Calcul de la commission de la plateforme…" : "Working out your platform commission…"}</p>}
       {error && !quote && <p role="alert" className="text-red-600">{error}</p>}
       {quote && (
         <div className="space-y-1.5">
@@ -128,20 +132,14 @@ export function DeliveryQuoteCard({
           {quote.deliveryMode === "express" && (
             <p className="text-violet-800" data-testid="quote-express">
               {fr ? "Un livreur apporte votre colis directement depuis la boutique du vendeur, sans passer par un entrepôt." : "A rider brings your parcel straight from the seller's store, with no warehouse in between."}
-              {quote.pinned && quote.distanceKm > 0 ? ` · ${quote.distanceKm.toLocaleString(fr ? "fr-FR" : "en-GB", { maximumFractionDigits: 1 })} km` : ""}
             </p>
           )}
           {quote.deliveryMode !== "express" && quote.destinationHub && (
             <p className="text-slate-700">
               {fr ? "Entrepôt de livraison" : "Delivery warehouse"}: <span className="font-medium">{quote.destinationHubName ?? quote.destinationHub.name}</span>
               {quote.destinationHub.city ? ` · ${quote.destinationHub.city}` : ""}
-              {quote.pinned && quote.distanceKm > 0 ? ` · ${quote.distanceKm.toLocaleString(fr ? "fr-FR" : "en-GB", { maximumFractionDigits: 1 })} km` : ""}
             </p>
           )}
-          <div className="flex justify-between text-slate-600">
-            <span>{fr ? "Livraison jusqu'à chez vous" : "Delivery to your door"}</span>
-            <span>{quote.deliveryUsd === 0 ? (fr ? "Gratuit" : "Free") : formatCurrency(quote.deliveryUsd, locale)}</span>
-          </div>
           {quote.deliveryMode !== "express" && (quote.origins ?? []).length > 0 && (
             <div className="space-y-0.5 text-xs text-slate-500" data-testid="quote-origins">
               <p>
@@ -169,7 +167,7 @@ export function DeliveryQuoteCard({
                         <span className="text-slate-700">
                           {fr ? `Étape ${k + 1}` : `Hop ${k + 1}`}: {h.from} → {h.to}
                         </span>
-                        <span className="text-slate-600">{hopFigures(h, fr, (usd) => formatCurrency(usd, locale))}</span>
+                        <span className="text-slate-600">{hopTransitText(h.transitHours, fr) ?? ""}</span>
                       </li>
                     ))}
                   </ol>
@@ -181,16 +179,6 @@ export function DeliveryQuoteCard({
               {quote.transitHours != null && quote.transitHours > 0 && (
                 <p>{fr ? "Transit entre entrepôts, compté dans la date estimée" : "Transit between warehouses, included in the estimate"}: ~{formatTransit(quote.transitHours, fr)}</p>
               )}
-            </div>
-          )}
-          {quote.transfer && (
-            <div className="flex justify-between text-slate-600">
-              <span>
-                {hopCount > 1
-                  ? fr ? `Transferts entre entrepôts (${hopCount} étapes, vendeur dans un autre secteur)` : `Transfers between warehouses (${hopCount} hops, seller in another area)`
-                  : fr ? "Transfert entre entrepôts (vendeur dans un autre secteur)" : "Transfer between warehouses (seller in another area)"}
-              </span>
-              <span>{formatCurrency(quote.transferUsd, locale)}</span>
             </div>
           )}
           {fallbackNote && (

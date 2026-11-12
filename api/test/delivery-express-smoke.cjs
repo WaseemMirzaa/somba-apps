@@ -151,7 +151,8 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   ok(pub?.seller?.expressDelivery === true && pub.products?.[0]?.sellerExpressDelivery === true, 'the public storefront and its products carry expressDelivery / sellerExpressDelivery', JSON.stringify([pub?.seller?.expressDelivery, pub?.products?.[0]?.sellerExpressDelivery]));
   const cust = await register('exbuyer');
   const line = (p, qty = 1) => ({ productId: p.id, qty });
-  const quote = (place, lines, extra = {}) => req(cust.sock, 'delivery:quote', { city: 'Kinshasa', ...(place.commune ? { commune: place.commune } : {}), ...(place.pin ? { geo: place.pin } : {}), lines, ...extra });
+  // An admin asks: staff get the full fee breakdown (the customer's one-line view is checked below).
+  const quote = (place, lines, extra = {}) => req(admin.sock, 'delivery:quote', { city: 'Kinshasa', ...(place.commune ? { commune: place.commune } : {}), ...(place.pin ? { geo: place.pin } : {}), lines, ...extra });
 
   section('The quote: express fee and date');
   let q = (await quote(GOMBE, [line(prod)])).data;
@@ -160,6 +161,14 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   ok(q && Math.abs(q.feeUsd - Math.min(10, 3 + 1 * q.distanceKm)) < 0.02 && q.distanceKm > 0, 'the fee is min(max, base + perKm x km) from the seller pin to the customer pin', JSON.stringify([q?.feeUsd, q?.distanceKm]));
   ok(q?.prepDays === 2 && q.routeDays === 1 && q.estimateDays === 3 && /^\d{4}-\d{2}-\d{2}$/.test(q.estimatedDeliveryDate ?? ''), 'the days are prep 2 + expressDeliveryDays 1, with a date', JSON.stringify([q?.prepDays, q?.routeDays, q?.estimateDays, q?.estimatedDeliveryDate]));
 
+  {
+    const c = (await req(cust.sock, 'delivery:quote', { city: 'Kinshasa', commune: 'Gombe', geo: GOMBE.pin, lines: [line(prod)] })).data;
+    ok(c?.platformFeeUsd === q?.feeUsd && c.feeUsd === q.feeUsd && c.express === true && /^\d{4}-\d{2}-\d{2}$/.test(c.estimatedDeliveryDate ?? ''), 'a customer gets ONE fee (platformFeeUsd) plus the express flag and the date', JSON.stringify([c?.platformFeeUsd, c?.feeUsd]));
+    ok(c && !['deliveryUsd', 'transferUsd', 'defaultTransferUsd', 'distanceKm', 'feeOverrideUsd'].some((k) => k in c) && !/costUsd|laneCost/.test(JSON.stringify(c)), 'and no breakdown (no distance part, transfer, kilometres, lane cost or flat-fee override)');
+    const g = (await req((await connect()), 'delivery:quote', { city: 'Kinshasa', commune: 'Gombe', geo: GOMBE.pin, lines: [line(prod)] })).data;
+    ok(g?.platformFeeUsd === q?.feeUsd && !('distanceKm' in g) && !('deliveryUsd' in g), 'a guest gets the same one-line view');
+  }
+
   section('orders:create gives one express leg that waits for the seller');
   const place = async (lines, method = 'stripe_card', where = GOMBE) => {
     const r = await req(cust.sock, 'orders:create', { items: lines, paymentMethod: method, shippingAddress: addr(where) });
@@ -167,6 +176,7 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
     return r.data;
   };
   const order = await place([line(prod)]);
+  ok(order.platformFeeUsd === order.deliveryFeeUsd && order.platformFeeUsd > 0 && !/commission/i.test(JSON.stringify(order.items)), 'the order the customer gets carries platformFeeUsd (= the fee) and no seller commission on its lines');
   ok(order.deliveryMode === 'express' && order.estimatedDeliveryDate === q.estimatedDeliveryDate, 'the order records deliveryMode express and the quoted date', JSON.stringify([order.deliveryMode, order.estimatedDeliveryDate, q.estimatedDeliveryDate]));
   ok(Math.abs(order.deliveryFeeUsd - q.feeUsd) < 0.011, 'it charges exactly the quoted fee', `${order.deliveryFeeUsd} vs ${q.feeUsd}`);
   const legs = await until(async () => { const l = await legsOf(order.id); return l.length ? l : null; });

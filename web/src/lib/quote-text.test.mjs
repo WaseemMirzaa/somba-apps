@@ -8,7 +8,7 @@ const src = readFileSync(new URL("./quote-text.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
 const q = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
-const hop = (from, to, transitHours, costUsd) => ({ fromHubId: from, fromHubName: `Entrepôt ${from}`, toHubId: to, toHubName: `Entrepôt ${to}`, transitHours, costUsd });
+const hop = (from, to, transitHours) => ({ fromHubId: from, fromHubName: `Entrepôt ${from}`, toHubId: to, toHubName: `Entrepôt ${to}`, transitHours });
 
 test("fallback note names the covering warehouse and the one that delivers (EN/FR)", () => {
   const quote = { fallback: "city", coveringHubName: "Entrepôt Limete", destinationHubName: "Entrepôt Kinshasa" };
@@ -40,44 +40,34 @@ test("the pickup side of the fallback", () => {
   assert.equal(q.originFallbackNote({ ...o, hubName: "Entrepôt Limete" }, false), null);
 });
 
-test("per-hop transit and cost come from origins[].hops[]", () => {
+test("per-hop transit comes from origins[].hops[] (and no hop carries a price)", () => {
   const quote = {
-    transferUsd: 3.5,
-    origins: [{ sellerId: "s1", areaName: "Limete", areaNameEn: "Limete", hops: [hop("L", "K", 4, 2), hop("K", "W", 24, null)], transitHours: 28 }],
+    origins: [{ sellerId: "s1", areaName: "Limete", areaNameEn: "Limete", hops: [hop("L", "K", 4), hop("K", "W", 24)], transitHours: 28 }],
   };
   const [route] = q.quoteRoutes(quote, false);
   assert.equal(route.hops.length, 2);
-  assert.deepEqual([route.hops[0].from, route.hops[0].to, route.hops[0].transitHours, route.hops[0].costUsd, route.hops[0].standardFee], ["Entrepôt L", "Entrepôt K", 4, 2, false]);
-  // The second lane has no cost of its own: the standard fee is what is left of the total (3.50 - 2.00).
-  assert.deepEqual([route.hops[1].transitHours, route.hops[1].costUsd, route.hops[1].standardFee], [24, 1.5, true]);
+  assert.deepEqual(route.hops[0], { from: "Entrepôt L", to: "Entrepôt K", transitHours: 4 });
+  assert.deepEqual(route.hops[1], { from: "Entrepôt K", to: "Entrepôt W", transitHours: 24 });
   assert.equal(route.transitHours, 28);
+  assert.equal(q.hopFigures, undefined);
+  assert.equal(q.standardHopFee, undefined);
 });
 
-test("a hop shared by two sellers pays once: the standard fee is not split twice", () => {
-  const quote = {
-    transferUsd: 3,
-    origins: [
-      { sellerId: "a", hops: [hop("L", "K", 4, null)] },
-      { sellerId: "b", hops: [hop("L", "K", 4, null), hop("K", "W", 24, null)] },
-    ],
-  };
-  assert.equal(q.standardHopFee(quote), 1.5);
-  const routes = q.quoteRoutes(quote, true);
-  assert.equal(routes.length, 2);
-  assert.equal(routes[1].hops[1].costUsd, 1.5);
-  // Two routes: each one is labelled by its seller's area (the French name in French).
-  const labelled = q.quoteRoutes({ transferUsd: 1.5, origins: [{ areaName: "Limète", areaNameEn: "Limete", hops: [hop("L", "K", 4, null)] }, { areaName: "Gombe", hops: [hop("G", "K", 2, null)] }] }, false);
+test("a route sums its hop transit when the origin does not say; two routes are labelled by their seller's area", () => {
+  const sum = q.quoteRoutes({ origins: [{ hops: [hop("L", "K", 4), hop("K", "W", 24)] }] }, false);
+  assert.equal(sum[0].transitHours, 28);
+  const labelled = q.quoteRoutes({ origins: [{ areaName: "Limète", areaNameEn: "Limete", hops: [hop("L", "K", 4)] }, { areaName: "Gombe", hops: [hop("G", "K", 2)] }] }, false);
   assert.deepEqual(labelled.map((r) => r.label), ["Limete", "Gombe"]);
+  assert.deepEqual(q.quoteRoutes({ origins: [{ areaName: "Limète", areaNameEn: "Limete", hops: [hop("L", "K", 4)] }, { areaName: "Gombe", hops: [hop("G", "K", 2)] }] }, true).map((r) => r.label), ["Limète", "Gombe"]);
 });
 
 test("old payloads: no transit and no cost per hop, or one chain on the quote", () => {
   const oldOrigins = q.quoteRoutes({ origins: [{ hops: [{ fromHubId: "L", fromHubName: "Entrepôt L", toHubId: "K", toHubName: "Entrepôt K" }] }] }, false);
   assert.equal(oldOrigins[0].hops[0].transitHours, null);
-  assert.equal(oldOrigins[0].hops[0].costUsd, null);
   assert.equal(oldOrigins[0].transitHours, null);
-  const flat = q.quoteRoutes({ hops: [hop("L", "K", 4, 2)] }, false);
+  const flat = q.quoteRoutes({ hops: [hop("L", "K", 4)] }, false);
   assert.equal(flat.length, 1);
-  assert.equal(flat[0].hops[0].costUsd, 2);
+  assert.equal(flat[0].hops[0].transitHours, 4);
   assert.deepEqual(q.quoteRoutes({ origins: [{ hops: [] }] }, false), []);
   assert.deepEqual(q.quoteRoutes(null, false), []);
 });
@@ -91,25 +81,6 @@ test("transit time is written as people say it", () => {
   assert.equal(q.formatTransit(null, true), "—");
 });
 
-test("a hop with no known transit time (a direct transfer, no lane) shows its cost only: no \"~0 min\"", () => {
-  const money = (usd) => `$${usd.toFixed(2)}`;
-  // the case from the demo: no lane configured, the default transfer fee, transit 0
-  assert.equal(q.hopFigures({ transitHours: 0, costUsd: 1.5 }, false, money), "$1.50");
-  assert.equal(q.hopFigures({ transitHours: 0, costUsd: 1.5 }, true, money), "$1.50");
-  assert.equal(q.hopFigures({ transitHours: null, costUsd: 1.5 }, false, money), "$1.50");
-  assert.equal(q.hopFigures({ costUsd: 1.5 }, false, money), "$1.50");
-  // a lane with a transit time shows both
-  assert.equal(q.hopFigures({ transitHours: 4, costUsd: 2 }, false, money), "~4 h · $2.00");
-  assert.equal(q.hopFigures({ transitHours: 36, costUsd: 2 }, true, money), "~36 h · $2.00");
-  assert.equal(q.hopFigures({ transitHours: 72, costUsd: 0 }, true, money), "~3 j · Gratuit");
-  assert.equal(q.hopFigures({ transitHours: 0.5, costUsd: null }, false, money), "~30 min");
-  // a free hop with no transit is still said
-  assert.equal(q.hopFigures({ transitHours: 0, costUsd: 0 }, false, money), "Free");
-  // nothing to say
-  assert.equal(q.hopFigures({ transitHours: 0, costUsd: null }, false, money), "");
-  assert.equal(q.hopFigures({}, false, money), "");
-});
-
 test("hopTransitText hides unknown, zero and nonsense transit", () => {
   for (const h of [null, undefined, 0, -1, NaN, Infinity]) assert.equal(q.hopTransitText(h, false), null);
   assert.equal(q.hopTransitText(4, false), "~4 h");
@@ -117,13 +88,21 @@ test("hopTransitText hides unknown, zero and nonsense transit", () => {
   assert.equal(q.hopTransitText(60, true), "~2 j 12 h");
 });
 
-test("an express order is labelled express, never as a warehouse delivery", async () => {
-  const { loadTs } = await import("./ts-load.mjs");
-  const q = await loadTs("quote-text");
-  assert.equal(q.deliveryLineLabel("express", "Entrepôt Kinshasa", false), "Express delivery (straight from the store)");
-  assert.equal(q.deliveryLineLabel("express", "Entrepôt Kinshasa", true), "Livraison express (directement depuis la boutique)");
-  assert.equal(q.deliveryLineLabel("standard", "Entrepôt Kinshasa", false), "Delivery (Entrepôt Kinshasa)");
-  assert.equal(q.deliveryLineLabel(undefined, null, true), "Livraison");
+test("the one customer fee line: its label, and the number it shows", () => {
+  assert.equal(q.platformFeeLabel(false), "Platform commission");
+  assert.equal(q.platformFeeLabel(true), "Commission de la plateforme");
+  // the server's platformFeeUsd wins; an older server's total fee is the fallback; an order carries deliveryFee(Usd)
+  assert.equal(q.platformFee({ platformFeeUsd: 4.5, feeUsd: 4 }), 4.5);
+  assert.equal(q.platformFee({ platformFeeUsd: 0, feeUsd: 4 }), 0);
+  assert.equal(q.platformFee({ feeUsd: 4 }), 4);
+  assert.equal(q.platformFee({ deliveryFeeUsd: 3 }), 3);
+  assert.equal(q.platformFee({ deliveryFee: 2 }), 2);
+  assert.equal(q.platformFee({ platformFeeUsd: null, feeUsd: undefined }), 0);
+  assert.equal(q.platformFee(null), 0);
+});
+
+test("an express order keeps its badge but no longer prices the delivery apart; the product fee check names where it comes from", () => {
+  assert.equal(q.deliveryLineLabel, undefined);
   assert.equal(q.feeOriginText({ deliveryMode: "express", destinationHubName: "Entrepôt Kinshasa" }, false), "Express · straight from the store");
   assert.equal(q.feeOriginText({ deliveryMode: "express" }, true), "Express · directement depuis la boutique");
   assert.equal(q.feeOriginText({ destinationHubName: "Entrepôt Kinshasa" }, false), "from Entrepôt Kinshasa");

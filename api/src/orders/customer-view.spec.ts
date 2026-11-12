@@ -96,6 +96,44 @@ describe('OrdersService.customerViews: partiallyDelivered', () => {
   });
 });
 
+describe('OrdersService.customerViews: one fee line, no seller commission', () => {
+  const full = () => ({
+    id: 'o1',
+    customerId: 'c1',
+    status: 'confirmed',
+    deliveryFeeUsd: 4.6,
+    totalUsd: 24.6,
+    items: [{ id: 'i1', productId: 'p1', priceUsd: 10, qty: 2, commissionPct: 12, commissionUsd: 2.4, sellerId: 's1' }],
+  }) as never;
+
+  it('adds platformFeeUsd (the sum of every fee the customer pays) and keeps deliveryFeeUsd for old builds', async () => {
+    const [v] = await make().svc.customerViews([full()]);
+    expect(v.platformFeeUsd).toBe(4.6);
+    expect(v.deliveryFeeUsd).toBe(4.6);
+  });
+
+  it('drops commissionPct / commissionUsd from every line but keeps the rest of the line', async () => {
+    const [v] = await make().svc.customerViews([full()]);
+    expect(v.items[0]).not.toHaveProperty('commissionPct');
+    expect(v.items[0]).not.toHaveProperty('commissionUsd');
+    expect(v.items[0]).toMatchObject({ id: 'i1', priceUsd: 10, qty: 2 });
+    expect(JSON.stringify(v)).not.toMatch(/commission/i);
+  });
+
+  it('does not touch the stored order (the seller and finance views still read the commission)', async () => {
+    const o = full() as unknown as { items: { commissionPct: number }[] };
+    await make().svc.customerViews([o as never]);
+    expect(o.items[0].commissionPct).toBe(12);
+  });
+
+  it('also holds for the live pushes (order:created / order:updated reach the customer through the same view)', async () => {
+    const { view } = make();
+    const out = (await view('c1', full())) as { platformFeeUsd: number; items: object[] };
+    expect(out.platformFeeUsd).toBe(4.6);
+    expect(JSON.stringify(out.items)).not.toMatch(/commission/i);
+  });
+});
+
 describe('OrdersService.withRiders: the rider is shown only while a customer leg is on the road', () => {
   const make2 = (legs: object[]) => {
     const manager = {

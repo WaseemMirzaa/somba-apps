@@ -74,8 +74,8 @@ export default function SellerTaxPage() {
 
       <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
         {fr
-          ? `Chaque facture récapitule vos commandes livrées du mois, la commission prélevée (${balance.data ? `${balance.data.commissionPct} % sur les nouvelles commandes` : "taux enregistré par commande"}), les commissions recréditées et le net. Un mois terminé est figé une fois émis ; le mois en cours est recalculé à chaque ouverture.`
-          : `Each invoice summarises the month's delivered orders, the commission charged (${balance.data ? `${balance.data.commissionPct}% on new orders` : "the rate stored per order"}), commission credited back and the net. A finished month is frozen once issued; the current month is rebuilt each time you open it.`}
+          ? `Chaque facture récapitule vos commandes livrées du mois, la commission prélevée (${balance.data ? `taux par défaut ${balance.data.commissionPct} % sur les nouvelles commandes, selon la catégorie` : "taux enregistré par commande"}), les commissions recréditées et le net. Un mois terminé est figé une fois émis ; le mois en cours est recalculé à chaque ouverture.`
+          : `Each invoice summarises the month's delivered orders, the commission charged (${balance.data ? `default rate ${balance.data.commissionPct}% on new orders, by category` : "the rate stored per order"}), commission credited back and the net. A finished month is frozen once issued; the current month is rebuilt each time you open it.`}
       </div>
 
       {docs.error && <LoadError message={docs.error} onRetry={docs.reload} />}

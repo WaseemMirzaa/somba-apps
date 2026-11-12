@@ -103,10 +103,12 @@ describe('settings:updated: the full set is the super admin’s, everyone else g
     const full = pushes.filter((e) => e.to === 'admin');
     expect(full).toHaveLength(2);
     expect(full[1].payload).toMatchObject({ fxRate: '2800', [FRAUD_KEY]: '7', requireStaffTwoFactor: 'true' });
+    // Two audiences per change: shoppers/sellers/riders (the public view) and warehouse staff + the other admin roles (public + delivery fee numbers).
     const others = pushes.filter((e) => e.to !== 'admin');
-    expect(others).toHaveLength(2);
+    expect(others).toHaveLength(4);
     for (const e of others) {
       const rooms = e.to.split(',');
+      if (e.to.startsWith('customer')) continue;
       for (const role of ALL_ADMINS.filter((r) => r !== 'admin')) expect(rooms).toContain(role); // the exchange rate keeps updating in every portal
       expect(rooms).not.toContain('admin');
       expect(Object.keys(e.payload)).not.toContain(FRAUD_KEY);

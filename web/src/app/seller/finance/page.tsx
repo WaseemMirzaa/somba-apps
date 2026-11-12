@@ -196,8 +196,8 @@ export default function SellerFinancePage() {
         <CardContent>
           <p className="text-sm text-slate-600">
             {fr
-              ? `La plateforme prélève ${b?.commissionPct ?? "—"} % sur les nouvelles commandes ; chaque commande garde le taux enregistré à sa création, un changement de taux ne modifie jamais vos commandes passées. Commission sur vos ventes à ce jour : ${money(b?.commissionUsd ?? 0)}. Le détail de chaque mois figure sur une facture de commission (Documents fiscaux).`
-              : `The platform keeps ${b?.commissionPct ?? "—"}% on new orders; each order keeps the rate stored when it was placed, so a rate change never alters your past orders. Commission on your sales so far: ${money(b?.commissionUsd ?? 0)}. Each month's detail is on a commission invoice (Tax documents).`}
+              ? `Le taux de commission par défaut est de ${b?.commissionPct ?? "—"} % sur les nouvelles commandes ; une catégorie peut avoir un taux différent. Chaque commande garde le taux enregistré à sa création, un changement de taux ne modifie jamais vos commandes passées. Commission sur vos ventes à ce jour : ${money(b?.commissionUsd ?? 0)}. Le détail de chaque mois figure sur une facture de commission (Documents fiscaux).`
+              : `The default commission rate is ${b?.commissionPct ?? "—"}% on new orders; a category can have a different rate. Each order keeps the rate stored when it was placed, so a rate change never alters your past orders. Commission on your sales so far: ${money(b?.commissionUsd ?? 0)}. Each month's detail is on a commission invoice (Tax documents).`}
           </p>
         </CardContent>
       </Card>
