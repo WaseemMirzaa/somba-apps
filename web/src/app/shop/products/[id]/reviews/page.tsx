@@ -149,7 +149,7 @@ export default function ProductReviewsPage() {
               <span className="ml-auto text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</span>
             </div>
             <div className="mt-3">
-              <TranslatableText kind="review" id={r.id} text={r.text} sourceLang={r.sourceLang} className="text-sm text-slate-700" />
+              <TranslatableText kind="review" id={r.id} auto text={r.text} sourceLang={r.sourceLang} i18n={r.textI18n} className="text-sm text-slate-700" />
               <AttachmentGallery urls={r.photos} className="mt-3" />
             </div>
             {r.sellerReply && (
@@ -158,7 +158,7 @@ export default function ProductReviewsPage() {
                   {fr ? "Réponse du vendeur" : "Seller reply"}
                   {r.sellerReplyAt && <span className="font-normal text-slate-500"> · {new Date(r.sellerReplyAt).toLocaleDateString()}</span>}
                 </p>
-                <TranslatableText kind="review_reply" id={r.id} text={r.sellerReply} className="mt-1 text-slate-600" />
+                <TranslatableText kind="review_reply" id={r.id} auto text={r.sellerReply} i18n={r.replyI18n} className="mt-1 text-slate-600" />
               </div>
             )}
             <button

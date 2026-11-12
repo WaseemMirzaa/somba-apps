@@ -11,39 +11,15 @@ import { useChatThread, type ChatMessage } from "@/lib/shop-engage";
 import { useLocale } from "@/context/locale-context";
 import { localized } from "@/lib/i18n-fields";
 import { useToast } from "@/context/toast-context";
-import { socketClient } from "@/lib/realtime/socket-client";
-import { useTranslationEnabled } from "@/lib/shop-live";
+import { TranslatableText } from "@/components/shop/translatable-text";
 
-/** One message with a "See translation" link (the server translates stored chat messages on demand). */
-function Bubble({ m, mine, fr, locale }: { m: ChatMessage; mine: boolean; fr: boolean; locale: string }) {
-  const { toast } = useToast();
-  const translationOn = useTranslationEnabled();
-  const [shown, setShown] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [same, setSame] = useState(false);
-
-  async function translate() {
-    if (shown) {
-      setShown(null);
-      return;
-    }
-    setBusy(true);
-    try {
-      const r = await socketClient.request<{ text: string; same: boolean }>("translate:text", { kind: "chat_message", id: m.id, target: locale });
-      if (r.same || !r.text) setSame(true);
-      else setShown(r.text);
-    } catch (e) {
-      toast((e as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
+/** One message: the other side's text shows in the page language by itself (the server's translations, else fetched). */
+function Bubble({ m, mine, fr }: { m: ChatMessage; mine: boolean; fr: boolean }) {
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${mine ? "bg-[var(--primary)] text-white" : "bg-slate-100 text-slate-900"}`} data-testid={mine ? "msg-mine" : "msg-theirs"}>
         {!mine && <p className="mb-0.5 text-xs font-semibold text-slate-600">{m.senderName}</p>}
-        {m.text && <p className="whitespace-pre-wrap">{shown ?? m.text}</p>}
+        {m.text && (mine ? <p className="whitespace-pre-wrap break-words">{m.text}</p> : <TranslatableText kind="chat_message" id={m.id} auto text={m.text} i18n={m.textI18n} className="whitespace-pre-wrap break-words" />)}
         {m.attachments.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {m.attachments.map((u) => (
@@ -56,12 +32,6 @@ function Bubble({ m, mine, fr, locale }: { m: ChatMessage; mine: boolean; fr: bo
         )}
         <p className={`mt-1 flex flex-wrap items-center gap-x-2 text-[11px] ${mine ? "text-white/80" : "text-slate-500"}`}>
           <span>{new Date(m.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB", { dateStyle: "short", timeStyle: "short" })}</span>
-          {translationOn && !mine && m.text && !same && (
-            <button type="button" onClick={() => void translate()} disabled={busy} className="font-medium underline disabled:opacity-60">
-              {busy ? "…" : shown ? (fr ? "Voir l'original" : "See original") : fr ? "Voir la traduction" : "See translation"}
-            </button>
-          )}
-          {shown && <span>{fr ? "Traduit automatiquement" : "Translated automatically"}</span>}
         </p>
       </div>
     </div>
@@ -125,7 +95,7 @@ function Thread() {
           <button type="button" onClick={() => void loadOlder()} className="mx-auto block text-xs font-medium text-[var(--primary)] hover:underline">{fr ? "Messages précédents" : "Earlier messages"}</button>
         )}
         {messages.map((m) => (
-          <Bubble key={m.id} m={m} mine={m.senderSide === "buyer"} fr={fr} locale={locale} />
+          <Bubble key={m.id} m={m} mine={m.senderSide === "buyer"} fr={fr} />
         ))}
         <div ref={bottom} />
       </div>

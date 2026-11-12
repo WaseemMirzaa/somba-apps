@@ -251,7 +251,7 @@ function ReviewRow({ review, fr, fresh, focused, onChanged }: { review: EngageRe
         </div>
       </div>
       <div className="mt-3">
-        <TranslatableText kind="review" id={review.id} text={review.text} sourceLang={review.sourceLang} className="whitespace-pre-line break-words text-sm text-slate-700" />
+        <TranslatableText kind="review" id={review.id} auto text={review.text} sourceLang={review.sourceLang} i18n={review.textI18n} className="whitespace-pre-line break-words text-sm text-slate-700" />
         <AttachmentGallery urls={review.photos} className="mt-3" />
       </div>
       <div className="mt-3 flex flex-wrap items-start gap-2">

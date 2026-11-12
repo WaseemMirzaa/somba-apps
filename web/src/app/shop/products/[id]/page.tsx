@@ -27,6 +27,7 @@ import { chooseEstimate, dayLabel, estimateFor } from "@/lib/delivery-estimate";
 import type { DeliveryQuote } from "@/lib/logistics";
 import { daysLabel, isMachineText, labeledGroups, langOf, pickText } from "@/lib/i18n-fields";
 import { TranslatableText } from "@/components/shop/translatable-text";
+import type { TextI18n } from "@/lib/text-i18n";
 import { AttachmentGallery } from "@/components/seller/attachments";
 
 type ProductQuestion = {
@@ -36,6 +37,9 @@ type ProductQuestion = {
   question: string;
   answer: string | null;
   answeredBy: string | null;
+  /** The question and the answer in English and French (absent: the page asks `translate:text`). */
+  questionI18n?: TextI18n | null;
+  answerI18n?: TextI18n | null;
   createdAt: string;
 };
 
@@ -440,7 +444,7 @@ export default function ShopProductDetailPage() {
                     <span className="font-medium">{r.author}</span>
                     <span className="text-amber-500">{"★".repeat(r.rating)}</span>
                   </div>
-                  <TranslatableText kind="review" id={r.id} text={r.text} sourceLang={r.sourceLang} className="mt-1 text-sm text-slate-600" />
+                  <TranslatableText kind="review" id={r.id} auto text={r.text} sourceLang={r.sourceLang} i18n={r.textI18n} className="mt-1 text-sm text-slate-600" />
                   <AttachmentGallery urls={r.photos} className="my-2" />
                   <p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</p>
                   {r.sellerReply && (
@@ -449,7 +453,7 @@ export default function ShopProductDetailPage() {
                         {fr ? "Réponse du vendeur" : "Seller reply"}
                         {r.sellerReplyAt && <span className="font-normal text-slate-500"> · {new Date(r.sellerReplyAt).toLocaleDateString()}</span>}
                       </p>
-                      <TranslatableText kind="review_reply" id={r.id} text={r.sellerReply} className="mt-1 text-slate-600" />
+                      <TranslatableText kind="review_reply" id={r.id} auto text={r.sellerReply} i18n={r.replyI18n} className="mt-1 text-slate-600" />
                     </div>
                   )}
                 </div>
@@ -478,12 +482,12 @@ export default function ShopProductDetailPage() {
               {questions.map((q) => (
                 <div key={q.id} className="rounded-lg border border-[var(--border)] p-4">
                   <div className="font-medium text-slate-900">
-                    <TranslatableText kind="question" id={q.id} auto text={q.question} />
+                    <TranslatableText kind="question" id={q.id} auto text={q.question} i18n={q.questionI18n} />
                   </div>
                   <div className="mt-1 text-sm text-slate-600">
                     {q.answer ? (
                       <>
-                        <TranslatableText kind="answer" id={q.id} auto text={q.answer} />
+                        <TranslatableText kind="answer" id={q.id} auto text={q.answer} i18n={q.answerI18n} />
                         {q.answeredBy && <p className="text-slate-400">— {q.answeredBy}</p>}
                       </>
                     ) : (
