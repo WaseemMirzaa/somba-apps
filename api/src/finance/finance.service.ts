@@ -100,6 +100,10 @@ export interface StatementLine {
   netUsd: number;
 }
 
+/** A payout's method as a person reads it (the transaction line carries the bare key: `bank`, `mobile_money`, `wallet`). */
+const PAYOUT_METHOD_EN: Record<string, string> = { bank: 'Bank transfer', mobile_money: 'Mobile money', wallet: 'KOMORIKO wallet' };
+const PAYOUT_METHOD_FR: Record<string, string> = { bank: 'Virement bancaire', mobile_money: 'Mobile money', wallet: 'Portefeuille KOMORIKO' };
+
 type Who = { id: string; role: string };
 
 @Injectable()
@@ -554,7 +558,9 @@ export class FinanceService {
         at: p.createdAt,
         kind: 'payout',
         reference: p.reference,
+        // The method key stays as it was (older clients map it); the French label is served next to it.
         description: p.method,
+        descriptionFr: PAYOUT_METHOD_FR[p.method] ?? p.method,
         grossUsd: 0,
         commissionUsd: 0,
         amountUsd: p.status === 'rejected' ? 0 : round2(-p.amountUsd),
@@ -586,7 +592,7 @@ export class FinanceService {
         filename: 'transactions.csv',
         csv: toCsv([
           [w.t('h.date'), w.t('h.kind'), w.t('h.reference'), w.t('h.description'), w.t('h.sales'), w.t('h.commission'), w.t('h.amount'), w.t('h.status')],
-          ...entries.map((e) => [e.at.toISOString(), w.kind(e.kind), e.reference, lang === 'fr' ? (e.descriptionFr ?? e.description) : e.description, fixed2(e.grossUsd), fixed2(e.commissionUsd), fixed2(e.amountUsd), e.kind === 'payout' ? w.payoutStatus(e.status) : w.orderStatus(e.status)]),
+          ...entries.map((e) => [e.at.toISOString(), w.kind(e.kind), e.reference, lang === 'fr' ? (e.descriptionFr ?? e.description) : e.kind === 'payout' ? (PAYOUT_METHOD_EN[e.description] ?? e.description) : e.description, fixed2(e.grossUsd), fixed2(e.commissionUsd), fixed2(e.amountUsd), e.kind === 'payout' ? w.payoutStatus(e.status) : w.orderStatus(e.status)]),
         ]),
       };
     }

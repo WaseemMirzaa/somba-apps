@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, IsNull, Repository } from 'typeorm';
+import { frenchLineNames } from '../translation/line-names';
 import { Order, OrderItem, Payout, PayoutStatementLine, Product, Seller } from '../database/entities';
 import { SettingsService } from '../content/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -404,7 +405,11 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
     // Same message for "missing" and "not yours": no probing of other sellers' payouts.
     if (!payout || (!finance && !(user.role === 'seller' && payout.sellerId === user.id))) throw new NotFoundException('Payout not found.');
     const rows = await this.statementLines.find({ where: { payoutId: payout.id } });
-    const lines = rows.sort(
+    // The French name and option of each line, as the buyer's order line carries them (null where there is none: clients show `productName` / `variant`).
+    const frNames = await frenchLineNames(this.statementLines.manager, rows.map((r) => r.orderItemId));
+    const lines = rows
+      .map((r) => Object.assign(r, { productNameFr: frNames.get(r.orderItemId)?.nameFr ?? null, variantFr: frNames.get(r.orderItemId)?.variantFr ?? null }))
+      .sort(
       (a, b) =>
         (a.kind === b.kind ? 0 : a.kind === 'sale' ? -1 : 1) ||
         String(a.orderReference).localeCompare(String(b.orderReference)) ||

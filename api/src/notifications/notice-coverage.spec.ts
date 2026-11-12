@@ -373,6 +373,14 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   ],
   '{} products imported by {} need moderation.': [['12 products imported by TechZone need moderation.', '12 produits importés par TechZone sont à modérer.']],
 
+  // Payouts: what the super admin is told (payouts.service `tellSuperAdmin`)
+  '{} · {} · ${} was paid.': [['PO-1 · Kinshasa Traders · $40.00 was paid.', 'PO-1 · Kinshasa Traders · 40,00\u00A0$ réglé.']],
+  '{} · {} · ${} was paid through pawaPay.': [['PO-1 · Kinshasa Traders · $40.00 was paid through pawaPay.', 'PO-1 · Kinshasa Traders · 40,00\u00A0$ réglé via pawaPay.']],
+  '{} · {} · ${} was rejected.': [
+    ['PO-1 · Kinshasa Traders · $40.00 was rejected.', 'PO-1 · Kinshasa Traders · 40,00\u00A0$ refusé.'],
+    ['PO-1 · Kinshasa Traders · $40.00 was rejected (Wrong account).', 'PO-1 · Kinshasa Traders · 40,00\u00A0$ refusé (Wrong account).'],
+  ],
+
   // Settings → "Send a test push"
   'Notifications reach this account. If push is set up, your devices show this too.': [
     [
@@ -545,6 +553,16 @@ function sentNotices(): Found[] {
         addBody(args[b] ?? '');
       }
     }
+    // `tellSuperAdmin(title, payout, what)` writes "<ref> · <seller> · $<amount> <what>.": the wording is the third argument.
+    const forward = 'this.tellSuperAdmin(';
+    for (let at = src.indexOf(forward); at >= 0; at = src.indexOf(forward, at + 1)) {
+      const args = callArgs(src, at + forward.length - 1);
+      title.push(...literalBranches(args[0] ?? '').map(skeleton));
+      // The sentence may end in an optional part (`was rejected${note ? ` (${note})` : ''}`): the wording before it is what is checked.
+      const what = args[2] ?? '';
+      const words = (literalBranches(what)[0] !== undefined ? skeleton(literalBranches(what)[0]) : '').replace(/\{\}$/, '').trim();
+      if (words) body.push('{} · {} · $' + '{}' + ' ' + words + '.');
+    }
     found.push({ where, title, body });
   }
   return found;
@@ -608,6 +626,31 @@ describe('notification coverage (French)', () => {
       for (const m of src.matchAll(/Wallet top-up via\s*\$\{([^}]*)\}/g)) check(m[1]);
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('sends no notice whose wording the scanner cannot see (a `{ title, body }` shorthand outside the known forwarders)', () => {
+    // A notice built from variables is checked where the variables are written. These helpers forward their own (title, body)
+    // arguments, which `sentNotices` reads at every call (`this.notifySellers(`, `this.tellSellers(`, `this.tellSuperAdmin(`), or carry
+    // data only / an already-bilingual notice. Anything else must pass literals or `quotedNotice(...)` so the French is checked.
+    const FORWARDERS: Record<string, string> = {
+      'orders/orders.service.ts': 'notifySellers(order, title, body): read at each call',
+      'content/promos.service.ts': 'notifySellers(product, title, body, saleId): read at each call',
+      'follows/follows.service.ts': 'new-product notice: carries its own `fr`',
+      'payouts/payouts.service.ts': 'tellSuperAdmin(title, payout, what): read at each call',
+      'flows/seller-lapse.service.ts': 'body is a reference pair (data only)',
+    };
+    const offenders: string[] = [];
+    for (const file of sourceFiles()) {
+      const where = file.slice(SRC.length + 1);
+      const src = readFileSync(file, 'utf8');
+      if (!/(?<!emitter)\.(toUser|toRole|toUsers|toAdmins)\(/.test(src)) continue;
+      for (const m of src.matchAll(/\.(?:toUser|toRole|toUsers|toAdmins)\([^\n]*\{[^{}\n]*\b(?:title|body)\s*[,}]/g)) {
+        if (!FORWARDERS[where]) offenders.push(`${where}: ${m[0].slice(0, 100)}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+    // and the list is not stale
+    for (const where of Object.keys(FORWARDERS)) expect(readFileSync(join(SRC, where), 'utf8')).toMatch(/\.(?:toUser|toRole|toUsers|toAdmins)\([^\n]*\b(?:title|body)\s*[,}]/);
   });
 
   it('keeps no stale entries (every listed template and body is still sent)', () => {

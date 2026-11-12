@@ -191,7 +191,26 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
       const notes = list(await req(S[who].sock, 'notifications:list'));
       ok(notes.length > 0 && notes.every((n) => n.titleFr), `${who}: every notice has a French title (${notes.length})`, notes.filter((n) => !n.titleFr).map((n) => n.title).slice(0, 3).join(' | '));
       const english = /\b(the|is|was|your|you|please|have|will|cannot|are|we|our|this|that|could)\b/i;
-      const half = notes.filter((n) => english.test(n.bodyFr ?? '')).map((n) => `${n.title}: ${String(n.bodyFr).slice(0, 60)}`);
+      // A notice that quotes what a person wrote (a review, a question, a reply, a ticket message) carries that text inside it. Under
+      // TRANSLATE_PROVIDER=fake the quote comes back as "[fr] <the English text>", and with no translator it is the original: either way
+      // it is English by design, not a notice the server left half translated. Only the sentence the server wrote around it is checked,
+      // so the longest verbatim run (12+ characters) that the English and French bodies share is taken out first. A body left identical in both
+      // languages is a notice with no French at all: it is checked whole.
+      const frame = (n) => {
+        let fr = String(n.bodyFr ?? '');
+        const en = String(n.body ?? '');
+        if (fr === en) return fr;
+        {
+          let best = '';
+          for (let i = 0; i + 12 <= en.length; i++) {
+            let len = Math.max(12, best.length + 1);
+            while (i + len <= en.length && fr.includes(en.slice(i, i + len))) { best = en.slice(i, i + len); len++; }
+          }
+          if (best.length >= 12) fr = fr.replace(best, ' ');
+        }
+        return fr.replace(/\[fr\]/g, ' ');
+      };
+      const half = notes.filter((n) => english.test(frame(n))).map((n) => `${n.title}: ${String(n.bodyFr).slice(0, 60)}`);
       ok(half.length === 0, `${who}: no notice body left half in English`, half.slice(0, 3).join(' | '));
     }
   }

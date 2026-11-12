@@ -325,7 +325,7 @@ describe('transactions name the product in the viewer\'s language (bug 2)', () =
     expect('line' in by.sale).toBe(false); // the helper field stays on the server
   });
 
-  it('the option label is French too; a payout has no product to name', async () => {
+  it('the option label is French too; a payout line names its method in French (the key stays in `description`)', async () => {
     const a = await sale({ hoursAgo: 200, price: 20, name: 'Hat' });
     await w.ds.getRepository(OrderItem).update({ id: a.item.id }, { variant: 'Colour: Blue' });
     await snap(a.item.id, 'productName', 'Chapeau');
@@ -333,7 +333,8 @@ describe('transactions name the product in the viewer\'s language (bug 2)', () =
     await payoutWith('requested', [a.item], { amountUsd: 8 });
     const r = await ledger();
     expect(r.items.find((e) => e.kind === 'sale')).toMatchObject({ description: '1 × Hat (Colour: Blue)', descriptionFr: '1 × Chapeau (Couleur : Bleu)' });
-    expect(r.items.find((e) => e.kind === 'payout')!.descriptionFr).toBeUndefined();
+    const payout = r.items.find((e) => e.kind === 'payout')!;
+    expect(payout.descriptionFr).toBe(({ bank: 'Virement bancaire', mobile_money: 'Mobile money', wallet: 'Portefeuille KOMORIKO' } as Record<string, string>)[payout.description]);
   });
 
   it('a product with no French name is named by its base name (the page shows it in both languages)', async () => {
