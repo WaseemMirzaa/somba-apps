@@ -11,9 +11,14 @@ match (the list is in §11). Every new handler lives in its own gateway file (`d
 `engagement.gateway.ts`, `support.gateway.ts`, `notifications.gateway.ts`); the matching handlers were removed from
 `realtime.gateway.ts`. Names that existed before keep working with the same payloads (new fields are additions).
 
-**Sellers** act as their store: a seller account or a team member with the right permission (`orders` for returns,
-disputes, replacements, exchanges; `support` for Q&A and review replies, see `seller-platform.md`). A seller whose
-store is suspended can read but not answer.
+> **Update (admin controls, `docs/contracts/admin-controls.md`)**: sellers no longer take part in returns, disputes, replacements
+> or exchanges. Every return and dispute starts at stage `awaiting_support`; support decides (`returns:decide`, `disputes:decide`,
+> `replacements:respond`, `exchanges:respond`); `returns:respond` and `disputes:escalate` are retired; sellers see no case, get no
+> push and no notice except the "Pickup scheduled" hand-over; `sellerResponseHours` is the **support** response time and an overdue
+> case alerts support once. Where this file says "seller answers", "seller_*" stages, "escalate" or "seller copy", read the update.
+
+**Sellers** act as their store for Q&A and review replies (`support` permission, see `seller-platform.md`). They take no part in
+returns, disputes, replacements or exchanges (see the update above).
 
 ---
 
@@ -22,7 +27,7 @@ store is suspended can read but not answer.
 | key | meaning | validation | default |
 |---|---|---|---|
 | `returnWindowDays` | a return can be opened this many days after delivery. `0` = returns closed | whole number 0–90 | 7 |
-| `sellerResponseHours` | a seller answers a return, replacement or exchange within this time | number 0.001–720 | 48 |
+| `sellerResponseHours` | **support** decides a return, dispute, replacement or exchange within this time (an overdue case alerts support once; the key keeps its old name) | number 0.001–720 | 48 |
 
 Both are seeded (`seed.ts`, `bootstrap-prod.ts`); a missing row means the default.
 
@@ -57,7 +62,8 @@ createdAt, updatedAt
 
 | stage | meaning | who moves it on |
 |---|---|---|
-| `awaiting_seller` | waits for the seller (return: yes/no; dispute: reply) | seller / timeout |
+| `awaiting_support` | **new first stage**: waits for KOMORIKO support | support (`returns:decide` / `disputes:decide`) |
+| `awaiting_seller` | LEGACY (migrated to `awaiting_support`) | — |
 | `seller_replied` | (dispute) the seller answered in the thread | support decides |
 | `seller_rejected` | (return) the seller said no | customer escalates / cancels |
 | `seller_timeout` | (return) the seller did not answer in `sellerResponseHours` | customer escalates / cancels |
@@ -84,8 +90,8 @@ Return flow in one line: `awaiting_seller` → seller yes → `pickup` → wareh
 | `returns:list` | same | same without `type` | returns only |
 | `disputes:get` | a party or staff | `{id}` | `DisputeView` with `messages` |
 | `disputes:reply` | customer / seller of the request / admin | `{ id, message, attachments? }` | `DisputeMessage` `{id, disputeId, authorId, authorName, role, text, attachments[], createdAt}` |
-| `returns:respond` | seller (`orders`) | `{ id, accept: boolean, reason? }` (reason ≥5 chars when rejecting) | `DisputeView` |
-| `disputes:escalate` | customer | `{ id, note? }` (note joins the thread) | `DisputeView` |
+| `returns:respond` | **retired**: answers "Returns are decided by KOMORIKO support." | | |
+| `disputes:escalate` | **retired**: answers "Your request is already with KOMORIKO support." | | |
 | `disputes:cancel` | customer | `{ id }` (only before the seller said yes) | `DisputeView` |
 | `returns:decide` | `admin`, `admin_support`, `admin_operations`, `admin_finance` | `{ id, approve: boolean, reason? }` (reason ≥5 chars when refusing) | `DisputeView` |
 | `disputes:decide` | same roles; refunds need `admin` or `admin_finance` | `{ id, outcome: 'refund_full'\|'refund_partial'\|'replacement'\|'reject', amountUsd? (partial), reason? (needed for reject), items?: [{itemId, qty}] (replacement), refundTo? }` | `DisputeView` |

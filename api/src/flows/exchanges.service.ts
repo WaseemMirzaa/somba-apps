@@ -10,9 +10,9 @@ import { SettingsService } from '../content/settings.service';
 import { WalletService } from '../wallet/wallet.service';
 import { checkVariant, storedVariantGroups } from '../common/variants/variants';
 import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
-import { cleanAttachments, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
+import { cleanAttachments, parseAttachments, storeAttachments } from '../common/attachments';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
-import { EXCHANGE_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
+import { EXCHANGE_NEXT, assertStep, sellerForItem } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
 import { quotedNotice } from '../notifications/quote';
 import { TranslationService } from '../translation/translation.service';
@@ -25,7 +25,6 @@ const cents = (n: number) => Number(n.toFixed(2));
 const STALE = 'This exchange was just updated by someone else. Refresh and try again.';
 const OPEN: ExchangeStatus[] = ['requested', 'approved', 'received', 'ready', 'dispatched'];
 const DESK_REFUND_FILE = "Only finance can file an exchange that refunds money to the customer's wallet.";
-const DESK_REFUND_APPROVE = "Only operations can approve an exchange that refunds money to the customer's wallet.";
 
 /**
  * Who may move an exchange through its steps (and so trigger the wallet credit on delivery): the exchange desk and
@@ -105,19 +104,7 @@ export class ExchangesService {
     const skip = Math.max(0, Math.floor(Number(paging?.offset) || 0));
     const status = paging?.status ? ({ status: paging.status as ExchangeStatus } as const) : {};
     if (ops) return this.serve(await this.exchanges.find({ where: status, order: { createdAt: 'DESC' }, take, skip }));
-    // A seller sees exchanges of their items (and any they filed as a customer).
-    if (user.role === 'seller') {
-      const keys = await sellerKeys(user.id, this.sellers);
-      const rows = await this.serve(
-        await this.exchanges.find({
-          where: [{ sellerId: In(keys), ...status }, { customerId: user.id, ...status }],
-          order: { createdAt: 'DESC' },
-          take,
-          skip,
-        }),
-      );
-      return rows.map((r) => redactForSeller(r, user.id));
-    }
+    // Everyone else (a seller included) sees only what they asked for themselves.
     return this.serve(await this.exchanges.find({ where: { customerId: user.id, ...status }, order: { createdAt: 'DESC' }, take, skip }));
   }
 
@@ -129,27 +116,17 @@ export class ExchangesService {
     return this.serve(await this.exchanges.find({ where: { customerId: userId, ...status }, order: { createdAt: 'DESC' }, take, skip }));
   }
 
+  /** One exchange, for the customer who asked or staff (a seller sees none: support decides). */
   async get(user: { id: string; role: string }, id: string): Promise<ExchangeView> {
     const ex = await this.exchanges.findOne({ where: { id: String(id ?? '') } });
-    const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
-    const allowed = !!ex && (OPS_ROLES.includes(user.role) || ex.customerId === user.id || (!!ex.sellerId && keys.includes(ex.sellerId)));
-    if (!ex || !allowed) throw new NotFoundException('Exchange not found.');
-    const [view] = await this.serve([ex]);
-    return user.role === 'seller' ? redactForSeller(view, user.id) : view;
+    if (!ex || !(OPS_ROLES.includes(user.role) || ex.customerId === user.id)) throw new NotFoundException('Exchange not found.');
+    return (await this.serve([ex]))[0];
   }
 
-  /** The seller account behind an exchange (null when the item's seller is unknown). */
-  private async sellerUserOf(ex: Pick<Exchange, 'sellerId'>): Promise<string | null> {
-    if (!ex.sellerId) return null;
-    const store = await this.sellers.findOne({ where: { id: ex.sellerId } });
-    return store?.userId ?? ex.sellerId;
-  }
-
+  /** The deciding desk, the warehouse and the customer hear about a change; the seller does not. */
   private async publish(ex: ExchangeView): Promise<void> {
     this.emitter.toRoles(OPS_ROLES, 'exchange:updated', ex);
     if (ex.customerId) this.emitter.toUser(ex.customerId, 'exchange:updated', ex);
-    const sellerUser = await this.sellerUserOf(ex);
-    if (sellerUser) this.emitter.toUser(sellerUser, 'exchange:updated', redactForSeller(ex));
   }
 
   async create(
@@ -218,6 +195,7 @@ export class ExchangesService {
     if (ops && diff < 0 && !inRoleGroup(actor.role, 'finance')) throw new BadRequestException(DESK_REFUND_FILE);
 
     const seller = await sellerForItem(order, fromSku, this.products, this.sellers);
+    // Support's response time (the setting keeps its old key).
     const hours = Number(await this.settings.get('sellerResponseHours'));
     // Translate first, then store: the reason is saved in both languages together.
     const reasonText = input.reason ? String(input.reason).slice(0, 1000) : '';
@@ -263,9 +241,10 @@ export class ExchangesService {
     await this.keep('exchange_reason', saved.id, reasonTr);
     const [ex] = await this.serve([saved]);
     await this.publish(ex);
-    if (seller) {
-      await this.notifications.toUser(seller.userId, {
-        title: 'Exchange requested on your item',
+    // Support decides now: tell them (a desk-filed exchange is theirs already).
+    if (!ops) {
+      await this.notifications.toRole('admin_support', {
+        title: 'Exchange requested',
         body: `${ex.reference} · ${order.reference}: ${ex.fromName} → ${ex.toName}`,
         type: 'exchange',
         entityId: ex.id,
@@ -275,19 +254,18 @@ export class ExchangesService {
   }
 
   /**
-   * The seller (or the desk / support, on their behalf) approves or rejects an exchange. C-X4 (A-03): other admin
-   * departments cannot, and support cannot approve one that refunds money to the wallet (the desk can).
+   * Support (the `exchangeDecide` group: super admin, operations, support) approves or rejects an exchange; sellers take no
+   * part, and support has full control including an exchange with a negative price difference (a refund to the customer's
+   * wallet on delivery): the rule that only operations could approve it is gone. Other admin departments cannot decide.
+   * (Filing an exchange that refunds money still needs finance, C-X5.)
    */
   async respond(actor: { id: string; role: string }, id: string, approve: boolean, rawReason: unknown): Promise<ExchangeView> {
     const ex = await this.exchanges.findOne({ where: { id: String(id ?? '') } });
-    const keys = actor.role === 'seller' ? await sellerKeys(actor.id, this.sellers) : [];
-    const mine = !!ex && actor.role === 'seller' && !!ex.sellerId && keys.includes(ex.sellerId);
-    if (!ex || !(mine || inRoleGroup(actor.role, 'exchangeDecide'))) throw new NotFoundException('Exchange not found.');
+    if (!ex || !inRoleGroup(actor.role, 'exchangeDecide')) throw new NotFoundException('Exchange not found.');
     if (ex.status !== 'requested') throw new BadRequestException('This request was already handled.');
-    if (approve && !mine && ex.priceDiffUsd < 0 && !inRoleGroup(actor.role, 'exchangeDesk')) throw new BadRequestException(DESK_REFUND_APPROVE);
     const reason = String(rawReason ?? '').trim().slice(0, 1000);
     if (!approve && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this exchange.');
-    // Translate first, then store: the seller's reason is saved in both languages together.
+    // Translate first, then store: the decision note is saved in both languages together (in `sellerReason`, as before).
     return this.move(ex, approve ? 'approved' : 'rejected', reason, await this.translateFor(reason, actor.id));
   }
 
@@ -336,7 +314,7 @@ export class ExchangesService {
   private async takeStockAndSend(ex: Exchange): Promise<true | string> {
     if (!ex.toSku.startsWith('ext:') && (await this.products.getRaw(ex.toSku))) {
       if (!(await this.products.reserve(ex.toSku, ex.qty, { variant: ex.toVariant, orderId: ex.orderId, reason: 'replacement' }))) {
-        return 'Not enough stock for this exchange. Restock the item or reject the request.';
+        return 'Not enough stock for this exchange. Ask the seller to restock the item, or reject the request.';
       }
       await this.exchanges.update({ id: ex.id }, { stockTaken: ex.qty });
     }
@@ -365,15 +343,7 @@ export class ExchangesService {
   }
 
   private async tell(ex: ExchangeView, status: ExchangeStatus, reason: string, reasonTr: SaveTranslation | null = null): Promise<void> {
-    const sellerUser = await this.sellerUserOf(ex);
-    if (sellerUser) {
-      await this.notifications.toUser(sellerUser, {
-        title: `Exchange ${status}`,
-        body: `${ex.reference} · ${ex.orderReference}: ${ex.fromName} → ${ex.toName}`,
-        type: 'exchange',
-        entityId: ex.id,
-      });
-    }
+    // The seller is told nothing here: the hand-over of the new unit reaches them as "Pickup scheduled" (logistics).
     if (ex.customerId) {
       await this.notifications.toUser(
         ex.customerId,
@@ -425,7 +395,7 @@ export class ExchangesService {
 
   /**
    * `translate:text` for `exchange_reason` / `exchange_reply` (id = the exchange). PRIVATE: only people who may read the
-   * exchange (`get`: the desk and warehouse, its customer, the seller whose item it is) may translate its notes. Anyone
+   * exchange (`get`: the desk and warehouse, its customer) may translate its notes. Anyone
    * else, and a made-up id, gets "Nothing to translate.".
    */
   async translate(user: { id: string; role: string }, kind: unknown, id: unknown, target: unknown) {
@@ -433,8 +403,7 @@ export class ExchangesService {
     const nothing = 'Nothing to translate.';
     if ((kind !== 'exchange_reason' && kind !== 'exchange_reply') || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error(nothing);
     const ex = await this.exchanges.findOne({ where: { id } });
-    const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
-    if (!ex || !(OPS_ROLES.includes(user.role) || ex.customerId === user.id || (!!ex.sellerId && keys.includes(ex.sellerId)))) throw new Error(nothing);
+    if (!ex || !(OPS_ROLES.includes(user.role) || ex.customerId === user.id)) throw new Error(nothing);
     return this.translations.translateStored(kind, id, target, { private: true });
   }
 }

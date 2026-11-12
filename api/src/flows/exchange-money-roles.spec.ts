@@ -5,8 +5,8 @@ import { ExchangesService } from './exchanges.service';
 
 /**
  * A-03: an exchange is a money path (a cheaper item refunds the difference to the customer's wallet when it is
- * delivered). Only the customer, the seller and the exchange desk may move one, the amount is always the server's own
- * price arithmetic, and a refund-bearing exchange is never filed or approved by a department that does not own it.
+ * delivered). Support decides it (sellers take no part), only the exchange desk and the warehouse may move one, the amount is
+ * always the server's own price arithmetic, and a refund-bearing exchange is never filed by a department that does not own it.
  */
 let ds: DataSource;
 let walletCalls: { userId: string; type: string; amount: number }[];
@@ -17,6 +17,7 @@ let s1: Seller;
 
 const customer = { id: 'c1', name: 'Marie Dubois', role: 'customer' };
 const sellerOne = { id: 'su1', name: 'Seller', role: 'seller' };
+const support = { id: 'sp1', name: 'Support', role: 'admin_support' };
 const staff = (role: string) => ({ id: `${role}-1`, name: `${role} name`, role });
 
 async function order(lines: { product: Product; price?: number }[], status: Order['status'] = 'delivered') {
@@ -102,7 +103,7 @@ describe('filing an exchange for someone else (A-03)', () => {
     const o = await order([{ product: pricey, price: 50 }]);
     const ex = await exchanges.create(customer, { orderId: o.id, fromSku: pricey.id, fromName: 'Boot', toSku: hat.id, toName: 'Hat', priceDiffUsd: -100000 });
     expect(ex.priceDiffUsd).toBe(-40);
-    await exchanges.respond(sellerOne, ex.id, true, '');
+    await exchanges.respond(support, ex.id, true, '');
     await deliver(ex.id);
     expect(credits()).toEqual([40]);
 
@@ -149,13 +150,13 @@ describe('approving and moving an exchange (A-03)', () => {
     expect((await ds.getRepository(Exchange).findOneByOrFail({ id: ex.id })).status).toBe('requested');
   });
 
-  it('support may decide for a silent seller, but not approve one that refunds money; operations may', async () => {
-    const ex = await cheaperSwap();
-    await expect(exchanges.respond(staff('admin_support'), ex.id, true, '')).rejects.toThrow(
-      "Only operations can approve an exchange that refunds money to the customer's wallet.",
-    );
-    expect((await exchanges.respond(staff('admin_operations'), ex.id, true, '')).status).toBe('approved');
-    // Support can still reject it, and approve one that moves no money back.
+  it('support has full control: it approves an exchange that refunds money to the wallet too, as operations and the super admin do', async () => {
+    for (const role of ['admin_support', 'admin_operations', 'admin']) {
+      const ex = await cheaperSwap();
+      expect(ex.priceDiffUsd).toBe(-40);
+      expect((await exchanges.respond(staff(role), ex.id, true, '')).status).toBe('approved');
+    }
+    // and it can still reject one, or approve one that moves no money back
     const other = await cheaperSwap();
     expect((await exchanges.respond(staff('admin_support'), other.id, false, 'Customer changed their mind')).status).toBe('rejected');
     const o = await order([{ product: hat }]);
@@ -163,11 +164,17 @@ describe('approving and moving an exchange (A-03)', () => {
     expect((await exchanges.respond(staff('admin_support'), free.id, true, '')).status).toBe('approved');
   });
 
+  it('the seller cannot decide any exchange, whatever it moves', async () => {
+    const ex = await cheaperSwap();
+    await expect(exchanges.respond(sellerOne, ex.id, true, '')).rejects.toThrow('Exchange not found.');
+    expect((await ds.getRepository(Exchange).findOneByOrFail({ id: ex.id })).status).toBe('requested');
+  });
+
   it.each(['admin_marketing', 'admin_moderation', 'admin_support', 'admin_finance', 'customer', 'seller'])(
     '%s cannot move an exchange to delivered (no wallet credit)',
     async (role) => {
       const ex = await cheaperSwap();
-      await exchanges.respond(sellerOne, ex.id, true, '');
+      await exchanges.respond(support, ex.id, true, '');
       await expect(exchanges.setStatus(ex.id, 'delivered', staff(role))).rejects.toThrow('Ops only.');
       expect(walletCalls).toEqual([]);
     },
@@ -175,7 +182,7 @@ describe('approving and moving an exchange (A-03)', () => {
 
   it('the desk and the warehouse move it, and delivery credits exactly the server’s difference once', async () => {
     const ex = await cheaperSwap();
-    await exchanges.respond(sellerOne, ex.id, true, '');
+    await exchanges.respond(support, ex.id, true, '');
     await exchanges.setStatus(ex.id, 'received', staff('warehouse_staff'));
     for (const s of ['ready', 'dispatched', 'delivered'] as const) await exchanges.setStatus(ex.id, s, staff('admin'));
     expect(credits()).toEqual([40]);

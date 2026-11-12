@@ -8,10 +8,10 @@ import type { TeamRole } from '../database/entities/seller-team.entity';
  *   insight         dashboards: sellers:stats, analytics:seller, goals
  *   catalog_read    products, categories, inventory (read)
  *   catalog         products, inventory, promotions / campaigns, flash-sale nominations, coupons, bulk import
- *   orders          orders, returns, disputes, replacements, exchanges, shipping
+ *   orders          orders, shipping (returns, disputes, replacements and exchanges are decided by KOMORIKO support: a store sees none)
  *   finance         payouts, statements, earnings, tax documents
- *   support         support tickets, product Q&A, review replies, customer chat
- *   storefront      store profile, vacation mode, handling time, policies
+ *   support         support tickets, product Q&A, review replies (customer chat is closed: customers contact KOMORIKO support)
+ *   storefront      store profile, vacation mode, handling time, policy proposals (a policy goes live when KOMORIKO admin approves it; express delivery is admin-managed)
  *   team            invite / change role / remove staff            (owner only)
  *   payout_account  where money is sent                            (owner only)
  *   account         plan, KYC, security, closing the store         (owner only)
@@ -67,9 +67,6 @@ export function permissionForEvent(event: string): SellerPermission | null {
   const head = event.split(':')[0];
   switch (head) {
     case 'order':
-    case 'exchange':
-    case 'replacement':
-    case 'dispute':
     case 'delivery':
       return 'orders';
     case 'product':
@@ -97,10 +94,6 @@ export function permissionForNotice(type: string | null | undefined): SellerPerm
   switch (type) {
     case 'order':
     case 'delivery':
-    case 'dispute':
-    case 'return':
-    case 'exchange':
-    case 'replacement':
       return 'orders';
     case 'payout':
     case 'finance':
@@ -115,10 +108,15 @@ export function permissionForNotice(type: string | null | undefined): SellerPerm
     case 'review':
     case 'question':
     case 'support':
-    case 'chat':
       return 'support';
     case 'team':
     case 'security':
+    // After-sale and chat notices are about the owner's own shopping now (a store takes no part in them): owner only.
+    case 'dispute':
+    case 'return':
+    case 'exchange':
+    case 'replacement':
+    case 'chat':
       return 'team';
     default:
       return 'storefront';

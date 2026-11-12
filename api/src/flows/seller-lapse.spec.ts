@@ -31,14 +31,14 @@ beforeEach(async () => {
     const n = args[args.length - 1] as { title: string; body: string; type?: string; entityId?: string };
     notices.push({ to: `${to}${args.length === 2 ? args[0] : ''}`, ...n });
   };
-  svc = new SellerLapseService(ds.getRepository(Replacement), ds.getRepository(Exchange), ds.getRepository(Seller), { toUser: record('user:'), toRole: record('role:') } as never);
+  svc = new SellerLapseService(ds.getRepository(Replacement), ds.getRepository(Exchange), { toUser: record('user:'), toRole: record('role:') } as never);
 });
 afterEach(async () => {
   jest.useRealTimers();
   await ds.destroy();
 });
 
-describe('replacements and exchanges whose seller never answers', () => {
+describe('replacements and exchanges that wait too long for support', () => {
   it('nothing happens before the response time ends', async () => {
     await replacement();
     await exchange();
@@ -47,24 +47,28 @@ describe('replacements and exchanges whose seller never answers', () => {
     expect(notices).toHaveLength(0);
   });
 
-  it('past the deadline the customer, the seller and support are told, exactly once', async () => {
+  it('past the deadline support is alerted, exactly once, and nobody else is told', async () => {
     const r = await replacement();
     const x = await exchange();
     at(48 * HOUR + 1000);
     expect(await svc.sweep()).toBe(2);
     expect(await svc.sweep()).toBe(0);
-    expect(notices.filter((n) => n.to === 'user:c1').map((n) => [n.title, n.type, n.entityId])).toEqual(
-      expect.arrayContaining([['Seller did not respond', 'replacement', r.id], ['Seller did not respond', 'exchange', x.id]]),
+    expect(notices.map((n) => [n.to, n.title, n.type, n.entityId, n.body])).toEqual(
+      expect.arrayContaining([
+        ['role:admin_support', 'Replacement waiting for support', 'replacement', r.id, `${r.reference} · SOM-1`],
+        ['role:admin_support', 'Exchange waiting for support', 'exchange', x.id, `${x.reference} · SOM-1`],
+      ]),
     );
-    expect(notices.filter((n) => n.to === 'user:su1')).toHaveLength(2);
-    expect(notices.filter((n) => n.to === 'role:admin_support')).toHaveLength(2);
+    expect(notices).toHaveLength(2);
+    // neither the customer nor the seller hears of it
+    expect(notices.filter((n) => n.to === 'user:c1' || n.to === 'user:su1')).toEqual([]);
     const row = await ds.getRepository(Replacement).findOneByOrFail({ id: r.id });
     expect(row.sellerLapsedAt!.getTime()).toBe(T0.getTime() + 48 * HOUR + 1000);
-    // The request itself still waits for an answer: support or the seller can still decide it.
+    // The request itself still waits: support decides it as usual.
     expect(row.status).toBe('requested');
   });
 
-  it('leaves alone a request the seller answered, one that is not waiting any more, and one with no deadline', async () => {
+  it('leaves alone a request that was decided, one that is not waiting any more, and one with no deadline', async () => {
     await replacement({ status: 'approved' });
     await exchange({ status: 'rejected' });
     await replacement({ sellerDueAt: null });
@@ -73,11 +77,11 @@ describe('replacements and exchanges whose seller never answers', () => {
     expect(notices).toHaveLength(0);
   });
 
-  it('a request filed by staff for no store still tells the customer and support', async () => {
+  it('a request filed by staff for no store alerts support just the same', async () => {
     await exchange({ sellerId: null });
     at(49 * HOUR);
     expect(await svc.sweep()).toBe(1);
-    expect(notices.map((n) => n.to).sort()).toEqual(['role:admin_support', 'user:c1']);
+    expect(notices.map((n) => n.to)).toEqual(['role:admin_support']);
   });
 
   it('runs on its own timer and stops with the module', async () => {

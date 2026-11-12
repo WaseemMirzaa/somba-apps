@@ -13,8 +13,11 @@ describe('linkFor', () => {
   it('opens the record a notice is about', () => {
     expect(linkFor('customer', 'order', 'o1')).toBe('/shop/orders/o1');
     expect(linkFor('customer', 'return', 'd1')).toBe('/shop/returns/d1');
-    expect(linkFor('seller', 'return', 'd1')).toBe('/seller/returns/d1');
-    expect(linkFor('seller', 'exchange', 'e1')).toBe('/seller/exchanges/e1');
+    // a store takes no part in after-sale: no page to open
+    expect(linkFor('seller', 'return', 'd1')).toBe('/seller/notifications');
+    expect(linkFor('seller', 'exchange', 'e1')).toBe('/seller/notifications');
+    expect(linkFor('seller', 'policy', 's1')).toBe('/seller/storefront');
+    expect(linkFor('admin_moderation', 'policy', 's1')).toBe('/admin/sellers/s1');
     expect(linkFor('seller', 'moderation', 'p1')).toBe('/seller/products/p1');
     expect(linkFor('admin_support', 'support', 't1')).toBe('/admin/support/t1');
     expect(linkFor('warehouse_staff', 'replacement', 'r1')).toBe('/warehouse/replacements/r1');

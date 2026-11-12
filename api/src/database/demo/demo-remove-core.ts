@@ -45,6 +45,7 @@ import {
   ReviewReport,
   Seller,
   Setting,
+  SellerPolicyRevision,
   SellerTeamMember,
   StockMovement,
   StoreFollow,
@@ -589,6 +590,11 @@ function steps(i: Ids): Step[] {
         ['sellerId', i.sellers],
         ['userId', i.users],
       ],
+    },
+    {
+      label: 'seller_policy_revisions',
+      entity: SellerPolicyRevision,
+      terms: [['sellerId', i.sellers]],
     },
     { label: 'sellers', entity: Seller, terms: [['id', i.sellers]] },
     {

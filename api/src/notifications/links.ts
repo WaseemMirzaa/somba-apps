@@ -28,7 +28,7 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'exchange') return pick(`/shop/exchanges/${id}`, '/shop/returns');
       if (t === 'replacement') return pick(`/shop/replacements/${id}`, '/shop/returns');
       if (t === 'question' || t === 'store') return pick(`/shop/products/${id}`, '/shop/notifications'); // entityId is the product
-      if (t === 'chat') return pick(`/shop/messages/${id}`, '/shop/messages'); // entityId is the conversation
+      if (t === 'chat') return '/shop/notifications'; // customer <-> seller chat is closed: an old notice has no page to open
       return '/shop/notifications';
     case 'seller':
       if (t === 'order') return pick(`/seller/orders/${id}`, '/seller/orders');
@@ -40,13 +40,9 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'stock') return '/seller/inventory';
       if (t === 'finance') return '/seller/finance/tax';
       if (t === 'support') return pick(`/seller/support/${id}`, '/seller/support');
-      if (t === 'return') return pick(`/seller/returns/${id}`, '/seller/returns');
-      if (t === 'dispute') return pick(`/seller/disputes/${id}`, '/seller/disputes');
-      if (t === 'replacement') return pick(`/seller/replacements/${id}`, '/seller/replacements');
-      if (t === 'exchange') return pick(`/seller/exchanges/${id}`, '/seller/exchanges');
+      if (t === 'policy') return '/seller/storefront'; // a policy approved, rejected or edited by KOMORIKO
       if (t === 'question') return pick(`/seller/questions?focus=${id}`, '/seller/questions');
       if (t === 'review') return pick(`/seller/reviews?focus=${id}`, '/seller/reviews');
-      if (t === 'chat') return pick(`/seller/messages/${id}`, '/seller/messages');
       if (t === 'team') return '/seller/team';
       if (t === 'security') return '/seller/settings';
       return '/seller/notifications';
@@ -75,6 +71,7 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'review' || t === 'question') return pick(`/admin/reviews?focus=${id}`, '/admin/reviews');
       if (t === 'exchange') return pick(`/admin/exchanges/${id}`, '/admin/exchanges');
       if (t === 'replacement') return pick(`/admin/replacements/${id}`, '/admin/replacements');
+      if (t === 'policy') return pick(`/admin/sellers/${id}`, '/admin/sellers'); // a store policy waiting for approval: the store's page (entityId is the store)
       return '/admin/notifications';
     }
     case 'warehouse':

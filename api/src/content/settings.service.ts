@@ -99,7 +99,7 @@ export class SettingsService {
       case 'returnWindowDays':
         return String(num(value, 'Return window', { min: 0, max: 90, int: true }));
       case 'sellerResponseHours':
-        return String(num(value, 'Seller response time', { min: 0.001, max: 720 }));
+        return String(num(value, 'Support response time', { min: 0.001, max: 720 }));
       case 'payoutClearanceHours':
         return String(num(value, 'Clearance hours', { min: 0, max: 720, int: true }));
       case 'hubAddress':

@@ -32,10 +32,9 @@ Promotions switch in notification settings controls the push. Its link is `/shop
 ## Timers
 - **Return window**: counts from the last `delivery` leg that reached the customer. A seller pickup, a return leg or a
   replacement delivered later no longer moves the end of the window.
-- **Seller response time** (`sellerResponseHours`): a *return* still moves to `seller_timeout` (the customer may
-  escalate). A *dispute*, a *replacement* and an *exchange* keep their status; the customer, the seller and support are
-  told once ("Seller did not respond") and `sellerLapsedAt` records it. Support can still decide on the seller's behalf,
-  and a late seller answer is still accepted until support decides.
+- **Support response time** (`sellerResponseHours`, key unchanged; see `admin-controls.md`): a return, dispute, replacement or exchange
+  that support has not decided by then alerts support **once** (`sellerLapsedAt` records it). Nothing moves and neither the
+  customer nor the seller is told; support decides as usual.
 - The sweeps run every `AFTER_SALE_SWEEP_MS` (default 60 000, read at start-up) and `VACATION_SWEEP_MS`.
 
 ## Help contact settings

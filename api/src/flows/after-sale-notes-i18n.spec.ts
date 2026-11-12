@@ -27,6 +27,7 @@ const otherCustomer = { id: 'c2', name: 'Paul', role: 'customer' };
 const sellerOne = { id: 'su1', name: 'Shop', role: 'seller' };
 const sellerTwo = { id: 'su2', name: 'Other shop', role: 'seller' };
 const ops = { id: 'a1', name: 'Ops', role: 'admin_operations' };
+const support = { id: 'a3', name: 'Support', role: 'admin_support' };
 const marketing = { id: 'a2', name: 'Marketing', role: 'admin_marketing' };
 const rider = { id: 'r1', name: 'Rider', role: 'rider' };
 const NOTHING = 'Nothing to translate.';
@@ -83,7 +84,7 @@ beforeEach(async () => {
 afterEach(async () => ds.destroy());
 
 describe('replacements', () => {
-  it('the customer’s reason is translated first: the view, every event and the seller notice carry both languages', async () => {
+  it('the customer’s reason is translated first: the view and every event carry both languages, and support is told', async () => {
     const o = await delivered();
     const rep = await replacements.create(customer, { orderId: o.id, itemId: o.items[0].id, reason: 'Le produit est arrivé cassé' });
     const both = { sourceLang: 'fr', fr: 'Le produit est arrivé cassé', en: '[en] Le produit est arrivé cassé' };
@@ -91,18 +92,18 @@ describe('replacements', () => {
     expect(rep.reasonI18n).toEqual(both);
     expect((await rowsOf(rep.id)).map((r) => [r.entityType, r.field, r.locale])).toEqual([['replacement_reason', 'reason', 'en']]);
     for (const e of sent('replacement:updated')) expect(e.payload.reasonI18n).toEqual(both);
-    expect((await replacements.list(sellerOne))[0].reasonI18n).toEqual(both);
-    expect((await replacements.list(sellerOne))[0].customerId).toBeUndefined(); // the seller's copy still hides the customer's id
-    const n1 = notices.find((x) => x.title === 'Replacement requested on your item')!;
+    expect((await replacements.list(ops))[0].reasonI18n).toEqual(both);
+    expect(await replacements.list(sellerOne)).toEqual([]); // the seller reads none
+    const n1 = notices.find((x) => x.to === 'role:admin_support' && x.title === 'Replacement requested')!;
     expect(n1.body).toContain(': [en] Le produit est arrivé cassé');
     expect(n1.fr?.body).toContain(': Le produit est arrivé cassé');
   });
 
-  it('the seller’s reason is translated (sellerReasonI18n) and the customer notice follows their language', async () => {
+  it('support’s reason is translated (sellerReasonI18n keeps its name) and the customer notice follows their language', async () => {
     const o = await delivered();
     const rep = await replacements.create(customer, { orderId: o.id, itemId: o.items[0].id, reason: 'Dead on arrival' });
     notices.length = 0;
-    const out = await replacements.respond(sellerOne, rep.id, false, 'Garantie expirée depuis longtemps');
+    const out = await replacements.respond(support, rep.id, false, 'Garantie expirée depuis longtemps');
     expect(out.status).toBe('rejected');
     expect(out.sellerReasonI18n).toEqual({ sourceLang: 'fr', fr: 'Garantie expirée depuis longtemps', en: '[en] Garantie expirée depuis longtemps' });
     const n2 = notices.find((x) => x.to === `user:${customer.id}`)!;
@@ -115,21 +116,21 @@ describe('replacements', () => {
     const o = await delivered();
     const rep = await replacements.create(customer, { orderId: o.id, itemId: o.items[0].id, reason: 'Le produit est arrivé cassé' });
     expect('reasonI18n' in rep).toBe(false);
-    const out = await replacements.respond(sellerOne, rep.id, false, 'Garantie expirée');
+    const out = await replacements.respond(support, rep.id, false, 'Garantie expirée');
     expect(out.status).toBe('rejected');
     expect('sellerReasonI18n' in out).toBe(false);
     expect(await rowsOf(rep.id)).toHaveLength(0);
   });
 
-  it('translate:text: the customer, the store, the deciding desk may; others get "Nothing to translate."', async () => {
+  it('translate:text: the customer and the deciding desk may; others (sellers included) get "Nothing to translate."', async () => {
     const o = await delivered();
     const rep = await replacements.create(customer, { orderId: o.id, itemId: o.items[0].id, reason: 'Le produit est arrivé cassé' });
     fake.calls.length = 0;
-    for (const who of [customer, sellerOne, ops]) {
+    for (const who of [customer, ops, support]) {
       expect(await replacements.translate(who, 'replacement_reason', rep.id, 'en')).toMatchObject({ text: '[en] Le produit est arrivé cassé' });
     }
     expect(fake.calls).toHaveLength(0);
-    for (const who of [otherCustomer, sellerTwo, marketing, rider]) {
+    for (const who of [otherCustomer, sellerOne, sellerTwo, marketing, rider]) {
       await expect(replacements.translate(who, 'replacement_reason', rep.id, 'en')).rejects.toThrow(NOTHING);
       await expect(replacements.translate(who, 'replacement_reply', rep.id, 'en')).rejects.toThrow(NOTHING);
     }
@@ -150,14 +151,15 @@ describe('exchanges', () => {
     expect(ex.reasonI18n).toEqual(both);
     expect((await rowsOf(ex.id)).map((r) => [r.entityType, r.field, r.locale])).toEqual([['exchange_reason', 'reason', 'en']]);
     for (const e of sent('exchange:updated')) expect(e.payload.reasonI18n).toEqual(both);
-    expect((await exchanges.get(sellerOne, ex.id)).reasonI18n).toEqual(both);
+    expect((await exchanges.get(ops, ex.id)).reasonI18n).toEqual(both);
+    await expect(exchanges.get(sellerOne, ex.id)).rejects.toThrow('Exchange not found.');
   });
 
-  it('the seller’s reason: sellerReasonI18n on the view and a notice in each language', async () => {
+  it('support’s reason: sellerReasonI18n on the view and a notice in each language', async () => {
     const o = await delivered();
     const ex = await ask(o, 'Too small');
     notices.length = 0;
-    const out = await exchanges.respond(sellerOne, ex.id, false, 'Nous sommes en rupture pour cette taille');
+    const out = await exchanges.respond(support, ex.id, false, 'Nous sommes en rupture pour cette taille');
     expect(out.sellerReasonI18n).toEqual({ sourceLang: 'fr', fr: 'Nous sommes en rupture pour cette taille', en: '[en] Nous sommes en rupture pour cette taille' });
     const n3 = notices.find((x) => x.to === `user:${customer.id}`)!;
     expect(n3.body).toContain('— [en] Nous sommes en rupture');
@@ -174,11 +176,11 @@ describe('exchanges', () => {
   it('translate:text refuses everyone who cannot read the exchange', async () => {
     const o = await delivered();
     const ex = await ask(o, 'Trop petit, je voudrais la taille M');
-    for (const who of [customer, sellerOne, ops]) {
+    for (const who of [customer, ops, support]) {
       expect(await exchanges.translate(who, 'exchange_reason', ex.id, 'en')).toMatchObject({ text: '[en] Trop petit, je voudrais la taille M' });
     }
     fake.calls.length = 0;
-    for (const who of [otherCustomer, sellerTwo, marketing, rider]) {
+    for (const who of [otherCustomer, sellerOne, sellerTwo, marketing, rider]) {
       await expect(exchanges.translate(who, 'exchange_reason', ex.id, 'en')).rejects.toThrow(NOTHING);
     }
     await expect(tr.translateStored('exchange_reason', ex.id, 'en', { staff: true })).rejects.toThrow(NOTHING);

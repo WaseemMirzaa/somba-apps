@@ -17,7 +17,6 @@ import {
   SupportTicket,
   User,
 } from '../database/entities';
-import { ChatService } from '../chat/chat.service';
 import { ReviewsService } from '../content/reviews.service';
 import { SupportService } from '../content/support.service';
 import { SellerContextService } from '../sellers/seller-context';
@@ -41,7 +40,6 @@ let fake: FakeTranslator;
 let tr: TranslationService;
 let notifications: NotificationsService;
 let reviews: ReviewsService;
-let chat: ChatService;
 let support: SupportService;
 let fcm: { tokens: string[]; notification: { title: string; body: string }; data: Record<string, string> }[];
 
@@ -86,21 +84,6 @@ function build(provider: TranslatorProvider) {
     productsSvc as never,
     ds.getRepository(ReviewReport),
     ds.getRepository(ReviewHelpful),
-    tr,
-  );
-  const ctx = new SellerContextService(ds.getRepository(Seller), ds.getRepository(SellerTeamMember), ds.getRepository(User), { get: async () => null } as never);
-  chat = new ChatService(
-    ds.getRepository(Conversation),
-    ds.getRepository(ConversationMessage),
-    ds.getRepository(Seller),
-    ds.getRepository(Product),
-    ds.getRepository(Order),
-    ds.getRepository(OrderItem),
-    ds.getRepository(User),
-    notifications,
-    emitter as never,
-    directory,
-    ctx,
     tr,
   );
   support = new SupportService(ds.getRepository(SupportTicket), ds.getRepository(SupportMessage), ds.getRepository(Order), ds.getRepository(User), notifications, emitter as never, tr);
@@ -201,40 +184,6 @@ describe('a review written in English', () => {
     await reviews.reply(caller(en.owner), r.id, 'Thank you for your review');
     await settle();
     expect(shown('tok-client')?.body).toBe('Téléphone: [fr] Thank you for your review');
-  });
-});
-
-describe('a chat message', () => {
-  it('the store owner is pushed in their language, and so is each staff copy', async () => {
-    const owner = await store('alice', 'en');
-    const manager = await user('manu', 'seller', 'fr');
-    await device(manager, 'tok-manu');
-    await ds.getRepository(SellerTeamMember).save(ds.getRepository(SellerTeamMember).create({ sellerId: owner.seller.id, userId: manager.id, emailHash: 'h', email: 'manu@x.y', role: 'manager', status: 'active', invitedBy: owner.owner.id } as never));
-    const buyer = await user('client', 'customer', 'fr');
-    await chat.start(caller(buyer), { sellerId: owner.seller.id, text: 'Bonjour, est-il neuf ? merci' });
-    await settle();
-    expect(shown(owner.token)).toEqual({ title: 'New customer message', body: 'client: [en] Bonjour, est-il neuf ? merci' });
-    expect(shown('tok-manu')).toEqual({ title: 'Nouveau message client', body: 'client: Bonjour, est-il neuf ? merci' });
-  });
-
-  it('the buyer hears the seller’s message in the buyer’s language', async () => {
-    const owner = await store('alice', 'en');
-    const buyer = await user('client', 'customer', 'fr');
-    await device(buyer, 'tok-client');
-    const first = await chat.start(caller(buyer), { sellerId: owner.seller.id, text: 'Bonjour, est-il neuf ? merci' });
-    // the buyer's unread counter is zero: a message from the seller notifies them
-    await chat.send(caller(owner.owner), { conversationId: first.conversation.id, text: 'Yes, brand new' });
-    await settle();
-    expect(shown('tok-client')).toEqual({ title: 'Nouveau message du vendeur', body: 'Shop alice: [fr] Yes, brand new' });
-  });
-
-  it('translation off: the original, in both languages', async () => {
-    build(off);
-    const owner = await store('alice', 'en');
-    const buyer = await user('client', 'customer', 'fr');
-    await chat.start(caller(buyer), { sellerId: owner.seller.id, text: 'Bonjour, est-il neuf ? merci' });
-    await settle();
-    expect(shown(owner.token)?.body).toBe('client: Bonjour, est-il neuf ? merci');
   });
 });
 

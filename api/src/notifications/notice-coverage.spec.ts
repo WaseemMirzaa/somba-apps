@@ -101,7 +101,14 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   '{} could not be delivered and is going back to the seller. Our team will contact you about your order.': [
     ['SOM-1001 could not be delivered and is going back to the seller. Our team will contact you about your order.', 'SOM-1001 n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.'],
   ],
-  '{}: a rider will collect your package.': [['SOM-1001: a rider will collect your package.', 'SOM-1001 : un livreur viendra récupérer votre colis.']],
+  '{}: a rider will collect your package.': [
+    ['SOM-1001: a rider will collect your package.', 'SOM-1001 : un livreur viendra récupérer votre colis.'],
+    ['SOM-1001 · REP-12345678: a rider will collect your package.', 'SOM-1001 · REP-12345678 : un livreur viendra récupérer votre colis.'],
+  ],
+  // Store policies need approval; express is KOMORIKO's switch
+  '{}: new returns or shipping policy to review.': [['Boutique Awa: new returns or shipping policy to review.', 'Boutique Awa : nouvelle politique de retour ou d’expédition à examiner.']],
+  'KOMORIKO turned express delivery on for your store.': [['KOMORIKO turned express delivery on for your store.', 'KOMORIKO a activé la livraison express pour votre boutique.']],
+  'KOMORIKO turned express delivery off for your store.': [['KOMORIKO turned express delivery off for your store.', 'KOMORIKO a désactivé la livraison express pour votre boutique.']],
   '{}: your package reached the warehouse.': [['SOM-1001: your package reached the warehouse.', 'SOM-1001 : votre colis est arrivé à l’entrepôt.']],
   '{}: the rider collected your package and is taking it to the customer.': [['SOM-1001: the rider collected your package and is taking it to the customer.', 'SOM-1001 : le livreur a récupéré votre colis et l’emmène chez le client.']],
   '{}: the delivery address has no map pin, so it was routed to {}.': [
@@ -279,9 +286,6 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   '{}: {}': [['Your review: Great, thanks!', 'Votre avis : Great, thanks!']],
   '{}: we received your goods. Your request is being reviewed.': [
     ['RET-1: we received your goods. Your request is being reviewed.', 'RET-1 : nous avons reçu vos articles. Votre demande est en cours d’examen.'],
-  ],
-  '{} · {}: the warehouse received the returned goods.': [
-    ['RET-1 · SOM-1001: the warehouse received the returned goods.', 'RET-1 · SOM-1001 : l’entrepôt a reçu les articles retournés.'],
   ],
 
   // Sellers, products, campaigns

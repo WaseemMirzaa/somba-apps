@@ -2487,19 +2487,23 @@ export class RealtimeGateway
     }
   }
 
-  /** Seller updates their own store profile. */
+  /**
+   * Seller updates their own store profile. Vacation mode and handling time are live at once; a returns / shipping policy
+   * becomes a pending revision for KOMORIKO admin to approve (the live text is not touched: `policyRevision` in the answer
+   * is that proposal). `expressDelivery` is ignored (admin switches it: `sellers:setExpress`).
+   */
   @SubscribeMessage('sellers:update')
   async sellersUpdate(
     @ConnectedSocket() client: AuthedSocket,
-    @MessageBody() body: { name?: string; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; pickupAreaId?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null; expressDelivery?: boolean },
+    @MessageBody() body: { name?: string; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; pickupAreaId?: string | null; logoUrl?: string | null; bannerUrl?: string | null; description?: string | null; descriptionFr?: string | null },
   ) {
     try {
       const user = this.requireUser(client);
       const ctx = await this.kit.ctx.resolve(user, 'storefront');
-      // Vacation mode, handling time, the express switch and policies are validated first, so a bad value saves nothing.
-      if (touchesStorefront(body)) await this.kit.storefront.update(ctx, body as never);
-      return ok(
-        await this.sellersSvc.updateProfile(ctx.actor.id, {
+      // Vacation mode, handling time and policies are validated first, so a bad value saves nothing.
+      const policyRevision = touchesStorefront(body) ? (await this.kit.storefront.update(ctx, body as never)).policyRevision : null;
+      return ok({
+        ...(await this.sellersSvc.updateProfile(ctx.actor.id, {
           name: body?.name,
           pickupAddress: body?.pickupAddress,
           pickupLat: body?.pickupLat,
@@ -2509,8 +2513,9 @@ export class RealtimeGateway
           bannerUrl: body?.bannerUrl,
           description: body?.description,
           descriptionFr: body?.descriptionFr,
-        }),
-      );
+        })),
+        policyRevision,
+      });
     } catch (e) {
       return fail((e as Error).message);
     }

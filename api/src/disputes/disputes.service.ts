@@ -15,7 +15,6 @@ import {
   DeliveryTask,
   Order,
   OrderItem,
-  Seller,
 } from '../database/entities';
 import type {
   DisputeOutcome,
@@ -24,7 +23,7 @@ import type {
   DisputeType,
   ReturnCondition,
 } from '../database/entities';
-import { cleanAttachments, firstName, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
+import { cleanAttachments, firstName, parseAttachments, storeAttachments } from '../common/attachments';
 import { pageOf } from '../common/paging';
 import { lockOrder } from '../common/order-lock';
 import { RETURNS_DESK_ADMINS } from '../common/staff-access';
@@ -34,8 +33,7 @@ import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { ProductsService } from '../products/products.service';
-import { linesBySeller, sellerUserId } from '../orders/order-sellers';
-import { sellerKeys } from '../flows/after-sale';
+import { linesBySeller } from '../orders/order-sellers';
 import { resolutionFr } from '../notifications/localize';
 import { quotedNotice } from '../notifications/quote';
 import { TranslationService } from '../translation/translation.service';
@@ -55,8 +53,13 @@ export const DISPUTE_CATEGORIES = ['missing', 'damaged', 'wrong_item', 'not_rece
 export const RETURN_CATEGORIES = ['damaged', 'wrong_item', 'not_as_described', 'changed_mind', 'defective', 'other'] as const;
 export const GRADES: readonly ReturnCondition[] = ['resellable', 'damaged', 'unsellable'];
 const DECIDE_OUTCOMES = ['refund_full', 'refund_partial', 'replacement', 'reject'] as const;
-/** Stages where a return still waits for somebody to say yes or no to it. */
-const UNDECIDED: DisputeStage[] = ['awaiting_seller', 'seller_rejected', 'seller_timeout', 'escalated'];
+/**
+ * Stages where a request still waits for support to decide it. `awaiting_support` is the only one written now; the others
+ * are LEGACY seller stages a migration moved away, kept here so a row (or a rolling deploy) that still carries one can be decided.
+ */
+const UNDECIDED: DisputeStage[] = ['awaiting_support', 'awaiting_seller', 'seller_rejected', 'seller_timeout', 'escalated'];
+/** Every stage an open request can be closed from (a decision by support, a refund, a refusal). */
+const OPEN_STAGES: DisputeStage[] = ['awaiting_support', 'awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'];
 const STALE = 'This request was just updated by someone else. Refresh and try again.';
 
 const cents = (n: number) => Number(n.toFixed(2));
@@ -65,19 +68,20 @@ const text = (x: unknown, max: number) => String(x ?? '').trim().slice(0, max);
 /** A returned line plus its name and option label in French (from the order line it came from). */
 export type DisputeItemView = DisputeItem & { productNameFr: string; variantFr: string | null };
 
-/** A request as clients receive it. `customerId` is dropped and the name cut to a first name for sellers. */
+/** A request as clients receive it (the customer and the returns and disputes desk; sellers take no part). */
 export type DisputeView = Omit<Dispute, 'attachments'> & {
   attachments: string[];
   /** `resolution` in French: stock phrases translated, an agent's own words unchanged. */
   resolutionFr: string | null;
   /** The customer's `reason` in both languages (docs/contracts/stored-text-i18n.md); absent when no translation is known. */
   reasonI18n?: TextI18n;
-  /** The seller's `sellerReason` in both languages. */
+  /** LEGACY: the old seller reason in both languages (sellers no longer answer; only rows from before carry one). */
   sellerReasonI18n?: TextI18n;
   /** `resolution` in both languages when it is an agent's own words (stock phrases have `resolutionFr` instead). */
   resolutionI18n?: TextI18n;
   items: DisputeItemView[];
   siblings?: string[];
+  /** Always false: a request is with support from the start (kept so an old client that reads it still works). */
   canEscalate: boolean;
   canCancel: boolean;
   messages?: DisputeMessageView[];
@@ -124,7 +128,6 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(DisputeItem) private readonly itemsRepo: Repository<DisputeItem>,
     @InjectRepository(DisputeMessage) private readonly messagesRepo: Repository<DisputeMessage>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
-    @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     @InjectRepository(DeliveryTask) private readonly tasks: Repository<DeliveryTask>,
     private readonly notifications: NotificationsService,
     private readonly payments: PaymentsService,
@@ -179,7 +182,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return Number.isFinite(n) && n >= 0 ? n : 7;
   }
 
-  async sellerResponseHours(): Promise<number> {
+  /** How long support has to decide a request (the setting keeps its old key, `sellerResponseHours`). */
+  async supportResponseHours(): Promise<number> {
     const n = Number(await this.settings.get('sellerResponseHours'));
     return Number.isFinite(n) && n > 0 ? n : 48;
   }
@@ -279,19 +283,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       ...(replies.has(d.id) ? { sellerReasonI18n: replies.get(d.id) } : {}),
       ...(resolutions.has(d.id) ? { resolutionI18n: resolutions.get(d.id) } : {}),
       items: items.get(d.id) ?? [],
-      canEscalate: d.status === 'open' && (d.stage === 'seller_rejected' || d.stage === 'seller_timeout'),
+      canEscalate: false,
       canCancel: d.status === 'open' && UNDECIDED.includes(d.stage),
     }));
-  }
-
-  /** What a seller may see of a request: the customer's first name, never their id. */
-  static forSeller<T extends { customerId?: string | null; customerName?: string | null }>(view: T, sellerUserIdOfViewer?: string): T {
-    return redactForSeller(view, sellerUserIdOfViewer);
-  }
-
-  /** A seller never learns the customer's account id: not from the request, and not from the thread either. */
-  private static messageForSeller(m: DisputeMessageView): DisputeMessageView {
-    return m.role === 'customer' ? { ...m, authorId: null } : m;
   }
 
   private async messageViews(disputeId: string): Promise<DisputeMessageView[]> {
@@ -301,26 +295,6 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Who is who ─────────────────────────────────────────────────────────────
-
-  /** User ids of the sellers the request concerns. */
-  private async sellerUsersOf(d: Pick<Dispute, 'sellerId' | 'orderId'>): Promise<string[]> {
-    try {
-      if (d.sellerId) return [await sellerUserId(d.sellerId, this.sellers)];
-      const order = await this.orders.findOne({ where: { id: d.orderId } });
-      if (!order) return [];
-      const ids = new Set<string>();
-      for (const sellerId of (await linesBySeller(order, this.products)).keys()) ids.add(await sellerUserId(sellerId, this.sellers));
-      return [...ids];
-    } catch {
-      return [];
-    }
-  }
-
-  private async isSellerOf(user: Viewer, d: Pick<Dispute, 'sellerId' | 'orderId'>): Promise<boolean> {
-    if (user.role !== 'seller') return false;
-    if (d.sellerId) return (await sellerKeys(user.id, this.sellers)).includes(d.sellerId);
-    return (await this.sellerUsersOf(d)).includes(user.id);
-  }
 
   /**
    * The warehouse a return belongs to: where the rider brings the goods from the customer (the return pickup's receiving
@@ -339,8 +313,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (user.role.startsWith('admin')) return inRoleGroup(user.role, 'disputeDesk');
     // Warehouse staff see the returns of their own warehouse only (their customers' names and addresses are in them).
     if (user.role === 'warehouse_staff') return d.type === 'return' && !!user.hubId && (await this.hubOfReturn(d)) === user.hubId;
-    if (d.customerId === user.id) return true;
-    return this.isSellerOf(user, d);
+    // The customer (a seller who shops reads their own purchases like anyone else). Sellers take no part in the after-sale flow.
+    return d.customerId === user.id;
   }
 
   private async loadFor(user: Viewer, id: string): Promise<Dispute> {
@@ -352,7 +326,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
 
   // ── Live updates ───────────────────────────────────────────────────────────
 
-  /** The customer, admins, the sellers on the order and, for returns, the warehouse. */
+  /** The customer, the returns and disputes desk and, for returns, the warehouse. Sellers hear nothing. */
   private async publish(dispute: Dispute, event: 'dispute:created' | 'dispute:updated'): Promise<DisputeView> {
     const [view] = await this.present([dispute]);
     this.emitter.toUser(dispute.customerId, event, view);
@@ -362,13 +336,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       const hub = await this.hubOfReturn(dispute);
       if (hub) this.emitter.toHub(hub, event, view);
     }
-    for (const id of await this.sellerUsersOf(dispute)) this.emitter.toUser(id, event, DisputesService.forSeller(view, id));
     return view;
-  }
-
-  /** Tell the sellers on the order how a request moved. */
-  private async tellSellers(dispute: Dispute, sellerIds: string[], title: string, body: string): Promise<void> {
-    await this.notifications.toUsers(sellerIds, { title, body, type: dispute.type, entityId: dispute.id });
   }
 
   // ── Opening ────────────────────────────────────────────────────────────────
@@ -399,7 +367,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const category = input.category ? text(input.category, 24) : null;
     if (category && !allowed.includes(category)) throw new BadRequestException('Choose what is wrong from the list.');
     const refundTo: 'wallet' | 'phone' = input.refundTo === 'phone' ? 'phone' : 'wallet';
-    const dueAt = new Date(Date.now() + (await this.sellerResponseHours()) * HOUR_MS);
+    const dueAt = new Date(Date.now() + (await this.supportResponseHours()) * HOUR_MS);
 
     const groups = type === 'return' ? await this.returnGroups(order, input.items) : await this.disputeGroups(order, customer.id, input.items);
     // Translate first, then store: the reason is written in both languages together (one call for all the requests it opens).
@@ -421,7 +389,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
             category,
             reason: reason.slice(0, 2000),
             status: 'open',
-            stage: 'awaiting_seller',
+            stage: 'awaiting_support',
             attachments: storeAttachments(photos),
             sellerId: group.sellerId,
             sellerDueAt: dueAt,
@@ -450,26 +418,12 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const views: DisputeView[] = [];
     for (const d of created) {
       views.push(await this.publish(d, 'dispute:created'));
-      const sellerIds = await this.sellerUsersOf(d);
       await this.notifications.toRole('admin_support', {
         title: type === 'return' ? 'Return requested' : 'Dispute opened',
         body: `${d.reference} · ${order.reference} · ${firstName(customer.name)}`,
         type,
         entityId: d.id,
       });
-      // Sellers learn about a problem on their own items as soon as it is raised.
-      await this.notifications.toUsers(
-        sellerIds,
-        quotedNotice({
-          title: type === 'return' ? 'Return requested on your order' : 'Dispute opened on your order',
-          body: (q) => `${d.reference} · ${order.reference}: ${q}`,
-          text: d.reason,
-          i18n: reasonTr,
-          max: 140,
-          type: d.type,
-          entityId: d.id,
-        }),
-      );
     }
     const [first, ...rest] = views;
     return rest.length ? { ...first, siblings: rest.map((v) => v.id) } : first;
@@ -529,7 +483,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return hit;
   }
 
-  /** The units a return asks for, grouped by seller (one request per seller: each answers for their own goods). */
+  /** The units a return asks for, grouped by seller (one request per seller, so each one's goods go back to the right store). */
   private async returnGroups(
     order: Order,
     wanted: { itemId?: string; productId?: string; qty?: number }[] | undefined,
@@ -589,37 +543,24 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
           'OR (d.pickupTaskId IS NULL AND d.orderId IN (SELECT o.id FROM orders o WHERE o.destinationHubId = :hub)))',
         { hub: user.hubId ?? '' },
       );
-    } else if (user.role === 'seller') {
-      const keys = await sellerKeys(user.id, this.sellers);
-      // Their store's requests, their own purchases, and requests that name no store on an order holding their goods
-      // (by the line's seller, else by the listing's seller on older lines).
-      qb.andWhere(
-        '(d.sellerId IN (:...keys) OR d.customerId = :me OR (d.sellerId IS NULL AND d.orderId IN (' +
-          'SELECT i.orderId FROM order_items i WHERE i.sellerId IN (:...keys) OR (i.sellerId IS NULL AND i.productId IN (SELECT p.id FROM products p WHERE p.sellerId IN (:...keys))))))',
-        { keys, me: user.id },
-      );
     } else {
       qb.andWhere('d.customerId = :me', { me: user.id });
     }
-    const views = await this.present(await qb.getMany());
-    return user.role === 'seller' ? views.map((v) => DisputesService.forSeller(v, user.id)) : views;
+    return this.present(await qb.getMany());
   }
 
-  /** One request with its thread (parties and staff only). */
+  /** One request with its thread (the customer and staff only). */
   async get(user: Viewer, id: string): Promise<DisputeView> {
     const d = await this.loadFor(user, id);
     const [view] = await this.present([d]);
     const messages = await this.messageViews(d.id);
-    if (user.role === 'seller' && d.customerId !== user.id) {
-      return DisputesService.forSeller({ ...view, messages: messages.map(DisputesService.messageForSeller), messageCount: messages.length }, user.id);
-    }
     return { ...view, messages, messageCount: messages.length };
   }
 
   /**
    * `translate:text` for the dispute kinds (`dispute_message`: id = the message; `dispute_reason` / `dispute_reply` /
    * `dispute_resolution`: id = the dispute). PRIVATE: only people who may read the request may translate it (the same
-   * rule as `get`: the customer, the seller(s) on the order, the returns/disputes desk, the warehouse of a return).
+   * rule as `get`: the customer, the returns/disputes desk, the warehouse of a return).
    * Anyone else, and a made-up id, gets "Nothing to translate.".
    */
   async translate(user: Viewer, kind: unknown, id: unknown, target: unknown) {
@@ -635,7 +576,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
 
   // ── The thread ─────────────────────────────────────────────────────────────
 
-  /** A message from the customer, the seller or KOMORIKO staff. */
+  /** A message from the customer or KOMORIKO staff. */
   async reply(user: Viewer & { name: string }, id: string, rawText: unknown, rawAttachments?: unknown): Promise<DisputeMessageView> {
     const d = await this.loadFor(user, id);
     if (user.role === 'warehouse_staff') throw new NotFoundException('Dispute not found.');
@@ -659,32 +600,17 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     await this.keep('dispute_message', row.id, bodyTr);
     const textI18n = body ? await this.translations?.i18nOne('dispute_message', row.id, body) : undefined;
     const msg: DisputeMessageView = { ...row, attachments: photos, ...(textI18n ? { textI18n } : {}) };
-    let nextStage: DisputeStage | null = null;
-    if (user.role === 'seller' && d.type === 'dispute' && d.stage === 'awaiting_seller') nextStage = 'seller_replied';
-    if (nextStage) {
-      await this.disputes.update({ id: d.id, stage: 'awaiting_seller' }, { stage: nextStage, sellerRespondedAt: new Date() });
-    }
     const fresh = (await this.disputes.findOne({ where: { id: d.id } }))!;
     const view = await this.publish(fresh, 'dispute:updated');
     // The thread goes to everyone on the request, the author included (their other devices).
     const payload = { disputeId: d.id, message: msg };
     this.emitter.toUser(d.customerId, 'dispute:message', payload);
     this.emitter.toRoles([...ROLE_GROUPS.disputeDesk], 'dispute:message', payload);
-    const sellerIds = await this.sellerUsersOf(d);
-    for (const sid of sellerIds) {
-      this.emitter.toUser(sid, 'dispute:message', sid === user.id ? payload : { disputeId: d.id, message: DisputesService.messageForSeller(msg) });
-    }
     // And a notice to the others: the words are quoted in each recipient's language (a photo-only message has nothing to translate).
     const what = d.type === 'return' ? 'Return' : 'Dispute';
     const quote = { text: body || '📷', i18n: body ? bodyTr : null, max: 140 };
     if (!mine) {
       await this.notifications.toUser(d.customerId, quotedNotice({ title: `${what} reply`, body: (q) => `${d.reference}: ${q}`, type: d.type, entityId: d.id, ...quote }));
-    }
-    if (user.role !== 'seller') {
-      await this.notifications.toUsers(
-        sellerIds.filter((s) => s !== user.id),
-        quotedNotice({ title: `${what} reply`, body: (q) => `${d.reference}: ${q}`, type: d.type, entityId: d.id, ...quote }),
-      );
     }
     if (!user.role.startsWith('admin')) {
       await this.notifications.toRole('admin_support', quotedNotice({ title: `${what} reply`, body: (q) => `${d.reference}: ${q}`, type: d.type, entityId: d.id, ...quote }));
@@ -693,7 +619,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return msg;
   }
 
-  // ── Returns: seller and admin decisions ─────────────────────────────────────
+  // ── Returns: support decides ────────────────────────────────────────────────
 
   /** Move an open request from one of `from` to a new stage in ONE statement; nobody else can have moved it. */
   private async advance(id: string, from: DisputeStage[], patch: Partial<Dispute>): Promise<Dispute> {
@@ -707,36 +633,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return (await this.disputes.findOne({ where: { id } }))!;
   }
 
-  /** The seller accepts or rejects a return within the response time. */
-  async sellerRespond(user: Viewer, id: string, accept: boolean, rawReason: unknown): Promise<DisputeView> {
-    const d = await this.loadFor(user, id);
-    if (user.role !== 'seller' || !(await this.isSellerOf(user, d))) throw new NotFoundException('Dispute not found.');
-    if (d.type !== 'return') throw new BadRequestException('Only returns need an accept or reject; reply to the customer instead.');
-    if (d.status !== 'open' || d.stage !== 'awaiting_seller') {
-      throw new BadRequestException(
-        d.stage === 'seller_timeout' || d.stage === 'escalated' ? 'The response time has passed; KOMORIKO support decides now.' : 'This request was already handled.',
-      );
-    }
-    const reason = text(rawReason, 1000);
-    if (!accept && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this return.');
-    // Translate first, then store: the seller's reason is saved in both languages together.
-    const reasonTr = await this.translateFor(reason, user.id);
-    const saved = await this.advance(d.id, ['awaiting_seller'], {
-      stage: accept ? 'approved' : 'seller_rejected',
-      sellerRespondedAt: new Date(),
-      sellerReason: reason || null,
-    });
-    await this.keep('dispute_reply', saved.id, reasonTr);
-    if (accept) return this.afterApproval(saved, 'Return accepted');
-    const view = await this.publish(saved, 'dispute:updated');
-    await this.notifications.toUser(
-      saved.customerId,
-      quotedNotice({ title: 'Return rejected', body: (q) => `${saved.reference} · ${saved.orderReference}: ${q}`, text: reason, i18n: reasonTr, max: 1000, type: 'return', entityId: saved.id }),
-    );
-    return view;
-  }
-
-  /** KOMORIKO support approves or refuses a return the seller rejected or let lapse (or any return still undecided). */
+  /** KOMORIKO support approves or refuses a return that is still undecided (`returns:decide`). */
   async adminDecideReturn(admin: Viewer, id: string, approve: boolean, rawReason: unknown): Promise<DisputeView> {
     if (!admin.role.startsWith('admin')) throw new BadRequestException('Admins only.');
     if (!inRoleGroup(admin.role, 'disputeDesk')) throw new BadRequestException('Not allowed.');
@@ -750,13 +647,13 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const reasonTr = await this.translateFor(reason, admin.id);
     if (approve) {
       const saved = await this.advance(d.id, UNDECIDED, { stage: 'approved' });
-      return this.afterApproval(saved, 'Return approved', reason, reasonTr);
+      return this.afterApproval(saved, reason, reasonTr);
     }
     return this.close(d, 'rejected', 'reject', reason, UNDECIDED, undefined, 0, reasonTr);
   }
 
-  /** The return was said yes to: ask logistics to collect the goods, and tell everyone. */
-  private async afterApproval(d: Dispute, kind: 'Return accepted' | 'Return approved', note = '', noteTr: SaveTranslation | null = null): Promise<DisputeView> {
+  /** The return was approved: ask logistics to collect the goods, and tell the customer (the seller is told by the legs that bring the goods back). */
+  private async afterApproval(d: Dispute, note = '', noteTr: SaveTranslation | null = null): Promise<DisputeView> {
     const items = await this.itemsRepo.find({ where: { disputeId: d.id } });
     const task = await this.logistics.returnPickup({
       disputeId: d.id,
@@ -770,42 +667,11 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     }
     const view = await this.publish(saved, 'dispute:updated');
     const lead = (q: string) => `${saved.reference} · ${saved.orderReference}${note ? `: ${q}` : ''}`;
-    await this.notifications.toUser(saved.customerId, quotedNotice({ title: kind, body: lead, text: note, i18n: noteTr, max: 1000, type: 'return', entityId: saved.id }));
-    if (kind === 'Return approved') {
-      await this.notifications.toUsers(
-        await this.sellerUsersOf(saved),
-        quotedNotice({ title: 'Return approved', body: lead, text: note, i18n: noteTr, max: 1000, type: 'return', entityId: saved.id }),
-      );
-    }
+    await this.notifications.toUser(saved.customerId, quotedNotice({ title: 'Return approved', body: lead, text: note, i18n: noteTr, max: 1000, type: 'return', entityId: saved.id }));
     if (!task) {
       // No pickup task (logistics not available): the warehouse collects by hand.
       await this.notifications.toRole('warehouse_staff', { title: 'Return approved', body: `${saved.reference} · ${saved.orderReference}`, type: 'return', entityId: saved.id });
     }
-    return view;
-  }
-
-  /** The customer takes a rejected or lapsed return to KOMORIKO support. */
-  async escalate(customer: Viewer, id: string, rawNote?: unknown): Promise<DisputeView> {
-    const d = await this.disputes.findOne({ where: { id: String(id ?? '') } });
-    if (!d || d.customerId !== customer.id) throw new NotFoundException('Dispute not found.');
-    if (d.type !== 'return') throw new BadRequestException('Only returns can be escalated; a dispute is already with KOMORIKO support.');
-    // C-R4: only after the seller said no or the time ran out.
-    if (d.status !== 'open' || !(d.stage === 'seller_rejected' || d.stage === 'seller_timeout')) {
-      throw new BadRequestException(d.stage === 'awaiting_seller' ? 'Wait for the seller to answer, or for the response time to pass.' : STALE);
-    }
-    const note = text(rawNote, 1000);
-    const noteTr = await this.translateFor(note, customer.id);
-    const saved = await this.advance(d.id, ['seller_rejected', 'seller_timeout'], { stage: 'escalated', escalatedAt: new Date() });
-    if (note) {
-      const row = await this.messagesRepo.save(
-        this.messagesRepo.create({ disputeId: d.id, authorId: customer.id, authorName: firstName(d.customerName), role: 'customer', text: note, attachments: null }),
-      );
-      await this.keep('dispute_message', row.id, noteTr);
-    }
-    const view = await this.publish(saved, 'dispute:updated');
-    const escalated = () => quotedNotice({ title: 'Return escalated', body: (q) => `${saved.reference} · ${saved.orderReference}${note ? `: ${q}` : ''}`, text: note, i18n: noteTr, max: 140, type: 'return', entityId: saved.id });
-    await this.notifications.toRole('admin_support', escalated());
-    await this.notifications.toUsers(await this.sellerUsersOf(saved), escalated());
     return view;
   }
 
@@ -864,7 +730,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const resolution =
       reason ||
       (outcome === 'refund_full' ? 'Refunded to wallet' : outcome === 'refund_partial' ? 'Partially refunded' : outcome === 'replacement' ? 'Replacement approved' : 'Rejected');
-    const closed = await this.close(d, outcome === 'reject' ? 'rejected' : 'resolved', outcome, resolution, ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'], undefined, refundUsd, resolutionTr);
+    const closed = await this.close(d, outcome === 'reject' ? 'rejected' : 'resolved', outcome, resolution, OPEN_STAGES, undefined, refundUsd, resolutionTr);
     void replacementNote;
     return closed;
   }
@@ -892,15 +758,10 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (DisputesService.ownWords(saved.resolution)) await this.keep('dispute_resolution', saved.id, resolutionTr);
     const view = await this.publish(saved, 'dispute:updated');
     const what = saved.type === 'return' ? 'Return' : 'Dispute';
-    const sellerIds = await this.sellerUsersOf(saved);
     const words = { text: saved.resolution ?? '', i18n: DisputesService.ownWords(saved.resolution) ? resolutionTr : null, max: 1000, type: saved.type, entityId: saved.id };
     if (!byCustomer) {
       await this.notifications.toUser(saved.customerId, quotedNotice({ title: status === 'resolved' ? `${what} resolved` : `${what} closed`, body: (q) => `${saved.reference}: ${q}`, ...words }));
     }
-    await this.notifications.toUsers(
-      sellerIds,
-      quotedNotice({ title: status === 'resolved' ? `${what} resolved` : `${what} closed`, body: (q) => `${saved.reference} · ${saved.orderReference}: ${q}`, ...words }),
-    );
     return view;
   }
 
@@ -939,7 +800,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       'resolved',
       opts.refund ? (dispute.type === 'return' ? 'return_refund' : 'refund_full') : 'reject',
       String(opts.resolution ?? (opts.refund ? 'Refunded to wallet' : 'Resolved')),
-      ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'],
+      OPEN_STAGES,
       undefined,
       refundUsd,
       resolutionTr,
@@ -956,7 +817,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       'rejected',
       'reject',
       String(resolution ?? 'Rejected'),
-      ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received'],
+      OPEN_STAGES,
       undefined,
       0,
       resolutionTr,
@@ -993,8 +854,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       type: 'return',
       entityId: saved.id,
     });
-    await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Returned goods received', `${saved.reference} · ${saved.orderReference}: the warehouse received the returned goods.`);
-    // A return the seller (or support) said yes to is paid as soon as the goods are back.
+    // A return support approved is paid as soon as the goods are back.
     if (wasApproved) view = await this.settleReturn(saved);
     return view;
   }
@@ -1049,7 +909,6 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     }
     const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
     const view = await this.publish(saved, 'dispute:updated');
-    await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Returned goods graded', `${saved.reference} · ${saved.orderReference}`);
     return view;
   }
 
@@ -1154,61 +1013,37 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
 
   // ── Time limits ────────────────────────────────────────────────────────────
 
-  /** Returns the seller never answered move to `seller_timeout`: the customer may now escalate. */
+  /**
+   * The support SLA alert: a return or dispute still waiting for support after `sellerResponseHours` (now the support
+   * response time; the setting keeps its key) alerts the support staff once. Nothing moves and nobody else is told:
+   * `sellerLapsedAt` is the "support was alerted" mark, set by a conditional update so two API instances cannot both alert.
+   */
   async sweep(now = new Date()): Promise<number> {
     const due = await this.disputes
       .createQueryBuilder('d')
-      .where("d.type = 'return' AND d.status = 'open' AND d.stage = 'awaiting_seller' AND d.sellerDueAt IS NOT NULL AND d.sellerDueAt < :now", { now })
+      .where("d.status = 'open' AND d.stage IN (:...waiting) AND d.sellerLapsedAt IS NULL AND d.sellerDueAt IS NOT NULL AND d.sellerDueAt < :now", { now, waiting: UNDECIDED })
       .take(100)
       .getMany();
-    let moved = 0;
-    for (const d of due) {
-      const res = await this.disputes
-        .createQueryBuilder()
-        .update(Dispute)
-        .set({ stage: 'seller_timeout' })
-        .where("id = :id AND stage = 'awaiting_seller' AND status = 'open'", { id: d.id })
-        .execute();
-      if (!res.affected) continue;
-      moved++;
-      const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
-      await this.publish(saved, 'dispute:updated');
-      const body = `${saved.reference} · ${saved.orderReference}`;
-      await this.notifications.toUser(saved.customerId, { title: 'Seller did not respond', body, type: 'return', entityId: saved.id });
-      await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Seller did not respond', body);
-      await this.notifications.toRole('admin_support', { title: 'Seller did not respond', body, type: 'return', entityId: saved.id });
-    }
-    return moved + (await this.sweepDisputes(now));
-  }
-
-  /**
-   * A dispute has no accept or reject, so a seller who never replies does not move it anywhere: it was already with
-   * support. When the time runs out, the customer, the seller and support are told once (`sellerLapsedAt` is the mark).
-   */
-  private async sweepDisputes(now: Date): Promise<number> {
-    const due = await this.disputes
-      .createQueryBuilder('d')
-      .where("d.type = 'dispute' AND d.status = 'open' AND d.stage = 'awaiting_seller' AND d.sellerLapsedAt IS NULL AND d.sellerDueAt IS NOT NULL AND d.sellerDueAt < :now", { now })
-      .take(100)
-      .getMany();
-    let moved = 0;
+    let alerted = 0;
     for (const d of due) {
       const res = await this.disputes
         .createQueryBuilder()
         .update(Dispute)
         .set({ sellerLapsedAt: now })
-        .where("id = :id AND stage = 'awaiting_seller' AND status = 'open' AND sellerLapsedAt IS NULL", { id: d.id })
+        .where("id = :id AND status = 'open' AND stage IN (:...waiting) AND sellerLapsedAt IS NULL", { id: d.id, waiting: UNDECIDED })
         .execute();
       if (!res.affected) continue;
-      moved++;
+      alerted++;
       const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
       await this.publish(saved, 'dispute:updated');
-      const body = `${saved.reference} · ${saved.orderReference}`;
-      await this.notifications.toUser(saved.customerId, { title: 'Seller did not respond', body, type: 'dispute', entityId: saved.id });
-      await this.tellSellers(saved, await this.sellerUsersOf(saved), 'Seller did not respond', body);
-      await this.notifications.toRole('admin_support', { title: 'Seller did not respond', body, type: 'dispute', entityId: saved.id });
+      await this.notifications.toRole('admin_support', {
+        title: saved.type === 'return' ? 'Return waiting for support' : 'Dispute waiting for support',
+        body: `${saved.reference} · ${saved.orderReference}`,
+        type: saved.type,
+        entityId: saved.id,
+      });
     }
-    return moved;
+    return alerted;
   }
 
   private static newReference(type: DisputeType): string {

@@ -26,6 +26,7 @@ const customer = { id: 'c1', name: 'Marie Dubois', role: 'customer' };
 const sellerOne = { id: 'su1', role: 'seller' };
 const sellerTwo = { id: 'su2', role: 'seller' };
 const admin = { id: 'a0', name: 'Admin', role: 'admin' };
+const support = { id: 'sp1', name: 'Support', role: 'admin_support' };
 
 async function order(lines: { product: Product; qty?: number; price?: number; variant?: string; sellerId?: string }[], status: Order['status'] = 'delivered') {
   const repo = ds.getRepository(Order);
@@ -145,7 +146,9 @@ describe('replacements', () => {
     expect(rep.attachments).toHaveLength(1);
     expect(rep.sellerDueAt).toBeTruthy();
     await expect(replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' })).rejects.toThrow('already asked');
-    expect(titles('su1')).toContain('Replacement requested on your item');
+    // sellers hear nothing; support is told it waits for a decision
+    expect(notices.filter((n) => n.to === 'su1')).toEqual([]);
+    expect(titles('role:admin_support')).toContain('Replacement requested');
   });
 
   it('accepts the order line id instead of the item code', async () => {
@@ -158,10 +161,10 @@ describe('replacements', () => {
     await expect(replacements.create(customer, { orderId: o.id, itemId: line.id })).rejects.toThrow('already asked');
   });
 
-  it('the seller approves: stock comes from them, logistics is asked, the customer and warehouse are told', async () => {
+  it('support approves: stock comes from the seller, logistics is asked, the customer and warehouse are told (the seller is not)', async () => {
     const o = await order([{ product: hat, qty: 2 }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat', qty: 1 });
-    const live = await replacements.respond(sellerOne, rep.id, true, '');
+    const live = await replacements.respond(support, rep.id, true, '');
     expect(live).toMatchObject({ status: 'approved', stockTaken: 1, deliveryTaskId: 'task-1', dispatchStatus: 'ready' });
     expect(stock.get(hat.id)).toBe(4);
     expect(reserves[0]).toEqual([hat.id, 1, expect.objectContaining({ reason: 'replacement', orderId: o.id })]);
@@ -169,47 +172,53 @@ describe('replacements', () => {
     expect(titles(customer.id)).toContain('Replacement approved');
     expect(titles('role:warehouse_staff')).toContain('Replacement approved');
     expect(emitter.sent.some((e) => e.event === 'replacement:updated' && e.to === `user:${customer.id}`)).toBe(true);
-    await expect(replacements.respond(sellerOne, rep.id, false, 'changed my mind')).rejects.toThrow('already handled');
+    await expect(replacements.respond(support, rep.id, false, 'changed my mind')).rejects.toThrow('already handled');
+    expect(notices.filter((n) => n.to === 'su1')).toEqual([]);
   });
 
-  it('no stock: the request goes back to requested and the seller is told why', async () => {
+  it('no stock: the request goes back to requested and support is told to ask the seller to restock, or reject', async () => {
     stock.set(hat.id, 0);
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
-    await expect(replacements.respond(sellerOne, rep.id, true, '')).rejects.toThrow('Not enough stock');
+    await expect(replacements.respond(support, rep.id, true, '')).rejects.toThrow('Not enough stock to send a replacement. Ask the seller to restock the item, or reject the request.');
     expect((await replacements.get(admin, rep.id)).status).toBe('requested');
     stock.set(hat.id, 3);
-    expect((await replacements.respond(sellerOne, rep.id, true, '')).status).toBe('approved');
+    expect((await replacements.respond(support, rep.id, true, '')).status).toBe('approved');
   });
 
   it('without a delivery task (logistics refused) it is still approved: staff dispatch by hand', async () => {
     taskAnswer = null;
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
-    const done = await replacements.respond(sellerOne, rep.id, true, '');
+    const done = await replacements.respond(support, rep.id, true, '');
     expect(done).toMatchObject({ status: 'approved', deliveryTaskId: null });
     expect((await replacements.setStatus(rep.id, 'dispatched')).status).toBe('dispatched');
   });
 
-  it('only that store (or support) answers; rejecting needs a reason and gives the stock back', async () => {
+  it('only support decides: sellers and customers get "not found"; rejecting needs a reason and gives the stock back', async () => {
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
+    // the store of the item takes no part any more
+    await expect(replacements.respond(sellerOne, rep.id, true, '')).rejects.toThrow('Replacement not found.');
     await expect(replacements.respond(sellerTwo, rep.id, true, '')).rejects.toThrow('Replacement not found.');
     await expect(replacements.respond(customer, rep.id, true, '')).rejects.toThrow('Replacement not found.');
-    await expect(replacements.respond(sellerOne, rep.id, false, 'no')).rejects.toThrow('why you are rejecting');
-    const rejected = await replacements.respond(sellerOne, rep.id, false, 'Worn through use, not a defect');
+    expect((await ds.getRepository(Replacement).findOneByOrFail({ id: rep.id })).status).toBe('requested');
+    await expect(replacements.respond(support, rep.id, false, 'no')).rejects.toThrow('why you are rejecting');
+    const rejected = await replacements.respond(support, rep.id, false, 'Worn through use, not a defect');
     expect(rejected.status).toBe('rejected');
+    expect(rejected.sellerReason).toBe('Worn through use, not a defect'); // the decision note keeps its old field
     expect(notices.find((n) => n.to === customer.id && n.title === 'Replacement rejected')?.body).toContain('Worn through use');
     expect(stock.get(hat.id)).toBe(5);
     const o2 = await order([{ product: hat }]);
     const r2 = await replacements.create(customer, { orderId: o2.id, sku: hat.id, productName: 'Hat' });
-    expect((await replacements.respond(admin, r2.id, true, '')).status).toBe('approved'); // support on the seller's behalf
+    expect((await replacements.respond(admin, r2.id, true, '')).status).toBe('approved');
+    expect(notices.filter((n) => n.to === 'su1')).toEqual([]);
   });
 
   it('approving then rejecting at the desk puts the unit back on the shelf, once', async () => {
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
-    await replacements.respond(sellerOne, rep.id, true, '');
+    await replacements.respond(support, rep.id, true, '');
     expect(stock.get(hat.id)).toBe(4);
     await replacements.setStatus(rep.id, 'rejected');
     expect(stock.get(hat.id)).toBe(5);
@@ -219,7 +228,7 @@ describe('replacements', () => {
   it('follows the delivery task: picked up -> dispatched, delivered -> delivered, with a notice; never backwards', async () => {
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
-    await replacements.respond(sellerOne, rep.id, true, '');
+    await replacements.respond(support, rep.id, true, '');
     expect((await replacements.syncFromDelivery(rep.id, 'picked_up'))!.status).toBe('dispatched');
     const done = await replacements.syncFromDelivery(rep.id, 'delivered');
     expect(done).toMatchObject({ status: 'delivered', dispatchStatus: 'delivered' });
@@ -230,17 +239,17 @@ describe('replacements', () => {
     await expect(replacements.setStatus(rep.id, 'requested')).rejects.toThrow("Can't move from delivered to requested.");
   });
 
-  it('the seller sees the customer by first name with no id, in the list, the detail and the live event', async () => {
+  it('the seller sees nothing: not the list, not the detail, no live event; the customer and staff see the whole row', async () => {
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
-    const [row] = await replacements.list(sellerOne);
-    expect(row).not.toHaveProperty('customerId');
-    expect(row.customerName).toBe('Marie');
+    await replacements.respond(support, rep.id, true, '');
+    expect(await replacements.list(sellerOne)).toEqual([]);
     expect(await replacements.list(sellerTwo)).toEqual([]);
-    expect(await replacements.get(sellerOne, rep.id)).not.toHaveProperty('customerId');
+    await expect(replacements.get(sellerOne, rep.id)).rejects.toThrow('Replacement not found.');
     await expect(replacements.get(sellerTwo, rep.id)).rejects.toThrow('Replacement not found.');
     expect((await replacements.get(admin, rep.id)).customerId).toBe('c1');
-    expect(emitter.sent.filter((e) => e.to === 'user:su1' && e.event === 'replacement:updated').every((e) => !('customerId' in (e.payload as object)))).toBe(true);
+    expect(emitter.sent.filter((e) => e.to === 'user:su1')).toEqual([]);
+    expect(notices.filter((n) => n.to === 'su1')).toEqual([]);
     expect((await replacements.list(customer))[0].customerId).toBe('c1');
   });
 
@@ -283,7 +292,8 @@ describe('exchanges', () => {
     const ex = await exchanges.create(customer, base(o, { toVariant: 'Size: 42', priceDiffUsd: 500 }));
     expect(ex).toMatchObject({ fromVariant: 'Size: 40', toVariant: 'Size: 42', priceDiffUsd: 0, heldUsd: 0, qty: 1, status: 'requested', sellerId: s1.id });
     expect(walletCalls).toEqual([]);
-    expect(titles('su1')).toContain('Exchange requested on your item');
+    expect(notices.filter((n) => n.to === 'su1')).toEqual([]);
+    expect(titles('role:admin_support')).toContain('Exchange requested');
   });
 
   const UP = 'http://x/uploads/00000000-0000-4000-8000-000000000002.png';
@@ -339,8 +349,8 @@ describe('exchanges', () => {
   it('rejecting gives the held difference back exactly once and frees the stock', async () => {
     const o = await order([{ product: hat, price: 10 }]);
     const ex = await exchanges.create(customer, { orderId: o.id, fromSku: hat.id, fromName: 'Hat', toSku: pricey.id, toName: 'Boot' });
-    await expect(exchanges.respond(sellerOne, ex.id, false, 'no')).rejects.toThrow('why you are rejecting');
-    const out = await exchanges.respond(sellerOne, ex.id, false, 'No boots left in that size');
+    await expect(exchanges.respond(support, ex.id, false, 'no')).rejects.toThrow('why you are rejecting');
+    const out = await exchanges.respond(support, ex.id, false, 'No boots left in that size');
     expect(out).toMatchObject({ status: 'rejected', heldUsd: 0 });
     expect(walletBalance).toBe(100);
     expect(walletCalls.map((c) => c.type)).toEqual(['debit', 'refund']);
@@ -348,23 +358,25 @@ describe('exchanges', () => {
     expect(titles(customer.id)).toContain('Exchange rejected');
   });
 
-  it('approving takes the new unit from the seller (the chosen option), asks logistics and tells everyone', async () => {
+  it('support approving takes the new unit from the seller (the chosen option), asks logistics and tells the customer and the warehouse, not the seller', async () => {
     const o = await order([{ product: shoe, variant: 'Size: 40' }]);
     const ex = await exchanges.create(customer, base(o, { toVariant: 'Size: 42' }));
     await expect(exchanges.respond(sellerTwo, ex.id, true, '')).rejects.toThrow('Exchange not found.');
-    const out = await exchanges.respond(sellerOne, ex.id, true, '');
+    await expect(exchanges.respond(sellerOne, ex.id, true, '')).rejects.toThrow('Exchange not found.');
+    const out = await exchanges.respond(support, ex.id, true, '');
     expect(out).toMatchObject({ status: 'approved', stockTaken: 1, deliveryTaskId: 'task-1' });
     expect(reserves[0]).toEqual([shoe.id, 1, expect.objectContaining({ variant: 'Size: 42', reason: 'replacement' })]);
     expect(tasks).toEqual([{ exchangeId: ex.id, orderId: o.id }]);
     expect(titles(customer.id)).toContain('Exchange approved');
     expect(titles('role:warehouse_staff')).toContain('Exchange approved');
+    expect(notices.filter((n) => n.to === 'su1')).toEqual([]);
   });
 
   it('no stock to approve with: the request stays open', async () => {
     const o = await order([{ product: hat, price: 10 }]);
     const ex = await exchanges.create(customer, { orderId: o.id, fromSku: hat.id, fromName: 'Hat', toSku: pricey.id, toName: 'Boot' });
     stock.set(pricey.id, 0);
-    await expect(exchanges.respond(sellerOne, ex.id, true, '')).rejects.toThrow('Not enough stock');
+    await expect(exchanges.respond(support, ex.id, true, '')).rejects.toThrow('Not enough stock for this exchange. Ask the seller to restock the item, or reject the request.');
     expect((await exchanges.get(admin, ex.id)).status).toBe('requested');
   });
 
@@ -373,7 +385,7 @@ describe('exchanges', () => {
     const ex = await exchanges.create(customer, { orderId: o.id, fromSku: pricey.id, fromName: 'Boot', toSku: hat.id, toName: 'Hat' });
     expect(ex.priceDiffUsd).toBe(-40);
     expect(walletCalls).toEqual([]);
-    await exchanges.respond(sellerOne, ex.id, true, '');
+    await exchanges.respond(support, ex.id, true, '');
     expect(walletCalls).toEqual([]);
     expect((await exchanges.syncFromDelivery(ex.id, 'in_transit'))!.status).toBe('dispatched');
     const done = await exchanges.syncFromDelivery(ex.id, 'delivered');
@@ -388,7 +400,7 @@ describe('exchanges', () => {
     // a customer's request for an item outside the catalogue is free text: no price, no hold, no stock
     const free = await exchanges.create(customer, { orderId: o.id, fromSku: hat.id, fromName: 'Hat', toSku: 'B', toName: 'Bigger one', priceDiffUsd: 99 });
     expect(free).toMatchObject({ priceDiffUsd: 0, heldUsd: 0 });
-    expect((await exchanges.respond(sellerOne, free.id, true, '')).status).toBe('approved');
+    expect((await exchanges.respond(support, free.id, true, '')).status).toBe('approved');
     expect(reserves).toHaveLength(0);
     await ds.getRepository(Exchange).update({ id: free.id }, { status: 'rejected' });
     // A-03: staff cannot set a price difference either (it used to be taken as sent, up to -$100,000).
@@ -401,14 +413,15 @@ describe('exchanges', () => {
     expect(walletCalls).toEqual([]);
   });
 
-  it('the seller sees a first name and no customer id; the customer and staff see the whole row', async () => {
+  it('the seller sees nothing; the customer and staff see the whole row', async () => {
     const o = await order([{ product: shoe, variant: 'Size: 40' }]);
     const ex = await exchanges.create(customer, base(o, { toVariant: 'Size: 41' }));
-    expect(await exchanges.list(sellerOne)).toEqual([expect.not.objectContaining({ customerId: expect.anything() })]);
-    expect((await exchanges.list(sellerOne))[0].customerName).toBe('Marie');
+    await exchanges.respond(support, ex.id, true, '');
+    expect(await exchanges.list(sellerOne)).toEqual([]);
     expect(await exchanges.list(sellerTwo)).toEqual([]);
+    await expect(exchanges.get(sellerOne, ex.id)).rejects.toThrow('Exchange not found.');
     expect((await exchanges.list(customer))[0].customerId).toBe('c1');
-    expect(emitter.sent.filter((e) => e.to === 'user:su1' && e.event === 'exchange:updated').every((e) => !('customerId' in (e.payload as object)))).toBe(true);
+    expect(emitter.sent.filter((e) => e.to === 'user:su1')).toEqual([]);
     expect((await exchanges.get(admin, ex.id)).customerId).toBe('c1');
   });
 });
@@ -437,16 +450,16 @@ describe('who reads and works replacements and exchanges (least privilege)', () 
     }
   });
 
-  it('warehouse staff, the customer and the seller read as before', async () => {
+  it('warehouse staff and the customer read as before; the seller reads none', async () => {
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
     expect((await replacements.list(staff('warehouse_staff'))).map((r) => r.id)).toEqual([rep.id]);
     expect((await replacements.list(customer)).map((r) => r.id)).toEqual([rep.id]);
-    expect((await replacements.list(sellerOne)).map((r) => r.id)).toEqual([rep.id]);
-    expect((await replacements.get(sellerOne, rep.id)).id).toBe(rep.id);
+    expect(await replacements.list(sellerOne)).toEqual([]);
+    await expect(replacements.get(sellerOne, rep.id)).rejects.toThrow('Replacement not found.');
   });
 
-  it('only the super admin and support/operations answer on the seller’s behalf; marketing, finance and moderation get "not found" and nothing changes', async () => {
+  it('only the super admin, support and operations decide; marketing, finance and moderation get "not found" and nothing changes', async () => {
     const o = await order([{ product: hat }]);
     const rep = await replacements.create(customer, { orderId: o.id, sku: hat.id, productName: 'Hat' });
     for (const role of OTHERS) await expect(replacements.respond(staff(role), rep.id, true, '')).rejects.toThrow('Replacement not found.');

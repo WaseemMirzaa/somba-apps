@@ -1,6 +1,5 @@
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import { AuditService } from '../ops/audit.service';
-import { sellerContext } from '../sellers/seller-context';
 import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
 import { StaffTierService } from '../logistics/staff-tier.service';
@@ -14,7 +13,8 @@ const idOf = (b: { id?: string; disputeId?: string } | undefined) => String(b?.i
 
 /**
  * Returns and disputes on the shared Socket.IO server (RealtimeGateway authenticates the socket). Customer opens →
- * seller answers → support decides → warehouse receives and grades → the refund follows. See docs/contracts/after-sale.md.
+ * support decides → warehouse receives and grades → the refund follows. Sellers take no part (docs/contracts/admin-controls.md).
+ * See docs/contracts/after-sale.md.
  */
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class DisputesGateway {
@@ -24,25 +24,15 @@ export class DisputesGateway {
     private readonly tiers: StaffTierService,
   ) {}
 
-  /** The seller's store owner identity for a seller account (a team member acts as the store); other roles as they are. */
-  private async actor(user: SocketUser, write: boolean) {
-    if (user.role !== 'seller') return user;
-    return (await sellerContext(user, 'orders', { write })).actor;
-  }
-
   /** An admin role outside the returns and disputes desk (marketing, moderation) is refused; null for everyone else (the service scopes the rest). */
   private adminRefusal(user: SocketUser): string | null {
     return user.role.startsWith('admin') && !inRoleGroup(user.role, 'disputeDesk') ? 'Not allowed.' : null;
   }
 
-  /** A seller who is not (yet) in a store still sees what they bought. Warehouse staff carry their warehouse (they see its returns only). */
+  /** Warehouse staff carry their warehouse (they see its returns only); everyone else is themselves (a seller who shops sees their own purchases). */
   private async viewer(user: SocketUser) {
     if (user.role === 'warehouse_staff') return { ...user, hubId: await this.tiers.hubOf(user) };
-    try {
-      return await this.actor(user, false);
-    } catch {
-      return user;
-    }
+    return user;
   }
 
   /**
@@ -126,27 +116,25 @@ export class DisputesGateway {
     }
   }
 
-  /** A message in the thread: the customer, the seller (a team member with the orders permission) or KOMORIKO staff. */
+  /** A message in the thread: the customer or KOMORIKO staff. */
   @SubscribeMessage('disputes:reply')
   async reply(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string; message?: string; text?: string; attachments?: string[] }) {
     try {
       const user = requireUser(client);
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
-      const who = await this.actor(user, true);
-      const asUser = user.role === 'seller' ? { ...who, name: user.name } : user;
-      return ok(await this.disputes.reply(asUser, idOf(body), body?.message ?? body?.text, body?.attachments));
+      return ok(await this.disputes.reply(user, idOf(body), body?.message ?? body?.text, body?.attachments));
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
+  /** Retired: a request is with KOMORIKO support from the start, so there is nothing to escalate. Answered (not ignored) so an old app build does not wait. */
   @SubscribeMessage('disputes:escalate')
-  async escalate(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string; note?: string }) {
+  async escalate(@ConnectedSocket() client: AuthedSocket) {
     try {
-      const user = requireUser(client);
-      if (user.role !== 'customer') return fail('Customers only.');
-      return ok(await this.disputes.escalate(user, idOf(body), body?.note));
+      requireUser(client);
+      return fail('Your request is already with KOMORIKO support.');
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -163,20 +151,18 @@ export class DisputesGateway {
     }
   }
 
-  /** The seller says yes or no to a return. */
+  /** Retired: sellers no longer answer returns; support decides with `returns:decide`. Answered (not ignored) so an old client does not wait. */
   @SubscribeMessage('returns:respond')
-  async respond(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string; accept: boolean; reason?: string }) {
+  async respond(@ConnectedSocket() client: AuthedSocket) {
     try {
-      const user = requireUser(client);
-      if (user.role !== 'seller') return fail('Sellers only.');
-      const ctx = await sellerContext(user, 'orders');
-      return ok(await this.disputes.sellerRespond(ctx.actor, idOf(body), body?.accept === true, body?.reason));
+      requireUser(client);
+      return fail('Returns are decided by KOMORIKO support.');
     } catch (e) {
       return fail((e as Error).message);
     }
   }
 
-  /** KOMORIKO support approves or refuses a return the seller rejected or let lapse. */
+  /** KOMORIKO support approves or refuses a return that is still undecided (the first decision on every return). */
   @SubscribeMessage('returns:decide')
   async decideReturn(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id?: string; disputeId?: string; approve: boolean; reason?: string }) {
     try {

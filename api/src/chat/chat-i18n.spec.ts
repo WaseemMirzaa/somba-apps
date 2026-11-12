@@ -1,7 +1,5 @@
 import { DataSource } from 'typeorm';
-import { Conversation, ConversationMessage, Order, OrderItem, Product, Seller, SellerTeamMember, Translation, User } from '../database/entities';
-import { SellerContextService } from '../sellers/seller-context';
-import { TeamDirectory } from '../sellers/team-directory';
+import { Conversation, ConversationMessage, Order, Product, Seller, Translation, User } from '../database/entities';
 import { FakeTranslator } from '../translation/fake.translator';
 import type { TranslationService } from '../translation/translation.service';
 import type { TranslatorProvider } from '../translation/translator.provider';
@@ -22,22 +20,7 @@ const caller = (u: User) => ({ id: u.id, role: u.role, name: u.name });
 
 function build(provider: TranslatorProvider) {
   tr = testTranslations(ds, provider);
-  const dir = new TeamDirectory(ds.getRepository(SellerTeamMember), ds.getRepository(Seller));
-  const ctx = new SellerContextService(ds.getRepository(Seller), ds.getRepository(SellerTeamMember), ds.getRepository(User), { get: async () => null } as never);
-  chat = new ChatService(
-    ds.getRepository(Conversation),
-    ds.getRepository(ConversationMessage),
-    ds.getRepository(Seller),
-    ds.getRepository(Product),
-    ds.getRepository(Order),
-    ds.getRepository(OrderItem),
-    ds.getRepository(User),
-    { toUser: async () => undefined } as never,
-    emitter as never,
-    dir,
-    ctx,
-    tr,
-  );
+  chat = new ChatService(ds.getRepository(Conversation), ds.getRepository(ConversationMessage), ds.getRepository(Seller), ds.getRepository(Product), ds.getRepository(Order), emitter as never, tr);
 }
 const broken: TranslatorProvider = { name: 'fake', enabled: true, translate: async () => { throw new Error('503'); }, detect: async () => { throw new Error('503'); } };
 
@@ -49,7 +32,7 @@ async function shop() {
   return { owner, seller, product };
 }
 const rowsOf = (id: string) => ds.getRepository(Translation).find({ where: { entityId: id }, order: { locale: 'ASC' } });
-const heard = (to: string) => emitter.sent.filter((e) => e.to === `user:${to}` && e.event === 'chat:message');
+const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000);
 
 beforeEach(async () => {
   ds = await testDb();
@@ -59,82 +42,70 @@ beforeEach(async () => {
 });
 afterEach(() => ds.destroy());
 
-describe('chat: translated before they are stored', () => {
-  it('start and send store the text and its row, and return and push both languages to both sides', async () => {
+describe('chat history: translated before it is stored, read in both languages', () => {
+  it('imported messages keep their text and a translation row; reads carry textI18n and lastMessageI18n', async () => {
     const { seller, owner } = await shop();
     const buyer = await user('buyer');
-    const first = await chat.start(caller(buyer), { sellerId: seller.id, text: 'Is it new?' });
-    const expected = { sourceLang: 'en', en: 'Is it new?', fr: '[fr] Is it new?' };
-    expect(first.message.text).toBe('Is it new?');
-    expect(first.message.textI18n).toEqual(expected);
-    expect((await rowsOf(first.message.id)).map((r) => [r.entityType, r.field, r.locale, r.origin])).toEqual([['chat_message', 'text', 'fr', 'machine']]);
-    expect(heard(owner.id)[0].payload.message.textI18n).toEqual(expected);
-    expect(heard(buyer.id)[0].payload.message.textI18n).toEqual(expected);
-    expect(first.conversation.lastMessageI18n).toEqual({ sourceLang: 'en', en: 'Is it new?', fr: '[fr] Is it new?' });
-
-    const sent = await chat.send(caller(owner), { conversationId: first.conversation.id, text: 'Oui, il est neuf' });
-    expect(sent.message.textI18n).toEqual({ sourceLang: 'fr', fr: 'Oui, il est neuf', en: '[en] Oui, il est neuf' });
-  });
-
-  it('the sender\'s language is the detect hint: a French sender costs one call', async () => {
-    const { seller } = await shop();
-    const buyer = await user('acheteur', 'customer', 'fr');
-    fake.calls.length = 0;
-    await chat.start(caller(buyer), { sellerId: seller.id, text: 'Très bon produit, livraison rapide' });
-    expect(fake.calls).toHaveLength(1);
-    expect(fake.calls[0].to).toBe('en');
-  });
-
-  it('history carries textI18n per message (one lookup for the whole page) and the conversation lists carry lastMessageI18n', async () => {
-    const { seller, owner } = await shop();
-    const buyer = await user('buyer');
-    const first = await chat.start(caller(buyer), { sellerId: seller.id, text: 'Is it new?' });
-    await chat.send(caller(owner), { conversationId: first.conversation.id, text: 'Oui, il est neuf' });
-    await chat.send(caller(buyer), { conversationId: first.conversation.id, text: 'Great, thanks a lot' });
+    const conv = await chat.importHistory({
+      buyer: caller(buyer),
+      sellerId: seller.id,
+      messages: [
+        { side: 'buyer', sender: caller(buyer), text: 'Is it new?', at: at(30) },
+        { side: 'seller', sender: caller(owner), text: 'Oui, il est neuf', at: at(20) },
+        { side: 'buyer', sender: caller(buyer), text: 'Great, thanks a lot', at: at(10) },
+      ],
+    });
+    const stored = await ds.getRepository(ConversationMessage).find({ where: { conversationId: conv.id }, order: { createdAt: 'ASC' } });
+    expect((await rowsOf(stored[0].id)).map((r) => [r.entityType, r.field, r.locale, r.origin])).toEqual([['chat_message', 'text', 'fr', 'machine']]);
     const spy = jest.spyOn(ds.getRepository(Translation), 'find');
-    const h = await chat.messages(caller(buyer), { conversationId: first.conversation.id });
+    const h = await chat.messages(caller(buyer), { conversationId: conv.id });
     expect(spy).toHaveBeenCalledTimes(2); // the page of messages, and the conversation's last-message preview
     expect(h.messages.map((m) => m.textI18n?.sourceLang)).toEqual(['en', 'fr', 'en']);
+    expect(h.messages[1].textI18n).toEqual({ sourceLang: 'fr', fr: 'Oui, il est neuf', en: '[en] Oui, il est neuf' });
     expect(h.conversation.lastMessageI18n).toEqual({ sourceLang: 'en', en: 'Great, thanks a lot', fr: '[fr] Great, thanks a lot' });
     spy.mockClear();
-    const asBuyer = await chat.list(caller(buyer), { as: 'buyer' });
-    const asSeller = await chat.list(caller(owner), { as: 'seller' });
-    expect(spy).toHaveBeenCalledTimes(2); // one batched lookup per list, whatever the number of conversations
-    for (const l of [asBuyer, asSeller]) expect(l[0].lastMessageI18n?.fr).toBe('[fr] Great, thanks a lot');
-    const push = heard(owner.id).at(-1)!.payload.conversation;
-    expect(push.lastMessageI18n?.fr).toBe('[fr] Great, thanks a lot');
+    const listed = await chat.list(caller(buyer), {});
+    expect(spy).toHaveBeenCalledTimes(1); // one batched lookup per list, whatever the number of conversations
+    expect(listed[0].lastMessageI18n?.fr).toBe('[fr] Great, thanks a lot');
+  });
+
+  it('support reads the same bilingual history, list and messages', async () => {
+    const { seller, owner } = await shop();
+    const buyer = await user('buyer');
+    const support = await user('support', 'admin_support');
+    const conv = await chat.importHistory({
+      buyer: caller(buyer),
+      sellerId: seller.id,
+      messages: [
+        { side: 'buyer', sender: caller(buyer), text: 'Is it new?', at: at(30) },
+        { side: 'seller', sender: caller(owner), text: 'Oui, il est neuf', at: at(20) },
+      ],
+    });
+    const list = await chat.adminList(caller(support), {});
+    expect(list[0].lastMessageI18n).toEqual({ sourceLang: 'fr', fr: 'Oui, il est neuf', en: '[en] Oui, il est neuf' });
+    const page = await chat.adminMessages(caller(support), { conversationId: conv.id });
+    expect(page.messages.map((m) => m.textI18n?.sourceLang)).toEqual(['en', 'fr']);
   });
 
   it('a long last message is cut like lastMessagePreview, in each language', async () => {
     const { seller } = await shop();
     const buyer = await user('buyer');
     const text = `Hello ${'there '.repeat(60)}`.trim();
-    const r = await chat.start(caller(buyer), { sellerId: seller.id, text });
-    expect(r.conversation.lastMessagePreview).toHaveLength(140);
-    expect(r.conversation.lastMessageI18n?.en).toBe(r.conversation.lastMessagePreview);
-    expect(r.conversation.lastMessageI18n?.fr).toHaveLength(140);
+    await chat.importHistory({ buyer: caller(buyer), sellerId: seller.id, messages: [{ side: 'buyer', sender: caller(buyer), text, at: at(5) }] });
+    const [c] = await chat.list(caller(buyer), {});
+    expect(c.lastMessagePreview).toHaveLength(140);
+    expect(c.lastMessageI18n?.en).toBe(c.lastMessagePreview);
+    expect(c.lastMessageI18n?.fr).toHaveLength(140);
   });
 
-  it('a failing translator still sends: no error, no i18n anywhere', async () => {
+  it('a failing translator still stores the history: no error, no i18n anywhere', async () => {
     build(broken);
-    const { seller, owner } = await shop();
-    const buyer = await user('buyer');
-    const r = await chat.start(caller(buyer), { sellerId: seller.id, text: 'Is it new?' });
-    expect(r.message.text).toBe('Is it new?');
-    expect('textI18n' in r.message).toBe(false);
-    expect('lastMessageI18n' in r.conversation).toBe(false);
-    expect(await ds.getRepository(ConversationMessage).count()).toBe(1);
-    expect('textI18n' in heard(owner.id)[0].payload.message).toBe(false);
-    const h = await chat.messages(caller(buyer), { conversationId: r.conversation.id });
-    expect('textI18n' in h.messages[0]).toBe(false);
-  });
-
-  it('one message costs one detect call for an English sender', async () => {
     const { seller } = await shop();
     const buyer = await user('buyer');
-    fake.calls.length = 0;
-    const r = await chat.start(caller(buyer), { sellerId: seller.id, text: 'Is it new?' });
-    expect(r.message.textI18n).toBeDefined();
-    expect(fake.calls).toHaveLength(1);
+    const conv = await chat.importHistory({ buyer: caller(buyer), sellerId: seller.id, messages: [{ side: 'buyer', sender: caller(buyer), text: 'Is it new?', at: at(5) }] });
+    expect(await ds.getRepository(ConversationMessage).count()).toBe(1);
+    const h = await chat.messages(caller(buyer), { conversationId: conv.id });
+    expect('textI18n' in h.messages[0]).toBe(false);
+    expect('lastMessageI18n' in h.conversation).toBe(false);
   });
 });

@@ -3,15 +3,11 @@ import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { Seller } from '../database/entities';
-import { str } from '../common/validate';
 import { cleanPoint } from '../common/geo/geo';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SellersService } from '../ops/sellers.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
-import { TranslationService } from '../translation/translation.service';
-import { planWrite } from '../translation/translatable';
-import type { FieldInput, WritePlan, WriteState } from '../translation/translatable';
-import { isLocale } from '../translation/translator.provider';
+import { SellerPolicyService, touchesPolicy } from './policy.service';
 import { cleanGoals, cleanHandlingDays, cleanVacationUntil, onVacation, parseGoals, vacationNotice } from './storefront';
 import { cleanPayoutAccount, maskAccount } from './payout-account';
 import type { SellerContext } from './seller-context';
@@ -20,19 +16,20 @@ import type { SellerContext } from './seller-context';
 export interface StorefrontPatch {
   vacationUntil?: unknown;
   handlingDays?: unknown;
-  /** Offer express delivery (a rider takes the parcel from the store straight to a customer in the same commune). Needs a pinned pickup location. */
-  expressDelivery?: unknown;
   returnsPolicy?: unknown;
   returnsPolicyFr?: unknown;
   shippingPolicy?: unknown;
   shippingPolicyFr?: unknown;
 }
 
-const POLICY_FIELDS = ['returnsPolicy', 'shippingPolicy'] as const;
-
-export const EXPRESS_NEEDS_PIN = 'Pin your pickup location on the map (Store settings) before offering express delivery.';
+export const EXPRESS_NEEDS_PIN = 'This store has no pinned pickup location. Ask the seller to pin it in Store settings before turning on express delivery.';
 export const EXPRESS_NOT_BOOLEAN = 'Express delivery must be true or false.';
-export const STOREFRONT_KEYS: (keyof StorefrontPatch)[] = ['vacationUntil', 'handlingDays', 'expressDelivery', 'returnsPolicy', 'returnsPolicyFr', 'shippingPolicy', 'shippingPolicyFr'];
+/**
+ * The keys of a `sellers:update` body that go to the storefront service. `expressDelivery` is NOT one: express is switched
+ * by KOMORIKO admin (`sellers:setExpress`), and an old client that still sends it is ignored without an error. The policy
+ * keys do not change the live text: they become a pending revision (`SellerPolicyService.propose`).
+ */
+export const STOREFRONT_KEYS: (keyof StorefrontPatch)[] = ['vacationUntil', 'handlingDays', 'returnsPolicy', 'returnsPolicyFr', 'shippingPolicy', 'shippingPolicyFr'];
 
 /** Does a `sellers:update` body touch storefront settings? */
 export const touchesStorefront = (body: unknown): boolean =>
@@ -48,7 +45,7 @@ export class StorefrontService implements OnModuleInit, OnModuleDestroy {
     private readonly sellersSvc: SellersService,
     private readonly emitter: RealtimeEmitter,
     private readonly notifications: NotificationsService,
-    private readonly translations?: TranslationService,
+    private readonly policies: SellerPolicyService,
   ) {}
 
   onModuleInit(): void {
@@ -63,54 +60,53 @@ export class StorefrontService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ── Vacation, handling time, policies ───────────────────────────────────
+  /**
+   * The seller's storefront settings. Vacation and handling time are live at once. Policies are NOT: they become a pending
+   * revision for KOMORIKO admin to approve (the live text stays), and the result says so in `policyRevision`. Express
+   * delivery is not the seller's to switch (`setExpress`): an `expressDelivery` key from an old client is ignored.
+   */
   async update(ctx: SellerContext, patch: StorefrontPatch) {
+    // Validate the policies first, so a bad value saves nothing (the revision itself is written after the live settings).
+    const policyPatch = touchesPolicy(patch) ? patch : null;
     const seller = await this.sellers.findOne({ where: { id: ctx.seller.id } });
     if (!seller) throw new BadRequestException('Store not found.');
     const wasAway = onVacation(seller);
-    if (patch.vacationUntil !== undefined) seller.vacationUntil = cleanVacationUntil(patch.vacationUntil);
-    if (patch.handlingDays !== undefined) seller.handlingDays = cleanHandlingDays(patch.handlingDays);
-    if (patch.expressDelivery !== undefined) {
-      if (typeof patch.expressDelivery !== 'boolean') throw new BadRequestException(EXPRESS_NOT_BOOLEAN);
-      if (patch.expressDelivery) {
-        // The pin may arrive in the same request (`sellers:update` saves the profile right after this), so a body that moves it is judged by what it sends.
-        const sent = patch as { pickupLat?: unknown; pickupLng?: unknown };
-        const pin = sent.pickupLat !== undefined || sent.pickupLng !== undefined ? cleanPoint(sent.pickupLat, sent.pickupLng) : cleanPoint(seller.pickupLat, seller.pickupLng);
-        if (!pin) throw new BadRequestException(EXPRESS_NEEDS_PIN);
-      }
-      seller.expressDelivery = patch.expressDelivery;
+    let changed = false;
+    if (patch.vacationUntil !== undefined) {
+      seller.vacationUntil = cleanVacationUntil(patch.vacationUntil);
+      changed = true;
     }
+    if (patch.handlingDays !== undefined) {
+      seller.handlingDays = cleanHandlingDays(patch.handlingDays);
+      changed = true;
+    }
+    const revision = policyPatch ? await this.policies.propose(ctx, policyPatch) : null;
+    const saved = changed ? await this.sellers.save(seller) : seller;
+    if (changed) await this.publish(saved, wasAway);
+    return { ...(await this.sellersSvc.withPlanState(saved)), policyRevision: revision };
+  }
 
-    // Policies are authored in either language; the other one is an author row or filled in by a machine.
-    const text = (v: unknown, label: string): string | null | undefined =>
-      v === undefined ? undefined : v === null || String(v).trim() === '' ? null : str(v, label, { min: 10, max: 2000 });
-    const input: Record<string, FieldInput> = {};
-    for (const f of POLICY_FIELDS) {
-      const en = text(patch[f], f === 'returnsPolicy' ? 'Returns policy' : 'Shipping policy');
-      const fr = text(patch[`${f}Fr` as keyof StorefrontPatch], f === 'returnsPolicy' ? 'Returns policy (French)' : 'Shipping policy (French)');
-      if (en !== undefined || fr !== undefined) input[f] = { en, fr };
+  /**
+   * KOMORIKO admin switches express delivery for a store (`sellers:setExpress`). Turning it on needs the store's pickup
+   * location pinned on the map (express prices the distance from it): the same check the seller's own switch had.
+   */
+  async setExpress(sellerId: unknown, enabled: unknown) {
+    if (typeof enabled !== 'boolean') throw new BadRequestException(EXPRESS_NOT_BOOLEAN);
+    const seller = await this.sellers.findOne({ where: { id: String(sellerId ?? '') } });
+    if (!seller) throw new BadRequestException('Store not found.');
+    if (enabled && !cleanPoint(seller.pickupLat, seller.pickupLng)) throw new BadRequestException(EXPRESS_NEEDS_PIN);
+    const changed = seller.expressDelivery !== enabled;
+    seller.expressDelivery = enabled;
+    const saved = await this.sellers.save(seller);
+    await this.publish(saved, onVacation(saved));
+    if (changed && saved.userId) {
+      await this.notifications.toUser(saved.userId, {
+        title: enabled ? 'Express delivery turned on' : 'Express delivery turned off',
+        body: enabled ? 'KOMORIKO turned express delivery on for your store.' : 'KOMORIKO turned express delivery off for your store.',
+        type: 'seller',
+        entityId: saved.id,
+      });
     }
-    let plan: WritePlan | null = null;
-    if (Object.keys(input).length) {
-      const rows = this.translations ? ((await this.translations.rowsFor('seller', [seller.id])).get(seller.id) ?? []) : [];
-      const state: WriteState = {
-        sourceLang: isLocale(seller.sourceLang) ? seller.sourceLang : 'en',
-        base: { returnsPolicy: seller.returnsPolicy, shippingPolicy: seller.shippingPolicy, description: seller.description },
-        authors: Object.fromEntries(
-          [...POLICY_FIELDS, 'description'].map((f) => [f, Object.fromEntries(rows.filter((r) => r.origin === 'author' && r.field === f).map((r) => [r.locale, r.value]))]),
-        ),
-      };
-      plan = planWrite({ type: 'seller', create: false, state, input });
-      for (const f of POLICY_FIELDS) if (f in plan.base) seller[f] = plan.base[f];
-    }
-    const saved = await this.sellers.manager.transaction(async (m) => {
-      const row = await m.save(seller);
-      if (plan && this.translations) {
-        await this.translations.applyPlan(m, 'seller', row.id, plan, { description: row.description, returnsPolicy: row.returnsPolicy, shippingPolicy: row.shippingPolicy });
-      }
-      return row;
-    });
-    if (plan?.touched) await this.translations?.enqueue('seller', saved.id);
-    await this.publish(saved, wasAway);
     return this.sellersSvc.withPlanState(saved);
   }
 

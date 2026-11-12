@@ -89,7 +89,6 @@ beforeEach(async () => {
     ds.getRepository(DisputeItem),
     ds.getRepository(DisputeMessage),
     ds.getRepository(Order),
-    ds.getRepository(Seller),
     ds.getRepository(DeliveryTask),
     notifications as never,
     payments as never,
@@ -113,7 +112,7 @@ describe('opening a return', () => {
     await ds.getRepository(Order).query('UPDATE orders SET updatedAt = ? WHERE id = ?', [new Date(Date.now() - 8 * 86_400_000).toISOString().replace('T', ' ').slice(0, 19), old.id]);
     await expect(svc.open(customer, { orderId: old.id, type: 'return', reason: 'Broken on arrival' })).rejects.toThrow('within 7 days');
     settingsMap.returnWindowDays = '30';
-    await expect(svc.open(customer, { orderId: old.id, type: 'return', reason: 'Broken on arrival' })).resolves.toMatchObject({ type: 'return', stage: 'awaiting_seller' });
+    await expect(svc.open(customer, { orderId: old.id, type: 'return', reason: 'Broken on arrival' })).resolves.toMatchObject({ type: 'return', stage: 'awaiting_support' });
   });
 
   it('a window of 0 days closes returns', async () => {
@@ -128,7 +127,7 @@ describe('opening a return', () => {
     await expect(svc.open(customer, { orderId: o.id, type: 'return', reason: 'no' })).rejects.toThrow('Please describe');
   });
 
-  it('records the lines and quantities, the photos, and gives the seller 48 hours', async () => {
+  it('records the lines and quantities, the photos, and gives support 48 hours', async () => {
     const o = await makeOrder([
       { sellerId: s1.id, productId: 'p1', qty: 3, price: 20 },
       { sellerId: s1.id, productId: 'p2', qty: 1, price: 5 },
@@ -181,20 +180,22 @@ describe('opening a return', () => {
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Not what I expected' });
     expect(d.siblings).toHaveLength(1);
     expect(await ds.getRepository(Dispute).count()).toBe(2);
-    const mine = await svc.list(sellerOne);
-    const theirs = await svc.list(sellerTwo);
-    expect(mine).toHaveLength(1);
-    expect(theirs).toHaveLength(1);
-    expect(mine[0].id).not.toBe(theirs[0].id);
-    expect(titles('user:su1')).toContain('Return requested on your order');
-    expect(titles('user:su2')).toContain('Return requested on your order');
-    expect(notices).toContainEqual(expect.objectContaining({ to: 'role:admin_support', title: 'Return requested' }));
+    // each store's goods are their own request (so they go back to the right store), and both wait for support
+    const all = await svc.list(agent);
+    expect(all.map((r) => r.sellerId).sort()).toEqual([s1.id, s2.id].sort());
+    expect(all.every((r) => r.stage === 'awaiting_support')).toBe(true);
+    // the stores take no part: they see nothing and are told nothing
+    expect(await svc.list(sellerOne)).toEqual([]);
+    expect(await svc.list(sellerTwo)).toEqual([]);
+    expect(notices.filter((n) => n.to.startsWith('user:su'))).toEqual([]);
+    expect(notices.filter((n) => n.to === 'role:admin_support' && n.title === 'Return requested')).toHaveLength(2);
   });
 
-  it('tells the sellers, admin support and the warehouse stays out until it is approved', async () => {
+  it('tells admin support (never the seller) and the warehouse stays out until it is approved', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Not what I expected' });
-    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'user:su1')).toBe(true);
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'user:su1')).toBe(false);
+    expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('admin_support'))).toBe(true);
     // The return goes to the staff of the warehouse it belongs to, and to no other warehouse's.
     expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to === 'hub:hub-k')).toBe(true);
     expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('warehouse_staff'))).toBe(false);
@@ -203,125 +204,125 @@ describe('opening a return', () => {
   });
 });
 
-describe('the seller’s answer', () => {
+describe('support decides a return', () => {
   async function opened(over: Partial<Parameters<DisputesService['open']>[1]> = {}) {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 2, price: 20 }]);
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead', ...over });
     return { o, d };
   }
 
-  it('accepting asks logistics to collect the goods and tells the customer', async () => {
+  it('every return starts with support, and support approving asks logistics to collect the goods and tells the customer', async () => {
     const { o, d } = await opened();
-    const done = await svc.sellerRespond(sellerOne, d.id, true, 'Sorry');
+    expect(d.stage).toBe('awaiting_support');
+    const done = await svc.adminDecideReturn(agent, d.id, true, 'Looks justified');
     expect(done.stage).toBe('pickup');
     expect(done.pickupTaskId).toBe('task-1');
     expect(pickups).toEqual([{ disputeId: d.id, orderId: o.id, items: [expect.objectContaining({ orderItemId: o.items[0].id, qty: 2 })] }]);
-    expect(titles('user:c1')).toContain('Return accepted');
+    expect(notices.find((n) => n.to === 'user:c1' && n.title === 'Return approved')?.body).toContain('Looks justified');
+    // the seller is told nothing: the goods coming back reach them as a delivery leg
+    expect(notices.filter((n) => n.to === 'user:su1')).toEqual([]);
+  });
+
+  it('every desk role and the super admin can approve (finance and operations too); other departments cannot', async () => {
+    for (const who of [admin, agent, { id: 'f1', role: 'admin_finance', name: 'F' }, { id: 'o1', role: 'admin_operations', name: 'O' }]) {
+      const { d } = await opened();
+      await expect(svc.adminDecideReturn(who, d.id, true, '')).resolves.toMatchObject({ stage: 'pickup' });
+      await ds.getRepository(Dispute).delete({ id: d.id }); // free the units for the next case
+    }
+    const { d } = await opened();
+    for (const role of ['admin_marketing', 'admin_moderation']) await expect(svc.adminDecideReturn({ id: 'x', role, name: 'X' }, d.id, true, '')).rejects.toThrow('Not allowed.');
   });
 
   it('without a pickup task the request is approved and the warehouse is asked to collect by hand', async () => {
     pickupAnswer = null;
     const { d } = await opened();
-    expect((await svc.sellerRespond(sellerOne, d.id, true, '')).stage).toBe('approved');
+    expect((await svc.adminDecideReturn(agent, d.id, true, '')).stage).toBe('approved');
     expect(titles('role:warehouse_staff')).toContain('Return approved');
   });
 
-  it('rejecting needs a reason and tells the customer why', async () => {
+  it('refusing needs a reason, closes the request, frees the units and tells the customer why', async () => {
     const { d } = await opened();
-    await expect(svc.sellerRespond(sellerOne, d.id, false, 'no')).rejects.toThrow('why you are rejecting');
-    const done = await svc.sellerRespond(sellerOne, d.id, false, 'Used and dirty, cannot take it back');
-    expect(done).toMatchObject({ stage: 'seller_rejected', canEscalate: true });
-    expect(notices.find((n) => n.title === 'Return rejected')?.body).toContain('Used and dirty');
+    await expect(svc.adminDecideReturn(agent, d.id, false, '')).rejects.toThrow('reason');
+    await expect(svc.adminDecideReturn(agent, d.id, false, 'no')).rejects.toThrow('reason');
+    const closed = await svc.adminDecideReturn(agent, d.id, false, 'Hygiene items are final sale');
+    expect(closed).toMatchObject({ status: 'rejected', stage: 'closed', resolution: 'Hygiene items are final sale' });
+    expect(notices.find((n) => n.to === 'user:c1' && n.title === 'Return closed')?.body).toContain('Hygiene items');
+    expect((await svc.eligibility(customer.id, d.orderId)).items[0].remaining).toBe(2);
+    expect(notices.filter((n) => n.to === 'user:su1')).toEqual([]);
   });
 
-  it('is for that store only, once', async () => {
+  it('sellers and customers cannot decide; a request is decided once; two decisions at the same moment: one wins', async () => {
     const { d } = await opened();
-    await expect(svc.sellerRespond(sellerTwo, d.id, true, '')).rejects.toThrow('Dispute not found.');
-    await expect(svc.sellerRespond({ id: 'c1', role: 'customer' }, d.id, true, '')).rejects.toThrow('Dispute not found.');
-    await svc.sellerRespond(sellerOne, d.id, true, '');
-    await expect(svc.sellerRespond(sellerOne, d.id, false, 'changed my mind')).rejects.toThrow('already handled');
-  });
-
-  it('two answers at the same moment: one wins', async () => {
-    const { d } = await opened();
-    const results = await Promise.allSettled([svc.sellerRespond(sellerOne, d.id, true, ''), svc.sellerRespond(sellerOne, d.id, false, 'second thoughts here')]);
+    await expect(svc.adminDecideReturn(sellerOne, d.id, true, '')).rejects.toThrow('Admins only.');
+    await expect(svc.adminDecideReturn({ id: 'c1', role: 'customer' }, d.id, true, '')).rejects.toThrow('Admins only.');
+    const results = await Promise.allSettled([svc.adminDecideReturn(agent, d.id, true, ''), svc.adminDecideReturn(admin, d.id, false, 'second thoughts here')]);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     expect(pickups.length).toBeLessThanOrEqual(1);
+    await expect(svc.adminDecideReturn(agent, d.id, true, '')).rejects.toThrow('just updated');
   });
 
-  it('only returns have an accept / reject', async () => {
+  it('only returns are decided here; a dispute is decided with decide', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'Missing the charger', category: 'missing' });
-    await expect(svc.sellerRespond(sellerOne, d.id, true, '')).rejects.toThrow('Only returns');
+    await expect(svc.adminDecideReturn(agent, d.id, true, '')).rejects.toThrow('Use decide for disputes.');
+  });
+
+  it('a request still carrying an old seller stage (before the migration ran) is decided like any other', async () => {
+    for (const stage of ['awaiting_seller', 'seller_rejected', 'seller_timeout', 'escalated'] as const) {
+      const { d } = await opened();
+      await ds.getRepository(Dispute).update({ id: d.id }, { stage });
+      await expect(svc.adminDecideReturn(agent, d.id, true, '')).resolves.toMatchObject({ stage: 'pickup' });
+      await ds.getRepository(Dispute).delete({ id: d.id });
+    }
+  });
+
+  it('the seller is left out of everything: no list, no detail, no thread, no live push, no notice', async () => {
+    const { d } = await opened();
+    await svc.reply(agent, d.id, 'We are reviewing this');
+    await svc.adminDecideReturn(agent, d.id, true, '');
+    await svc.onReturnReceived(d.id);
+    expect(await svc.list(sellerOne)).toEqual([]);
+    await expect(svc.get(sellerOne, d.id)).rejects.toThrow('Dispute not found.');
+    await expect(svc.reply(sellerOne, d.id, 'May I join?')).rejects.toThrow('Dispute not found.');
+    expect(emitter.sent.filter((e) => e.to === 'user:su1')).toEqual([]);
+    expect(notices.filter((n) => n.to === 'user:su1')).toEqual([]);
+    // the two retired entry points are gone from the service
+    expect((svc as unknown as Record<string, unknown>).sellerRespond).toBeUndefined();
+    expect((svc as unknown as Record<string, unknown>).escalate).toBeUndefined();
   });
 });
 
-describe('escalation, cancelling and the time limit', () => {
-  async function rejected() {
-    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
-    const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
-    await svc.sellerRespond(sellerOne, d.id, false, 'Cannot take it back, sorry');
-    return d;
-  }
-
-  it('the customer escalates only after a rejection or a timeout, and support decides', async () => {
-    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
-    const fresh = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
-    await expect(svc.escalate(customer, fresh.id)).rejects.toThrow('Wait for the seller');
-    await svc.sellerRespond(sellerOne, fresh.id, false, 'Cannot take it back, sorry');
-    await expect(svc.escalate({ id: 'other', role: 'customer' }, fresh.id)).rejects.toThrow('Dispute not found.');
-    const esc = await svc.escalate(customer, fresh.id, 'Please look again');
-    expect(esc.stage).toBe('escalated');
-    expect((await svc.get(agent, fresh.id)).messages).toHaveLength(1);
-    expect(titles('role:admin_support')).toContain('Return escalated');
-    expect(titles('user:su1')).toContain('Return escalated');
-    await expect(svc.escalate(customer, fresh.id)).rejects.toThrow();
-  });
-
-  it('support can approve or refuse; refusing needs a reason; sellers and customers cannot', async () => {
-    const d = await rejected();
-    await svc.escalate(customer, d.id);
-    await expect(svc.adminDecideReturn(sellerOne, d.id, true, '')).rejects.toThrow('Admins only.');
-    await expect(svc.adminDecideReturn(agent, d.id, false, '')).rejects.toThrow('reason');
-    const approved = await svc.adminDecideReturn(agent, d.id, true, 'The seller was wrong');
-    expect(approved.stage).toBe('pickup');
-    expect(titles('user:c1')).toContain('Return approved');
-    expect(titles('user:su1')).toContain('Return approved');
-  });
-
-  it('refusing closes the request and frees the units', async () => {
-    const d = await rejected();
-    await svc.escalate(customer, d.id);
-    const closed = await svc.adminDecideReturn(agent, d.id, false, 'Hygiene items are final sale');
-    expect(closed).toMatchObject({ status: 'rejected', stage: 'closed', resolution: 'Hygiene items are final sale' });
-    expect(titles('user:c1')).toContain('Return closed');
-    expect((await svc.eligibility(customer.id, d.orderId)).items[0].remaining).toBe(1);
-  });
-
+describe('cancelling and the support SLA alert', () => {
   it('the customer can cancel until the return is on its way, not after', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     const a = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
     expect(await svc.cancel(customer, a.id)).toMatchObject({ status: 'rejected', stage: 'closed' });
     await expect(svc.cancel(customer, a.id)).rejects.toThrow();
     const b = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
-    await svc.sellerRespond(sellerOne, b.id, true, '');
+    await svc.adminDecideReturn(agent, b.id, true, '');
     await expect(svc.cancel(customer, b.id)).rejects.toThrow('too late');
   });
 
-  it('sweep moves overdue returns to seller_timeout and tells everyone, leaving the rest', async () => {
+  it('the customer can no longer escalate: a request is with support from the start', async () => {
+    const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
+    const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
+    expect(d).toMatchObject({ stage: 'awaiting_support', canEscalate: false, canCancel: true });
+  });
+
+  it('sweep alerts support once for a request that waited past the response time, moves nothing and tells nobody else', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 2, price: 20 }, { sellerId: s1.id, productId: 'p2', qty: 1, price: 5 }]);
     const late = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead', items: [{ itemId: o.items[0].id, qty: 1 }] });
     const onTime = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Charger is dead', items: [{ itemId: o.items[1].id, qty: 1 }] });
     await ds.getRepository(Dispute).update({ id: late.id }, { sellerDueAt: new Date(Date.now() - 60_000) });
+    notices.length = 0;
     expect(await svc.sweep()).toBe(1);
     expect(await svc.sweep()).toBe(0);
-    expect((await svc.get(admin, late.id)).stage).toBe('seller_timeout');
-    expect((await svc.get(admin, onTime.id)).stage).toBe('awaiting_seller');
-    expect(titles('user:c1')).toContain('Seller did not respond');
-    expect(titles('user:su1')).toContain('Seller did not respond');
-    expect(titles('role:admin_support')).toContain('Seller did not respond');
-    await expect(svc.sellerRespond(sellerOne, late.id, true, '')).rejects.toThrow('response time has passed');
-    expect((await svc.get(customer, late.id)).canEscalate).toBe(true);
+    expect((await svc.get(admin, late.id)).stage).toBe('awaiting_support'); // nothing moves
+    expect((await svc.get(admin, onTime.id)).stage).toBe('awaiting_support');
+    expect(notices).toEqual([expect.objectContaining({ to: 'role:admin_support', title: 'Return waiting for support', body: `${late.reference} · ${o.reference}`, type: 'return', entityId: late.id })]);
+    expect((await ds.getRepository(Dispute).findOneByOrFail({ id: late.id })).sellerLapsedAt).not.toBeNull();
+    // support can still decide it as usual
+    await expect(svc.adminDecideReturn(agent, late.id, true, '')).resolves.toMatchObject({ stage: 'pickup' });
   });
 });
 
@@ -329,7 +330,7 @@ describe('goods back, grading and the refund', () => {
   async function approved(lines = [{ sellerId: 's', productId: 'p1', qty: 3, price: 20 }, { sellerId: 's', productId: 'p2', qty: 1, price: 10 }], pick: { index: number; qty: number }[] = [{ index: 0, qty: 2 }]) {
     const o = await makeOrder(lines.map((l) => ({ ...l, sellerId: s1.id })), { discountUsd: 0 });
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead', items: pick.map((p) => ({ itemId: o.items[p.index].id, qty: p.qty })) });
-    await svc.sellerRespond(sellerOne, d.id, true, '');
+    await svc.adminDecideReturn(agent, d.id, true, '');
     return { o, d };
   }
 
@@ -350,7 +351,7 @@ describe('goods back, grading and the refund', () => {
   it('shares a promo discount across the lines, so a part-return never refunds more than was paid', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 2, price: 20 }, { sellerId: s1.id, productId: 'p2', qty: 1, price: 20 }], { discountUsd: 6 });
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead', items: [{ itemId: o.items.find((i) => i.productId === 'p1')!.id, qty: 2 }] });
-    await svc.sellerRespond(sellerOne, d.id, true, '');
+    await svc.adminDecideReturn(agent, d.id, true, '');
     await svc.onReturnReceived(d.id);
     // 40 of 60 subtotal: pays back 40 - 6 * 40/60 = 36
     expect(refundCalls[0].amountUsd).toBe(36);
@@ -446,42 +447,39 @@ describe('disputes: the thread and support’s decision', () => {
 
   it('opens against the items, one open dispute per order', async () => {
     const { o, d } = await dispute();
-    expect(d).toMatchObject({ type: 'dispute', category: 'missing', stage: 'awaiting_seller' });
+    expect(d).toMatchObject({ type: 'dispute', category: 'missing', stage: 'awaiting_support' });
     expect(d.items).toHaveLength(1);
     await expect(svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'Another problem entirely' })).rejects.toThrow('open request');
-    expect(titles('user:su1')).toContain('Dispute opened on your order');
-    // A dispute is a matter for the seller and support: unlike a return, it is not sent to the warehouse.
+    expect(titles('user:su1')).toEqual([]); // the seller is told nothing
+    expect(titles('role:admin_support')).toContain('Dispute opened');
+    // A dispute is a matter for support alone: unlike a return, it is not sent to the warehouse.
     expect(emitter.sent.some((e) => e.event === 'dispute:created' && e.to.includes('warehouse_staff'))).toBe(false);
   });
 
-  it('the seller replies with evidence; the stage moves; only parties can join', async () => {
+  it('support replies in the thread; only the customer and the desk can join, and the stage does not move', async () => {
     const { d } = await dispute();
-    const msg = await svc.reply({ ...sellerOne }, d.id, 'Shipped Monday, see the label', [UP]);
-    expect(msg).toMatchObject({ role: 'seller', attachments: [UP] });
-    expect((await svc.get(sellerOne, d.id)).stage).toBe('seller_replied');
+    const msg = await svc.reply(agent, d.id, 'Could you send a photo of the box?', [UP]);
+    expect(msg).toMatchObject({ role: 'admin_support', attachments: [UP] });
+    expect((await svc.get(agent, d.id)).stage).toBe('awaiting_support');
     await svc.reply({ ...customer, role: 'customer' }, d.id, 'The box was empty');
     expect(titles('user:c1')).toContain('Dispute reply');
     expect(titles('role:admin_support')).toContain('Dispute reply');
     await expect(svc.reply({ id: 'x', role: 'customer', name: 'X' }, d.id, 'Let me in')).rejects.toThrow('Dispute not found.');
+    // sellers take no part: not the store of the order, not another store
+    await expect(svc.reply({ ...sellerOne }, d.id, 'Shipped Monday, see the label')).rejects.toThrow('Dispute not found.');
     await expect(svc.reply({ ...sellerTwo }, d.id, 'Not my order at all')).rejects.toThrow('Dispute not found.');
-    await expect(svc.reply({ ...sellerOne }, d.id, '')).rejects.toThrow('Write a message first');
-    const view = await svc.get(sellerOne, d.id);
+    await expect(svc.reply(agent, d.id, '')).rejects.toThrow('Write a message first');
+    const view = await svc.get(customer, d.id);
     expect(view.messages).toHaveLength(2);
-    expect(view.messages![1].authorName).toBe('Marie'); // the customer shows by first name
-    expect(view.messages![1].authorId).toBeNull(); // and without their account id
-    expect(emitter.sent.filter((e) => e.to === 'user:su1' && e.event === 'dispute:message').every((e) => !JSON.stringify(e.payload).includes('"c1"'))).toBe(true);
     expect((await svc.get(agent, d.id)).messages![1].authorId).toBe('c1');
+    expect(emitter.sent.filter((e) => e.to === 'user:su1')).toEqual([]);
   });
 
-  it('a seller sees the customer by first name, without the id; staff see the row whole', async () => {
+  it('a seller cannot read a dispute of their store; the customer and staff see the row whole', async () => {
     const { d } = await dispute();
-    const seen = await svc.get(sellerOne, d.id);
-    expect(seen).not.toHaveProperty('customerId');
-    expect(seen.customerName).toBe('Marie');
-    const [row] = await svc.list(sellerOne);
-    expect(row).not.toHaveProperty('customerId');
+    await expect(svc.get(sellerOne, d.id)).rejects.toThrow('Dispute not found.');
+    expect(await svc.list(sellerOne)).toEqual([]);
     expect((await svc.get(agent, d.id)).customerId).toBe('c1');
-    expect(emitter.sent.filter((e) => e.to === 'user:su1' && e.event === 'dispute:created').every((e) => !('customerId' in (e.payload as object)))).toBe(true);
     expect(emitter.sent.some((e) => e.to === 'user:c1' && 'customerId' in (e.payload as object))).toBe(true);
   });
 
@@ -494,7 +492,7 @@ describe('disputes: the thread and support’s decision', () => {
     expect(refundCalls).toEqual([{ orderId: o.id, amountUsd: 7.5, toWallet: true, memo: `Refund for ${o.reference} (dispute)`, source: { kind: 'dispute', disputeId: d.id, disputeReference: d.reference } }]);
     expect(done).toMatchObject({ status: 'resolved', outcome: 'refund_partial', refundUsd: 7.5, resolution: 'The charger was missing', stage: 'closed' });
     expect(titles('user:c1')).toContain('Dispute resolved');
-    expect(titles('user:su1')).toContain('Dispute resolved');
+    expect(titles('user:su1')).toEqual([]); // the seller is told nothing about the outcome
     await expect(svc.decide(admin, d.id, { outcome: 'reject', reason: 'second thoughts' }, true)).rejects.toThrow('already handled');
   });
 
@@ -525,15 +523,15 @@ describe('disputes: the thread and support’s decision', () => {
 });
 
 describe('who sees what', () => {
-  it('lists: customers their own, sellers their store’s, the warehouse the returns, admins all', async () => {
+  it('lists: customers their own, sellers none (but their own purchases), the warehouse the returns, admins all', async () => {
     const o1 = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     const o2 = await makeOrder([{ sellerId: s2.id, productId: 'p2', qty: 1, price: 20 }]);
     await svc.open(customer, { orderId: o1.id, type: 'return', reason: 'Left cup is dead' });
     await svc.open(customer, { orderId: o2.id, type: 'dispute', reason: 'Wrong colour was sent' });
     expect(await svc.list(customer)).toHaveLength(2);
     expect(await svc.list({ id: 'someone', role: 'customer' })).toHaveLength(0);
-    expect(await svc.list(sellerOne)).toHaveLength(1);
-    expect(await svc.list(sellerTwo)).toHaveLength(1);
+    expect(await svc.list(sellerOne)).toHaveLength(0);
+    expect(await svc.list(sellerTwo)).toHaveLength(0);
     expect(await svc.list(warehouse)).toHaveLength(1);
     expect(await svc.list(agent)).toHaveLength(2);
     expect(await svc.list(agent, { type: 'dispute' })).toHaveLength(1);
@@ -562,19 +560,25 @@ describe('who sees what', () => {
     const task = await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: o.id, orderReference: o.reference, kind: 'return_pickup', toHubId: 'hub-l', hubId: 'hub-l' }));
     pickupAnswer = { id: task.id };
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
-    await svc.sellerRespond(sellerOne, d.id, true, '');
+    await svc.adminDecideReturn(agent, d.id, true, '');
     expect((await svc.list(otherWarehouse)).map((x) => x.id)).toEqual([d.id]);
     expect(await svc.list(warehouse)).toEqual([]);
   });
 
-  it('a dispute that names no lines on a two-store order is visible to both stores', async () => {
+  it('a dispute that names no lines on a two-store order belongs to no store and is visible to neither', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }, { sellerId: s2.id, productId: 'p2', qty: 1, price: 20 }]);
     const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'Parcel arrived crushed' });
     expect(d.sellerId).toBeNull();
-    expect(await svc.list(sellerOne)).toHaveLength(1);
-    expect(await svc.list(sellerTwo)).toHaveLength(1);
-    expect(titles('user:su1')).toContain('Dispute opened on your order');
-    expect(titles('user:su2')).toContain('Dispute opened on your order');
+    expect(await svc.list(sellerOne)).toHaveLength(0);
+    expect(await svc.list(sellerTwo)).toHaveLength(0);
+    expect(notices.filter((n) => n.to.startsWith('user:su'))).toEqual([]);
+  });
+
+  it('a seller who also shops sees their own purchases like any customer', async () => {
+    const o = await makeOrder([{ sellerId: s2.id, productId: 'p2', qty: 1, price: 20 }], { customerId: sellerOne.id, customerName: sellerOne.name });
+    const d = await svc.open({ id: sellerOne.id, name: sellerOne.name }, { orderId: o.id, type: 'dispute', reason: 'Wrong colour was sent' });
+    expect((await svc.list(sellerOne)).map((x) => x.id)).toEqual([d.id]);
+    expect((await svc.get(sellerOne, d.id)).id).toBe(d.id);
   });
 
   it('eligibility shows the window, the lines and what is left', async () => {
@@ -639,7 +643,7 @@ describe('time limits on a fake clock: the return deadline', () => {
     // Day 1: the customer returns the first line; day 6: the warehouse collects it (that leg is "delivered" at the warehouse).
     at(DAY);
     const first = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead', items: [{ itemId: o.items[0].id, qty: 2 }] });
-    expect(first.stage).toBe('awaiting_seller');
+    expect(first.stage).toBe('awaiting_support');
     await deliveredLeg(o.id, 'return_pickup', new Date(T0.getTime() + 6 * DAY));
     await deliveredLeg(o.id, 'replacement_delivery', new Date(T0.getTime() + 6.5 * DAY));
     await deliveredLeg(o.id, 'pickup', new Date(T0.getTime() + 6.8 * DAY));
@@ -661,7 +665,7 @@ describe('time limits on a fake clock: the return deadline', () => {
   });
 });
 
-describe('time limits on a fake clock: the seller response time', () => {
+describe('time limits on a fake clock: the support response time', () => {
   beforeEach(() => {
     jest.useFakeTimers({ now: T0, doNotFake: [...ONLY_DATE] });
   });
@@ -672,43 +676,44 @@ describe('time limits on a fake clock: the seller response time', () => {
     return svc.open(customer, { orderId: o.id, type: 'return', reason: 'Left cup is dead' });
   }
 
-  it('gives the seller 48 hours by default and sweeps nothing before then', async () => {
+  it('gives support 48 hours by default and alerts nobody before then', async () => {
     const r = await openReturn();
     expect(r.sellerDueAt!.getTime()).toBe(T0.getTime() + 48 * HOUR);
     at(48 * HOUR - 1000);
     expect(await svc.sweep()).toBe(0);
-    expect((await svc.get(customer, r.id)).stage).toBe('awaiting_seller');
-    // The seller can still answer right up to the deadline.
-    expect((await svc.sellerRespond(sellerOne, r.id, true, '')).stage).not.toBe('awaiting_seller');
+    expect((await svc.get(customer, r.id)).stage).toBe('awaiting_support');
+    // support can still decide right up to the deadline
+    expect((await svc.adminDecideReturn(agent, r.id, true, '')).stage).not.toBe('awaiting_support');
   });
 
-  it('one second past the deadline the return times out, everyone is told once, and the customer may escalate', async () => {
+  it('one second past the deadline support is alerted once; the request does not move and the customer and the seller are not told', async () => {
     const r = await openReturn();
     at(48 * HOUR + 1000);
     expect(await svc.sweep()).toBe(1);
     expect(await svc.sweep()).toBe(0); // idempotent: a second pass finds nothing
     const seen = await svc.get(customer, r.id);
-    expect(seen).toMatchObject({ stage: 'seller_timeout', canEscalate: true, canCancel: true });
-    for (const to of ['user:c1', 'user:su1', 'role:admin_support']) expect(titles(to).filter((t) => t === 'Seller did not respond')).toHaveLength(1);
-    expect(emitter.sent.some((e) => e.event === 'dispute:updated' && e.to === 'user:c1' && (e.payload as { stage: string }).stage === 'seller_timeout')).toBe(true);
-    await expect(svc.sellerRespond(sellerOne, r.id, true, '')).rejects.toThrow('response time has passed');
-    expect((await svc.escalate(customer, r.id, 'Still waiting')).stage).toBe('escalated');
-    expect(await svc.sweep()).toBe(0); // an escalated request is support's now
+    expect(seen).toMatchObject({ stage: 'awaiting_support', canEscalate: false, canCancel: true });
+    expect(titles('role:admin_support').filter((t) => t === 'Return waiting for support')).toHaveLength(1);
+    expect(titles('user:c1')).toEqual([]);
+    expect(titles('user:su1')).toEqual([]);
+    expect(emitter.sent.some((e) => e.event === 'dispute:updated' && e.to === 'user:su1')).toBe(false);
+    expect((await svc.adminDecideReturn(agent, r.id, true, '')).stage).toBe('pickup'); // a late decision works
+    expect(await svc.sweep()).toBe(0);
   });
 
-  it('follows the platform setting (2 hours) and ignores a request the seller already answered', async () => {
+  it('follows the platform setting (2 hours) and ignores a request support already decided', async () => {
     settingsMap.sellerResponseHours = '2';
     const a = await openReturn();
     const b = await openReturn({ qty: 2 });
     expect(a.sellerDueAt!.getTime()).toBe(T0.getTime() + 2 * HOUR);
-    await svc.sellerRespond(sellerOne, b.id, false, 'Not covered by the policy');
+    await svc.adminDecideReturn(agent, b.id, false, 'Not covered by the policy');
     at(2 * HOUR + 1000);
     expect(await svc.sweep()).toBe(1);
-    expect((await svc.get(admin, a.id)).stage).toBe('seller_timeout');
-    expect((await svc.get(admin, b.id)).stage).toBe('seller_rejected');
+    expect((await svc.get(admin, a.id)).stage).toBe('awaiting_support');
+    expect((await svc.get(admin, b.id)).stage).toBe('closed');
   });
 
-  it('a request the customer cancelled never times out', async () => {
+  it('a request the customer cancelled never alerts', async () => {
     const r = await openReturn();
     await svc.cancel(customer, r.id);
     at(60 * HOUR);
@@ -716,7 +721,7 @@ describe('time limits on a fake clock: the seller response time', () => {
     expect((await svc.get(admin, r.id)).stage).toBe('closed');
   });
 
-  it('a dispute: once its response time passes the customer, the seller and support are told, once', async () => {
+  it('a dispute alerts support once past its response time and does not move', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'The charger never arrived', category: 'missing' });
     at(47 * HOUR);
@@ -724,22 +729,22 @@ describe('time limits on a fake clock: the seller response time', () => {
     at(49 * HOUR);
     expect(await svc.sweep()).toBe(1);
     expect(await svc.sweep()).toBe(0);
-    for (const to of ['user:c1', 'user:su1', 'role:admin_support']) expect(titles(to).filter((t) => t === 'Seller did not respond')).toHaveLength(1);
+    expect(titles('role:admin_support').filter((t) => t === 'Dispute waiting for support')).toHaveLength(1);
+    expect(titles('user:c1')).toEqual([]);
+    expect(titles('user:su1')).toEqual([]);
     const row = await ds.getRepository(Dispute).findOneByOrFail({ id: d.id });
     expect(row.sellerLapsedAt!.getTime()).toBe(T0.getTime() + 49 * HOUR);
-    // Unlike a return it does not move stage: it was already with support, and the seller may still reply.
-    expect(row.stage).toBe('awaiting_seller');
-    expect((await svc.reply(sellerOne, d.id, 'Shipped Monday, see the label')).role).toBe('seller');
+    expect(row.stage).toBe('awaiting_support');
   });
 
-  it('a dispute the seller answered in time is not reported', async () => {
+  it('a dispute support answered in time is not reported late', async () => {
     const o = await makeOrder([{ sellerId: s1.id, productId: 'p1', qty: 1, price: 20 }]);
     const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'The charger never arrived', category: 'missing' });
     at(10 * HOUR);
-    await svc.reply(sellerOne, d.id, 'Shipped Monday, see the label');
+    await svc.decide(agent, d.id, { outcome: 'reject', reason: 'Tracking shows it was signed for' }, false);
     at(60 * HOUR);
     expect(await svc.sweep()).toBe(0);
-    expect(titles('role:admin_support').filter((t) => t === 'Seller did not respond')).toHaveLength(0);
+    expect(titles('role:admin_support').filter((t) => t.endsWith('waiting for support'))).toHaveLength(0);
   });
 });
 

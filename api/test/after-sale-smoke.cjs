@@ -1,5 +1,6 @@
-/* After-sale & engagement: returns (accept, reject -> escalate -> admin, seller timeout), partial refunds, restock and
- * grading, disputes (reply, decide), replacements and exchanges (approve, stock, price difference, delivery follow-up),
+/* After-sale & engagement: returns (support decides: approve, refuse, the support SLA alert), partial refunds, restock and
+ * grading, disputes (reply, decide), replacements and exchanges (support approves, stock, price difference, delivery follow-up),
+ * sellers taking no part (they see nothing, answer nothing, are told nothing),
  * product Q&A, reviews (report, hide, helpful), the bell (super admin, read state) and support (photos, unread,
  * agent notices, rider tickets, assignment, concurrent replies).
  *
@@ -8,7 +9,7 @@
  *
  *   API_URL=http://localhost:3022 DB_DATABASE=somba_after AFTER_SALE_SWEEP_MS=1500 node test/after-sale-smoke.cjs
  *
- * The API must run with AFTER_SALE_SWEEP_MS=1500 (the seller-timeout check) and ADMIN_PW to override the seed password.
+ * The API must run with AFTER_SALE_SWEEP_MS=1500 (the support SLA alert check) and ADMIN_PW to override the seed password.
  */
 const { io } = require('socket.io-client');
 const mysql = require('mysql2/promise');
@@ -183,33 +184,40 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(!a.ok && /within 7 days/.test(a.error ?? ''), 'an order delivered 9 days ago is outside the 7-day window', a.error ?? '');
   ok(!(await req(cust.sock, 'disputes:eligibility', { orderId: old.id })).data.eligible, 'eligibility says so too');
 
-  section('Returns: the seller accepts, the goods come back, the returned items are refunded');
-  const sellerLive = nextEvent(s1.sock, 'dispute:created');
+  section('Returns: support approves, the goods come back, the returned items are refunded');
+  const sellerLive = nextEvent(s1.sock, 'dispute:created', () => true, 2500);
   const balBefore = await balance(cust);
   const stockBeforeA = await stockOf(pA);
   a = await req(cust.sock, 'disputes:open', { orderId: o1.id, type: 'return', reason: 'Left cup is dead', category: 'defective', items: [{ itemId: lineA.id, qty: 2 }], attachments: [photo, photo2] });
-  ok(a.ok && a.data.type === 'return' && a.data.stage === 'awaiting_seller' && a.data.items.length === 1 && a.data.items[0].qty === 2 && a.data.attachments.length === 2, 'the customer opens a return for 2 of the 3 headphones with 2 photos', a.error ?? '');
+  ok(a.ok && a.data.type === 'return' && a.data.stage === 'awaiting_support' && a.data.items.length === 1 && a.data.items[0].qty === 2 && a.data.attachments.length === 2, 'the customer opens a return for 2 of the 3 headphones with 2 photos, and it starts with support', a.error ?? '');
   const r1 = a.data;
-  ok(!!r1.sellerDueAt && Math.abs(new Date(r1.sellerDueAt) - Date.now() - 48 * 3600000) < 60000, 'the seller has 48 hours to answer');
-  const live = await sellerLive;
-  ok(live && live.id === r1.id && !('customerId' in live) && live.customerName === 'buyer', 'the seller is pushed dispute:created live, with the first name and no customer id', JSON.stringify(live && { c: live.customerId, n: live.customerName }));
-  const sList = (await req(s1.sock, 'disputes:list')).data;
-  ok(sList.some((d) => d.id === r1.id && !('customerId' in d) && d.customerName === 'buyer'), "the seller's list shows it without the customer id and with a first name only");
+  ok(!!r1.sellerDueAt && Math.abs(new Date(r1.sellerDueAt) - Date.now() - 48 * 3600000) < 60000, 'support has 48 hours to decide (sellerResponseHours, the support response time)');
+  ok(r1.canEscalate === false, 'nothing to escalate: it is with support from the start');
+  ok((await sellerLive) === null, 'the seller is pushed nothing');
+  ok(!(await req(s1.sock, 'disputes:list')).data.some((d) => d.id === r1.id) && !(await req(s1.sock, 'returns:list')).data.some((d) => d.id === r1.id), "the seller's lists do not show it");
+  ok(!(await req(s1.sock, 'disputes:get', { id: r1.id })).ok, 'the seller cannot open it');
+  ok(!(await req(s1.sock, 'disputes:reply', { id: r1.id, message: 'May I say something?' })).ok, 'or write in its thread');
   ok(!(await req(s2.sock, 'disputes:list')).data.some((d) => d.id === r1.id), 'an unrelated seller does not see it');
   a = await req(cust.sock, 'disputes:open', { orderId: o1.id, type: 'return', reason: 'And the rest too please', items: [{ itemId: lineA.id, qty: 2 }] });
   ok(!a.ok, 'the same units cannot be returned twice (only 1 headphone is left)', a.error ?? '');
-  ok(await hasNotice(s1, (n) => n.entityId === r1.id && n.title === 'Return requested on your order'), 'the seller gets a notice');
   ok(await hasNotice(agent, (n) => n.entityId === r1.id && n.title === 'Return requested'), 'support agents get a notice');
   ok(await hasNotice(admin, (n) => n.entityId === r1.id && n.title === 'Return requested'), 'the super admin sees the support notice too');
-  ok(!(await req(cust.sock, 'returns:respond', { id: r1.id, accept: true })).ok, 'a customer cannot answer for the seller');
-  ok(!(await req(s2.sock, 'returns:respond', { id: r1.id, accept: true })).ok, "another store cannot answer");
-  const custLive = nextEvent(cust.sock, 'dispute:updated', (d) => d.id === r1.id && d.stage !== 'awaiting_seller');
-  a = await req(s1.sock, 'returns:respond', { id: r1.id, accept: true, reason: 'Sorry about that' });
-  ok(a.ok && ['approved', 'pickup'].includes(a.data.stage), 'the seller accepts the return', a.error ?? '');
+  ok(!(await noticesOf(s1)).some((n) => n.entityId === r1.id), 'the seller gets no notice');
+  for (const [who, name] of [[cust, 'a customer'], [s1, 'the seller'], [s2, 'another store']]) {
+    ok(!(await req(who.sock, 'returns:respond', { id: r1.id, accept: true })).ok, `${name} cannot answer: returns:respond is retired`);
+  }
+  a = await req(cust.sock, 'disputes:escalate', { id: r1.id });
+  ok(!a.ok && /already with KOMORIKO support/.test(a.error ?? ''), 'disputes:escalate answers "already with support"', a.error ?? '');
+  ok(!(await req(s1.sock, 'returns:decide', { id: r1.id, approve: true })).ok, 'a seller cannot decide');
+  ok(!(await req(cust.sock, 'returns:decide', { id: r1.id, approve: true })).ok, 'a customer cannot decide');
+  ok(!(await req(mod.sock, 'returns:decide', { id: r1.id, approve: true })).ok, 'a moderator is not on the returns desk');
+  const custLive = nextEvent(cust.sock, 'dispute:updated', (d) => d.id === r1.id && d.stage !== 'awaiting_support');
+  a = await req(agent.sock, 'returns:decide', { id: r1.id, approve: true, reason: 'Looks justified' });
+  ok(a.ok && ['approved', 'pickup'].includes(a.data.stage), 'support approves the return', a.error ?? '');
   ok((await custLive)?.id === r1.id, 'the customer sees it move live');
-  ok(await hasNotice(cust, (n) => n.entityId === r1.id && n.title === 'Return accepted'), 'the customer is told it was accepted');
-  a = await req(s1.sock, 'returns:respond', { id: r1.id, accept: false, reason: 'Changed my mind later' });
-  ok(!a.ok, 'a request that was answered cannot be answered again', a.error ?? '');
+  ok(await hasNotice(cust, (n) => n.entityId === r1.id && n.title === 'Return approved'), 'the customer is told it was approved');
+  a = await req(admin.sock, 'returns:decide', { id: r1.id, approve: false, reason: 'Changed my mind later' });
+  ok(!a.ok, 'a request that was decided cannot be decided again', a.error ?? '');
   const pickup = await until(async () => (await sql("SELECT id, kind, status, hubId, toHubId FROM delivery_tasks WHERE disputeId = ? AND kind = 'return_pickup'", [r1.id]))[0]);
   ok(!!pickup, 'logistics created the return pickup task', 'no task');
   ok((await req(cust.sock, 'disputes:get', { id: r1.id })).data.stage === 'pickup', 'the return is in the pickup stage');
@@ -267,62 +275,51 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(a.ok && !!a.data.gradedAt && a.data.items[0].restockedQty === 1 && a.data.items[0].condition === 'resellable', 'the warehouse grades: 1 of the 2 back on the shelf', a.error ?? '');
   ok((await stockOf(pA)) === stockBeforeA + 1, 'only those units are restocked', `${stockBeforeA} -> ${await stockOf(pA)}`);
   ok(!(await req(warehouse.sock, 'returns:grade', { id: r1.id, grades: [{ itemId: item.id, condition: 'resellable' }] })).ok, 'grading twice is refused (no double restock)');
-  ok(await hasNotice(s1, (n) => n.entityId === r1.id && n.title === 'Returned goods graded'), 'the seller is told');
+  ok(!(await noticesOf(s1)).some((n) => n.entityId === r1.id), 'the seller is told nothing of the grading (the goods reach them as a delivery leg)');
 
-  section('Returns: the seller rejects, the customer escalates, support decides');
+  section('Returns: support refuses; a refused return frees its units');
   const o2 = await delivered(cust, [{ productId: pA.id, qty: 1 }, { productId: pB.id, qty: 1 }]);
   const l2 = await lines(o2.id);
   a = await req(cust.sock, 'disputes:open', { orderId: o2.id, type: 'return', reason: 'Not what I expected at all', items: [{ itemId: l2.find((l) => l.productId === pB.id).id, qty: 1 }] });
   const r2 = a.data;
-  ok(a.ok && r2.canCancel && !r2.canEscalate, 'a fresh return can be cancelled but not escalated');
-  a = await req(cust.sock, 'disputes:escalate', { id: r2.id });
-  ok(!a.ok && /Wait for the seller/.test(a.error ?? ''), 'escalating before the seller answered is refused', a.error ?? '');
-  a = await req(s1.sock, 'returns:respond', { id: r2.id, accept: false, reason: '' });
-  ok(!a.ok, 'a rejection needs a reason');
-  a = await req(s1.sock, 'returns:respond', { id: r2.id, accept: false, reason: 'Used and dirty, we cannot take it back' });
-  ok(a.ok && a.data.stage === 'seller_rejected' && a.data.sellerReason.startsWith('Used'), 'the seller rejects with a reason', a.error ?? '');
-  ok(await hasNotice(cust, (n) => n.entityId === r2.id && n.title === 'Return rejected' && /Used and dirty/.test(n.body)), 'the customer is told why');
-  a = await req(admin.sock, 'returns:decide', { id: r2.id, approve: true });
-  ok(a.ok && ['approved', 'pickup'].includes(a.data.stage) === true || !a.ok, 'support may decide a rejected return straight away (or only after escalation)');
-  if (a.ok) {
-    ok(true, 'support approved it before escalation');
-  }
-  // A second rejected return for the escalation path
+  ok(a.ok && r2.canCancel && !r2.canEscalate && r2.stage === 'awaiting_support', 'a fresh return can be cancelled and waits for support');
+  a = await req(agent.sock, 'returns:decide', { id: r2.id, approve: false, reason: '' });
+  ok(!a.ok, 'refusing a return needs a reason');
+  const esc = nextEvent(agent.sock, 'dispute:updated', (d) => d.id === r2.id && d.status === 'rejected');
+  a = await req(agent.sock, 'returns:decide', { id: r2.id, approve: false, reason: 'Hygiene items are final sale' });
+  ok(a.ok && a.data.status === 'rejected' && a.data.stage === 'closed' && a.data.resolution === 'Hygiene items are final sale', 'support refuses the return: closed, with the reason', a.error ?? '');
+  ok((await esc)?.id === r2.id, 'support agents see it live');
+  ok(await hasNotice(cust, (n) => n.entityId === r2.id && n.title === 'Return closed' && /Hygiene items/.test(n.body)), 'the customer is told why');
+  ok(!(await noticesOf(s1)).some((n) => n.entityId === r2.id), 'the seller is told nothing');
+  ok((await req(cust.sock, 'disputes:eligibility', { orderId: o2.id })).data.items.find((i) => i.productId === pB.id).remaining === 1, 'a refused return frees its units');
   const o2b = await delivered(cust, [{ productId: pCheap.id, qty: 2 }]);
   const r2b = (await req(cust.sock, 'disputes:open', { orderId: o2b.id, type: 'return', reason: 'Too small for my feet', items: [{ productId: pCheap.id, qty: 2 }] })).data;
-  await req(s1.sock, 'returns:respond', { id: r2b.id, accept: false, reason: 'Hygiene items cannot be returned' });
-  const esc = nextEvent(agent.sock, 'dispute:updated', (d) => d.id === r2b.id && d.stage === 'escalated');
-  a = await req(cust.sock, 'disputes:escalate', { id: r2b.id, note: 'Please look again, they were never worn' });
-  ok(a.ok && a.data.stage === 'escalated' && !!a.data.escalatedAt, 'the customer escalates', a.error ?? '');
-  ok((await esc)?.id === r2b.id, 'support agents see it live');
-  ok(await hasNotice(agent, (n) => n.entityId === r2b.id && n.title === 'Return escalated'), 'support agents get a notice');
-  ok(await hasNotice(s1, (n) => n.entityId === r2b.id && n.title === 'Return escalated'), 'and so does the seller');
-  ok(!(await req(cust.sock, 'returns:decide', { id: r2b.id, approve: true })).ok, 'customers cannot decide');
-  ok(!(await req(s1.sock, 'returns:decide', { id: r2b.id, approve: true })).ok, 'sellers cannot decide either');
-  a = await req(agent.sock, 'returns:decide', { id: r2b.id, approve: false, reason: '' });
-  ok(!a.ok, 'refusing a return needs a reason');
-  a = await req(agent.sock, 'returns:decide', { id: r2b.id, approve: false, reason: 'Hygiene items are final sale' });
-  ok(a.ok && a.data.status === 'rejected' && a.data.stage === 'closed', 'support refuses the return: closed', a.error ?? '');
-  ok(await hasNotice(cust, (n) => n.entityId === r2b.id && n.title === 'Return closed'), 'the customer is told it is closed');
+  a = await req(agent.sock, 'disputes:reply', { id: r2b.id, message: 'Could you send a photo of the soles?' });
+  ok(a.ok && a.data.role === 'admin_support', 'support asks the customer a question in the thread', a.error ?? '');
+  a = await req(cust.sock, 'disputes:reply', { id: r2b.id, message: 'Here they are, never worn' });
+  ok(a.ok, 'the customer answers');
   const thread = (await req(cust.sock, 'disputes:get', { id: r2b.id })).data;
-  ok(thread.messages.length === 1 && thread.messages[0].text.startsWith('Please look again'), 'the escalation note is in the thread');
-  // the units come free again after a refusal
-  ok((await req(cust.sock, 'disputes:eligibility', { orderId: o2b.id })).data.items[0].remaining === 2, 'a refused return frees its units');
+  ok(thread.stage === 'awaiting_support' && thread.messages.length === 2, 'the thread has both messages and the request still waits for support');
+  ok((await req(agent.sock, 'disputes:get', { id: r2b.id })).data.messages.every((m) => m.authorName), 'support reads the thread');
+  ok(!(await req(s1.sock, 'disputes:get', { id: r2b.id })).ok, 'the seller still cannot');
+  ok(!(await req(cust.sock, 'returns:decide', { id: r2b.id, approve: true })).ok && !(await req(s1.sock, 'returns:decide', { id: r2b.id, approve: true })).ok, 'customers and sellers cannot decide');
+  a = await req(agent.sock, 'returns:decide', { id: r2b.id, approve: false, reason: 'Hygiene items are final sale' });
+  ok(a.ok, 'support closes it after the exchange of messages', a.error ?? '');
 
-  section('Returns: the seller never answers (timeout), the customer cancels, a full return closes the order');
+  section('Returns: support runs late (SLA alert), the customer cancels, a full return closes the order');
   await req(admin.sock, 'settings:set', { key: 'sellerResponseHours', value: '0.001' });
   const o3 = await delivered(cust, [{ productId: pCheap.id, qty: 1 }]);
   const r3 = (await req(cust.sock, 'disputes:open', { orderId: o3.id, type: 'return', reason: 'Wrong colour for me', items: [{ productId: pCheap.id, qty: 1 }] })).data;
   await req(admin.sock, 'settings:set', { key: 'sellerResponseHours', value: '48' });
-  const lapsed = await until(async () => { const d = (await req(cust.sock, 'disputes:get', { id: r3.id })).data; return d.stage === 'seller_timeout' ? d : null; }, 10000);
-  ok(!!lapsed && lapsed.canEscalate, 'after the response time the return moves to seller_timeout and can be escalated');
-  ok(await hasNotice(cust, (n) => n.entityId === r3.id && n.title === 'Seller did not respond'), 'the customer is told');
-  ok(await hasNotice(s1, (n) => n.entityId === r3.id && n.title === 'Seller did not respond'), 'the seller is told');
-  a = await req(s1.sock, 'returns:respond', { id: r3.id, accept: true });
-  ok(!a.ok && /response time has passed/.test(a.error ?? ''), 'the seller can no longer answer', a.error ?? '');
-  await req(cust.sock, 'disputes:escalate', { id: r3.id });
-  a = await req(admin.sock, 'returns:decide', { id: r3.id, approve: true, reason: 'Seller did not respond' });
-  ok(a.ok && ['approved', 'pickup'].includes(a.data.stage), 'support approves the lapsed return', a.error ?? '');
+  ok(await hasNotice(agent, (n) => n.entityId === r3.id && n.title === 'Return waiting for support'), 'once the support response time passes, support is alerted');
+  const late = (await req(cust.sock, 'disputes:get', { id: r3.id })).data;
+  ok(late.stage === 'awaiting_support' && !late.canEscalate, 'nothing moves: the request is still with support');
+  ok(!(await noticesOf(cust)).some((n) => n.entityId === r3.id && /did not respond|waiting for support/i.test(n.title)), 'the customer is not told off about it');
+  ok(!(await noticesOf(s1)).some((n) => n.entityId === r3.id), 'nor is the seller');
+  const alerts = (await noticesOf(agent)).filter((n) => n.entityId === r3.id && n.title === 'Return waiting for support');
+  ok(alerts.length === 1, 'and support is alerted once', String(alerts.length));
+  a = await req(admin.sock, 'returns:decide', { id: r3.id, approve: true, reason: 'Support approves, a little late' });
+  ok(a.ok && ['approved', 'pickup'].includes(a.data.stage), 'support approves the late return', a.error ?? '');
   // goods back by hand (the old desk button) -> refund -> the whole order is returned
   const stockBeforeS = await stockOf(pCheap);
   a = await req(warehouse.sock, 'disputes:markReceived', { disputeId: r3.id, restock: true });
@@ -372,24 +369,28 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(a.ok && a.data.status === 'resolved', 'finance resolves it with the refund', a.error ?? '');
 
   // ======================================================================== DISPUTES
-  section('Disputes: open, seller reply with evidence, support decides');
+  section('Disputes: open, support asks for evidence, support decides (the seller takes no part)');
   const od = await delivered(cust, [{ productId: pA.id, qty: 1 }, { productId: pB.id, qty: 1 }]);
   const ld = await lines(od.id);
   a = await req(cust.sock, 'disputes:open', { orderId: od.id, type: 'dispute', reason: 'The charger never arrived', category: 'missing', items: [{ itemId: ld.find((l) => l.productId === pB.id).id, qty: 1 }], attachments: [photo] });
   ok(a.ok && a.data.type === 'dispute' && a.data.category === 'missing' && a.data.items.length === 1, 'the customer opens a dispute about one item', a.error ?? '');
   const d1 = a.data;
   ok(!(await req(cust.sock, 'disputes:open', { orderId: od.id, type: 'dispute', reason: 'And another thing as well' })).ok, 'one open dispute per order');
+  ok(d1.stage === 'awaiting_support', 'a dispute starts with support');
   ok(!(await req(s2.sock, 'disputes:get', { id: d1.id })).ok, 'an unrelated seller cannot read it');
-  const msgLive = nextEvent(cust.sock, 'dispute:message');
+  ok(!(await req(s1.sock, 'disputes:get', { id: d1.id })).ok, 'neither can the seller of the item');
   a = await req(s1.sock, 'disputes:reply', { id: d1.id, message: 'Shipped on Monday, see the photo of the label', attachments: [photo2] });
-  ok(a.ok && a.data.attachments.length === 1 && a.data.role === 'seller', 'the seller replies with evidence', a.error ?? '');
+  ok(!a.ok, 'the seller cannot reply: they take no part', a.error ?? '');
+  const msgLive = nextEvent(cust.sock, 'dispute:message');
+  a = await req(agent.sock, 'disputes:reply', { id: d1.id, message: 'Could you send a photo of the box when it arrived?', attachments: [photo2] });
+  ok(a.ok && a.data.attachments.length === 1 && a.data.role === 'admin_support', 'support asks for evidence', a.error ?? '');
   ok((await msgLive)?.disputeId === d1.id, 'the customer gets the message live');
   ok(await hasNotice(cust, (n) => n.entityId === d1.id && n.title === 'Dispute reply'), 'and a notice');
   a = await req(cust.sock, 'disputes:reply', { id: d1.id, message: 'The box was empty when I opened it' });
   ok(a.ok, 'the customer can answer back');
   ok(await hasNotice(agent, (n) => n.entityId === d1.id && n.title === 'Dispute reply'), 'support agents are told about the thread');
-  const full = (await req(s1.sock, 'disputes:get', { id: d1.id })).data;
-  ok(full.messages.length === 2 && full.stage === 'seller_replied' && !('customerId' in full), 'the seller sees the thread, the stage moved to seller_replied, no customer id');
+  const full = (await req(agent.sock, 'disputes:get', { id: d1.id })).data;
+  ok(full.messages.length === 2 && full.stage === 'awaiting_support', 'support sees the thread and the dispute stays with support');
   ok(!(await req(other.sock, 'disputes:reply', { id: d1.id, message: 'Hello from nowhere' })).ok, 'a stranger cannot join the thread');
   a = await req(admin.sock, 'disputes:decide', { id: d1.id, outcome: 'refund_partial', amountUsd: 0, reason: '' });
   ok(!a.ok, 'a partial refund needs an amount', a.error ?? '');
@@ -402,7 +403,7 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(Math.abs((await balance(cust)) - b0 - 7.5) < 0.01, 'the wallet got $7.50');
   ok((await sql('SELECT status FROM orders WHERE id = ?', [od.id]))[0].status === 'delivered', 'the order stays delivered');
   ok(await hasNotice(cust, (n) => n.entityId === d1.id && n.title === 'Dispute resolved'), 'the customer is told');
-  ok(await hasNotice(s1, (n) => n.entityId === d1.id && n.title === 'Dispute resolved'), 'the seller is told');
+  ok(!(await noticesOf(s1)).some((n) => n.entityId === d1.id), 'the seller is told nothing about the dispute');
   ok(!(await req(finance.sock, 'disputes:decide', { id: d1.id, outcome: 'reject', reason: 'second thoughts' })).ok, 'a decided dispute cannot be decided again');
 
   const odf = await delivered(cust, [{ productId: pB.id, qty: 1 }]);
@@ -430,26 +431,38 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(await hasNotice(cust, (n) => n.entityId === d4.id && n.title === 'Dispute closed' && /Tracking/.test(n.body)), 'the customer is told why');
 
   // ======================================================================== REPLACEMENTS & EXCHANGES
-  section('Replacements: the seller approves, stock is taken, the delivery is followed');
+  section('Replacements: support approves, stock is taken from the seller, the delivery is followed');
   const orp = await delivered(cust, [{ productId: pB.id, qty: 2 }]);
   const pre = await stockOf(pB);
   a = await req(cust.sock, 'replacements:create', { orderId: orp.id, sku: pB.id, productName: pB.name, reason: 'One charger is cracked', qty: 1, attachments: [photo] });
   ok(a.ok && a.data.qty === 1 && a.data.attachments.length === 1 && a.data.status === 'requested', 'the customer asks for 1 replacement with a photo', a.error ?? '');
   const rep = a.data;
-  ok(!('customerId' in ((await req(s1.sock, 'replacements:list')).data.find((r) => r.id === rep.id) ?? { customerId: 1 })), 'the seller sees it without the customer id');
-  ok((await req(s1.sock, 'replacements:list')).data.find((r) => r.id === rep.id)?.customerName === 'buyer', 'and with a first name');
+  ok(!(await req(s1.sock, 'replacements:list')).data.some((r) => r.id === rep.id), 'the seller does not see it');
+  ok(!(await req(s1.sock, 'replacements:get', { id: rep.id })).ok, 'and cannot open it');
+  ok((await req(agent.sock, 'replacements:list')).data.some((r) => r.id === rep.id), 'support sees it');
+  ok(await hasNotice(agent, (n) => n.entityId === rep.id && n.title === 'Replacement requested'), 'support is told it waits for a decision');
+  ok(!(await noticesOf(s1)).some((n) => n.entityId === rep.id), 'the seller is told nothing');
   ok(!(await req(cust.sock, 'replacements:create', { orderId: orp.id, sku: pB.id, productName: pB.name, reason: 'again please' })).ok, 'one open replacement per item');
+  ok(!(await req(s1.sock, 'replacements:respond', { id: rep.id, approve: true })).ok, 'the seller cannot answer (support decides)');
   ok(!(await req(s2.sock, 'replacements:respond', { id: rep.id, approve: true })).ok, 'another store cannot answer');
   ok(!(await req(cust.sock, 'replacements:respond', { id: rep.id, approve: true })).ok, 'the customer cannot answer');
+  ok(!(await req(mod.sock, 'replacements:respond', { id: rep.id, approve: true })).ok, 'a moderator cannot answer');
   const live3 = nextEvent(cust.sock, 'replacement:updated', (r) => r.id === rep.id && r.status === 'approved');
-  a = await req(s1.sock, 'replacements:respond', { id: rep.id, approve: true });
-  ok(a.ok && a.data.status === 'approved' && a.data.stockTaken === 1, 'the seller approves', a.error ?? '');
+  a = await req(agent.sock, 'replacements:respond', { id: rep.id, approve: true });
+  ok(a.ok && a.data.status === 'approved' && a.data.stockTaken === 1, 'support approves', a.error ?? '');
   ok((await stockOf(pB)) === pre - 1, 'one unit is taken from the seller stock', `${pre} -> ${await stockOf(pB)}`);
   ok((await live3)?.id === rep.id, 'the customer is pushed replacement:updated');
   ok(await hasNotice(cust, (n) => n.entityId === rep.id && n.title === 'Replacement approved'), 'and gets a notice');
   const repRow = await until(async () => { const r = (await sql('SELECT deliveryTaskId FROM replacements WHERE id = ?', [rep.id]))[0]; return r?.deliveryTaskId ? r : null; });
   ok(!!repRow, 'logistics created the delivery (a task id is on the replacement)');
-  ok(!(await req(s1.sock, 'replacements:respond', { id: rep.id, approve: false, reason: 'changed my mind' })).ok, 'answered once only');
+  // the seller learns of it as the hand-over: "Pickup scheduled" tagged with the replacement reference (their only after-sale notice)
+  const firstLeg = (await sql("SELECT id, hubId FROM delivery_tasks WHERE replacementId = ? AND kind = 'pickup' ORDER BY createdAt LIMIT 1", [rep.id]))[0];
+  if (firstLeg) {
+    await collect(firstLeg.id, firstLeg.hubId);
+    ok(await hasNotice(s1, (n) => n.title === 'Pickup scheduled' && n.body.includes(rep.reference)), 'the seller gets "Pickup scheduled" for the hand-over, tagged with the replacement reference');
+    ok((await noticesOf(s1)).filter((n) => n.body.includes(rep.reference) && n.title !== 'Pickup scheduled').length === 0, 'and no other notice about it');
+  }
+  ok(!(await req(agent.sock, 'replacements:respond', { id: rep.id, approve: false, reason: 'changed my mind' })).ok, 'answered once only');
   // follow the delivery: scan the seller pickup in, then the rider delivers the last leg
   const legs = async () => sql("SELECT id, kind, status, toHubId, hubId, riderId FROM delivery_tasks WHERE replacementId = ? ORDER BY createdAt", [rep.id]);
   const first = (await legs())[0];
@@ -478,17 +491,17 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
 
   const orp2 = await delivered(cust, [{ productId: pDear.id, qty: 1 }]);
   const rep2 = (await req(cust.sock, 'replacements:create', { orderId: orp2.id, sku: pDear.id, productName: pDear.name, reason: 'The sole came off' })).data;
-  a = await req(s1.sock, 'replacements:respond', { id: rep2.id, approve: false, reason: '' });
+  a = await req(agent.sock, 'replacements:respond', { id: rep2.id, approve: false, reason: '' });
   ok(!a.ok, 'a rejection needs a reason');
-  a = await req(s1.sock, 'replacements:respond', { id: rep2.id, approve: false, reason: 'Worn through use, not a defect' });
-  ok(a.ok && a.data.status === 'rejected', 'the seller can reject', a.error ?? '');
+  a = await req(agent.sock, 'replacements:respond', { id: rep2.id, approve: false, reason: 'Worn through use, not a defect' });
+  ok(a.ok && a.data.status === 'rejected', 'support can reject', a.error ?? '');
   ok(await hasNotice(cust, (n) => n.entityId === rep2.id && n.title === 'Replacement rejected' && /Worn through/.test(n.body)), 'the customer gets the reason');
   // out of stock: approving is refused and the request stays open
   const pLow = await mkProduct(s1, 'Rare watch', 40, 1);
   const olow = await delivered(cust, [{ productId: pLow.id, qty: 1 }]);
   const repLow = (await req(cust.sock, 'replacements:create', { orderId: olow.id, sku: pLow.id, productName: pLow.name, reason: 'Dial is cracked' })).data;
-  a = await req(s1.sock, 'replacements:respond', { id: repLow.id, approve: true });
-  ok(!a.ok && /Not enough stock/.test(a.error ?? ''), 'with no stock left the seller cannot approve', a.error ?? '');
+  a = await req(agent.sock, 'replacements:respond', { id: repLow.id, approve: true });
+  ok(!a.ok && /Not enough stock.*Ask the seller to restock/.test(a.error ?? ''), 'with no stock left support cannot approve: ask the seller to restock, or reject', a.error ?? '');
   ok((await req(cust.sock, 'replacements:get', { id: repLow.id })).data.status === 'requested', 'and the request stays open');
 
   section('Exchanges: variant choice, price difference from the wallet');
@@ -502,8 +515,10 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   ok(a.ok && a.data.toVariant === 'Size: 42' && a.data.fromVariant === 'Size: 40' && a.data.priceDiffUsd === 0, 'another size: variant chosen, no difference (a customer cannot set the price)', a.error ?? '');
   const ex1 = a.data;
   const stockBeforeEx = await stockOf(pS);
-  a = await req(s1.sock, 'exchanges:respond', { id: ex1.id, approve: true });
-  ok(a.ok && a.data.status === 'approved' && a.data.stockTaken === 1, 'the seller approves the exchange', a.error ?? '');
+  ok(!(await req(s1.sock, 'exchanges:respond', { id: ex1.id, approve: true })).ok, 'the seller cannot approve the exchange');
+  ok(!(await req(s1.sock, 'exchanges:list')).data.some((x) => x.id === ex1.id), 'and does not see it');
+  a = await req(agent.sock, 'exchanges:respond', { id: ex1.id, approve: true });
+  ok(a.ok && a.data.status === 'approved' && a.data.stockTaken === 1, 'support approves the exchange', a.error ?? '');
   ok((await stockOf(pS)) === stockBeforeEx - 1, 'the new unit is taken from the seller stock');
   ok(await hasNotice(cust, (n) => n.entityId === ex1.id && n.title === 'Exchange approved'), 'the customer gets a notice');
   const exTask = await until(async () => (await sql('SELECT id FROM delivery_tasks WHERE exchangeId = ? LIMIT 1', [ex1.id]))[0]);
@@ -528,14 +543,16 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   const balHeld = await balance(cust);
   const txs = (await req(cust.sock, 'wallet:transactions')).data;
   ok(txs.some((t) => /price difference/.test(t.description) && t.descriptionFr?.includes('différence de prix')), 'the wallet history says so, in French too');
-  a = await req(s1.sock, 'exchanges:respond', { id: ex2.id, approve: false, reason: 'No boots left in that size' });
-  ok(a.ok && a.data.status === 'rejected', 'the seller rejects it', a.error ?? '');
+  a = await req(agent.sock, 'exchanges:respond', { id: ex2.id, approve: false, reason: 'No boots left in that size' });
+  ok(a.ok && a.data.status === 'rejected', 'support rejects it', a.error ?? '');
   ok(Math.abs((await balance(cust)) - balHeld - 45) < 0.01, 'the held difference goes back to the wallet', `${balHeld} -> ${await balance(cust)}`);
   // cheaper item: the difference comes back when it is delivered
   const oex3 = await delivered(cust, [{ productId: pDear.id, qty: 1 }]);
   const ex3 = (await req(cust.sock, 'exchanges:create', { orderId: oex3.id, fromSku: pDear.id, fromName: pDear.name, toSku: pCheap.id, toName: pCheap.name, reason: 'Too fancy' })).data;
   ok(ex3 && ex3.priceDiffUsd === -45, 'a cheaper item gives a negative difference', JSON.stringify(ex3 && ex3.priceDiffUsd));
-  await req(s1.sock, 'exchanges:respond', { id: ex3.id, approve: true });
+  // support has full control: it approves an exchange that will refund money to the wallet too
+  a = await req(agent.sock, 'exchanges:respond', { id: ex3.id, approve: true });
+  ok(a.ok && a.data.status === 'approved', 'support approves an exchange with a negative price difference (no longer an operations-only call)', a.error ?? '');
   const balBeforeEx3 = await balance(cust);
   const exLegs = await sql("SELECT id, hubId FROM delivery_tasks WHERE exchangeId = ? ORDER BY createdAt", [ex3.id]);
   if (exLegs.length) {
@@ -711,13 +728,14 @@ const hasNotice = async (u, pred) => !!(await until(async () => (await noticesOf
   rider.sock.close();
 
   // ======================================================================== PRIVACY / LISTS
-  section('Privacy: sellers never get the customer id');
+  section('Privacy: sellers get no after-sale row at all');
   const all = [
     ...(await req(s1.sock, 'disputes:list')).data,
+    ...(await req(s1.sock, 'returns:list')).data,
     ...(await req(s1.sock, 'replacements:list')).data,
     ...(await req(s1.sock, 'exchanges:list')).data,
   ];
-  ok(all.length > 6 && all.every((r) => !('customerId' in r) && r.customerName === 'buyer'), `none of the ${all.length} rows a seller receives carries a customer id or a full name`);
+  ok(all.length === 0, `a seller receives none of the ${all.length} after-sale rows (so no customer id or full name can leak)`);
   ok((await req(admin.sock, 'disputes:list')).data.every((r) => 'customerId' in r), 'admins still get the full row');
 
   console.log(`\n${pass} passed, ${fails.length} failed`);

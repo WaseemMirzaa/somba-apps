@@ -509,6 +509,34 @@ const register = async (label, role = 'customer') => {
   const notMarketing = { finance, ops, support, moderation };
   const notSupport = { finance, ops, marketing, moderation };
 
+  // Store controls KOMORIKO admin holds: express delivery (admin / operations), store policies (admin / moderation), old chats and returns (support).
+  const pinned = await makeSeller('selX', true);
+  await req(pinned.sock, 'sellers:update', { pickupLat: -4.3031, pickupLng: 15.3033 });
+  for (const [name, u] of Object.entries({ customer: cust, seller: pinned, rider, guest, warehouse, finance, support, marketing, moderation })) {
+    ok(!(await req(u.sock, 'sellers:setExpress', { sellerId: pinned.store.id, enabled: true })).ok, `${name} cannot call sellers:setExpress (admin and operations only)`);
+  }
+  ok((await req(pinned.sock, 'sellers:mine')).data.expressDelivery === false, 'so express is still off');
+  a = await req(ops.sock, 'sellers:setExpress', { sellerId: pinned.store.id, enabled: true });
+  ok(a.ok && a.data.expressDelivery === true, 'operations switches express on for a pinned store', a.error);
+  a = await req(admin.sock, 'sellers:setExpress', { sellerId: pinned.store.id, enabled: false });
+  ok(a.ok && a.data.expressDelivery === false, 'and the super admin off again', a.error);
+  const rev = await req(pinned.sock, 'sellers:update', { returnsPolicy: 'We take returns within 14 days if unused.' });
+  const revId = rev.data?.policyRevision?.id;
+  ok(rev.ok && !!revId, 'a seller\'s policy becomes a pending revision', rev.error);
+  for (const [name, u] of Object.entries({ customer: cust, seller: pinned, rider, guest, warehouse, finance, support, marketing, ops })) {
+    ok(!(await req(u.sock, 'sellers:policy:list', {})).ok && !(await req(u.sock, 'sellers:policy:approve', { id: revId })).ok && !(await req(u.sock, 'sellers:policy:reject', { id: revId, note: 'Not good enough' })).ok && !(await req(u.sock, 'sellers:policy:publish', { sellerId: pinned.store.id, returnsPolicy: 'Anything goes, no returns at all.' })).ok, `${name} cannot read the policy queue, approve, reject or publish a store policy`);
+  }
+  ok((await req(pinned.sock, 'sellers:mine')).data.returnsPolicy == null, 'so the live policy is untouched');
+  a = await req(moderation.sock, 'sellers:policy:approve', { id: revId });
+  ok(a.ok && a.data.status === 'approved', 'the moderation admin approves it', a.error);
+  for (const [name, u] of Object.entries({ customer: cust, seller: pinned, rider, guest, warehouse, finance, marketing, moderation, ops })) {
+    ok(!(await req(u.sock, 'chat:adminList', {})).ok, `${name} cannot read every chat (admin and support only)`);
+  }
+  ok((await req(support.sock, 'chat:adminList', {})).ok && (await req(admin.sock, 'chat:adminList', {})).ok, 'support and the super admin read the old chats (read-only)');
+  for (const [name, u] of Object.entries({ customer: cust, seller: sellerA, rider, guest, warehouse, finance })) {
+    ok(!(await req(u.sock, 'returns:respond', { id: 'x', accept: true })).ok && !(await req(u.sock, 'returns:decide', { id: 'x', approve: true })).ok, `${name} cannot answer or decide a return`);
+  }
+
   // Product moderation (Moderation department): approve / reject / block / un-remove.
   const modProd = (await req(sellerA.sock, 'products:create', { name: `A Moderated ${tag}`, price: 25, category: 'Electronics', stock: 4 })).data;
   const statusOf = async (id) => (await req(admin.sock, 'products:get', { id })).data?.status;

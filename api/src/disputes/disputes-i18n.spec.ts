@@ -40,7 +40,6 @@ function build(provider: TranslatorProvider) {
     ds.getRepository(DisputeItem),
     ds.getRepository(DisputeMessage),
     ds.getRepository(Order),
-    ds.getRepository(Seller),
     ds.getRepository(DeliveryTask),
     notifications as never,
     { refund: async () => ({ refund: { amountUsd: 0 } }) } as never,
@@ -85,7 +84,7 @@ beforeEach(async () => {
 afterEach(async () => ds.destroy());
 
 describe('the customer’s reason', () => {
-  it('is translated before it is stored; the view, every event and the seller notice carry both languages', async () => {
+  it('is translated before it is stored; the view and every event carry both languages, and the seller hears nothing', async () => {
     const o = await order();
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Le produit est cassé, très déçu' });
     const both = { sourceLang: 'fr', fr: 'Le produit est cassé, très déçu', en: '[en] Le produit est cassé, très déçu' };
@@ -93,20 +92,15 @@ describe('the customer’s reason', () => {
     expect(d.reasonI18n).toEqual(both);
     expect((await rowsOf(d.id)).map((r) => [r.entityType, r.field, r.locale, r.origin])).toEqual([['dispute_reason', 'reason', 'en', 'machine']]);
     const events = sent('dispute:created');
-    expect(events.length).toBeGreaterThanOrEqual(3); // the customer, the desk, the seller
+    expect(events.length).toBeGreaterThanOrEqual(2); // the customer and the desk
     for (const e of events) expect(e.payload.reasonI18n).toEqual(both);
-    // the seller's copy still hides the customer's id and keeps a first name only
-    const toSeller = events.find((e) => e.to === `user:${sellerOne.id}`)!;
-    expect(toSeller.payload.customerId).toBeUndefined();
-    expect(toSeller.payload.customerName).toBe('Marie');
-    // the seller notice: English quotes the English version, `fr` the French one
-    const n = notices.find((x) => x.to === `user:${sellerOne.id}` && x.title === 'Return requested on your order')!;
-    expect(n.body).toContain('[en] Le produit est cassé');
-    expect(n.fr?.body).toContain(': Le produit est cassé, très déçu');
-    expect(n.fr?.body).not.toContain('[en]');
+    // the seller takes no part: no push, no notice
+    expect(events.some((e) => e.to === `user:${sellerOne.id}`)).toBe(false);
+    expect(notices.some((x) => x.to === `user:${sellerOne.id}`)).toBe(false);
+    expect(notices.some((x) => x.to === 'role:admin_support' && x.title === 'Return requested')).toBe(true);
   });
 
-  it('a failing translator still opens the request: no error, no i18n field, the original in the notice', async () => {
+  it('a failing translator still opens the request: no error, no i18n field', async () => {
     build(broken);
     const o = await order();
     const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'Le produit est cassé' });
@@ -114,22 +108,20 @@ describe('the customer’s reason', () => {
     expect('reasonI18n' in d).toBe(false);
     expect(await rowsOf(d.id)).toHaveLength(0);
     expect(sent('dispute:created').every((e) => !('reasonI18n' in e.payload))).toBe(true);
-    const n = notices.find((x) => x.title === 'Dispute opened on your order')!;
-    expect(n.body).toContain('Le produit est cassé');
-    expect(n.fr).toBeUndefined();
+    expect(notices.some((x) => x.to === 'role:admin_support' && x.title === 'Dispute opened')).toBe(true);
   });
 
-  it('translation off (the original is stored and quoted, no field)', async () => {
+  it('translation off (the original is stored, no field)', async () => {
     build({ name: 'off', enabled: false, translate: async (t: string[]) => t, detect: async (t: string[]) => t.map((text) => ({ text, sourceLang: 'und' })) } as never);
     const o = await order();
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Broken on arrival' });
     expect('reasonI18n' in d).toBe(false);
-    expect(notices.find((x) => x.title === 'Return requested on your order')?.body).toContain('Broken on arrival');
+    expect(notices.some((x) => x.to === 'role:admin_support' && x.title === 'Return requested')).toBe(true);
   });
 });
 
 describe('the thread', () => {
-  it('a message is translated before it is stored; the dispute:message event, the thread and the seller view carry both languages', async () => {
+  it('a message is translated before it is stored; the dispute:message event and the thread carry both languages', async () => {
     const o = await order();
     const d = await svc.open(customer, { orderId: o.id, type: 'dispute', reason: 'Not received at all' });
     fake.calls.length = 0;
@@ -137,23 +129,21 @@ describe('the thread', () => {
     const both = { sourceLang: 'fr', fr: 'Je n’ai toujours rien reçu, merci de vérifier', en: '[en] Je n’ai toujours rien reçu, merci de vérifier' };
     expect(m.textI18n).toEqual(both);
     expect(sent('dispute:message').every((e) => e.payload.message.textI18n?.en === both.en)).toBe(true);
-    const asSeller = await svc.get({ ...sellerOne, name: 'Seller One' }, d.id);
-    expect(asSeller.messages?.[0].textI18n).toEqual(both);
-    expect(asSeller.messages?.[0].authorId).toBeNull(); // the customer's account id is still hidden from the seller
     expect((await svc.get(customer, d.id)).messages?.[0].textI18n).toEqual(both);
     fake.calls.length = 0;
     await svc.get(agent, d.id);
     expect(fake.calls).toHaveLength(0); // read from the saved rows: no provider call
   });
 
-  it('the customer’s escalation note and the warehouse’s grading note are thread messages too', async () => {
+  it('support’s reply and the customer’s answer are thread messages in both languages', async () => {
     const o = await order();
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Broken on arrival' });
-    await svc.sellerRespond(sellerOne, d.id, false, 'Not covered by the warranty');
-    await svc.escalate(customer, d.id, 'Le vendeur a tort, le produit est cassé');
+    await svc.reply(agent, d.id, 'Pouvez-vous envoyer une photo ?');
+    await svc.reply(customer, d.id, 'Le produit est cassé, voir la photo');
     const thread = (await svc.get(agent, d.id)).messages!;
-    expect(thread).toHaveLength(1);
-    expect(thread[0].textI18n).toEqual({ sourceLang: 'fr', fr: 'Le vendeur a tort, le produit est cassé', en: '[en] Le vendeur a tort, le produit est cassé' });
+    expect(thread).toHaveLength(2);
+    expect(thread[0].textI18n).toEqual({ sourceLang: 'fr', fr: 'Pouvez-vous envoyer une photo ?', en: '[en] Pouvez-vous envoyer une photo ?' });
+    expect(thread[1].textI18n).toEqual({ sourceLang: 'fr', fr: 'Le produit est cassé, voir la photo', en: '[en] Le produit est cassé, voir la photo' });
   });
 
   it('a photo-only message has nothing to translate: no provider call', async () => {
@@ -177,18 +167,7 @@ describe('the thread', () => {
   });
 });
 
-describe('the seller’s reason and the resolution', () => {
-  it('a rejection reason is translated (sellerReasonI18n) and the customer notice follows their language', async () => {
-    const o = await order();
-    const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Broken on arrival' });
-    const v = await svc.sellerRespond(sellerOne, d.id, false, 'Garantie expirée depuis longtemps');
-    expect(v.sellerReasonI18n).toEqual({ sourceLang: 'fr', fr: 'Garantie expirée depuis longtemps', en: '[en] Garantie expirée depuis longtemps' });
-    expect(sent('dispute:updated').at(-1)?.payload.sellerReasonI18n).toBeDefined();
-    const n = notices.find((x) => x.title === 'Return rejected')!;
-    expect(n.body).toContain('[en] Garantie expirée');
-    expect(n.fr?.body).toContain('Garantie expirée depuis longtemps');
-  });
-
+describe('the resolution', () => {
   it('an agent’s own words become resolutionI18n; a stock phrase has none and costs no provider call', async () => {
     const o = await order();
     const d = await svc.open(customer, { orderId: o.id, type: 'return', reason: 'Broken on arrival' });
@@ -212,10 +191,10 @@ describe('translate:text on a private dispute text', () => {
     return { d, m };
   }
 
-  it('the customer, the seller on the order, the desk and the warehouse of a return may; the cached row is reused', async () => {
+  it('the customer, the desk and the warehouse of a return may; the cached row is reused', async () => {
     const { d, m } = await thread();
     fake.calls.length = 0;
-    for (const viewer of [customer, sellerOne, agent]) {
+    for (const viewer of [customer, agent]) {
       expect(await svc.translate(viewer, 'dispute_message', m.id, 'en')).toMatchObject({ text: '[en] Je n’ai rien reçu du tout', same: false });
       expect(await svc.translate(viewer, 'dispute_reason', d.id, 'en')).toMatchObject({ same: true });
     }
@@ -227,6 +206,7 @@ describe('translate:text on a private dispute text', () => {
 
   it.each([
     ['another customer', otherCustomer],
+    ['the seller of the order (sellers take no part)', sellerOne],
     ['another store’s seller', sellerTwo],
     ['a marketing admin (not on the returns desk)', marketing],
     ['a warehouse of another hub', otherWarehouse],

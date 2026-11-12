@@ -13,6 +13,11 @@ export const ROLE_GROUPS = {
   catalog: ['admin', 'admin_operations', 'admin_marketing'],
   /** Approve, reject, block or restore a listing, and edit or remove another seller's listing (Moderation: queue + Products). */
   productModeration: ['admin', 'admin_moderation'],
+  /**
+   * Approve, reject or edit-and-publish a store's returns / shipping policy (a seller's change waits as a `pending` revision
+   * until one of them decides it; Moderation: Store policies).
+   */
+  storePolicy: ['admin', 'admin_moderation'],
   /** Approve or reject a seller's campaign, and run campaigns as the platform (Marketing: Marketing). */
   campaignDecisions: ['admin', 'admin_marketing'],
   /** Support tickets: see everyone's, answer, assign, close (Support: Support). */
