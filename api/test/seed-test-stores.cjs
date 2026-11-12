@@ -25,101 +25,117 @@ const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'somba-stores-'));
 const NEW_CATEGORIES = [{ name: 'Groceries', nameFr: 'Alimentation', icon: '🛒', sortOrder: 5 }];
 
 const SIZES = { name: 'Size', options: ['S', 'M', 'L', 'XL'] };
+// French option labels (sizes and numbers stay as they are).
+const VARIANT_FR = {
+  Size: 'Taille', Colour: 'Couleur', Shade: 'Teinte', Grind: 'Mouture', Age: 'Âge',
+  Orange: 'Orange', Blue: 'Bleu', Green: 'Vert', Red: 'Rouge', Gold: 'Or', Indigo: 'Indigo', Black: 'Noir', White: 'Blanc',
+  Ruby: 'Rubis', Cocoa: 'Cacao', Plum: 'Prune', Nude: 'Nude', Single: 'Une place', Double: 'Deux places', King: 'Grand lit',
+  Beans: 'Grains', Ground: 'Moulu',
+};
+const frVariants = (groups) => groups.map((g) => ({ name: VARIANT_FR[g.name] ?? g.name, options: g.options.map((o) => VARIANT_FR[o] ?? o) }));
 const STORES = [
   {
     slug: 'mama-wax', days: 5, name: 'Mama Wax Couture', owner: 'Esther Mbuyi', color: '0xC2410C', accent: '0xFDBA74',
     category: 'Fashion', commune: 'Kalamu', idNumber: 'CD-1021-7781',
     description: 'Hand-tailored wax print dresses, shirts and headwraps, sewn in our Kalamu workshop. Custom sizes in 5 days.',
+    descriptionFr: 'Robes, chemises et foulards en pagne wax cousus sur mesure dans notre atelier de Kalamu. Tailles personnalisées en 5 jours.',
     pickup: '27 Avenue Kasa-Vubu, Kalamu, Kinshasa',
     products: [
-      { name: 'Wax Print Maxi Dress', nameFr: 'Robe longue en wax', price: 45, orig: 60, stock: 30, variants: [SIZES, { name: 'Colour', options: ['Orange', 'Blue', 'Green'] }], desc: 'Full-length dress in 100% cotton wax print, lined bodice, side pockets.' },
-      { name: 'Men\'s Wax Shirt', nameFr: 'Chemise homme en wax', price: 28, stock: 40, variants: [SIZES], desc: 'Short-sleeve shirt with a wax print front and plain back.' },
-      { name: 'Headwrap (Duku)', nameFr: 'Foulard de tête (duku)', price: 9, stock: 80, variants: [{ name: 'Colour', options: ['Red', 'Gold', 'Indigo'] }], desc: 'Two-metre headwrap, pre-hemmed.' },
-      { name: 'Wax Tote Bag', nameFr: 'Sac cabas en wax', price: 15, orig: 18, stock: 25, desc: 'Lined tote with an inner pocket, fits a 15" laptop.' },
+      { name: 'Wax Print Maxi Dress', nameFr: 'Robe longue en wax', price: 45, orig: 60, stock: 30, variants: [SIZES, { name: 'Colour', options: ['Orange', 'Blue', 'Green'] }], desc: 'Full-length dress in 100% cotton wax print, lined bodice, side pockets.', descFr: 'Robe longue en pagne wax 100 % coton, corsage doublé, poches latérales.' },
+      { name: 'Men\'s Wax Shirt', nameFr: 'Chemise homme en wax', price: 28, stock: 40, variants: [SIZES], desc: 'Short-sleeve shirt with a wax print front and plain back.', descFr: 'Chemise à manches courtes, devant en pagne wax et dos uni.' },
+      { name: 'Headwrap (Duku)', nameFr: 'Foulard de tête (duku)', price: 9, stock: 80, variants: [{ name: 'Colour', options: ['Red', 'Gold', 'Indigo'] }], desc: 'Two-metre headwrap, pre-hemmed.', descFr: 'Foulard de tête de deux mètres, ourlet déjà fait.' },
+      { name: 'Wax Tote Bag', nameFr: 'Sac cabas en wax', price: 15, orig: 18, stock: 25, desc: 'Lined tote with an inner pocket, fits a 15" laptop.', descFr: 'Cabas doublé avec poche intérieure, convient à un ordinateur portable de 15 pouces.' },
     ],
   },
   {
     slug: 'kin-tech', days: 2, name: 'Kin Tech Hub', owner: 'Patrick Ilunga', color: '0x1D4ED8', accent: '0x93C5FD',
     category: 'Electronics', commune: 'Gombe', idNumber: 'CD-3390-1188',
     description: 'Phones, chargers and accessories with a 6-month warranty. Repairs and screen replacements at our Gombe counter.',
+    descriptionFr: 'Téléphones, chargeurs et accessoires garantis 6 mois. Réparations et remplacements d’écran à notre comptoir de la Gombe.',
     pickup: '8 Boulevard du 30 Juin, Gombe, Kinshasa',
     products: [
-      { name: 'Smartphone A15 128 GB', nameFr: 'Smartphone A15 128 Go', price: 189, orig: 220, stock: 15, variants: [{ name: 'Colour', options: ['Black', 'Blue'] }], desc: '6.5" screen, dual SIM, 5000 mAh battery, 128 GB storage.' },
-      { name: 'Fast Charger 25 W USB-C', nameFr: 'Chargeur rapide 25 W USB-C', price: 14, stock: 60, days: 1, desc: 'Wall charger with a 1 m USB-C cable.' },
-      { name: 'Wireless Earbuds Pro', nameFr: 'Écouteurs sans fil Pro', price: 39, orig: 49, stock: 35, desc: 'Noise reduction, 24 h with the case, splash resistant.' },
-      { name: 'Power Bank 20000 mAh', nameFr: 'Batterie externe 20000 mAh', price: 29, stock: 40, desc: 'Charges a phone 4 times; two USB ports and USB-C.' },
+      { name: 'Smartphone A15 128 GB', nameFr: 'Smartphone A15 128 Go', price: 189, orig: 220, stock: 15, variants: [{ name: 'Colour', options: ['Black', 'Blue'] }], desc: '6.5" screen, dual SIM, 5000 mAh battery, 128 GB storage.', descFr: 'Écran de 6,5 pouces, double SIM, batterie 5000 mAh, 128 Go de stockage.' },
+      { name: 'Fast Charger 25 W USB-C', nameFr: 'Chargeur rapide 25 W USB-C', price: 14, stock: 60, days: 1, desc: 'Wall charger with a 1 m USB-C cable.', descFr: 'Chargeur secteur avec câble USB-C de 1 m.' },
+      { name: 'Wireless Earbuds Pro', nameFr: 'Écouteurs sans fil Pro', price: 39, orig: 49, stock: 35, desc: 'Noise reduction, 24 h with the case, splash resistant.', descFr: 'Réduction de bruit, 24 h d’autonomie avec le boîtier, résistants aux éclaboussures.' },
+      { name: 'Power Bank 20000 mAh', nameFr: 'Batterie externe 20000 mAh', price: 29, stock: 40, desc: 'Charges a phone 4 times; two USB ports and USB-C.', descFr: 'Recharge un téléphone 4 fois ; deux ports USB et un port USB-C.' },
     ],
   },
   {
     slug: 'beaute-lumiere', days: 3, name: 'Beauté Lumière', owner: 'Grâce Kabeya', color: '0xBE185D', accent: '0xF9A8D4',
     category: 'Beauty', commune: 'Ngaliema', idNumber: 'CD-5512-0042',
     description: 'Skincare and hair care for African skin and hair. Shea butter and natural oils sourced in the DRC.',
+    descriptionFr: 'Soins de la peau et des cheveux pour peaux et cheveux africains. Beurre de karité et huiles naturelles issus de la RDC.',
     pickup: '15 Avenue des Cliniques, Ngaliema, Kinshasa',
     products: [
-      { name: 'Raw Shea Butter 250 g', nameFr: 'Beurre de karité brut 250 g', price: 8, stock: 100, desc: 'Unrefined grade A shea butter for skin and hair.' },
-      { name: 'Hair Growth Oil', nameFr: 'Huile de croissance capillaire', price: 12, orig: 15, stock: 50, desc: 'Castor, coconut and rosemary oil blend, 100 ml.' },
-      { name: 'Matte Lipstick', nameFr: 'Rouge à lèvres mat', price: 7, stock: 70, variants: [{ name: 'Shade', options: ['Ruby', 'Cocoa', 'Plum', 'Nude'] }], desc: 'Long-lasting matte finish.' },
-      { name: 'Black Soap Face Wash', nameFr: 'Savon noir nettoyant visage', price: 6, stock: 90, desc: 'Gentle African black soap cleanser, 200 ml.' },
+      { name: 'Raw Shea Butter 250 g', nameFr: 'Beurre de karité brut 250 g', price: 8, stock: 100, desc: 'Unrefined grade A shea butter for skin and hair.', descFr: 'Beurre de karité brut de qualité A pour la peau et les cheveux.' },
+      { name: 'Hair Growth Oil', nameFr: 'Huile de croissance capillaire', price: 12, orig: 15, stock: 50, desc: 'Castor, coconut and rosemary oil blend, 100 ml.', descFr: 'Mélange d’huiles de ricin, de coco et de romarin, 100 ml.' },
+      { name: 'Matte Lipstick', nameFr: 'Rouge à lèvres mat', price: 7, stock: 70, variants: [{ name: 'Shade', options: ['Ruby', 'Cocoa', 'Plum', 'Nude'] }], desc: 'Long-lasting matte finish.', descFr: 'Fini mat longue tenue.' },
+      { name: 'Black Soap Face Wash', nameFr: 'Savon noir nettoyant visage', price: 6, stock: 90, desc: 'Gentle African black soap cleanser, 200 ml.', descFr: 'Nettoyant doux au savon noir africain, 200 ml.' },
     ],
   },
   {
     slug: 'maison-gombe', days: 4, name: 'Maison Gombe', owner: 'Jean-Paul Tshibanda', color: '0x047857', accent: '0x6EE7B7',
     category: 'Home & Living', commune: 'Gombe', idNumber: 'CD-7720-3315',
     description: 'Kitchenware, bedding and home décor. Free assembly for furniture ordered before noon.',
+    descriptionFr: 'Ustensiles de cuisine, linge de lit et décoration. Montage offert pour les meubles commandés avant midi.',
     pickup: '41 Avenue de la Justice, Gombe, Kinshasa',
     products: [
-      { name: 'Non-stick Cooking Pot Set', nameFr: 'Lot de marmites antiadhésives', price: 55, orig: 70, stock: 20, desc: 'Three pots (18, 22, 26 cm) with glass lids.' },
-      { name: 'Cotton Bed Sheet Set', nameFr: 'Parure de draps en coton', price: 32, stock: 30, variants: [{ name: 'Size', options: ['Single', 'Double', 'King'] }], desc: 'Fitted sheet, flat sheet and two pillowcases.' },
-      { name: 'Rechargeable LED Lamp', nameFr: 'Lampe LED rechargeable', price: 18, stock: 45, desc: '12 hours of light per charge — made for power cuts.' },
-      { name: 'Woven Storage Basket', nameFr: 'Panier de rangement tressé', price: 13, stock: 35, desc: 'Hand-woven basket with handles, 40 cm.' },
+      { name: 'Non-stick Cooking Pot Set', nameFr: 'Lot de marmites antiadhésives', price: 55, orig: 70, stock: 20, desc: 'Three pots (18, 22, 26 cm) with glass lids.', descFr: 'Trois marmites (18, 22, 26 cm) avec couvercles en verre.' },
+      { name: 'Cotton Bed Sheet Set', nameFr: 'Parure de draps en coton', price: 32, stock: 30, variants: [{ name: 'Size', options: ['Single', 'Double', 'King'] }], desc: 'Fitted sheet, flat sheet and two pillowcases.', descFr: 'Drap-housse, drap plat et deux taies d’oreiller.' },
+      { name: 'Rechargeable LED Lamp', nameFr: 'Lampe LED rechargeable', price: 18, stock: 45, desc: '12 hours of light per charge — made for power cuts.', descFr: '12 heures d’éclairage par charge, pensée pour les coupures de courant.' },
+      { name: 'Woven Storage Basket', nameFr: 'Panier de rangement tressé', price: 13, stock: 35, desc: 'Hand-woven basket with handles, 40 cm.', descFr: 'Panier tressé à la main avec anses, 40 cm.' },
     ],
   },
   {
     slug: 'sport-kin', days: 3, name: 'Sport Plus Kinshasa', owner: 'Cédric Mukendi', color: '0xB91C1C', accent: '0xFCA5A5',
     category: 'Sports', commune: 'Lingwala', idNumber: 'CD-2245-9083',
     description: 'Football kits, training gear and fitness equipment. Team orders and club printing on request.',
+    descriptionFr: 'Tenues de football, matériel d’entraînement et de fitness. Commandes d’équipe et flocage de club sur demande.',
     pickup: '3 Avenue du Stade, Lingwala, Kinshasa',
     products: [
-      { name: 'Football Size 5', nameFr: 'Ballon de football taille 5', price: 22, stock: 50, desc: 'Match ball, hand-stitched, for grass and turf.' },
-      { name: 'Leopards Home Jersey', nameFr: 'Maillot domicile Léopards', price: 35, orig: 45, stock: 60, variants: [SIZES], desc: 'Supporter jersey, breathable polyester.' },
-      { name: 'Training Cones (Set of 20)', nameFr: 'Plots d\'entraînement (lot de 20)', price: 11, stock: 40, desc: 'Flexible cones with a carry stand.' },
-      { name: 'Running Shoes', nameFr: 'Chaussures de course', price: 49, stock: 30, variants: [{ name: 'Size', options: ['40', '41', '42', '43', '44'] }, { name: 'Colour', options: ['Black', 'White'] }], desc: 'Lightweight running shoes with cushioned soles.' },
+      { name: 'Football Size 5', nameFr: 'Ballon de football taille 5', price: 22, stock: 50, desc: 'Match ball, hand-stitched, for grass and turf.', descFr: 'Ballon de match cousu main, pour pelouse naturelle et synthétique.' },
+      { name: 'Leopards Home Jersey', nameFr: 'Maillot domicile Léopards', price: 35, orig: 45, stock: 60, variants: [SIZES], desc: 'Supporter jersey, breathable polyester.', descFr: 'Maillot de supporter en polyester respirant.' },
+      { name: 'Training Cones (Set of 20)', nameFr: 'Plots d\'entraînement (lot de 20)', price: 11, stock: 40, desc: 'Flexible cones with a carry stand.', descFr: 'Plots souples avec support de transport.' },
+      { name: 'Running Shoes', nameFr: 'Chaussures de course', price: 49, stock: 30, variants: [{ name: 'Size', options: ['40', '41', '42', '43', '44'] }, { name: 'Colour', options: ['Black', 'White'] }], desc: 'Lightweight running shoes with cushioned soles.', descFr: 'Chaussures de course légères à semelles amorties.' },
     ],
   },
   {
     slug: 'saveurs-congo', days: 1, name: 'Saveurs du Congo', owner: 'Marie-Claire Lukusa', color: '0xA16207', accent: '0xFDE68A',
     category: 'Groceries', commune: 'Limete', idNumber: 'CD-6634-2210',
     description: 'Congolese pantry staples: fufu flour, palm oil, pondu, spices and coffee from Kivu. Packed fresh every morning.',
+    descriptionFr: 'Produits de base congolais : farine de fufu, huile de palme, pondu, épices et café du Kivu. Emballés frais chaque matin.',
     pickup: '112 Boulevard Lumumba, Limete, Kinshasa',
     products: [
-      { name: 'Cassava Flour (Fufu) 5 kg', nameFr: 'Farine de manioc (fufu) 5 kg', price: 9, stock: 120, desc: 'Fine-milled cassava flour.' },
-      { name: 'Red Palm Oil 1 L', nameFr: 'Huile de palme rouge 1 L', price: 4, stock: 150, desc: 'Unrefined red palm oil.' },
-      { name: 'Kivu Arabica Coffee 500 g', nameFr: 'Café arabica du Kivu 500 g', price: 14, orig: 17, stock: 60, variants: [{ name: 'Grind', options: ['Beans', 'Ground'] }], desc: 'Single-origin coffee from South Kivu, medium roast.' },
-      { name: 'Pili-Pili Hot Sauce', nameFr: 'Sauce pili-pili', price: 3, stock: 200, desc: 'Fresh chilli sauce, 250 ml.' },
+      { name: 'Cassava Flour (Fufu) 5 kg', nameFr: 'Farine de manioc (fufu) 5 kg', price: 9, stock: 120, desc: 'Fine-milled cassava flour.', descFr: 'Farine de manioc finement moulue.' },
+      { name: 'Red Palm Oil 1 L', nameFr: 'Huile de palme rouge 1 L', price: 4, stock: 150, desc: 'Unrefined red palm oil.', descFr: 'Huile de palme rouge non raffinée.' },
+      { name: 'Kivu Arabica Coffee 500 g', nameFr: 'Café arabica du Kivu 500 g', price: 14, orig: 17, stock: 60, variants: [{ name: 'Grind', options: ['Beans', 'Ground'] }], desc: 'Single-origin coffee from South Kivu, medium roast.', descFr: 'Café d’origine unique du Sud-Kivu, torréfaction moyenne.' },
+      { name: 'Pili-Pili Hot Sauce', nameFr: 'Sauce pili-pili', price: 3, stock: 200, desc: 'Fresh chilli sauce, 250 ml.', descFr: 'Sauce pimentée fraîche, 250 ml.' },
     ],
   },
   {
     slug: 'kin-kids', days: 3, name: 'Kin Kids Corner', owner: 'Sarah Ngalula', color: '0x7C3AED', accent: '0xC4B5FD',
     category: 'Fashion', commune: 'Bandalungwa', idNumber: 'CD-8812-4476',
     description: 'Children\'s clothes and school uniforms from 2 to 14 years. Uniform sets for most Kinshasa schools.',
+    descriptionFr: 'Vêtements d’enfant et uniformes scolaires de 2 à 14 ans. Ensembles d’uniformes pour la plupart des écoles de Kinshasa.',
     pickup: '9 Avenue Kasavubu, Bandalungwa, Kinshasa',
     products: [
-      { name: 'School Uniform Set', nameFr: 'Ensemble uniforme scolaire', price: 24, stock: 80, days: 6, variants: [{ name: 'Age', options: ['4-6', '7-9', '10-12', '13-14'] }], desc: 'White shirt and navy trousers or skirt.' },
-      { name: 'Kids Sneakers', nameFr: 'Baskets enfant', price: 19, orig: 25, stock: 40, variants: [{ name: 'Size', options: ['28', '30', '32', '34'] }], desc: 'Velcro sneakers with a non-slip sole.' },
-      { name: 'Cotton Pyjamas', nameFr: 'Pyjama en coton', price: 12, stock: 50, variants: [{ name: 'Age', options: ['2-3', '4-5', '6-7'] }], desc: 'Soft two-piece pyjamas.' },
-      { name: 'School Backpack', nameFr: 'Sac à dos scolaire', price: 16, stock: 45, desc: 'Padded straps, bottle pocket, fits A4 folders.' },
+      { name: 'School Uniform Set', nameFr: 'Ensemble uniforme scolaire', price: 24, stock: 80, days: 6, variants: [{ name: 'Age', options: ['4-6', '7-9', '10-12', '13-14'] }], desc: 'White shirt and navy trousers or skirt.', descFr: 'Chemise blanche et pantalon ou jupe bleu marine.' },
+      { name: 'Kids Sneakers', nameFr: 'Baskets enfant', price: 19, orig: 25, stock: 40, variants: [{ name: 'Size', options: ['28', '30', '32', '34'] }], desc: 'Velcro sneakers with a non-slip sole.', descFr: 'Baskets à scratch avec semelle antidérapante.' },
+      { name: 'Cotton Pyjamas', nameFr: 'Pyjama en coton', price: 12, stock: 50, variants: [{ name: 'Age', options: ['2-3', '4-5', '6-7'] }], desc: 'Soft two-piece pyjamas.', descFr: 'Pyjama deux pièces tout doux.' },
+      { name: 'School Backpack', nameFr: 'Sac à dos scolaire', price: 16, stock: 45, desc: 'Padded straps, bottle pocket, fits A4 folders.', descFr: 'Bretelles rembourrées, poche pour bouteille, convient aux classeurs A4.' },
     ],
   },
   {
     slug: 'digital-masina', days: 4, name: 'Digital Masina', owner: 'Héritier Kalonji', color: '0x0F766E', accent: '0x5EEAD4',
     category: 'Electronics', commune: 'Masina', idNumber: 'CD-4407-6619',
     description: 'TVs, solar kits and home electronics at fair prices. Installation in Masina, N\'djili and Kimbanseke.',
+    descriptionFr: 'Téléviseurs, kits solaires et électronique domestique à prix justes. Installation à Masina, N’djili et Kimbanseke.',
     pickup: '56 Route de Matadi, Masina, Kinshasa',
     products: [
-      { name: '43" Smart TV', nameFr: 'Smart TV 43"', price: 249, orig: 299, stock: 10, desc: 'Full HD smart TV with Wi-Fi, YouTube and Netflix.' },
-      { name: 'Solar Home Kit 100 W', nameFr: 'Kit solaire domestique 100 W', price: 159, stock: 12, days: 7, desc: 'Panel, battery, 4 bulbs and a phone-charging port.' },
-      { name: 'Bluetooth Speaker', nameFr: 'Enceinte Bluetooth', price: 27, stock: 35, variants: [{ name: 'Colour', options: ['Black', 'Red'] }], desc: '10 W speaker, 12-hour battery, FM radio.' },
-      { name: 'Voltage Stabiliser 1000 VA', nameFr: 'Stabilisateur de tension 1000 VA', price: 38, stock: 20, desc: 'Protects the TV and fridge from power surges.' },
+      { name: '43" Smart TV', nameFr: 'Smart TV 43"', price: 249, orig: 299, stock: 10, desc: 'Full HD smart TV with Wi-Fi, YouTube and Netflix.', descFr: 'Téléviseur connecté Full HD avec Wi-Fi, YouTube et Netflix.' },
+      { name: 'Solar Home Kit 100 W', nameFr: 'Kit solaire domestique 100 W', price: 159, stock: 12, days: 7, desc: 'Panel, battery, 4 bulbs and a phone-charging port.', descFr: 'Panneau, batterie, 4 ampoules et un port de recharge pour téléphone.' },
+      { name: 'Bluetooth Speaker', nameFr: 'Enceinte Bluetooth', price: 27, stock: 35, variants: [{ name: 'Colour', options: ['Black', 'Red'] }], desc: '10 W speaker, 12-hour battery, FM radio.', descFr: 'Enceinte de 10 W, batterie de 12 heures, radio FM.' },
+      { name: 'Voltage Stabiliser 1000 VA', nameFr: 'Stabilisateur de tension 1000 VA', price: 38, stock: 20, desc: 'Protects the TV and fridge from power surges.', descFr: 'Protège le téléviseur et le réfrigérateur des surtensions.' },
     ],
   },
 ];
@@ -235,7 +251,7 @@ async function signIn(email, password, name) {
     }
 
     // Storefront branding (uploaded again only when missing).
-    const brand = { pickupAddress: st.pickup, description: st.description };
+    const brand = { pickupAddress: st.pickup, description: st.description, descriptionFr: st.descriptionFr };
     if (!store.logoUrl) {
       const initials = st.name.split(/\s+/).filter((w) => /^[A-Za-zÀ-ÿ]/.test(w)).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
       brand.logoUrl = await upload(seller.token, draw(path.join(TMP, `${st.slug}-logo.png`), { w: 512, h: 512, color: st.color, accent: st.accent, text: initials, size: 200 }));
@@ -263,9 +279,14 @@ async function signIn(email, password, name) {
           deliveryDays: p.days ?? st.days,
           image: img,
           description: p.desc,
-          ...(p.variants ? { variants: p.variants } : {}),
+          descriptionFr: p.descFr,
+          ...(p.variants ? { variants: p.variants, variantLabels: { fr: frVariants(p.variants) } } : {}),
         }), `create ${p.name}`);
         created++;
+      }
+      // A product made before it had a French description gets one now (only when it has none: nothing a person wrote is replaced).
+      if (p.descFr && (!prod.descriptionFr || prod.descriptionFr === prod.description)) {
+        must(await req(seller.sock, 'products:update', { id: prod.id, patch: { descriptionFr: p.descFr } }), `French description ${p.name}`);
       }
       // The seller's delivery time (kept in step when the script changes it; not a material edit, stays live).
       const days = p.days ?? st.days;

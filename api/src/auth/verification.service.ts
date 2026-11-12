@@ -42,6 +42,30 @@ export const smsText = {
       : `Your KOMORIKO sign-in code is ${code}. It expires in 10 minutes. Never share it.`,
 };
 
+/** The e-mails, in the account's language. */
+export const emailText = {
+  verify: (name: string, link: string, locale?: string | null) =>
+    locale === 'fr'
+      ? {
+          subject: 'Confirmez votre e-mail KOMORIKO',
+          text: `Bonjour ${name},\n\nConfirmez votre adresse e-mail :\n${link}\n\nCe lien expire dans 24 heures. Si vous n’avez pas créé de compte, ignorez ce message.`,
+        }
+      : {
+          subject: 'Verify your KOMORIKO email',
+          text: `Hello ${name},\n\nConfirm your email address:\n${link}\n\nThis link expires in 24 hours. If you didn't create an account, ignore this message.`,
+        },
+  reset: (name: string, link: string, locale?: string | null) =>
+    locale === 'fr'
+      ? {
+          subject: 'Réinitialisez votre mot de passe KOMORIKO',
+          text: `Bonjour ${name},\n\nRéinitialisez votre mot de passe :\n${link}\n\nCe lien expire dans 1 heure et ne fonctionne qu’une fois. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message : votre mot de passe reste inchangé.`,
+        }
+      : {
+          subject: 'Reset your KOMORIKO password',
+          text: `Hello ${name},\n\nReset your password:\n${link}\n\nThis link expires in 1 hour and works once. If you didn't ask for this, ignore this message — your password is unchanged.`,
+        },
+};
+
 /** What the API returns; `devToken` is only ever present outside production. */
 export interface SendResult {
   sent: boolean;
@@ -115,11 +139,8 @@ export class VerificationService {
       throw new HttpException('Please wait before requesting another email.', HttpStatus.TOO_MANY_REQUESTS);
     }
     const link = `${this.webUrl}/shop/verify-email?token=${secret}`;
-    const d = await this.messaging.deliverEmail(
-      user.email,
-      'Verify your KOMORIKO email',
-      `Hello ${user.name},\n\nConfirm your email address:\n${link}\n\nThis link expires in 24 hours. If you didn't create an account, ignore this message.`,
-    );
+    const mail = emailText.verify(user.name, link, user.locale);
+    const d = await this.messaging.deliverEmail(user.email, mail.subject, mail.text);
     return { ...outcome(d, user.email), ...(this.expose ? { devToken: secret } : {}) };
   }
 
@@ -221,11 +242,8 @@ export class VerificationService {
     const secret = randomBytes(32).toString('hex');
     if (!(await this.issue(user.id, 'reset', secret, true))) return { sent: true, ...unconfigured };
     const link = `${this.webUrl}/shop/reset?token=${secret}`;
-    await this.messaging.sendEmail(
-      user.email,
-      'Reset your KOMORIKO password',
-      `Hello ${user.name},\n\nReset your password:\n${link}\n\nThis link expires in 1 hour and works once. If you didn't ask for this, ignore this message — your password is unchanged.`,
-    );
+    const mail = emailText.reset(user.name, link, user.locale);
+    await this.messaging.sendEmail(user.email, mail.subject, mail.text);
     return { sent: true, ...unconfigured, ...(this.expose ? { devToken: secret } : {}) };
   }
 

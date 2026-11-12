@@ -301,7 +301,8 @@ export class NotificationsService {
       const mine = (authored.get(n.id) ?? []) as { field: string; locale: string; value: string }[];
       const title = mine.find((r) => r.field === 'title' && r.locale === 'fr')?.value;
       const body = mine.find((r) => r.field === 'body' && r.locale === 'fr')?.value;
-      const view = NotificationsService.view(n, linkFor(role, n.type, n.entityId), title && body ? { title, body } : null);
+      // Either half may be authored on its own (the other falls back to the built-in French).
+      const view = NotificationsService.view(n, linkFor(role, n.type, n.entityId), title || body ? { title: title ?? '', body: body ?? '' } : null);
       return n.userId ? view : { ...view, read: seen.has(n.id) };
     });
   }

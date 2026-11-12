@@ -49,6 +49,8 @@ import { renameLegacyDemoEmails } from './demo/demo-legacy';
 import { seedCommerce } from './demo/demo-commerce';
 import { seedEngagement } from './demo/demo-engagement';
 import { seedAdminQueues } from './demo/demo-admin';
+import { seedBilingual } from './demo/demo-bilingual';
+import { frOf, variantsFr } from './demo/demo-texts';
 import type { DemoCtx } from './demo/demo-ctx';
 
 /**
@@ -70,6 +72,11 @@ const EXPECTED: Record<string, string> = {
   requireDeliveryCode: 'true',
   requireParcelScan: 'true',
 };
+
+const RETURNS_POLICY =
+  'Returns are accepted within 7 days of delivery for unused items in their original packaging. Food and beauty products can only be returned unopened.';
+const SHIPPING_POLICY =
+  'We pack every order within one working day and hand it to the KOMORIKO warehouse in Gombe.';
 
 async function preflight(
   ds: DataSource,
@@ -416,6 +423,8 @@ async function main(app: INestApplicationContext) {
   await seedCommerce(ctx);
   await seedEngagement(ctx);
   await seedAdminQueues(ctx);
+  // Every record in both languages (and the French the first run of an older seed never wrote).
+  await seedBilingual(ctx);
 
   // The credentials file lists every demo account (passwords of accounts created in an earlier run come from the old file).
   writeCredentials(
@@ -620,12 +629,10 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
   if (!A.seller.returnsPolicy) {
     await storefront.update(A, {
       handlingDays: 1,
-      returnsPolicy:
-        'Returns are accepted within 7 days of delivery for unused items in their original packaging. Food and beauty products can only be returned unopened.',
-      returnsPolicyFr:
-        'Les retours sont acceptés dans les 7 jours suivant la livraison pour les articles non utilisés dans leur emballage d’origine. Les produits alimentaires et de beauté doivent être non ouverts.',
-      shippingPolicy:
-        'We pack every order within one working day and hand it to the KOMORIKO warehouse in Gombe.',
+      returnsPolicy: RETURNS_POLICY,
+      returnsPolicyFr: frOf(RETURNS_POLICY),
+      shippingPolicy: SHIPPING_POLICY,
+      shippingPolicyFr: frOf(SHIPPING_POLICY),
     } as never);
     await storefront.setGoals(A, { revenueUsd: 2000, orders: 60, rating: 4.5 });
     await storefront.setPayoutAccount(A, {
@@ -748,9 +755,9 @@ async function seedProducts(ctx: DemoCtx): Promise<void> {
     const clean = cleanListing(
       {
         name: p.name,
-        nameFr: p.machineFr ? undefined : p.nameFr,
+        nameFr: p.nameFr,
         description: p.description,
-        descriptionFr: p.machineFr ? undefined : p.descriptionFr,
+        descriptionFr: p.descriptionFr,
         price: p.price,
         originalPrice: p.was ?? null,
         category: p.category,
@@ -761,6 +768,7 @@ async function seedProducts(ctx: DemoCtx): Promise<void> {
         weightGrams: p.weightGrams,
         prepDays: p.prepDays,
         variants: p.variants ?? undefined,
+        ...(p.variants ? { variantLabels: { fr: variantsFr(p.variants) } } : {}),
         variantStock: p.variantStock ?? undefined,
         sourceLang: 'en',
       },

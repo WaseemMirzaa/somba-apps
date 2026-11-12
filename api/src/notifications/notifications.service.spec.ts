@@ -137,6 +137,15 @@ describe('NotificationsService', () => {
       expect(translations.rowsFor).toHaveBeenCalledTimes(1);
     });
 
+    it('serves an authored body on its own, with the built-in French title (the seeds write only the quote)', async () => {
+      const { svc, rows, authored } = make({ u1: { role: 'seller', prefs: null } });
+      authored.q1 = [{ field: 'body', locale: 'fr', value: 'Robe : Les avez-vous en pointure 45 ?' }];
+      rows.push({ id: 'q1', title: 'New product question', body: 'Dress: Do you have these in size 45?', type: 'question', entityId: 'p1' });
+      const [n] = await svc.listForUser('u1', 'seller');
+      expect(n.bodyFr).toBe('Robe : Les avez-vous en pointure 45 ?');
+      expect(n.titleFr).toBe('Nouvelle question sur un produit');
+    });
+
     it('adds the French text to every row of the list', async () => {
       const { svc, rows } = make({ u1: { role: 'customer', prefs: null } });
       rows.push(

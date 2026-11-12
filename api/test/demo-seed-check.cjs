@@ -169,6 +169,30 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(named.length > 0, 'French names on order lines', JSON.stringify(orders[0]?.items?.[0]?.productNameFr));
   }
 
+  section('Both languages: products, options and notices');
+  {
+    const any = S['customer.full'] ?? S['customer.fr'] ?? Object.values(S)[0];
+    if (any) {
+      const ps = list(await req(any.sock, 'products:list', { limit: 200 }));
+      const demo = ps.filter((p) => /^(MK|MB|MG|MC|MF|MH)-/.test(p.sku ?? '') || ['Smartphone A15', 'Wax Print Maxi Dress'].includes(p.name));
+      ok(demo.length >= 20, `demo listings in the shop (${demo.length})`);
+      const noFr = demo.filter((p) => !p.nameFr || !p.descriptionFr || p.descriptionFr === p.description).map((p) => p.name);
+      ok(noFr.length === 0, 'every demo listing has a French name and a French description', noFr.slice(0, 5).join(', '));
+      const phone = ps.find((p) => p.name === 'Smartphone A15');
+      ok(phone && phone.descriptionFr && phone.descriptionFr !== phone.description, 'Smartphone A15: description in both languages', JSON.stringify(phone?.descriptionFr));
+      const dress = ps.find((p) => p.name === 'Wax Print Maxi Dress');
+      ok(dress?.variantLabels?.fr?.some((g) => g.name === 'Taille') && dress.variantLabels.fr.some((g) => g.options.includes('Bleu')), 'option labels in French (Taille, Bleu)', JSON.stringify(dress?.variantLabels?.fr));
+    }
+    for (const who of ['seller.a', 'customer.full', 'seller.b']) {
+      if (!S[who]) continue;
+      const notes = list(await req(S[who].sock, 'notifications:list'));
+      ok(notes.length > 0 && notes.every((n) => n.titleFr), `${who}: every notice has a French title (${notes.length})`, notes.filter((n) => !n.titleFr).map((n) => n.title).slice(0, 3).join(' | '));
+      const english = /\b(the|is|was|your|you|please|have|will|cannot|are|we|our|this|that|could)\b/i;
+      const half = notes.filter((n) => english.test(n.bodyFr ?? '')).map((n) => `${n.title}: ${String(n.bodyFr).slice(0, 60)}`);
+      ok(half.length === 0, `${who}: no notice body left half in English`, half.slice(0, 3).join(' | '));
+    }
+  }
+
   section('Stores');
   const mine = async (local) => data(await req(S[local].sock, 'sellers:mine'));
   if (S['seller.a']) {

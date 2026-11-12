@@ -1,4 +1,4 @@
-import { smsText, VerificationService } from './verification.service';
+import { emailText, smsText, VerificationService } from './verification.service';
 
 function make(user: Record<string, unknown>) {
   const tokens = {
@@ -44,6 +44,26 @@ describe('SMS text', () => {
     const gsm = /^[A-Za-z0-9 .,&:;!?'"()@%\-+\/éèùìòÇØøÅåÆæÉÄÖÑÜäöñüà]*$/;
     expect(smsText.verify('123456', 'fr')).toMatch(gsm);
     expect(smsText.signIn('123456', 'fr')).toMatch(gsm);
+  });
+});
+
+describe('E-mail text', () => {
+  it('has French verification and reset e-mails, with the link intact', () => {
+    const v = emailText.verify('Awa', 'https://x.test/v?token=abc', 'fr');
+    expect(v.subject).toBe('Confirmez votre e-mail KOMORIKO');
+    expect(v.text).toContain('Bonjour Awa');
+    expect(v.text).toContain('https://x.test/v?token=abc');
+    const r = emailText.reset('Awa', 'https://x.test/r?token=abc', 'fr');
+    expect(r.subject).toBe('Réinitialisez votre mot de passe KOMORIKO');
+    expect(r.text).toContain('Bonjour Awa');
+    expect(r.text).toContain('https://x.test/r?token=abc');
+  });
+
+  it('keeps the English e-mails for English, unknown and missing languages', () => {
+    for (const locale of ['en', undefined, null, '', 'de']) {
+      expect(emailText.verify('Awa', 'L', locale).subject).toBe('Verify your KOMORIKO email');
+      expect(emailText.reset('Awa', 'L', locale).subject).toBe('Reset your KOMORIKO password');
+    }
   });
 });
 
