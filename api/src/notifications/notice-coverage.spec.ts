@@ -518,8 +518,11 @@ function sentNotices(): Found[] {
     const title: string[] = [];
     const body: string[] = [];
     // A body that is only data (a reference, a name, free text) has nothing to translate.
-    const addBody = (expr: string) =>
+    // A body written for a quoted notice (`quotedNotice({ body: (quote) => `...` })`) is scanned as the sentence it builds.
+    const addBody = (raw: string) => {
+      const expr = raw.replace(/^\(\s*\w+(?:\s*,\s*\w+)?\s*\)\s*=>\s*/, '');
       body.push(...literalBranches(expr).filter((l) => hasWords(skeleton(l)) || hasWords(nestedWording(l))).map(skeleton));
+    };
     for (const key of ['title', 'body'] as const) {
       for (const m of src.matchAll(new RegExp(`\\b${key}:\\s*`, 'g'))) {
         const expr = src.slice(m.index! + m[0].length, exprEnd(src, m.index! + m[0].length)).trim();

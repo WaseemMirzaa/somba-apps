@@ -189,6 +189,12 @@ Editing rules:
   `questionI18n`, `answerI18n`; chat adds `lastMessageI18n` to conversation rows). When anything fails the text is stored
   untranslated exactly as before and `translate:text` stays the fallback (it reuses the rows written at save). See
   `docs/contracts/stored-text-i18n.md`.
+- **Addendum 2 (support, disputes, notices, platform content):** the same flow now covers support ticket subjects and
+  messages, dispute-thread messages and the customer / seller / agent notes on returns, exchanges, replacements and disputes
+  (private kinds: `translate:text` checks the reader). Notices that quote those words (and reviews, questions, chat) quote the
+  version in each recipient's language (`api/src/notifications/quote.ts`). Authored platform content (products, categories,
+  stores, campaigns, flash sales, CMS blocks) is translated before its first publish: `enqueue` waits, bounded by the same
+  `TRANSLATE_SAVE_TIMEOUT_MS`. Details in `docs/contracts/stored-text-i18n.md`.
 
 ### 2.5 Notifications, SMS, locale
 - The app's `notification_text.dart` patterns move to `api/src/notifications/localize.ts`.

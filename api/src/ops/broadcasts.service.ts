@@ -113,7 +113,8 @@ export class BroadcastsService {
     for (const r of made) {
       await this.translations.writeMachine('broadcast', broadcast.id, { field: r.field, locale: other, value: r.value, sourceLang: source, sourceHash: sourceHash(source, r.src) });
     }
-    if (!translated) await this.translations.enqueue('broadcast', broadcast.id);
+    // The synchronous translation above already waited once: only queue the retry.
+    if (!translated) await this.translations.enqueue('broadcast', broadcast.id, { wait: false });
 
     // Push a notification into the audience room. Phones show the title/body in the recipient's language.
     await this.notifications.toRole(role, {

@@ -271,7 +271,7 @@ Tickets: `id, reference, userId, userName, role (the creator's role: customer|se
 | Support reply | the ticket owner (customer / seller / rider) | support | `/shop|seller|rider/support/:id` |
 | Ticket assigned to you / Ticket resolved / closed / reopened | the assignee / the owner | support | |
 
-Bodies are data only (references, names and the people's own words), so they need no translation.
+Bodies are data (references, names) plus, where a notice quotes what somebody wrote, that text. The quote is served in the receiver's language: see "Notices that quote people's words" in `stored-text-i18n.md`.
 
 Wallet history lines added (French in `localizeWalletDescription`): `Refund for SOM-… (returned items)`, `Refund for SOM-… (dispute)`,
 `Exchange EXC-…: price difference`, `Exchange EXC-… : price difference refunded`, `Exchange EXC-… rejected: price difference returned`.
@@ -317,7 +317,8 @@ Support:
 - **Questions.** Shoppers and guests get the public view (first name, no ids) in `questions:list`, in the `questions:ask` reply and in `question:created` /
   `question:updated` pushes; admins and the store get the full row (`askerId`, `sellerId`, full name). The asker's id stays server-side for notices.
 - **Dispute resolution** text is bilingual: `DisputeView.resolutionFr` is the French of the stock phrases (`Refunded to wallet`, `Partially refunded`, `Replacement approved`,
-  `Rejected`, `Resolved`, `Cancelled by the customer`) and an agent's own words unchanged.
+  `Rejected`, `Resolved`, `Cancelled by the customer`) and an agent's own words unchanged. An agent's own words also come in both languages as
+  `DisputeView.resolutionI18n` (see `stored-text-i18n.md`).
 - **Photo formats.** Photos (support, returns, replacements, exchanges, chat) must be files stored by `POST /api/v1/uploads`, which now writes png, jpg, webp **and heic**
   (iPhone photos); `.jpeg` links are accepted too. The upload error reads `Only JPEG, PNG, WebP or HEIC images are allowed.`
 - **Links.** Admin notices for exchanges / replacements open `/admin/exchanges/<id>` and `/admin/replacements/<id>`.

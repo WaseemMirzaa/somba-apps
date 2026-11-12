@@ -12,6 +12,9 @@ import { cleanAttachments, parseAttachments, redactForSeller, storeAttachments }
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { REPLACEMENT_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
+import { quotedNotice } from '../notifications/quote';
+import { TranslationService } from '../translation/translation.service';
+import type { SaveTranslation, StoredKind, TextI18n } from '../translation/translation.service';
 
 /** Who follows replacements live and reads them all: the admin roles that decide them (group `exchangeDecide`: super admin, operations, support) and warehouse staff. */
 const OPS_ROLES = [...ROLE_GROUPS.exchangeDecide, 'warehouse_staff'];
@@ -29,9 +32,16 @@ const IN_PROGRESS: ReplacementStatus[] = ['approved', 'received', 'allocated', '
 
 /**
  * A replacement as clients receive it: the stored fields plus the item's name in French (null when it cannot be told)
- * and the customer's photos. `reason` / `condition` are the customer's own words and are never translated.
+ * and the customer's photos. `reason` and `sellerReason` are people's own words: each is translated before it is stored and
+ * served in both languages next to it (`reasonI18n`, `sellerReasonI18n`; absent when no translation is known, then
+ * `translate:text` is the fallback). `condition` is a short grade the customer picks: left as written.
  */
-export type ReplacementView = Omit<Replacement, 'attachments'> & { productNameFr: string | null; attachments: string[] };
+export type ReplacementView = Omit<Replacement, 'attachments'> & {
+  productNameFr: string | null;
+  attachments: string[];
+  reasonI18n?: TextI18n;
+  sellerReasonI18n?: TextI18n;
+};
 
 /** Like-for-like replacements of defective/returned items. */
 @Injectable()
@@ -47,12 +57,36 @@ export class ReplacementsService {
     private readonly names: AfterSaleNames,
     private readonly settings: SettingsService,
     private readonly logistics: LogisticsBridge,
+    private readonly translations?: TranslationService,
   ) {}
 
-  /** Rows with the French name of their item, looked up for all of them at once. */
+  /** Translate first, then store (null: stored untranslated, as before). The writer's account language is the hint. */
+  private translateFor(text: string, userId?: string): Promise<SaveTranslation | null> {
+    if (!text || !this.translations) return Promise.resolve(null);
+    return userId ? this.translations.translateForSender(text, userId) : this.translations.translateForSave(text);
+  }
+
+  private keep(kind: StoredKind, id: string, saved: SaveTranslation | null): Promise<void> {
+    return this.translations?.saveTranslated(kind, id, saved) ?? Promise.resolve();
+  }
+
+  /** Rows with the French name of their item and both languages of their notes, looked up for all of them at once. */
   private async serve(rows: Replacement[]): Promise<ReplacementView[]> {
     const fr = await this.names.frenchNames(rows.map((r) => ({ orderId: r.orderId, sku: r.sku, name: r.productName })));
-    return rows.map((r, i) => ({ ...r, attachments: parseAttachments(r.attachments), productNameFr: fr[i] }));
+    const t = this.translations;
+    const [reasons, replies] = t
+      ? await Promise.all([
+          t.i18nFor('replacement_reason', rows.map((r) => ({ id: r.id, text: r.reason }))),
+          t.i18nFor('replacement_reply', rows.map((r) => ({ id: r.id, text: r.sellerReason }))),
+        ])
+      : [new Map<string, TextI18n>(), new Map<string, TextI18n>()];
+    return rows.map((r, i) => ({
+      ...r,
+      attachments: parseAttachments(r.attachments),
+      productNameFr: fr[i],
+      ...(reasons.has(r.id) ? { reasonI18n: reasons.get(r.id) } : {}),
+      ...(replies.has(r.id) ? { sellerReasonI18n: replies.get(r.id) } : {}),
+    }));
   }
 
   async list(user: { id: string; role: string }, paging?: { limit?: number; offset?: number; status?: string }): Promise<ReplacementView[]> {
@@ -153,6 +187,9 @@ export class ReplacementsService {
     const photos = cleanAttachments(input.attachments);
     const seller = await sellerForItem(order, sku, this.products, this.sellers);
     const hours = Number(await this.settings.get('sellerResponseHours'));
+    // Translate first, then store: the reason is saved in both languages together.
+    const reasonText = input.reason ? String(input.reason).slice(0, 1000) : '';
+    const reasonTr = await this.translateFor(reasonText.trim(), actor.id);
     const saved = await this.replacements.save(
       this.replacements.create({
         reference: `REP-${Date.now().toString().slice(-8)}`,
@@ -163,7 +200,7 @@ export class ReplacementsService {
         customerName: order.customerName,
         sku: sku.slice(0, 100),
         productName: String(nameIn).slice(0, 200),
-        reason: input.reason ? String(input.reason).slice(0, 1000) : null,
+        reason: reasonText || null,
         condition: input.condition ? String(input.condition).slice(0, 100) : null,
         qty,
         variant: line?.variant ?? null,
@@ -173,15 +210,22 @@ export class ReplacementsService {
         dispatchStatus: 'pending',
       }),
     );
+    await this.keep('replacement_reason', saved.id, reasonTr);
     const [rep] = await this.serve([saved]);
     await this.publish(rep);
     if (seller) {
-      await this.notifications.toUser(seller.userId, {
-        title: 'Replacement requested on your item',
-        body: `${rep.reference} · ${order.reference} · ${rep.productName}${rep.reason ? `: ${rep.reason.slice(0, 120)}` : ''}`,
-        type: 'replacement',
-        entityId: rep.id,
-      });
+      await this.notifications.toUser(
+        seller.userId,
+        quotedNotice({
+          title: 'Replacement requested on your item',
+          body: (q) => `${rep.reference} · ${order.reference} · ${rep.productName}${rep.reason ? `: ${q}` : ''}`,
+          text: rep.reason ?? '',
+          i18n: reasonTr,
+          max: 120,
+          type: 'replacement',
+          entityId: rep.id,
+        }),
+      );
     }
     return rep;
   }
@@ -195,7 +239,8 @@ export class ReplacementsService {
     if (rep.status !== 'requested') throw new BadRequestException('This request was already handled.');
     const reason = String(rawReason ?? '').trim().slice(0, 1000);
     if (!approve && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this replacement.');
-    return this.move(rep, approve ? 'approved' : 'rejected', reason);
+    // Translate first, then store: the seller's reason is saved in both languages together.
+    return this.move(rep, approve ? 'approved' : 'rejected', reason, await this.translateFor(reason, actor.id));
   }
 
   /** Warehouse / admin steps (the desk buttons). Approving and rejecting go through the same path as the seller's. */
@@ -207,7 +252,7 @@ export class ReplacementsService {
   }
 
   /** One step: claim it in a single statement, do what the step needs, tell everyone. */
-  private async move(rep: Replacement, status: ReplacementStatus, reason: string): Promise<ReplacementView> {
+  private async move(rep: Replacement, status: ReplacementStatus, reason: string, reasonTr: SaveTranslation | null = null): Promise<ReplacementView> {
     assertStep(REPLACEMENT_NEXT, rep.status, status);
     const patch: Partial<Replacement> = { status };
     if (status === 'allocated') patch.dispatchStatus = 'ready';
@@ -240,9 +285,11 @@ export class ReplacementsService {
       await this.products.restock(rep.sku, rep.stockTaken, { variant: rep.variant, orderId: rep.orderId, reason: 'replacement' });
       await this.replacements.update({ id: rep.id }, { stockTaken: 0 });
     }
+    // The seller's reason is stored now (and was not rolled back above): its translation goes with it.
+    if (reason && (status === 'approved' || status === 'rejected')) await this.keep('replacement_reply', rep.id, reasonTr);
     const [saved] = await this.serve([(await this.replacements.findOne({ where: { id: rep.id } }))!]);
     await this.publish(saved);
-    await this.tell(saved, status, reason);
+    await this.tell(saved, status, reason, reasonTr);
     return saved;
   }
 
@@ -259,7 +306,7 @@ export class ReplacementsService {
     return true;
   }
 
-  private async tell(rep: ReplacementView, status: ReplacementStatus, reason: string): Promise<void> {
+  private async tell(rep: ReplacementView, status: ReplacementStatus, reason: string, reasonTr: SaveTranslation | null = null): Promise<void> {
     const sellerUser = await this.sellerUserOf(rep);
     if (sellerUser) {
       await this.notifications.toUser(sellerUser, {
@@ -270,12 +317,18 @@ export class ReplacementsService {
       });
     }
     if (rep.customerId) {
-      await this.notifications.toUser(rep.customerId, {
-        title: `Replacement ${status}`,
-        body: `${rep.reference}: ${rep.productName}${reason ? ` — ${reason}` : ''}`,
-        type: 'replacement',
-        entityId: rep.id,
-      });
+      await this.notifications.toUser(
+        rep.customerId,
+        quotedNotice({
+          title: `Replacement ${status}`,
+          body: (q) => `${rep.reference}: ${rep.productName}${reason ? ` — ${q}` : ''}`,
+          text: reason,
+          i18n: reasonTr,
+          max: 1000,
+          type: 'replacement',
+          entityId: rep.id,
+        }),
+      );
     }
     if (status === 'approved') {
       await this.notifications.toRole('warehouse_staff', {
@@ -335,6 +388,8 @@ export class ReplacementsService {
     }
     if (!wanted.length) throw new BadRequestException('Pick the item to replace.');
     const out: ReplacementView[] = [];
+    // The reason is the dispute's own text: both languages once for all the replacements it creates.
+    const reasonTr = await this.translateFor(dispute.reason.slice(0, 1000).trim());
     for (const w of wanted) {
       const seller = await sellerForItem(order, w.line.productId, this.products, this.sellers);
       const saved = await this.replacements.save(
@@ -357,9 +412,25 @@ export class ReplacementsService {
           disputeId: dispute.id,
         }),
       );
+      await this.keep('replacement_reason', saved.id, reasonTr);
       // It is the admin's decision: approve at once (the same path as an approval by the seller).
       out.push(await this.move(saved, 'approved', ''));
     }
     return out;
+  }
+
+  /**
+   * `translate:text` for `replacement_reason` / `replacement_reply` (id = the replacement). PRIVATE: only people who may
+   * read the replacement (`get`: the desk and warehouse, its customer, the seller whose item it is) may translate its
+   * notes. Anyone else, and a made-up id, gets "Nothing to translate.".
+   */
+  async translate(user: { id: string; role: string }, kind: unknown, id: unknown, target: unknown) {
+    if (!this.translations) throw new Error('Translation is not available right now. Try again later.');
+    const nothing = 'Nothing to translate.';
+    if ((kind !== 'replacement_reason' && kind !== 'replacement_reply') || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error(nothing);
+    const rep = await this.replacements.findOne({ where: { id } });
+    const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
+    if (!rep || !(readsAll(user.role) || rep.customerId === user.id || (!!rep.sellerId && keys.includes(rep.sellerId)))) throw new Error(nothing);
+    return this.translations.translateStored(kind, id, target, { private: true });
   }
 }

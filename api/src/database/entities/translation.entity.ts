@@ -22,7 +22,17 @@ export type TranslationEntityType =
   | 'review_reply'
   | 'question'
   | 'answer'
-  | 'chat_message';
+  | 'chat_message'
+  | 'support_ticket'
+  | 'support_message'
+  | 'dispute_message'
+  | 'dispute_reason'
+  | 'dispute_reply'
+  | 'dispute_resolution'
+  | 'exchange_reason'
+  | 'exchange_reply'
+  | 'replacement_reason'
+  | 'replacement_reply';
 
 /** author = typed by a person (a machine never overwrites it) · machine = Google · snapshot = copied at order time. */
 export type TranslationOrigin = 'author' | 'machine' | 'snapshot';
