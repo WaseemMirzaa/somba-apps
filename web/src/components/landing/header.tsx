@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, ShoppingCart, User, Menu, X, Heart, Bell, LogOut, MessageCircle } from "lucide-react";
+import { Search, ShoppingCart, User, Menu, X, Heart, Bell, LogOut, LifeBuoy } from "lucide-react";
 import { SearchAutocomplete } from "@/components/shop/search-autocomplete";
 import { useState, FormEvent } from "react";
 import { useLocale } from "@/context/locale-context";
@@ -12,7 +12,6 @@ import { useShop } from "@/context/shop-context";
 import { useRealtime } from "@/context/realtime-context";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
-import { useChatUnread } from "@/lib/shop-engage";
 
 export function LandingHeader() {
   const { t, locale, setLocale } = useLocale();
@@ -24,7 +23,6 @@ export function LandingHeader() {
   const { logout } = useAuth();
   const signedIn = !!rt.user;
   const unread = rt.unreadCount;
-  const chatUnread = useChatUnread();
 
   function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -94,16 +92,13 @@ export function LandingHeader() {
 
             {signedIn && rt.user?.role === "customer" && (
               <Link
-                href="/shop/messages"
+                href="/shop/support"
                 className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 sm:flex"
-                aria-label={locale === "fr" ? "Messages" : "Messages"}
+                aria-label={locale === "fr" ? "Contacter le support" : "Contact support"}
+                title={locale === "fr" ? "Contacter le support" : "Contact support"}
+                data-testid="header-contact-support"
               >
-                <MessageCircle className="h-5 w-5" />
-                {chatUnread > 0 && (
-                  <span data-testid="header-chat-unread" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                    {chatUnread > 99 ? "99+" : chatUnread}
-                  </span>
-                )}
+                <LifeBuoy className="h-5 w-5" />
               </Link>
             )}
             {signedIn && (

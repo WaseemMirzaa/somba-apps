@@ -22,7 +22,7 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { useSocketEvent, usePublicSettings, useProductReviews, useStoreFollow } from "@/lib/shop-live";
 import { useCampaignView } from "@/lib/shop-engage";
 import { ProductFeeCheck } from "@/components/shop/product-fee-check";
-import { ContactSeller } from "@/components/shop/contact-seller";
+import { ContactSupport } from "@/components/shop/contact-support";
 import { chooseEstimate, dayLabel, estimateFor } from "@/lib/delivery-estimate";
 import type { DeliveryQuote } from "@/lib/logistics";
 import { daysLabel, isMachineText, labeledGroups, langOf, pickText } from "@/lib/i18n-fields";
@@ -388,7 +388,7 @@ export default function ShopProductDetailPage() {
             </button>
           </div>
 
-          <ContactSeller sellerId={product.sellerId} productId={product.id} fr={fr} returnTo={`/shop/products/${product.id}`} />
+          <ContactSupport fr={fr} productId={product.id} productName={name} />
 
           <button onClick={shareProduct} className="inline-flex items-center gap-2 rounded-xl border border-blue-200 px-4 py-2.5 text-sm text-slate-600 hover:bg-blue-50">
             <Share2 className="h-4 w-4" />

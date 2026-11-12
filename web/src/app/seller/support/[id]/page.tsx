@@ -15,6 +15,8 @@ import { useToast } from "@/context/toast-context";
 import { useSellerLoad, useSellerTickets } from "@/lib/seller";
 import { errMessage, ticketStatusLabel, ticketStatusVariant } from "@/lib/seller-labels";
 import { senderRoleLabel } from "@/lib/seller-engage";
+import { StoredText } from "@/components/shop/translatable-text";
+import { shownText } from "@/lib/text-i18n";
 import { supportCategoryLabel } from "@/lib/i18n-fields";
 
 export default function SellerSupportDetailPage() {
@@ -71,7 +73,7 @@ export default function SellerSupportDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={ticket.reference}
-        subtitle={ticket.subject}
+        subtitle={shownText(ticket.subjectI18n, locale, ticket.subject)}
         backHref="/seller/support"
         actions={<Badge variant={ticketStatusVariant(ticket.status)}>{ticketStatusLabel(ticket.status, fr)}</Badge>}
       />
@@ -106,7 +108,7 @@ export default function SellerSupportDetailPage() {
                   <p className={`text-[10px] font-semibold uppercase tracking-wide ${mine ? "text-white/70" : "text-slate-500"}`}>
                     {mine ? (m.from && m.from !== ticket.userName ? `${m.from} · ` : "") + senderRoleLabel("seller", fr) : `${m.from ? `${m.from} · ` : ""}${senderRoleLabel(m.role, fr)}`} · {new Date(m.at).toLocaleString(locale)}
                   </p>
-                  {m.text && <p className="mt-1 whitespace-pre-wrap break-words">{m.text}</p>}
+                  {m.text && (mine ? <p className="mt-1 whitespace-pre-wrap break-words">{m.text}</p> : <StoredText kind="support_message" id={m.id} text={m.text} i18n={m.textI18n} className="mt-1 whitespace-pre-wrap break-words" />)}
                   <AttachmentGallery urls={m.attachments} className="mt-2" />
                 </div>
               </div>

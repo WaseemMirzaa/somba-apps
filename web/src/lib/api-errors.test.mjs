@@ -251,3 +251,21 @@ test("HTTP error bodies: messageFr in French, message otherwise; lists are joine
   assert.equal(httpErrorText({ message: ["a", "b"], messageFr: ["x", "y"] }, "fr"), "x y");
   assert.equal(httpErrorText({}, "fr"), undefined);
 });
+
+test("admin-controls contract errors map to French (docs/contracts/admin-controls.md §8)", () => {
+  const fr = (m) => localizeApiError(m, "fr");
+  assert.equal(fr("Messaging sellers is closed. Contact support from your account."), "La messagerie avec les vendeurs est fermée. Contactez le support depuis votre compte.");
+  assert.equal(fr("Returns are decided by KOMORIKO support."), "Les retours sont décidés par le support KOMORIKO.");
+  assert.equal(fr("Your request is already with KOMORIKO support."), "Votre demande est déjà entre les mains du support KOMORIKO.");
+  assert.match(fr("Not enough stock to send a replacement. Ask the seller to restock the item, or reject the request."), /^Stock insuffisant pour envoyer un remplacement/);
+  assert.match(fr("Not enough stock for this exchange. Ask the seller to restock the item, or reject the request."), /^Stock insuffisant pour cet échange/);
+  assert.match(fr("This store has no pinned pickup location. Ask the seller to pin it in Store settings before turning on express delivery."), /^Cette boutique n’a pas de lieu de collecte placé sur la carte/);
+  assert.equal(fr("Policy change not found."), "Modification de politique introuvable.");
+  assert.equal(fr("This policy change was already decided."), "Cette modification de politique a déjà été traitée.");
+  assert.equal(fr("Tell the seller why the policy was not approved."), "Expliquez au vendeur pourquoi la politique n’a pas été approuvée.");
+  assert.equal(fr("Nothing to publish: write at least one policy."), "Rien à publier : rédigez au moins une politique.");
+  assert.equal(fr("Status must be pending, approved, rejected or all."), "Le statut doit être en attente, approuvé, refusé ou tous.");
+  assert.equal(fr("Support response time must be a number between 0.001 and 720."), "Le délai de réponse du support doit être un nombre entre 0,001 et 720.");
+  // English readers get every sentence untouched.
+  assert.equal(localizeApiError("Policy change not found.", "en"), "Policy change not found.");
+});

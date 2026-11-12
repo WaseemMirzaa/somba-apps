@@ -33,6 +33,8 @@ import {
   type SupportTicketRow,
 } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
+import { StoredText } from "@/components/shop/translatable-text";
+import { shownText } from "@/lib/text-i18n";
 
 export default function AdminSupportDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -146,7 +148,7 @@ export default function AdminSupportDetailPage() {
     <div className="space-y-6">
       <PageHeader
         title={t0.reference}
-        subtitle={`${supportCategoryLabel(t0.category, fr)} · ${t0.subject}`}
+        subtitle={`${supportCategoryLabel(t0.category, fr)} · ${shownText(t0.subjectI18n, locale, t0.subject)}`}
         backHref="/admin/support"
         breadcrumbs={[adminBreadcrumb(locale), { label: fr ? "Support" : "Support", href: "/admin/support" }, { label: t0.reference }]}
         actions={
@@ -168,7 +170,7 @@ export default function AdminSupportDetailPage() {
                   <div key={m.id ?? i} className={`flex ${staff ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${staff ? "bg-[var(--primary)] text-white" : "bg-slate-100 text-slate-800"}`}>
                       <p className={`mb-0.5 text-xs ${staff ? "text-white/70" : "text-slate-400"}`}>{m.from} · {localDateTime(m.at)}</p>
-                      {m.text && <p className="whitespace-pre-wrap break-words">{m.text}</p>}
+                      {m.text && (staff ? <p className="whitespace-pre-wrap break-words">{m.text}</p> : <StoredText kind="support_message" id={m.id} text={m.text} i18n={m.textI18n} className="whitespace-pre-wrap break-words" />)}
                       {m.attachments && m.attachments.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {m.attachments.map((u) => (

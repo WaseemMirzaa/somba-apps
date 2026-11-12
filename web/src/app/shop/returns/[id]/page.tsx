@@ -11,6 +11,8 @@ import { RequireSignIn } from "@/components/shop/require-sign-in";
 import { StepList } from "@/components/shop/step-list";
 import { ReturnParcelCard } from "@/components/shop/return-parcel-card";
 import { PhotoPicker } from "@/components/shop/photo-picker";
+import { TranslatableText } from "@/components/shop/translatable-text";
+import { isUndecidedStage } from "@/lib/support-stage";
 import { CONDITION_LABEL, categoryLabel, requestSteps, stageText, useDisputeDetail } from "@/lib/after-sale";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -45,9 +47,7 @@ function RequestStatus() {
   const { dispute: d, loaded, error, patch, addMessage } = useDisputeDetail(id);
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
-  const [busy, setBusy] = useState<null | "reply" | "escalate" | "cancel">(null);
-  const [note, setNote] = useState("");
-  const [showEscalate, setShowEscalate] = useState(false);
+  const [busy, setBusy] = useState<null | "reply" | "cancel">(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   if (!d) {
@@ -82,22 +82,6 @@ function RequestStatus() {
     }
   }
 
-  async function escalate() {
-    if (!d) return;
-    setBusy("escalate");
-    try {
-      const upd = await socketClient.request<Dispute>("disputes:escalate", { id: d.id, ...(note.trim() ? { note: note.trim() } : {}) });
-      patch(upd);
-      setShowEscalate(false);
-      setNote("");
-      toast(fr ? "Le support KOMORIKO examine votre demande" : "KOMORIKO support is reviewing your request");
-    } catch (e) {
-      toast((e as Error).message, "error");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function cancel() {
     if (!d) return;
     setBusy("cancel");
@@ -122,40 +106,16 @@ function RequestStatus() {
         actions={<Badge variant={d.status === "resolved" ? "success" : d.status === "rejected" ? "danger" : "warning"}>{stageText(d, fr)}</Badge>}
       />
 
-      {(d.canEscalate || d.canCancel) && (
-        <div className="card-premium space-y-3 p-4" data-testid="request-actions">
-          {d.canEscalate && (
-            <div>
-              <p className="text-sm text-slate-700">
-                {d.stage === "seller_timeout"
-                  ? (fr ? "Le vendeur n'a pas répondu à temps. Le support KOMORIKO peut décider à sa place." : "The seller did not answer in time. KOMORIKO support can decide for them.")
-                  : (fr ? "Le vendeur a refusé. Vous pouvez demander au support KOMORIKO de réexaminer votre demande." : "The seller declined. You can ask KOMORIKO support to review your request.")}
-              </p>
-              {showEscalate ? (
-                <div className="mt-2 space-y-2">
-                  <textarea className="input-premium w-full px-3 py-2 text-sm" rows={2} placeholder={fr ? "Un mot pour le support (facultatif)" : "A note for support (optional)"} value={note} onChange={(e) => setNote(e.target.value)} />
-                  <div className="flex gap-2">
-                    <Button onClick={escalate} disabled={busy === "escalate"}>{busy === "escalate" ? "…" : fr ? "Demander l'avis du support" : "Ask KOMORIKO support"}</Button>
-                    <Button variant="ghost" onClick={() => setShowEscalate(false)}>{fr ? "Annuler" : "Cancel"}</Button>
-                  </div>
-                </div>
-              ) : (
-                <Button className="mt-2" onClick={() => setShowEscalate(true)}>{fr ? "Demander l'avis du support KOMORIKO" : "Ask KOMORIKO support to review"}</Button>
-              )}
+      {d.canCancel && (
+        <div className="card-premium p-4" data-testid="request-actions">
+          {confirmCancel ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-slate-700">{fr ? "Annuler cette demande ?" : "Cancel this request?"}</span>
+              <Button variant="secondary" onClick={cancel} disabled={busy === "cancel"}>{busy === "cancel" ? "…" : fr ? "Oui, annuler" : "Yes, cancel it"}</Button>
+              <Button variant="ghost" onClick={() => setConfirmCancel(false)}>{fr ? "Non" : "No"}</Button>
             </div>
-          )}
-          {d.canCancel && (
-            <div>
-              {confirmCancel ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-slate-700">{fr ? "Annuler cette demande ?" : "Cancel this request?"}</span>
-                  <Button variant="secondary" onClick={cancel} disabled={busy === "cancel"}>{busy === "cancel" ? "…" : fr ? "Oui, annuler" : "Yes, cancel it"}</Button>
-                  <Button variant="ghost" onClick={() => setConfirmCancel(false)}>{fr ? "Non" : "No"}</Button>
-                </div>
-              ) : (
-                <button type="button" onClick={() => setConfirmCancel(true)} className="text-sm text-red-600 hover:underline">{fr ? "Annuler la demande" : "Cancel the request"}</button>
-              )}
-            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirmCancel(true)} className="text-sm text-red-600 hover:underline">{fr ? "Annuler la demande" : "Cancel the request"}</button>
           )}
         </div>
       )}
@@ -164,8 +124,8 @@ function RequestStatus() {
         <div className="space-y-6 lg:col-span-2">
           <DetailSection title={fr ? "Avancement" : "Progress"}>
             <StepList steps={steps} fr={fr} />
-            {open && d.type === "return" && d.sellerDueAt && d.stage === "awaiting_seller" && (
-              <p className="mt-2 text-xs text-slate-500">{fr ? "Réponse du vendeur attendue avant le" : "The seller should answer by"} {new Date(d.sellerDueAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</p>
+            {open && d.sellerDueAt && isUndecidedStage(d.stage) && (
+              <p className="mt-2 text-xs text-slate-500">{fr ? "Le support KOMORIKO répond avant le" : "KOMORIKO support answers by"} {new Date(d.sellerDueAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</p>
             )}
           </DetailSection>
 
@@ -177,9 +137,9 @@ function RequestStatus() {
               { label: fr ? "Demandé le" : "Requested", value: new Date(d.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB") },
               ...(d.receivedAt ? [{ label: fr ? "Articles reçus le" : "Items received", value: new Date(d.receivedAt).toLocaleString(fr ? "fr-FR" : "en-GB") }] : []),
               ...(d.refundUsd != null && d.status === "resolved" ? [{ label: fr ? "Montant remboursé" : "Refunded", value: <span className="font-semibold text-emerald-700">{formatCurrency(d.refundUsd, locale)}{d.refundTo ? ` · ${d.refundTo === "phone" ? (fr ? "téléphone" : "phone") : fr ? "portefeuille" : "wallet"}` : ""}</span> }] : []),
-              { label: fr ? "Votre explication" : "Your explanation", value: d.reason, full: true },
-              ...(d.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: d.sellerReason, full: true }] : []),
-              ...(d.resolution ? [{ label: fr ? "Décision" : "Decision", value: resolutionText(d, fr), full: true }] : []),
+              { label: fr ? "Votre explication" : "Your explanation", value: <TranslatableText kind="dispute_reason" id={d.id} auto text={d.reason} i18n={d.reasonI18n} />, full: true },
+              ...(d.sellerReason ? [{ label: fr ? "Réponse précédente" : "Earlier answer", value: <TranslatableText kind="dispute_reply" id={d.id} auto text={d.sellerReason} i18n={d.sellerReasonI18n} />, full: true }] : []),
+              ...(d.resolution ? [{ label: fr ? "Décision" : "Decision", value: d.resolutionI18n ? <TranslatableText kind="dispute_resolution" id={d.id} auto text={d.resolution} i18n={d.resolutionI18n} /> : resolutionText(d, fr), full: true }] : []),
             ]} />
             <Photos urls={d.attachments ?? []} fr={fr} />
             <Link href={`/shop/orders/${d.orderId}`} className="mt-4 inline-block text-sm text-[var(--primary)] hover:underline">{fr ? "Voir la commande →" : "View order →"}</Link>
@@ -217,7 +177,7 @@ function RequestStatus() {
                       {mine ? (fr ? "Vous" : "You") : m.authorName}
                       <span className="ml-1 font-normal text-slate-500">· {authorRoleLabel(m.role, fr)} · {new Date(m.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</span>
                     </p>
-                    <p className="mt-1 whitespace-pre-line text-slate-800">{m.text}</p>
+                    {mine ? <p className="mt-1 whitespace-pre-line text-slate-800">{m.text}</p> : <TranslatableText kind="dispute_message" id={m.id} auto text={m.text} i18n={m.textI18n} className="mt-1 whitespace-pre-line text-slate-800" />}
                     <Photos urls={m.attachments ?? []} fr={fr} />
                   </div>
                 );
@@ -225,7 +185,7 @@ function RequestStatus() {
             </div>
             {open ? (
               <div className="mt-4 space-y-2">
-                <textarea className="input-premium w-full px-3 py-2 text-sm" rows={3} aria-label={fr ? "Votre message" : "Your message"} placeholder={fr ? "Écrire au vendeur / au support…" : "Write to the seller / support…"} value={text} onChange={(e) => setText(e.target.value)} />
+                <textarea className="input-premium w-full px-3 py-2 text-sm" rows={3} aria-label={fr ? "Votre message" : "Your message"} placeholder={fr ? "Écrire au support KOMORIKO…" : "Write to KOMORIKO support…"} value={text} onChange={(e) => setText(e.target.value)} />
                 <PhotoPicker value={photos} onChange={setPhotos} max={4} fr={fr} />
                 <Button onClick={reply} disabled={busy === "reply"} className="w-full">{busy === "reply" ? "…" : fr ? "Envoyer" : "Send"}</Button>
               </div>

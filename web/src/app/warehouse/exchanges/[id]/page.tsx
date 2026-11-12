@@ -1,5 +1,6 @@
 "use client";
 
+import { TranslatableText } from "@/components/shop/translatable-text";
 import { localizeVariant } from "@/lib/i18n-fields";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -62,11 +63,11 @@ export default function WarehouseExchangeDetailPage() {
             { label: fr ? "Demandé le" : "Requested", value: shortDate(exc.createdAt, locale) },
             { label: fr ? "Mis à jour" : "Updated", value: shortDate(exc.updatedAt, locale) },
             { label: fr ? "Statut" : "Status", value: statusLabel },
-            { label: fr ? "Motif" : "Reason", value: exc.reason ?? "—", full: true },
+            { label: fr ? "Motif" : "Reason", value: exc.reason ? <TranslatableText kind="exchange_reason" id={exc.id} auto text={exc.reason} i18n={exc.reasonI18n} /> : "—", full: true },
             { label: fr ? "Différence de prix" : "Price difference", value: priceDiffLabel },
             { label: fr ? "Quantité" : "Quantity", value: exc.qty ?? 1 },
             { label: fr ? "Livré le" : "Delivered", value: exc.deliveredAt ? shortDate(exc.deliveredAt, locale) : "—" },
-            ...(exc.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: exc.sellerReason, full: true }] : []),
+            ...(exc.sellerReason ? [{ label: fr ? "Réponse du support KOMORIKO" : "KOMORIKO support's answer", value: <TranslatableText kind="exchange_reply" id={exc.id} auto text={exc.sellerReason} i18n={exc.sellerReasonI18n} />, full: true }] : []),
           ]} />
           {exc.deliveryTaskId ? (
             <Link href={ops(`/tasks/${exc.deliveryTaskId}`)} className="mt-3 inline-block text-sm text-[var(--primary)] hover:underline">

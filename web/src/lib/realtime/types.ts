@@ -457,11 +457,15 @@ export interface DisputeMessage {
   authorName: string;
   role: string;
   text: string;
+  /** The text in both languages (docs/contracts/stored-text-i18n.md); absent when the server has nothing. */
+  textI18n?: TextI18n | null;
   attachments: string[];
   createdAt: string;
 }
 
 export type DisputeStage =
+  /** New first stage: waits for KOMORIKO support. The `seller_*` / `awaiting_seller` stages are legacy and read like it. */
+  | "awaiting_support"
   | "awaiting_seller"
   | "seller_replied"
   | "seller_rejected"
@@ -485,6 +489,10 @@ export interface Dispute {
   type: "dispute" | "return";
   category?: string | null;
   reason: string;
+  /** `reason`, `sellerReason` and `resolution` (an agent's own words) in both languages. */
+  reasonI18n?: TextI18n | null;
+  sellerReasonI18n?: TextI18n | null;
+  resolutionI18n?: TextI18n | null;
   status: "open" | "resolved" | "rejected";
   stage?: DisputeStage;
   attachments?: string[];

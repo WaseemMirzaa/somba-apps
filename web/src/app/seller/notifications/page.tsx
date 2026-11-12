@@ -11,8 +11,8 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { errMessage } from "@/lib/seller-labels";
 import {
-  ArrowLeftRight, Bell, Boxes, CreditCard, Landmark, Lock, Megaphone, MessageCircle, MessageSquareQuote, PackageCheck, RefreshCw, RotateCcw,
-  ShieldAlert, ShieldCheck, LifeBuoy, Star, Tag, Truck, Users, Wallet, Zap, type LucideIcon,
+  Bell, Boxes, CreditCard, Landmark, Lock, Megaphone, MessageSquareQuote, PackageCheck,
+  ShieldCheck, LifeBuoy, Star, Tag, Truck, Users, Wallet, Zap, type LucideIcon,
 } from "lucide-react";
 import { noticeHref } from "@/lib/notice-links";
 import { localizedNotice, noticeTypeLabel } from "@/lib/i18n-fields";
@@ -29,13 +29,7 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   campaign: Megaphone,
   moderation: ShieldCheck,
   support: LifeBuoy,
-  return: RotateCcw,
-  dispute: ShieldAlert,
-  exchange: ArrowLeftRight,
-  replacement: RefreshCw,
   question: MessageSquareQuote,
-  chat: MessageCircle,
-  message: MessageCircle,
   review: Star,
   stock: Boxes,
   flash: Zap,
@@ -44,12 +38,16 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   payment: CreditCard,
   security: Lock,
   team: Users,
+  policy: ShieldCheck,
 };
+
+/** Returns, disputes, exchanges, replacements and chat are KOMORIKO support's business now: a store sees none of those notices. */
+const HIDDEN_TYPES = new Set(["return", "dispute", "exchange", "replacement", "chat", "message"]);
 
 /** Every notice type a store can receive (the filter lists the ones present first). */
 const ALL_TYPES = [
-  "order", "delivery", "return", "dispute", "replacement", "exchange", "question", "review", "chat", "stock", "campaign", "flash",
-  "promo", "payout", "finance", "payment", "moderation", "support", "team", "security",
+  "order", "delivery", "question", "review", "stock", "campaign", "flash",
+  "promo", "payout", "finance", "payment", "moderation", "policy", "support", "team", "security",
 ];
 
 export default function SellerNotificationsPage() {
@@ -63,6 +61,7 @@ export default function SellerNotificationsPage() {
   const items = useMemo(
     () =>
       [...notifications]
+        .filter((n) => !HIDDEN_TYPES.has(n.type))
         .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
         .map((n) => ({ ...n, ...localizedNotice(n, fr), href: noticeHref(n, "seller"), state: n.read ? "read" : "unread" })),
     [notifications, fr]

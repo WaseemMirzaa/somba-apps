@@ -20,7 +20,7 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
       if (t === "support") return pick(`/shop/support/${id}`, "/shop/support");
       if (t === "replacement") return pick(`/shop/replacements/${id}`, "/shop/returns");
       if (t === "exchange") return pick(`/shop/exchanges/${id}`, "/shop/returns");
-      if (t === "chat") return pick(`/shop/messages/${id}`, "/shop/messages");
+      if (t === "chat") return "/shop/notifications"; // chat is closed: old chat notices open the notifications page
       if (t === "question") return pick(`/shop/products/${id}`, "/shop/products");
       if (t === "review") return pick(`/shop/products/${id}`, "/shop/products");
       return "/shop/notifications";
@@ -31,13 +31,9 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
       if (t === "payout") return "/seller/finance/payouts";
       if (t === "campaign") return pick(`/seller/promotions/${id}`, "/seller/promotions");
       if (t === "support") return pick(`/seller/support/${id}`, "/seller/support");
-      if (t === "return") return pick(`/seller/returns/${id}`, "/seller/returns");
-      if (t === "dispute") return pick(`/seller/disputes/${id}`, "/seller/disputes");
-      if (t === "replacement") return pick(`/seller/replacements/${id}`, "/seller/replacements");
-      if (t === "exchange") return pick(`/seller/exchanges/${id}`, "/seller/exchanges");
       if (t === "question") return pick(`/seller/questions?focus=${id}`, "/seller/questions");
       if (t === "review") return pick(`/seller/reviews?focus=${id}`, "/seller/reviews");
-      if (t === "chat") return pick(`/seller/messages/${id}`, "/seller/messages");
+      if (t === "policy") return "/seller/storefront"; // a policy approved, rejected or edited by KOMORIKO
       if (t === "stock") return "/seller/inventory";
       if (t === "flash") return "/seller/flash-sales";
       if (t === "promo") return "/seller/coupons";
@@ -54,6 +50,7 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
       if (t === "support") return pick(`/admin/support/${id}`, "/admin/support");
       if (t === "return") return pick(`/admin/returns/${id}`, "/admin/returns");
       if (t === "dispute") return pick(`/admin/disputes/${id}`, "/admin/disputes");
+      if (t === "policy") return pick(`/admin/policies?seller=${id}`, "/admin/policies");
       if (t === "campaign") return "/admin/marketing";
       if (t === "exchange") return pick(`/admin/fulfillment/exchanges/${id}`, "/admin/fulfillment/exchanges");
       if (t === "replacement") return pick(`/admin/fulfillment/replacements/${id}`, "/admin/fulfillment/replacements");

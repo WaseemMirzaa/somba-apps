@@ -15,6 +15,8 @@ import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useSupportTickets, ticketStatusLabel, type SupportTicketRow } from "@/lib/shop-live";
 import { MessageSquare } from "lucide-react";
+import { shownText } from "@/lib/text-i18n";
+import { contactSupportPrefill } from "@/lib/contact-support";
 
 const CATEGORIES = [
   { id: "general", en: "General", fr: "Général" },
@@ -34,9 +36,11 @@ function SupportContent() {
   const rt = useRealtime();
   const { tickets, loaded, error: listError, put } = useSupportTickets();
 
-  const [subject, setSubject] = useState(params.get("subject") ?? "");
+  // "Contact support" links carry the order / product / store (lib/contact-support.ts): the new ticket starts filled in.
+  const prefill = useMemo(() => contactSupportPrefill(params, fr, typeof window === "undefined" ? "" : window.location.origin), [params, fr]);
+  const [subject, setSubject] = useState(prefill.subject);
   const [category, setCategory] = useState(params.get("order") ? "orders" : "general");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(prefill.message);
   const [photos, setPhotos] = useState<string[]>([]);
   // Prefill the order from ?order= (an order id or reference) once the orders are loaded.
   const orderParam = params.get("order");
@@ -112,7 +116,7 @@ function SupportContent() {
               <div className="flex items-center gap-3">
                 <span className="rounded-lg bg-blue-50 p-2"><MessageSquare className="h-4 w-4 text-[var(--primary)]" /></span>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{tk.subject}</p>
+                  <p className="text-sm font-medium text-slate-900">{shownText(tk.subjectI18n, locale, tk.subject)}</p>
                   <p className="text-xs text-slate-500">{tk.reference} · {new Date(tk.updatedAt).toLocaleDateString()}</p>
                 </div>
               </div>
@@ -170,12 +174,20 @@ function SupportContent() {
   );
 }
 
+/** Signing in returns to the same page WITH the order / product the ticket is about. */
+function SupportGate() {
+  const qs = useSearchParams().toString();
+  return (
+    <RequireSignIn next={qs ? `/shop/support?${qs}` : "/shop/support"}>
+      <SupportContent />
+    </RequireSignIn>
+  );
+}
+
 export default function ShopSupportPage() {
   return (
-    <RequireSignIn next="/shop/support">
-      <Suspense fallback={<PageLoader className="py-12" />}>
-        <SupportContent />
-      </Suspense>
-    </RequireSignIn>
+    <Suspense fallback={<PageLoader className="py-12" />}>
+      <SupportGate />
+    </Suspense>
   );
 }

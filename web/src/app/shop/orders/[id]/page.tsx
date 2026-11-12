@@ -9,7 +9,7 @@ import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { OrderProducts, type OrderProductEntry } from "@/components/shop/order-products";
 import { StepList } from "@/components/shop/step-list";
-import { ContactSeller } from "@/components/shop/contact-seller";
+import { ContactSupport } from "@/components/shop/contact-support";
 import { customerJourney } from "@/lib/order-journey";
 import { useHubDirectory } from "@/lib/shop-engage";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
@@ -109,7 +109,6 @@ function OrderDetail() {
   const riderOnRoad = !order.partiallyDelivered || !!openCustomerLeg(raw?.tracking?.legs);
   const steps = raw ? customerJourney(raw, hubs, fr) : [];
   const requests = rt.disputes.filter((d) => d.orderId === order.id);
-  const sellers = [...new Map(rawItems.filter((i) => i.sellerId).map((i) => [i.sellerId as string, i.sellerName ?? ""])).entries()];
   const reportable = ["shipped", "out_for_delivery", "delivered"].includes(order.status);
 
   return (
@@ -235,10 +234,7 @@ function OrderDetail() {
         <DetailGridSection title="Support">
           <p className="text-sm text-slate-500">{fr ? "Besoin d'aide avec cette commande ?" : "Need help with this order?"}</p>
           <div className="mt-3 flex flex-col items-start gap-2">
-            <Link href={`/shop/support?order=${order.id}`} className="btn-primary inline-block px-4 py-2 text-sm">{fr ? "Ouvrir un ticket de support" : "Open Support Ticket"}</Link>
-            {sellers.map(([sid, name]) => (
-              <ContactSeller key={sid} sellerId={sid} orderId={order.id} fr={fr} label={fr ? `Écrire à ${name}` : `Message ${name}`} returnTo={`/shop/orders/${order.id}`} />
-            ))}
+            <ContactSupport fr={fr} orderId={order.id} primary />
           </div>
           {requests.length > 0 && (
             <div className="mt-4 border-t border-[var(--border)] pt-3" data-testid="order-requests">

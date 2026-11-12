@@ -42,7 +42,7 @@ export function useHubs(): HubInfo[] {
 }
 
 // ── Notification preferences (me:prefs) ────────────────────────────────────────────────────────────────────────────
-export const NOTIFY_KINDS = ["order", "payout", "stock", "review", "question", "message", "product", "promo"] as const;
+export const NOTIFY_KINDS = ["order", "payout", "stock", "review", "question", "product", "promo"] as const;
 export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 
 /**
@@ -55,18 +55,16 @@ export const NOTIFY_PERMISSION: Record<NotifyKind, SellerPermission> = {
   stock: "catalog",
   review: "support",
   question: "support",
-  message: "support",
   product: "catalog",
   promo: "catalog",
 };
 
 export const NOTIFY_LABEL: Record<NotifyKind, { en: string; fr: string; descEn: string; descFr: string }> = {
-  order: { en: "Orders and deliveries", fr: "Commandes et livraisons", descEn: "New orders, pickups, returns, disputes, replacements and exchanges.", descFr: "Nouvelles commandes, collectes, retours, litiges, remplacements et échanges." },
+  order: { en: "Orders and deliveries", fr: "Commandes et livraisons", descEn: "New orders, pickups and goods coming back to your store.", descFr: "Nouvelles commandes, collectes et marchandises qui reviennent à votre boutique." },
   payout: { en: "Payouts and finance", fr: "Versements et finance", descEn: "Payout requests, payments and commission invoices.", descFr: "Demandes de versement, paiements et factures de commission." },
   stock: { en: "Stock alerts", fr: "Alertes de stock", descEn: "Low stock and out-of-stock warnings.", descFr: "Alertes de stock bas et de rupture." },
   review: { en: "Reviews", fr: "Avis", descEn: "New reviews and moderation decisions on them.", descFr: "Nouveaux avis et décisions de modération." },
   question: { en: "Product questions", fr: "Questions sur les produits", descEn: "Shoppers asking about your products.", descFr: "Questions des clients sur vos produits." },
-  message: { en: "Customer messages", fr: "Messages des clients", descEn: "New chat messages from shoppers.", descFr: "Nouveaux messages des clients." },
   product: { en: "Listings and moderation", fr: "Annonces et modération", descEn: "Approvals and refusals of your listings.", descFr: "Validations et refus de vos annonces." },
   promo: { en: "Promotions and flash sales", fr: "Promotions et ventes flash", descEn: "Campaign decisions, budgets and flash sales.", descFr: "Décisions sur les campagnes, budgets et ventes flash." },
 };

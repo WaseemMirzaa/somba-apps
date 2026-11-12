@@ -1,5 +1,6 @@
 "use client";
 
+import type { TextI18n } from "@/lib/text-i18n";
 import { httpErrorText, currentLocale } from "@/lib/api-errors";
 
 import { isExpressOrder } from "@/lib/split-delivery";
@@ -23,7 +24,6 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import type { ParcelLabel, ParcelLabelPack } from "@/lib/parcel-labels";
 import { authApi } from "@/lib/realtime/auth-api";
 import type {
-  Dispute,
   Order,
   Payment,
   Payout,
@@ -201,6 +201,7 @@ export interface SupportMessage {
   /** The sender's real role (customer | seller | rider | admin_support …). */
   role: string;
   text: string;
+  textI18n?: TextI18n | null;
   at: string;
   /** Photos the sender attached (upload URLs). */
   attachments?: string[];
@@ -212,6 +213,7 @@ export interface SupportTicket {
   userId: string;
   userName: string;
   subject: string;
+  subjectI18n?: TextI18n | null;
   category: string;
   orderId: string | null;
   status: "open" | "pending" | "resolved" | "closed";
@@ -226,45 +228,8 @@ export interface SupportTicket {
   updatedAt: string;
 }
 
-export interface Replacement {
-  id: string;
-  reference: string;
-  orderId: string;
-  orderReference: string;
-  customerName: string;
-  sku: string;
-  productName: string;
-  /** French name of the product when the server snapshots one (absent otherwise: the English name shows). */
-  productNameFr?: string | null;
-  reason: string | null;
-  condition: string | null;
-  status: "requested" | "approved" | "received" | "allocated" | "dispatched" | "rejected";
-  createdAt: string;
-  updatedAt: string;
-}
-
 /** Campaign statuses the seller may still edit (an edit sends it back to marketing). */
 export const EDITABLE_CAMPAIGN: readonly string[] = ["draft", "pending", "rejected"];
-
-/** An exchange (swap for another item) on one of this store's products. Read-only: the warehouse processes it. */
-export interface Exchange {
-  id: string;
-  reference: string;
-  orderId: string;
-  orderReference: string;
-  customerName: string;
-  fromSku: string;
-  fromName: string;
-  fromNameFr?: string | null;
-  toSku: string;
-  toName: string;
-  toNameFr?: string | null;
-  priceDiffUsd: number;
-  reason: string | null;
-  status: "requested" | "approved" | "received" | "ready" | "dispatched" | "rejected";
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface ProductInput {
   /** English title. At least one of `name` / `nameFr` is required (C-I1); never send an empty one. */
@@ -449,12 +414,9 @@ interface BuildInput {
   /** The server's seller view (own lines + package status); a full Order is accepted as an offline fallback. */
   orders: (SellerOrderView | Order)[];
   payouts: SellerPayout[];
-  disputes: Dispute[];
   reviews: SellerReview[];
   available: PayoutAvailability | null;
   campaigns: Campaign[];
-  replacements: Replacement[];
-  exchanges: Exchange[];
   /** The portal is read in French: names, options and other bilingual text are picked for this language. */
   fr: boolean;
 }
@@ -470,8 +432,8 @@ type RawOrder = SellerOrderView & {
 
 function buildSellerData(input: BuildInput) {
   const {
-    storeName, seller, stats, products, orders, payouts, disputes, reviews,
-    available, campaigns, replacements, exchanges, fr,
+    storeName, seller, stats, products, orders, payouts, reviews,
+    available, campaigns, fr,
   } = input;
   const commissionPct = available?.commissionPct ?? DEFAULT_COMMISSION_PCT;
   // The store's own low-stock line (Inventory > settings); 10 until the seller sets one.
@@ -862,24 +824,6 @@ function buildSellerData(input: BuildInput) {
       date: dayOf(r.createdAt),
     }));
 
-  // Returns / disputes visible to this account.
-  const orderAmountByRef = new Map(sellerOrderList.map((o) => [o.id, o.amount]));
-  const toCase = (d: Dispute) => ({
-    id: d.reference,
-    disputeId: d.id,
-    orderId: d.orderReference,
-    customer: firstNameOnly(d.customerName),
-    reason: d.reason,
-    resolution: d.resolution ?? "",
-    amount: orderAmountByRef.get(d.orderReference) ?? 0,
-    status: d.status,
-    type: d.type,
-    date: dayOf(d.createdAt),
-    createdAt: d.createdAt,
-  });
-  const sellerReturnList = disputes.filter((d) => d.type === "return").map(toCase);
-  const sellerDisputeList = disputes.filter((d) => d.type === "dispute").map(toCase);
-
   // Dashboard stats (live).
   // Pending work = packages still to pack (an unpaid order is not work yet).
   const pendingOrders = sellerOrderList.filter((o) => o.needsPacking).length;
@@ -903,9 +847,6 @@ function buildSellerData(input: BuildInput) {
     pendingOrders,
     productsSold,
     storeRating: seller?.rating || avgRating,
-    // Waiting for the seller's own answer (stage awaiting_seller); an older server without `stage` counts every open one.
-    pendingReturns: disputes.filter((d) => d.type === "return" && d.status === "open" && ((d as { stage?: string }).stage ?? "awaiting_seller") === "awaiting_seller").length,
-    pendingReplacements: replacements.filter((r) => r.status === "requested").length,
   };
 
   const sellerStore = {
@@ -970,42 +911,6 @@ function buildSellerData(input: BuildInput) {
     orders: c.orders,
     revenue: c.revenueUsd,
     roi: c.budgetUsd > 0 ? Number((c.revenueUsd / c.budgetUsd).toFixed(2)) : 0,
-  }));
-
-  // Replacements and exchanges keep the product's name as it was when they were opened, in one language. When the
-  // server sends no French copy, the seller's own listing with the same SKU gives the name in the portal's language.
-  const nameBySku = new Map(sellerProductList.map((p) => [p.sku, p.name]));
-  const snapshotName = (sku: string, snap: string, snapFr?: string | null): string =>
-    snapFr?.trim() ? pickText(fr, snap, snapFr) : (nameBySku.get(sku) ?? snap);
-
-  // Replacements (live, read-only).
-  const sellerReplacementList = replacements.map((r) => ({
-    id: r.reference,
-    replacementId: r.id,
-    orderId: r.orderReference,
-    customer: firstNameOnly(r.customerName),
-    sku: r.sku,
-    productName: snapshotName(r.sku, r.productName, r.productNameFr),
-    reason: r.reason ?? "",
-    condition: r.condition ?? "",
-    status: r.status,
-    date: dayOf(r.createdAt),
-  }));
-
-  // Exchanges on this store's items (live, read-only).
-  const sellerExchangeList = exchanges.map((x) => ({
-    id: x.reference,
-    exchangeId: x.id,
-    orderId: x.orderReference,
-    customer: firstNameOnly(x.customerName),
-    fromName: snapshotName(x.fromSku, x.fromName, x.fromNameFr),
-    fromSku: x.fromSku,
-    toName: snapshotName(x.toSku, x.toName, x.toNameFr),
-    toSku: x.toSku,
-    priceDiffUsd: x.priceDiffUsd,
-    reason: x.reason ?? "",
-    status: x.status,
-    date: dayOf(x.createdAt),
   }));
 
   // Recent activity: the latest real events of this store, newest first.
@@ -1073,10 +978,7 @@ function buildSellerData(input: BuildInput) {
     statements,
     categoryRevenue,
     sellerReviewList,
-    sellerReturnList,
-    sellerDisputeList,
     promotionList,
-    sellerReplacementList,
     lowStockProducts,
     topSellingProducts,
     storeSettings,
@@ -1090,15 +992,10 @@ function buildSellerData(input: BuildInput) {
     getShipment: (id: string) => shipmentList.find((s) => s.id === id),
     getShipmentByOrderId: (orderId: string) => shipmentList.find((s) => s.orderId === orderId),
     // Links from notifications carry the record id; lists use the reference.
-    getSellerReturn: (id: string) => sellerReturnList.find((r) => r.id === id || r.disputeId === id),
     getPayout: (id: string) => payoutList.find((p) => p.id === id || p.payoutId === id),
     getSellerPayoutItems: () => sellerPayoutPendingItems,
     getPendingPayoutItems: () => sellerPayoutPendingItems.filter((i) => i.status !== "paid_out"),
     getPromotion: (id: string) => promotionList.find((p) => p.id === id || p.reference === id),
-    getSellerReplacement: (id: string) =>
-      sellerReplacementList.find((r) => r.id === id || r.replacementId === id),
-    sellerExchangeList,
-    getSellerExchange: (id: string) => sellerExchangeList.find((x) => x.id === id || x.exchangeId === id),
   };
 }
 
@@ -1186,8 +1083,7 @@ export interface StorePatch {
   /** ISO date, or a bare YYYY-MM-DD (end of that day); null / "" reopens. */
   vacationUntil?: string | null;
   handlingDays?: number;
-  /** Needs a pinned pickup location (`pickupLat` / `pickupLng`): the server refuses it otherwise. */
-  expressDelivery?: boolean;
+  /** Policy fields become a PENDING proposal that KOMORIKO approves (docs/contracts/admin-controls.md §5). Express delivery is admin-managed. */
   returnsPolicy?: string | null;
   returnsPolicyFr?: string | null;
   shippingPolicy?: string | null;
@@ -1215,8 +1111,6 @@ interface SellerCtx {
   available: PayoutAvailability | null;
   campaigns: Campaign[];
   tickets: SupportTicket[];
-  replacements: Replacement[];
-  exchanges: Exchange[];
   plans: SellerPlanInfo[] | null;
   load: SellerLoadState;
   /** Increments (debounced) whenever a push changed something analytics are computed from. */
@@ -1246,8 +1140,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const [available, setAvailable] = useState<PayoutAvailability | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [replacements, setReplacements] = useState<Replacement[]>([]);
-  const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [plans, setPlans] = useState<SellerPlanInfo[] | null>(null);
   const [liveTick, setLiveTick] = useState(0);
   const productsRef = useRef<SellerProductRow[] | null>(null);
@@ -1302,14 +1194,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     () => read<unknown[]>("tickets", "support:list", (t) => setTickets((t ?? []).map(parseTicket))),
     [read],
   );
-  const refreshReplacements = useCallback(
-    () => read<Replacement[]>("replacements", "replacements:list", (r) => setReplacements(r ?? [])),
-    [read],
-  );
-  const refreshExchanges = useCallback(
-    () => read<Exchange[]>("exchanges", "exchanges:list", (x) => setExchanges(x ?? [])),
-    [read],
-  );
   const refreshPlans = useCallback(() => read<SellerPlanInfo[]>("plans", "sellers:plans", setPlans), [read]);
 
   const refresh = useCallback(async () => {
@@ -1324,13 +1208,11 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       can("support") ? refreshReviews() : Promise.resolve(),
       can("catalog") ? refreshCampaigns() : Promise.resolve(),
       can("support") ? refreshTickets() : Promise.resolve(),
-      can("orders") ? refreshReplacements() : Promise.resolve(),
-      can("orders") ? refreshExchanges() : Promise.resolve(),
       refreshPlans(),
     ]);
     setFirstLoadDone(true);
     setLiveTick((n) => n + 1);
-  }, [refreshSeller, refreshProducts, refreshOrders, refreshAvailable, refreshStats, refreshReviews, refreshCampaigns, refreshTickets, refreshReplacements, refreshExchanges, refreshPlans]);
+  }, [refreshSeller, refreshProducts, refreshOrders, refreshAvailable, refreshStats, refreshReviews, refreshCampaigns, refreshTickets, refreshPlans]);
 
   // Initial load, and again every time the socket (re)connects and the server
   // says `ready` (isSeller flips false → true): whatever was pushed while we
@@ -1350,7 +1232,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       pendingWhat.current = {
         money: pendingWhat.current.money || what.money,
         analytics: pendingWhat.current.analytics || what.analytics,
-        cases: pendingWhat.current.cases || what.cases,
       };
       followUp.current = setTimeout(() => {
         const w = pendingWhat.current;
@@ -1360,14 +1241,10 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
           void refreshStats();
           void refreshAvailable();
         }
-        if (w.cases) {
-          void refreshReplacements();
-          void refreshExchanges();
-        }
         if (w.analytics) setLiveTick((n) => n + 1);
       }, PUSH_DEBOUNCE_MS);
     },
-    [refreshStats, refreshAvailable, refreshReplacements, refreshExchanges],
+    [refreshStats, refreshAvailable],
   );
   const pendingWhat = useRef<{ money?: boolean; analytics?: boolean; cases?: boolean }>({});
   useEffect(
@@ -1434,7 +1311,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       setSellerLoaded(true);
     };
     const onPayout = () => scheduleFollowUp({ money: true });
-    const onNotify = () => scheduleFollowUp({ money: true, cases: true });
+    const onNotify = () => scheduleFollowUp({ money: true });
     // A delivery leg moved (rider assigned, parcel scanned in...): the order's tracking changed, so re-read the orders.
     let taskTimer: ReturnType<typeof setTimeout> | null = null;
     const onTask = () => {
@@ -1443,8 +1320,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     };
     const onCampaign = (c: Campaign) => setCampaigns((cur) => upsert(cur, c));
     const onTicket = (t: unknown) => setTickets((cur) => upsert(cur, parseTicket(t)));
-    const onReplacement = (r: Replacement) => setReplacements((cur) => upsert(cur, r));
-    const onExchange = (x: Exchange) => setExchanges((cur) => upsert(cur, x));
     // Warehouse coverage changed: the store's pickup area may have become (or stopped being) served.
     let coverageTimer: ReturnType<typeof setTimeout> | null = null;
     const onCoverage = () => {
@@ -1464,8 +1339,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     s.on("notification:new", onNotify);
     s.on("campaign:updated", onCampaign);
     s.on("support:updated", onTicket);
-    s.on("replacement:updated", onReplacement);
-    s.on("exchange:updated", onExchange);
     s.on("task:updated", onTask);
     s.on("delivery:updated", onTask);
     s.on("team:me", onTeamMe);
@@ -1483,8 +1356,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
       s.off("notification:new", onNotify);
       s.off("campaign:updated", onCampaign);
       s.off("support:updated", onTicket);
-      s.off("replacement:updated", onReplacement);
-      s.off("exchange:updated", onExchange);
       s.off("task:updated", onTask);
       s.off("delivery:updated", onTask);
       if (taskTimer) clearTimeout(taskTimer);
@@ -1508,7 +1379,6 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
     setAvailable(null);
     setCampaigns([]);
     setTickets([]);
-    setReplacements([]);
     setPlans(null);
     setErrors({});
     setFirstLoadDone(false);
@@ -1655,9 +1525,9 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
   const value = useMemo<SellerCtx>(
     () => ({
       seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, ordersRaw: allOrders, available,
-      campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions,
+      campaigns, tickets, plans, load, liveTick, refresh, actions,
     }),
-    [seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, allOrders, available, campaigns, tickets, replacements, exchanges, plans, load, liveTick, refresh, actions],
+    [seller, sellerLoaded, removedFrom, stats, reviews, ownProducts, allOrders, available, campaigns, tickets, plans, load, liveTick, refresh, actions],
   );
 
   return <SellerContext.Provider value={value}>{children}</SellerContext.Provider>;
@@ -1748,14 +1618,11 @@ export function useSellerData() {
         products: ctx.ownProducts ?? (rt.products as SellerProductRow[]),
         orders: ctx.ordersRaw ?? rt.orders,
         payouts: rt.payouts as SellerPayout[],
-        disputes: rt.disputes,
         reviews: ctx.reviews,
         available: ctx.available,
         campaigns: ctx.campaigns,
-        replacements: ctx.replacements,
-        exchanges: ctx.exchanges,
       }),
-    [fr, storeName, ctx.seller, ctx.stats, ctx.ownProducts, ctx.ordersRaw, ctx.reviews, ctx.available, ctx.campaigns, ctx.replacements, ctx.exchanges, rt.products, rt.orders, rt.payouts, rt.disputes],
+    [fr, storeName, ctx.seller, ctx.stats, ctx.ownProducts, ctx.ordersRaw, ctx.reviews, ctx.available, ctx.campaigns, rt.products, rt.orders, rt.payouts],
   );
 
   return useMemo(

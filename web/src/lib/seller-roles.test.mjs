@@ -30,9 +30,9 @@ test("every menu entry uses a permission the server knows", () => {
   for (const e of entries) assert.ok(ALL.includes(e.perm), `${e.href}: ${e.perm}`);
 });
 
-test("support opens exactly: dashboard, messages, questions, notifications, reviews, support, settings", () => {
+test("support opens exactly: dashboard, questions, notifications, reviews, support, settings (no chat: customers contact KOMORIKO support)", () => {
   const open = entries.filter((e) => table.support.includes(e.perm)).map((e) => e.href);
-  assert.deepEqual(open.sort(), ["/seller", "/seller/messages", "/seller/notifications", "/seller/questions", "/seller/reviews", "/seller/settings", "/seller/support"]);
+  assert.deepEqual(open.sort(), ["/seller", "/seller/notifications", "/seller/questions", "/seller/reviews", "/seller/settings", "/seller/support"]);
 });
 
 test("no role is offered a menu entry its permissions do not open, and every page needs a permission some role has", () => {
@@ -45,11 +45,14 @@ test("no role is offered a menu entry its permissions do not open, and every pag
 test("each notification switch needs the permission the server gives that kind of notice", () => {
   const kinds = Object.fromEntries([...account.match(/NOTIFY_PERMISSION[^=]*=\s*\{([\s\S]*?)\};/)[1].matchAll(/([a-z]+): "([a-z_]+)"/g)].map((m) => [m[1], m[2]]));
   // server: permissionForNotice(type) for a notice type of each category (api/src/users/notify-prefs.ts maps type -> kind)
-  const serverFor = { order: "orders", payout: "finance", stock: "catalog", review: "support", question: "support", message: "support", product: "catalog", promo: "catalog" };
+  // (no "message" switch any more: customer chat is closed)
+  const serverFor = { order: "orders", payout: "finance", stock: "catalog", review: "support", question: "support", product: "catalog", promo: "catalog" };
   assert.deepEqual(kinds, serverFor);
-  for (const [type, perm] of Object.entries({ order: "orders", payout: "finance", stock: "catalog", review: "support", question: "support", chat: "support", product: "catalog", promo: "catalog" })) {
+  for (const [type, perm] of Object.entries({ order: "orders", payout: "finance", stock: "catalog", review: "support", question: "support", product: "catalog", promo: "catalog" })) {
     assert.match(server, new RegExp(`case '${type}':[\\s\\S]*?return '${perm}'`), `server: ${type} -> ${perm}`);
   }
+  // a store policy notice has no switch of its own: the server's default permission is the storefront's
+  assert.match(server, /default:\s*return 'storefront';/);
   assert.match(prefs, /NOTIFY_KINDS\.filter\(\(k\) => access\.can\(NOTIFY_PERMISSION\[k\]\)\)/);
 });
 
@@ -60,4 +63,19 @@ test("the dashboard hides what the role cannot use: analytics (insight), pickup 
   assert.match(dashboard, /\{access\.can\("insight"\) && \(\s*<Card className="lg:col-span-1">/);
   assert.match(plan, /useSellerAccess\(\)\.can\("account"\)/);
   assert.match(plan, /\{canChange && \(/);
+});
+
+test("after-sale and chat notices are owner-only on the server, and the team role texts no longer promise them", () => {
+  assert.match(server, /case 'dispute':[\s\S]*?case 'chat':\s*return 'team';/);
+  const access = read("./seller-access.ts");
+  const orders = access.match(/orders: \{[^\n]*\}/)[0];
+  const support = access.match(/support: \{[^\n]*\}/)[0];
+  assert.doesNotMatch(orders, /returns|disputes|replacements|exchanges|retours|litiges|remplacements|échanges/i);
+  assert.doesNotMatch(support, /chat|messages clients/i);
+});
+
+test("no seller dashboard tile or notice link points at the removed pages", () => {
+  assert.doesNotMatch(dashboard, /returnRatePct|disputeRatePct/);
+  const links = read("./notice-links.ts");
+  assert.doesNotMatch(links, /\/seller\/(returns|disputes|exchanges|replacements|messages)/);
 });

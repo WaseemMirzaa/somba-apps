@@ -4,6 +4,7 @@ import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
+import { ChatClosedNote } from "@/components/shop/chat-closed-note";
 import { useConversations } from "@/lib/shop-engage";
 import { useLocale } from "@/context/locale-context";
 import { localized } from "@/lib/i18n-fields";
@@ -26,11 +27,12 @@ function Inbox() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        title={fr ? "Mes messages" : "My messages"}
-        subtitle={fr ? "Vos conversations avec les vendeurs" : "Your conversations with sellers"}
+        title={fr ? "Anciens messages" : "Past messages"}
+        subtitle={fr ? "Vos anciennes conversations avec les vendeurs (lecture seule)" : "Your old conversations with sellers (read-only)"}
         backHref="/shop/account"
         breadcrumbs={[{ label: fr ? "Mon compte" : "Account", href: "/shop/account" }, { label: fr ? "Messages" : "Messages" }]}
       />
+      <ChatClosedNote fr={fr} />
       {error ? (
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {error} <button type="button" onClick={() => void reload()} className="font-medium underline">{fr ? "Réessayer" : "Retry"}</button>
@@ -39,7 +41,7 @@ function Inbox() {
         <p className="text-sm text-slate-500">{fr ? "Chargement…" : "Loading…"}</p>
       ) : rows.length === 0 ? (
         <div className="card-premium p-8 text-center text-sm text-slate-500">
-          {fr ? "Aucune conversation. Écrivez à un vendeur depuis un produit, une boutique ou une commande." : "No conversations yet. Message a seller from a product, a store or an order."}
+          {fr ? "Aucune ancienne conversation." : "No old conversations."}
         </div>
       ) : (
         <div className="space-y-2" data-testid="conversation-list">

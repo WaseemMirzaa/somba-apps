@@ -62,3 +62,12 @@ export function previewText(i18n: TextI18n | null | undefined, locale: string, p
   const picked = i18n ? value(i18n, locale) : null;
   return picked ?? base;
 }
+
+/**
+ * A short stored text that sits in a title or a list cell (a ticket subject): the text for the page language when the payload has
+ * it and it still belongs to the written text, else the text as written. Never a request: a title does not wait for a translator.
+ */
+export function shownText(i18n: TextI18n | null | undefined, locale: string, original: string | null | undefined): string {
+  const base = original ?? "";
+  return pickI18n(i18n, locale, base)?.text ?? base;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import { TranslatableText } from "@/components/shop/translatable-text";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle } from "lucide-react";
@@ -177,7 +178,7 @@ export function DisputeCase({ id, kind }: { id: string; kind: "dispute" | "retur
               {d.type === "return" ? (fr ? "Motif du retour" : "Return reason") : fr ? "Motif du litige" : "Dispute reason"}
               {d.category ? ` · ${lab(DISPUTE_CATEGORY_LABEL, d.category, fr)}` : ""}
             </p>
-            <p className="mt-1 whitespace-pre-wrap text-lg font-bold text-slate-900">{d.reason}</p>
+            <TranslatableText kind="dispute_reason" id={d.id} auto text={d.reason} i18n={d.reasonI18n} className="mt-1 whitespace-pre-wrap text-lg font-bold text-slate-900" />
           </div>
         </div>
       </div>
@@ -195,18 +196,19 @@ export function DisputeCase({ id, kind }: { id: string; kind: "dispute" | "retur
                 : []),
               ...(d.outcome ? [{ label: fr ? "Issue" : "Outcome", value: lab(DISPUTE_OUTCOME_LABEL, d.outcome, fr) }] : []),
               ...(d.refundUsd ? [{ label: fr ? "Remboursé" : "Refunded", value: `${formatCurrency(d.refundUsd, locale)} → ${d.refundTo === "phone" ? (fr ? "téléphone" : "phone") : fr ? "portefeuille" : "wallet"}` }] : []),
-              ...(d.resolution ? [{ label: fr ? "Décision" : "Resolution", value: resolutionText(d, fr), full: true }] : []),
+              ...(d.resolution ? [{ label: fr ? "Décision" : "Resolution", value: d.resolutionI18n ? <TranslatableText kind="dispute_resolution" id={d.id} auto text={d.resolution} i18n={d.resolutionI18n} /> : resolutionText(d, fr), full: true }] : []),
             ]}
           />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Vendeur" : "Seller"}>
+        <DetailGridSection title={fr ? "Support" : "Support"}>
           <InfoGrid
             items={[
-              { label: fr ? "Réponse attendue avant" : "Answer due", value: due },
-              { label: fr ? "A répondu le" : "Answered", value: d.sellerRespondedAt ? localDateTime(d.sellerRespondedAt) : fr ? "Pas encore" : "Not yet" },
+              { label: fr ? "Décision attendue avant" : "Decision due", value: due },
+              // Rows from before KOMORIKO took the seller out of it may still carry the seller's answer.
+              ...(d.sellerRespondedAt ? [{ label: fr ? "Ancienne réponse du vendeur le" : "Earlier seller answer on", value: localDateTime(d.sellerRespondedAt) }] : []),
               ...(d.escalatedAt ? [{ label: fr ? "Escaladé le" : "Escalated", value: localDateTime(d.escalatedAt) }] : []),
-              ...(d.sellerReason ? [{ label: fr ? "Motif du vendeur" : "Seller's reason", value: d.sellerReason, full: true }] : []),
+              ...(d.sellerReason ? [{ label: fr ? "Ancien motif du vendeur" : "Earlier seller reason", value: <TranslatableText kind="dispute_reply" id={d.id} auto text={d.sellerReason} i18n={d.sellerReasonI18n} />, full: true }] : []),
             ]}
           />
         </DetailGridSection>
@@ -281,7 +283,7 @@ export function DisputeCase({ id, kind }: { id: string; kind: "dispute" | "retur
                   </span>
                   <span>{localDateTime(m.createdAt)}</span>
                 </div>
-                <p className="mt-1.5 whitespace-pre-wrap text-slate-800">{m.text}</p>
+                <TranslatableText kind="dispute_message" id={m.id} auto text={m.text} i18n={m.textI18n} className="mt-1.5 whitespace-pre-wrap text-slate-800" />
                 {m.attachments?.length > 0 && <div className="mt-2"><Photos urls={m.attachments} fr={fr} /></div>}
               </div>
             ))}
@@ -290,7 +292,7 @@ export function DisputeCase({ id, kind }: { id: string; kind: "dispute" | "retur
                 <textarea
                   className="input-premium w-full px-4 py-2 text-sm"
                   rows={2}
-                  placeholder={fr ? "Répondre au client et au vendeur…" : "Reply to the customer and the seller…"}
+                  placeholder={fr ? "Répondre au client…" : "Reply to the customer…"}
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                 />

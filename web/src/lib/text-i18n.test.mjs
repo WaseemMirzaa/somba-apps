@@ -6,7 +6,7 @@ import ts from "typescript";
 
 const src = readFileSync(new URL("./text-i18n.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-const { pickI18n, isMachine, freshI18n, previewText } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
+const { pickI18n, isMachine, freshI18n, previewText, shownText } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
 
 const fr = { sourceLang: "fr", fr: "Très bon produit", en: "Very good product" };
 const ORIGINAL_FR = "Très bon produit";
@@ -76,4 +76,13 @@ test("preview: the viewer-language text when the payload has it, else the previe
   assert.equal(previewText({ sourceLang: "fr", fr: "Salut" }, "en", "Salut"), "Salut");
   assert.equal(previewText(undefined, "en", "As sent"), "As sent");
   assert.equal(previewText(null, "en", null), "");
+});
+
+test("a ticket subject in a title: the page language when the payload has it and it is fresh, else as written (no request)", () => {
+  const subject = { sourceLang: "fr", fr: "Où est ma commande ?", en: "Where is my order?" };
+  assert.equal(shownText(subject, "en", "Où est ma commande ?"), "Where is my order?");
+  assert.equal(shownText(subject, "fr", "Où est ma commande ?"), "Où est ma commande ?");
+  assert.equal(shownText(subject, "en", "Edited since"), "Edited since"); // stale object: the written text
+  assert.equal(shownText(undefined, "en", "As written"), "As written");
+  assert.equal(shownText(null, "fr", null), "");
 });

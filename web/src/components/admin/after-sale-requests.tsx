@@ -25,6 +25,8 @@ import { LEG_KIND, LEG_STATUS, pickL } from "@/lib/logistics";
 import { replacementConditionLabel } from "@/lib/replacement-condition";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { isDeskAdmin } from "@/lib/staff-access";
+import { TranslatableText } from "@/components/shop/translatable-text";
+import type { TextI18n } from "@/lib/text-i18n";
 import { formatCurrency } from "@/lib/utils";
 
 export type AfterSaleKind = "replacement" | "exchange";
@@ -39,6 +41,9 @@ interface Row {
   status: string;
   qty?: number;
   reason: string | null;
+  /** `reason` and the decision note (`sellerReason`) in both languages. */
+  reasonI18n?: TextI18n | null;
+  sellerReasonI18n?: TextI18n | null;
   sellerDueAt: string | null;
   sellerRespondedAt: string | null;
   sellerReason: string | null;
@@ -68,7 +73,7 @@ interface Row {
 
 type L2 = { en: string; fr: string };
 const STATUS: Record<string, L2> = {
-  requested: { en: "Waiting for the seller", fr: "En attente du vendeur" },
+  requested: { en: "Waiting for support", fr: "En attente du support" },
   approved: { en: "Approved", fr: "Approuvé" },
   received: { en: "Old item received", fr: "Ancien article reçu" },
   allocated: { en: "New unit allocated", fr: "Nouvelle unité allouée" },
@@ -98,8 +103,8 @@ const CFG = {
     base: "/admin/replacements",
     titleEn: "Replacements",
     titleFr: "Remplacements",
-    subEn: "Replacement requests: the seller approves, the destination warehouse delivers the new unit and collects the old one",
-    subFr: "Demandes de remplacement : le vendeur approuve, l'entrepôt de destination livre la nouvelle unité et reprend l'ancienne",
+    subEn: "Replacement requests: support decides, the destination warehouse delivers the new unit and collects the old one",
+    subFr: "Demandes de remplacement : le support décide, l'entrepôt de destination livre la nouvelle unité et reprend l'ancienne",
     notFoundEn: "Replacement not found",
     notFoundFr: "Remplacement introuvable",
   },
@@ -267,10 +272,9 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
   if (!r) return <div className="p-8 text-center text-slate-500">{fr ? c.notFoundFr : c.notFoundEn}</div>;
 
   const diff = Number(r.priceDiffUsd ?? 0);
-  // Support answers on a seller's behalf, but an exchange that refunds money to the customer's wallet is approved by the exchange desk
-  // (super admin, operations): the server refuses Support too (`exchanges:respond`), so the button is not offered. Support may still reject.
+  // Support decides every replacement and exchange, a negative price difference included (docs/contracts/admin-controls.md §2).
+  // Only the delivery legs stay with the desk (super admin, operations).
   const desk = isDeskAdmin(rt.user?.role);
-  const needsDesk = kind === "exchange" && diff < 0 && !desk;
 
   return (
     <div className="space-y-6">
@@ -292,18 +296,18 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
               { label: fr ? "Article" : "Item", value: itemOf(r, kind, fr), full: true },
               { label: fr ? "Quantité" : "Quantity", value: r.qty ?? 1 },
               ...(r.condition ? [{ label: fr ? "État" : "Condition", value: replacementConditionLabel(r.condition, fr) }] : []),
-              { label: fr ? "Motif" : "Reason", value: r.reason ?? "—", full: true },
+              { label: fr ? "Motif" : "Reason", value: r.reason ? <TranslatableText kind={kind === "replacement" ? "replacement_reason" : "exchange_reason"} id={r.id} auto text={r.reason} i18n={r.reasonI18n} /> : "—", full: true },
             ]}
           />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? "Vendeur" : "Seller"}>
+        <DetailGridSection title={fr ? "Décision du support" : "Support decision"}>
           <InfoGrid
             items={[
               { label: fr ? "Réponse attendue avant" : "Answer due", value: r.sellerDueAt ? localDateTime(r.sellerDueAt) : "—" },
-              { label: fr ? "A répondu le" : "Answered", value: r.sellerRespondedAt ? localDateTime(r.sellerRespondedAt) : fr ? "Pas encore" : "Not yet" },
+              { label: fr ? "Décidé le" : "Decided", value: r.sellerRespondedAt ? localDateTime(r.sellerRespondedAt) : fr ? "Pas encore" : "Not yet" },
               { label: fr ? "Stock pris chez le vendeur" : "Stock taken from the seller", value: r.stockTaken ?? 0 },
-              ...(r.sellerReason ? [{ label: fr ? "Motif du vendeur" : "Seller's reason", value: r.sellerReason, full: true }] : []),
+              ...(r.sellerReason ? [{ label: fr ? "Note de décision" : "Decision note", value: <TranslatableText kind={kind === "replacement" ? "replacement_reply" : "exchange_reply"} id={r.id} auto text={r.sellerReason} i18n={r.sellerReasonI18n} />, full: true }] : []),
             ]}
           />
         </DetailGridSection>
@@ -352,15 +356,15 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
           {r.status === "requested" ? (
             <div className="space-y-2">
               <p className="text-sm text-slate-600">
-                {fr ? "Le vendeur répond normalement. Le support peut répondre à sa place si le délai est dépassé." : "The seller normally answers. Support can answer for them when the time has passed."}
+                {fr ? "Le support KOMORIKO décide de cette demande." : "KOMORIKO support decides this request."}
               </p>
-              {needsDesk && (
-                <p className="text-sm text-amber-700">
-                  {fr ? "Cet échange rembourse une différence sur le portefeuille du client : seules les opérations peuvent l'approuver. Vous pouvez le rejeter." : "This exchange refunds a difference to the customer's wallet: only operations can approve it. You can still reject it."}
+              {kind === "exchange" && diff < 0 && (
+                <p className="text-sm text-slate-600">
+                  {fr ? "Cet échange rembourse une différence sur le portefeuille du client à la livraison." : "This exchange refunds a difference to the customer's wallet on delivery."}
                 </p>
               )}
               <div className="flex gap-2">
-                {!needsDesk && <Button size="sm" onClick={() => { setMode("approve"); setReason(""); setFormError(null); }}>{fr ? "Approuver" : "Approve"}</Button>}
+                <Button size="sm" onClick={() => { setMode("approve"); setReason(""); setFormError(null); }}>{fr ? "Approuver" : "Approve"}</Button>
                 <Button size="sm" variant="reject" onClick={() => { setMode("reject"); setReason(""); setFormError(null); }}>{fr ? "Rejeter" : "Reject"}</Button>
               </div>
             </div>

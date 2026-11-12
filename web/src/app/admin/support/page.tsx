@@ -12,6 +12,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
+import { shownText, type TextI18n } from "@/lib/text-i18n";
 import { useRealtime } from "@/context/realtime-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { ROLE_BADGE, ROLE_LABEL, SUPPORT_STATUS_BADGE, SUPPORT_STATUS_LABEL, lab, useServerList, type SupportTicketRow } from "@/lib/admin-live";
@@ -92,7 +93,7 @@ export default function AdminSupportPage() {
                   {Number(row.staffUnread) > 0 && <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white" title={fr ? "Messages non lus" : "Unread messages"}>{String(row.staffUnread)}</span>}
                 </span>
               )},
-              { key: "subject", label: fr ? "Sujet" : "Subject" },
+              { key: "subject", label: fr ? "Sujet" : "Subject", render: (row) => <span>{shownText(row.subjectI18n as TextI18n | null | undefined, locale, String(row.subject))}</span> },
               { key: "userName", label: fr ? "Demandeur" : "Requester", render: (row) => (
                 <span className="flex flex-wrap items-center gap-1.5">{String(row.userName)}<Badge variant={ROLE_BADGE[String(row.role ?? "customer")] ?? "default"}>{lab(ROLE_LABEL, String(row.role ?? "customer"), fr)}</Badge></span>
               )},

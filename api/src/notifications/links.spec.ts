@@ -17,7 +17,9 @@ describe('linkFor', () => {
     expect(linkFor('seller', 'return', 'd1')).toBe('/seller/notifications');
     expect(linkFor('seller', 'exchange', 'e1')).toBe('/seller/notifications');
     expect(linkFor('seller', 'policy', 's1')).toBe('/seller/storefront');
-    expect(linkFor('admin_moderation', 'policy', 's1')).toBe('/admin/sellers/s1');
+    expect(linkFor('admin_moderation', 'policy', 's1')).toBe('/admin/policies?seller=s1');
+    expect(linkFor('admin_moderation', 'policy', null)).toBe('/admin/policies');
+    expect(linkFor('admin', 'policy', 's1')).toBe('/admin/policies?seller=s1');
     expect(linkFor('seller', 'moderation', 'p1')).toBe('/seller/products/p1');
     expect(linkFor('admin_support', 'support', 't1')).toBe('/admin/support/t1');
     expect(linkFor('warehouse_staff', 'replacement', 'r1')).toBe('/warehouse/replacements/r1');

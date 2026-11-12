@@ -35,6 +35,8 @@ import {
   Globe2,
   Route,
   ShieldCheck,
+  ScrollText,
+  MessagesSquare,
 } from "lucide-react";
 
 export type AdminDepartment =
@@ -104,6 +106,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
       { href: "/admin/replacements", label: "replacements", icon: RefreshCw, i18n: true },
       { href: "/admin/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
+      // Operations switches express delivery per store (server group `logisticsDesk`): the toggle is on the store page.
+      { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
     ],
   },
   {
@@ -125,6 +129,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
     titleFr: "Modération",
     items: [
       { href: "/admin/moderation", label: "moderation", icon: Shield, i18n: true },
+      // Every change to a store policy needs approval (server group `storePolicy`: Super Admin and Moderation).
+      { href: "/admin/policies", label: "storePolicies", icon: ScrollText, i18n: true },
       { href: "/admin/products", label: "products", icon: Package, i18n: true },
       { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
       { href: "/admin/reviews", label: "reviews", icon: Star, i18n: true },
@@ -152,10 +158,12 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/support", label: "support", icon: Headphones, i18n: true },
       { href: "/admin/disputes", label: "disputes", icon: AlertTriangle, i18n: true },
       { href: "/admin/returns", label: "returns", icon: RotateCcw, i18n: true },
-      // Support may approve or reject a replacement or an exchange on a silent seller's side (server group `exchangeDecide`), and its
-      // notices open these pages. The pages offer Support only that (read, approve, reject); the desk actions stay Operations'.
+      // Support decides replacements and exchanges, price-difference ones included (server group `exchangeDecide`), and its
+      // notices open these pages. The desk actions (moving an exchange through its steps) stay Operations'.
       { href: "/admin/replacements", label: "replacements", icon: RefreshCw, i18n: true },
       { href: "/admin/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
+      // Old customer-seller chats, read-only (`chat:adminList` / `chat:adminMessages`: Super Admin and Support).
+      { href: "/admin/chats", label: "chatsReadOnly", icon: MessagesSquare, i18n: true },
       { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
       // Support may suspend accounts (`customers:setActive`), so it sees the fraud alerts whose action is a block.
       { href: "/admin/fraud", label: "fraudPayments", icon: AlertTriangle, i18n: true },
@@ -189,8 +197,9 @@ const SECTION_BY_ID = new Map<AdminDepartment, AdminNavSection>(
 export function getAdminSections(dept: AdminDepartment): AdminNavSection[] {
   if (dept === "super") {
     // Geography belongs to both Operations and Warehouse Admin; the Super Admin lists it once, next to Warehouses.
+    // The Stores page is Moderation's for the Super Admin (Operations reaches it for the express toggle).
     const sections = DEPARTMENT_SECTIONS.map((section) =>
-      section.id === "operations" ? { ...section, items: section.items.filter((i) => i.href !== "/admin/geography") } : section,
+      section.id === "operations" ? { ...section, items: section.items.filter((i) => i.href !== "/admin/geography" && i.href !== "/admin/sellers") } : section,
     );
     return [SUPER_SECTION, ...sections];
   }

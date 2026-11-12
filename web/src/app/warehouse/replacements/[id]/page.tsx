@@ -1,5 +1,6 @@
 "use client";
 
+import { TranslatableText } from "@/components/shop/translatable-text";
 import { localizeVariant } from "@/lib/i18n-fields";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -75,7 +76,7 @@ export default function WarehouseReplacementDetailPage() {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-wide text-red-700">{fr ? "Motif du remplacement" : "Replacement reason"}</p>
-              <p className="mt-1 text-lg font-bold text-red-950">{rep.reason}</p>
+              <TranslatableText kind="replacement_reason" id={rep.id} auto text={rep.reason} i18n={rep.reasonI18n} className="mt-1 text-lg font-bold text-red-950" />
               {rep.condition && <p className="mt-1 text-sm text-red-900/80">{fr ? "État : " : "Condition: "}{replacementConditionLabel(rep.condition, fr)}</p>}
             </div>
           </div>
@@ -101,7 +102,7 @@ export default function WarehouseReplacementDetailPage() {
             { label: fr ? "Quantité" : "Quantity", value: rep.qty ?? 1 },
             { label: fr ? "Expédition" : "Dispatch", value: rep.dispatchStatus ? pick(DISPATCH_STATUS[rep.dispatchStatus], fr, rep.dispatchStatus) : "—" },
             { label: fr ? "Livré le" : "Delivered", value: rep.deliveredAt ? shortDate(rep.deliveredAt, locale) : "—" },
-            ...(rep.sellerReason ? [{ label: fr ? "Réponse du vendeur" : "Seller's answer", value: rep.sellerReason, full: true }] : []),
+            ...(rep.sellerReason ? [{ label: fr ? "Réponse du support KOMORIKO" : "KOMORIKO support's answer", value: <TranslatableText kind="replacement_reply" id={rep.id} auto text={rep.sellerReason} i18n={rep.sellerReasonI18n} />, full: true }] : []),
           ]} />
           {rep.deliveryTaskId ? (
             <Link href={ops(`/tasks/${rep.deliveryTaskId}`)} className="mt-3 inline-block text-sm text-[var(--primary)] hover:underline">

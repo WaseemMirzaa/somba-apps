@@ -1,5 +1,6 @@
 "use client";
 
+import type { TextI18n } from "@/lib/text-i18n";
 /**
  * Small live-data helpers shared by the web shop pages.
  * Everything here talks to the backend over the single socket connection.
@@ -247,6 +248,8 @@ export interface SupportMessage {
   fromId?: string;
   role: string;
   text: string;
+  /** The text in both languages (docs/contracts/stored-text-i18n.md); absent when the server has nothing. */
+  textI18n?: TextI18n | null;
   at: string;
   /** Photos (platform upload URLs). */
   attachments?: string[];
@@ -256,6 +259,8 @@ export interface SupportTicketRow {
   id: string;
   reference: string;
   subject: string;
+  /** The subject in both languages. */
+  subjectI18n?: TextI18n | null;
   category: string;
   orderId: string | null;
   status: "open" | "pending" | "resolved" | "closed";

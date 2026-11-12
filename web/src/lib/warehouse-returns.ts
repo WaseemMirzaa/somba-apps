@@ -4,6 +4,7 @@ import { useCallback, useMemo } from "react";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useOpsQuery } from "@/lib/warehouse-live";
 import type { Dispute, DisputeItem } from "@/lib/realtime/types";
+import { WITH_SUPPORT } from "@/lib/support-stage";
 
 /**
  * Returns as the warehouse sees them (`returns:list`, `returns:get`): the items and photos the customer sent,
@@ -14,7 +15,7 @@ import type { Dispute, DisputeItem } from "@/lib/realtime/types";
 export type ReturnPhase = "with_seller" | "awaiting_goods" | "received" | "graded" | "refunded" | "rejected";
 
 export const RETURN_PHASE_LABEL: Record<ReturnPhase, { en: string; fr: string }> = {
-  with_seller: { en: "With the seller / support", fr: "Chez le vendeur / support" },
+  with_seller: { en: "With support", fr: "Chez le support" },
   awaiting_goods: { en: "Awaiting goods", fr: "En attente des articles" },
   received: { en: "To grade", fr: "À évaluer" },
   graded: { en: "Graded", fr: "Évalué" },
@@ -38,10 +39,11 @@ export const RETURN_PHASE_VARIANT: Record<ReturnPhase, "warning" | "info" | "suc
 };
 
 export const RETURN_STAGE_LABEL: Record<string, { en: string; fr: string }> = {
-  awaiting_seller: { en: "Waiting for the seller", fr: "En attente du vendeur" },
-  seller_replied: { en: "Seller replied", fr: "Le vendeur a répondu" },
-  seller_rejected: { en: "Seller said no", fr: "Refusé par le vendeur" },
-  seller_timeout: { en: "Seller did not answer", fr: "Le vendeur n'a pas répondu" },
+  awaiting_support: { en: "Waiting for support", fr: "En attente du support" },
+  awaiting_seller: WITH_SUPPORT,
+  seller_replied: WITH_SUPPORT,
+  seller_rejected: WITH_SUPPORT,
+  seller_timeout: WITH_SUPPORT,
   escalated: { en: "With KOMORIKO support", fr: "Chez le support KOMORIKO" },
   approved: { en: "Approved (no pickup yet)", fr: "Approuvé (pas encore de collecte)" },
   pickup: { en: "Pickup in progress", fr: "Collecte en cours" },

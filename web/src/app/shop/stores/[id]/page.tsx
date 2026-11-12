@@ -12,7 +12,7 @@ import { useRealtime } from "@/context/realtime-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import type { Product, Seller } from "@/lib/realtime/types";
 import { StoreHeader } from "@/components/shop/store-header";
-import { ContactSeller } from "@/components/shop/contact-seller";
+import { ContactSupport } from "@/components/shop/contact-support";
 import { couponLabel, useStoreCoupons } from "@/lib/shop-engage";
 import { useSocketEvent, usePublicSettings } from "@/lib/shop-live";
 import { useToast } from "@/context/toast-context";
@@ -150,7 +150,7 @@ export default function ShopStoreDetailPage() {
               {fr ? `Délai de préparation : ${seller.handlingDays} j (ajouté au délai de livraison)` : `Handling time: ${seller.handlingDays} day${seller.handlingDays === 1 ? "" : "s"} (added to the delivery time)`}
             </p>
           )}
-          <ContactSeller sellerId={seller.id} fr={fr} className="mt-3" returnTo={`/shop/stores/${seller.id}`} />
+          <ContactSupport fr={fr} className="mt-3" storeName={seller.name} />
           {localized(seller, "description", fr) && (
             <p className="mt-3 max-w-3xl whitespace-pre-line text-sm text-slate-700">{localized(seller, "description", fr)}</p>
           )}

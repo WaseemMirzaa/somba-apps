@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Shapes and small helpers for the seller's engagement pages: reviews, product Q&A, customer chat.
+ * Shapes and small helpers for the seller's engagement pages: reviews, product Q&A (customer chat is closed: customers contact KOMORIKO support).
  * Contracts: docs/contracts/after-sale.md §4-§5 and docs/contracts/seller-platform.md §3.
  */
 import { useEffect, useRef, useState } from "react";
@@ -61,45 +61,6 @@ export interface EngageQuestion {
   answerI18n?: TextI18n | null;
   createdAt: string;
 }
-
-// ─── Chat ───────────────────────────────────────────────────────────────────────────────────────────────────────────
-export interface ChatConversation {
-  id: string;
-  side: "buyer" | "seller";
-  buyerId: string;
-  buyerName: string;
-  sellerId: string;
-  storeName: string;
-  storeLogo: string | null;
-  productId: string | null;
-  productName: string | null;
-  /** The product's French name: the header chip shows the viewer's language (`localized(c, "productName", fr)`). */
-  productNameFr?: string | null;
-  productImage: string | null;
-  orderId: string | null;
-  orderReference: string | null;
-  lastMessageAt: string;
-  lastMessagePreview: string;
-  /** The last message in English and French, for the list preview (`previewText`). */
-  lastMessageI18n?: TextI18n | null;
-  unread: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  senderSide: "buyer" | "seller";
-  senderName: string;
-  text: string;
-  /** The text in English and French (absent: the page asks `translate:text`). */
-  textI18n?: TextI18n | null;
-  attachments: string[];
-  createdAt: string;
-}
-
-export const CHAT_MAX_CHARS = 2000;
-export const CHAT_MAX_PHOTOS = 4;
 
 /** `?focus=<id>`: the record a notice pointed at. Scrolls it into view once it is rendered. */
 export function useFocusId(): string | null {

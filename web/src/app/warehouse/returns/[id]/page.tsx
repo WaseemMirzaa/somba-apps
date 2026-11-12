@@ -1,5 +1,6 @@
 "use client";
 
+import { TranslatableText } from "@/components/shop/translatable-text";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -129,9 +130,9 @@ export default function WarehouseReturnDetailPage() {
               { label: fr ? "Catégorie" : "Category", value: ret.category ? pickL(RETURN_CATEGORY_LABEL[ret.category], fr, ret.category) : "—" },
               { label: fr ? "Articles reçus le" : "Goods received", value: ret.receivedAt ? shortDate(ret.receivedAt, locale) : "—" },
               { label: fr ? "Évalués le" : "Graded", value: ret.gradedAt ? shortDate(ret.gradedAt, locale) : "—" },
-              { label: fr ? "Motif" : "Reason", value: ret.reason, full: true },
+              { label: fr ? "Motif" : "Reason", value: <TranslatableText kind="dispute_reason" id={ret.id} auto text={ret.reason} i18n={ret.reasonI18n} />, full: true },
               ...(ret.refundUsd ? [{ label: fr ? "Remboursé" : "Refunded", value: formatCurrency(Number(ret.refundUsd), locale) }] : []),
-              ...(ret.resolution ? [{ label: fr ? "Résolution" : "Resolution", value: resolutionText(ret, fr), full: true }] : []),
+              ...(ret.resolution ? [{ label: fr ? "Résolution" : "Resolution", value: ret.resolutionI18n ? <TranslatableText kind="dispute_resolution" id={ret.id} auto text={ret.resolution} i18n={ret.resolutionI18n} /> : resolutionText(ret, fr), full: true }] : []),
             ]}
           />
           {ret.pickupTaskId && (

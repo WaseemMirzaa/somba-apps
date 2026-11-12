@@ -109,7 +109,6 @@ export default function SellerInventoryDetailPage() {
           <div className="flex flex-wrap gap-3 text-sm">
             <NavLinkButton href={`/seller/products/${item.productId}`}>{fr ? "→ Détail du produit" : "→ Product Detail"}</NavLinkButton>
             <NavLinkButton href="/seller/orders">{fr ? "→ Commandes" : "→ Orders"}</NavLinkButton>
-            <NavLinkButton href="/seller/returns">{fr ? "→ Retours" : "→ Returns"}</NavLinkButton>
           </div>
         </DetailGridSection>
 
