@@ -11,6 +11,7 @@ export type ScanStage = "pickup" | "dropoff";
 /** One box of a leg, as the server sends it (`TaskView.parcels`). */
 export interface BoxLine {
   code: string;
+  groupId?: string | null;
   boxNo: number;
   boxCount: number;
   pickupScannedAt: string | null;
@@ -136,7 +137,37 @@ export const handMarkStage = (status: string): ScanStage | null => scanStageFor(
 
 /** The boxes of several legs (a transfer run) as one list. */
 export function mergeBoxes(legs: readonly { parcels?: readonly BoxLine[] | null }[]): BoxLine[] {
-  return legs.flatMap((l) => [...(l.parcels ?? [])]);
+  // Sibling legs (orders packed in the same boxes) list the same box: it counts once, and is scanned when every leg has the scan.
+  const byCode = new Map<string, BoxLine[]>();
+  for (const b of legs.flatMap((l) => [...(l.parcels ?? [])])) byCode.set(b.code, [...(byCode.get(b.code) ?? []), b]);
+  return [...byCode.values()].map((copies) => ({
+    ...copies[0],
+    pickupScannedAt: copies.every((c) => c.pickupScannedAt) ? copies[0].pickupScannedAt : null,
+    dropoffScannedAt: copies.every((c) => c.dropoffScannedAt) ? copies[0].dropoffScannedAt : null,
+  }));
+}
+
+/** One line of what is in the boxes (`contents` of a checklist). Kept here as a plain shape so this file stays import-free. */
+export interface BoxContent {
+  name: string;
+  nameFr?: string | null;
+  variant: string | null;
+  variantFr?: string | null;
+  qty: number;
+  orderReference: string;
+}
+
+/** The contents of several legs as one list: a line that two sibling legs both carry is listed once. */
+export function mergeContents(legs: readonly { parcelContents?: readonly BoxContent[] | null }[]): BoxContent[] {
+  const seen = new Set<string>();
+  const out: BoxContent[] = [];
+  for (const c of legs.flatMap((l) => [...(l.parcelContents ?? [])])) {
+    const key = `${c.orderReference}|${c.name}|${c.variant ?? ""}|${c.qty}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(c);
+  }
+  return out;
 }
 
 /**

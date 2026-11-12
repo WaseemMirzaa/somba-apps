@@ -10,6 +10,7 @@ import { ActivityTimeline } from "@/components/ui/timeline";
 import { Badge } from "@/components/ui/badge";
 import { ProductImage } from "@/components/seller/product-image";
 import { useSellerAccess, useSellerData } from "@/lib/seller";
+import { useSellerOrder } from "@/lib/seller-order-lookup";
 import { buildJourney, shippingStep, shippingStepLabel, useSellerShipments } from "@/lib/seller-orders";
 import { ShipmentDetailGrid } from "@/components/seller/shipment-detail-grid";
 import { NavLinkButton } from "@/components/ui/nav-link-button";
@@ -41,10 +42,10 @@ export default function SellerOrderDetailPage() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
-  const { getSellerOrder, sellerReady, sellerLabels, sellerBoxes, load } = useSellerData();
+  const { sellerReady, sellerLabels, sellerBoxes } = useSellerData();
   const { getByOrder } = useSellerShipments();
   const access = useSellerAccess();
-  const order = getSellerOrder(id);
+  const { order, load } = useSellerOrder(id);
   const shipment = order ? getByOrder(order.id) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +113,7 @@ export default function SellerOrderDetailPage() {
       const made = await sellerReady(order.orderId, boxes);
       if (made) {
         setPack(made);
+        setPackError(null);
         setNewBoxes(null);
       }
       // Others still packing (the server's count; unknown on old payloads → assume yes).
@@ -133,7 +135,7 @@ export default function SellerOrderDetailPage() {
     if (!order || newBoxes == null) return;
     setSavingBoxes(true);
     try {
-      const p = await sellerBoxes(order.orderId, newBoxes);
+      const p = await sellerBoxes(order.orderId, newBoxes, pack?.groupId);
       setPack(p);
       setNewBoxes(null);
       toast(fr ? `${labelsReadyToast(p.boxCount, true)}. Les anciennes étiquettes ne sont plus valables : imprimez les nouvelles.` : `${labelsReadyToast(p.boxCount, false)}. The old labels are void: print the new ones.`);
@@ -221,9 +223,21 @@ export default function SellerOrderDetailPage() {
         <section className="card-premium space-y-3 p-4" data-testid="parcel-labels" aria-label={fr ? "Étiquettes du colis" : "Parcel labels"}>
           <h2 className="text-sm font-semibold text-slate-900">{fr ? "Étiquettes du colis" : "Parcel labels"}</h2>
           {packError && !pack ? (
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="space-y-3" data-testid="labels-recovery">
               <p role="alert" className="text-sm text-red-700">{packError}</p>
-              <button type="button" onClick={retryPack} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700">{fr ? "Réessayer" : "Retry"}</button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" onClick={retryPack} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-700">{fr ? "Réessayer" : "Retry"}</button>
+                {/* The package is marked ready but no labels exist (an older half-finished action): make them now. */}
+                {/Mark the package ready first|Marquez d'abord/i.test(packError) && !access.suspended && (
+                  <>
+                    <label htmlFor="box-count-recover" className="text-sm text-slate-700">{fr ? "Boîtes dans cet envoi" : "Boxes in this package"}</label>
+                    <BoxCountStepper id="box-count-recover" value={boxes} onChange={setBoxes} disabled={busy} fr={fr} />
+                    <button type="button" onClick={() => void markReady()} disabled={busy} className="btn-primary rounded-lg px-4 py-2 text-sm disabled:opacity-50" data-testid="make-labels">
+                      {busy ? (fr ? "Envoi…" : "Sending…") : fr ? "Créer les étiquettes" : "Make the labels"}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ) : !pack ? (
             <p className="text-sm text-slate-500">{fr ? "Chargement…" : "Loading…"}</p>
@@ -244,10 +258,19 @@ export default function SellerOrderDetailPage() {
                 >
                   {savingBoxes ? (fr ? "Envoi…" : "Saving…") : fr ? "Enregistrer" : "Save"}
                 </button>
-                <Link href={`/seller/orders/${encodeURIComponent(order.orderId)}/labels`} className="btn-primary rounded-lg px-4 py-2 text-sm">
+                <Link href={`/seller/orders/${encodeURIComponent(order.orderId)}/labels${(pack.orders?.length ?? 0) > 1 && pack.groupId ? `?group=${encodeURIComponent(pack.groupId)}` : ""}`} className="btn-primary rounded-lg px-4 py-2 text-sm">
                   {fr ? "Imprimer les étiquettes" : "Print labels"}
                 </Link>
               </div>
+              {(pack.orders?.length ?? 0) > 1 && (
+                <p role="note" className="text-xs text-slate-600" data-testid="box-set-note">
+                  {fr ? "Ces boîtes contiennent aussi les commandes : " : "These boxes also hold the orders: "}
+                  {pack.orders!.map((o) => o.reference).join(", ")}
+                </p>
+              )}
+              {(pack.contentsRev ?? 0) > 0 && !pack.locked && (
+                <p role="note" className="text-xs text-amber-700">{fr ? "Le contenu a changé depuis la première impression : réimprimez les étiquettes." : "The contents changed after the first print: print the labels again."}</p>
+              )}
               {pack.locked && <p role="note" className="text-xs text-amber-700">{fr ? BOXES_LOCKED_COPY.fr : BOXES_LOCKED_COPY.en}</p>}
             </>
           )}

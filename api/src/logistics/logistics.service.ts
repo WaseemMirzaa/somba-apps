@@ -47,7 +47,8 @@ import {
 } from './leg-rules';
 import { DESK_ADMINS_ONLY, DESK_ROLES, isDeskAdmin, tierAllows } from './tiers';
 import { HubOpsSettingsService } from './hub-ops-settings.service';
-import { Checklist, ParcelLine, ParcelsService } from './parcels.service';
+import { Checklist, ContentLine, OrderRef, ParcelLine, ParcelsService } from './parcels.service';
+import { variantLabel } from './parcel-groups';
 import { REQUIRE_PARCEL_SCAN, scanRequired } from './parcel-rules';
 import { AUTO_ASSIGN_KINDS, Candidate, EXPRESS_NOT_RETURNABLE, RETURN_TO_SELLER_REASON, canReturnToSeller, isWorkingNow, pickLeastBusy } from './hub-ops-rules';
 import { pushOrderToOps } from './hub-scope';
@@ -82,6 +83,7 @@ export interface CargoLine {
   nameFr?: string | null;
   qty: number;
   variant?: string | null;
+  variantFr?: string | null;
   sellerId?: string | null;
   [k: string]: unknown;
 }
@@ -148,6 +150,9 @@ export interface TaskView {
   pickupComplete: boolean;
   dropoffComplete: boolean;
   scanRequired: boolean;
+  /** What is in those boxes (every product x qty with its options, of every order packed into them) and which orders; empty with no labelled parcel. */
+  parcelContents: ContentLine[];
+  parcelOrders: OrderRef[];
 }
 
 export type LogisticsEventType = 'created' | 'assigned' | 'picked_up' | 'in_transit' | 'scanned_in' | 'delivered' | 'failed' | 'voided';
@@ -245,6 +250,34 @@ export class LogisticsService {
     return row?.proofCode ?? null;
   }
 
+  /** The handover code of an open customer leg of a sibling order (same label set), or null. */
+  private async siblingProofCode(orderId: string, m?: EntityManager): Promise<string | null> {
+    const sibs = this.parcels ? await this.parcels.siblingOrderIds(orderId, m) : [];
+    if (!sibs.length) return null;
+    const qb = (m ?? this.tasks.manager).createQueryBuilder(DeliveryTask, 't').addSelect('t.proofCode').where('t.orderId IN (:...sibs)', { sibs }).andWhere("t.kind IN ('delivery','express')").andWhere("t.status IN ('unassigned','assigned','picked_up','in_transit')").andWhere('t.proofCode IS NOT NULL').orderBy('t.createdAt', 'ASC');
+    return (await qb.getOne())?.proofCode ?? null;
+  }
+
+  /** The open legs of the same kind on the sibling orders of a leg's label set (not in a run, same warehouse): they are given to the same rider. */
+  private async siblingLegsOf(task: DeliveryTask): Promise<DeliveryTask[]> {
+    if (!this.parcels || task.runId || task.disputeId || task.replacementId || task.exchangeId) return [];
+    const sibs = await this.parcels.siblingOrderIds(task.orderId);
+    if (!sibs.length) return [];
+    return this.tasks.find({ where: { orderId: In(sibs), kind: task.kind, status: In(['unassigned', 'assigned']), runId: IsNull(), disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull(), hubId: task.hubId ?? IsNull() } });
+  }
+
+  /** After a leg was given to a rider: the same-kind legs of its sibling orders go to that rider too (the boxes are the same boxes). */
+  private async giveSiblings(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>, actor: Actor): Promise<void> {
+    for (const sib of await this.siblingLegsOf(task)) {
+      if (sib.status === 'assigned' && sib.riderId === rider.id) continue;
+      try {
+        await this.giveTo(sib, rider, actor);
+      } catch (e) {
+        this.logger.debug(`sibling assign ${sib.id}: ${(e as Error).message}`);
+      }
+    }
+  }
+
   private audit(actor: Actor | null, action: string, task: DeliveryTask, detail?: string): void {
     if (!actor) return;
     void this.audits
@@ -254,8 +287,18 @@ export class LogisticsService {
   }
 
   /** A line of an order as a leg carries it. */
-  private static cargoLine(i: Pick<OrderItem, 'id' | 'productId' | 'productName' | 'qty'>, nameFr?: string | null): CargoLine {
-    return { orderItemId: i.id, productId: i.productId, name: i.productName, ...(nameFr?.trim() ? { nameFr: nameFr.trim() } : {}), qty: i.qty };
+  private static cargoLine(i: Pick<OrderItem, 'id' | 'productId' | 'productName' | 'qty'> & Partial<Pick<OrderItem, 'variant' | 'variantFr'>>, nameFr?: string | null): CargoLine {
+    const variant = variantLabel(i.variant);
+    return {
+      orderItemId: i.id,
+      productId: i.productId,
+      name: i.productName,
+      ...(nameFr?.trim() ? { nameFr: nameFr.trim() } : {}),
+      qty: i.qty,
+      // The size / option the customer chose ("L / Blue"): a rider packing the van and a warehouse desk see WHICH one, not just the product.
+      variant,
+      ...(variant && i.variantFr?.trim() ? { variantFr: i.variantFr.trim() } : {}),
+    };
   }
 
   /** What a task carries, parsed from `itemsJson` (a broken value is no cargo). */
@@ -276,13 +319,21 @@ export class LogisticsService {
   private static withFrenchNames(items: CargoLine[], order: Order | undefined): CargoLine[] {
     const lines = order?.items ?? [];
     return items.map((it) => {
-      if (typeof it.nameFr === 'string' && it.nameFr.trim()) return it;
       const line =
         (it.orderItemId ? lines.find((l) => l.id === it.orderItemId) : undefined) ??
         (it.productId ? lines.find((l) => l.productId === it.productId) : undefined) ??
         lines.find((l) => l.productName === it.name);
-      const nameFr = line?.productNameFr?.trim();
-      return nameFr ? { ...it, nameFr } : it;
+      let out = it;
+      if (!(typeof it.nameFr === 'string' && it.nameFr.trim())) {
+        const nameFr = line?.productNameFr?.trim();
+        if (nameFr) out = { ...out, nameFr };
+      }
+      // Legs made before the option was kept: the order's own line knows it (and its French label).
+      if (out.variant === undefined && line) {
+        const variant = variantLabel(line.variant);
+        out = { ...out, variant, ...(variant && line.variantFr?.trim() ? { variantFr: line.variantFr.trim() } : {}) };
+      }
+      return out;
     });
   }
 
@@ -422,6 +473,8 @@ export class LogisticsService {
         pickupComplete: lists.get(t.id)?.pickupComplete ?? true,
         dropoffComplete: lists.get(t.id)?.dropoffComplete ?? true,
         scanRequired: parcelRule,
+        parcelContents: lists.get(t.id)?.contents ?? [],
+        parcelOrders: lists.get(t.id)?.orders ?? [],
       };
       if (audience === 'seller') {
         // A seller sees where their parcel is, never the customer.
@@ -468,6 +521,9 @@ export class LogisticsService {
   private async make(base: Partial<DeliveryTask> & Pick<DeliveryTask, 'kind' | 'orderId' | 'orderReference'>, m?: EntityManager): Promise<DeliveryTask> {
     const hubId = base.hubId ?? managingHub(base.kind, base.fromHubId, base.toHubId);
     const repo = m ? m.getRepository(DeliveryTask) : this.tasks;
+    // One handover code per label set: the same customer receives every order of it from one rider in one handover, so a new customer leg
+    // takes the code of a sibling order's open one (a retry keeps its own).
+    const shared = isCustomerKind(base.kind) && !base.proofCode ? await this.siblingProofCode(base.orderId, m) : null;
     const row = repo.create({
       status: 'unassigned',
       attempts: 1,
@@ -481,7 +537,7 @@ export class LogisticsService {
       ...base,
       hubId,
       // Only the customer delivery of an order is protected by the 4-digit code.
-      proofCode: isCustomerKind(base.kind) ? (base.proofCode ?? String(randomInt(1000, 10000))) : null,
+      proofCode: isCustomerKind(base.kind) ? (base.proofCode ?? shared ?? String(randomInt(1000, 10000))) : null,
     });
     const saved = await repo.save(row);
     saved.proofCode = null; // the code lives in the database only; the object we hand around must never carry it
@@ -1107,6 +1163,15 @@ export class LogisticsService {
       return { task: r.task, next: [], parcels: r.checklist, completed: false };
     }
     const { task, next } = await this.onScanIn(r.task.id, hubId ?? (r.task.toHubId as string), actor);
+    // The sibling orders' legs the same scans completed arrive with it.
+    for (const sib of r.siblings) {
+      if (!(await this.parcels.checklist(sib)).dropoffComplete && (await this.parcels.required())) continue;
+      try {
+        next.push(...(await this.onScanIn(sib.id, hubId ?? (sib.toHubId as string), actor)).next);
+      } catch (e) {
+        this.logger.debug(`sibling scan-in ${sib.id}: ${(e as Error).message}`);
+      }
+    }
     return { task, next, parcels: await this.parcels.checklist(task), completed: true };
   }
 
@@ -1121,6 +1186,14 @@ export class LogisticsService {
       return { task: r.task, parcels: r.checklist, completed: false };
     }
     const task = await this.scanOut(r.task.id, hubId ?? (r.task.fromHubId as string), actor);
+    for (const sib of r.siblings) {
+      if (sib.runId || (!(await this.parcels.checklist(sib)).pickupComplete && (await this.parcels.required()))) continue;
+      try {
+        await this.scanOut(sib.id, hubId ?? (sib.fromHubId as string), actor);
+      } catch (e) {
+        this.logger.debug(`sibling scan-out ${sib.id}: ${(e as Error).message}`);
+      }
+    }
     return { task, parcels: await this.parcels.checklist(task), completed: true };
   }
 
@@ -1339,7 +1412,9 @@ export class LogisticsService {
     if (!rider || rider.role !== 'rider' || !rider.active) throw new BadRequestException('Choose an active rider.');
     if (!riderFits(task, rider.hubId)) throw new BadRequestException('This rider works at another warehouse.');
     if (!['unassigned', 'assigned'].includes(task.status)) throw new BadRequestException('This delivery is no longer available.');
-    return this.giveTo(task, rider, actor);
+    const given = await this.giveTo(task, rider, actor);
+    await this.giveSiblings(given, rider, actor);
+    return given;
   }
 
   /** Give an open task to a rider (the checks are the caller's): claim it atomically, tell the old rider, audit, announce. */
@@ -1396,7 +1471,9 @@ export class LogisticsService {
       if (!ops.autoAssign || !isWorkingNow(ops, at)) return null;
       const rider = pickLeastBusy(await this.candidatesFor(task));
       if (!rider) return null;
-      return await this.giveTo(task, { id: rider.id, name: rider.name }, LogisticsService.AUTO_ACTOR, { onlyUnassigned: true });
+      const given = await this.giveTo(task, { id: rider.id, name: rider.name }, LogisticsService.AUTO_ACTOR, { onlyUnassigned: true });
+      await this.giveSiblings(given, { id: rider.id, name: rider.name }, LogisticsService.AUTO_ACTOR);
+      return given;
     } catch (e) {
       // Someone else (or a second sweep) got there first, or the rider vanished: the leg stays in the queue for staff.
       this.logger.debug(`auto-assign ${task.id}: ${(e as Error).message}`);
@@ -1845,6 +1922,15 @@ export class LogisticsService {
     }
     await this.parcels?.voidFor(orderId, sellerKeys);
     await this.progressChain({ orderId });
+  }
+
+  /** The seller's open pickup (or express) leg of an order, read only: null when there is none to be marked ready. */
+  async sellerPickup(orderId: string, sellerKeys: string[]): Promise<DeliveryTask | null> {
+    const pickups = await this.tasks.find({
+      where: { orderId, kind: In(['pickup', 'express']), sellerId: In(sellerKeys), disputeId: IsNull(), replacementId: IsNull(), exchangeId: IsNull() },
+      order: { createdAt: 'DESC' },
+    });
+    return pickups[0] ?? null;
   }
 
   /** The seller packed their lines: their pickup is ready for the rider. Returns the seller's pickup task (null when none). */

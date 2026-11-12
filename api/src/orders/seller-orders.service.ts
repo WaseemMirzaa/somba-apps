@@ -22,6 +22,8 @@ export interface SellerOrderQuery {
   status?: unknown;
   from?: unknown;
   to?: unknown;
+  /** One order by its id or its reference (the detail and label pages open an order that is not on the first page of the list). */
+  id?: unknown;
   format?: unknown;
   /** `en` | `fr`: the language of the CSV's headings and labels (the gateway fills in the caller's). */
   locale?: unknown;
@@ -65,6 +67,8 @@ export class SellerOrdersService {
         qb.andWhere("i.fulfilment = :step AND o.status IN ('confirmed','processing')", { step });
       } else throw new BadRequestException(`Status must be one of: ${[...ORDER_STATUSES, ...PACKAGE_STATUSES].join(', ')}.`);
     }
+    const one = typeof input.id === 'string' ? input.id.trim().slice(0, 80) : '';
+    if (one) qb.andWhere('(o.id = :oneId OR o.reference = :oneId)', { oneId: one });
     const from = dateInput(input.from, false);
     const to = dateInput(input.to, true);
     if (from) qb.andWhere('o.createdAt >= :fromDate', { fromDate: from });

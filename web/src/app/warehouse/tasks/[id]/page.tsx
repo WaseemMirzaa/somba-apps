@@ -19,7 +19,7 @@ import { LegBadges, LegRoute, WaitingForSellerNote } from "@/components/warehous
 import { OpsLoading } from "@/components/warehouse/ops-state";
 import { useLocale } from "@/context/locale-context";
 import { useOpsBase, useOpsPath } from "@/lib/ops-path";
-import { LEG_KIND, LEG_STATUS, endpointName, fmtDateTime, legItemsText, legStatusVariant, mapsLink, pickL, isHubBound, isCustomerLeg } from "@/lib/logistics";
+import { LEG_KIND, LEG_STATUS, endpointName, fmtDateTime, legItemVariant, legItemsText, legStatusVariant, mapsLink, pickL, isHubBound, isCustomerLeg } from "@/lib/logistics";
 import { boxesSummary, scanStageFor } from "@/lib/parcel-scan";
 import { addressText, findLeg, isOpenLeg, legAgeHours, parcelCode, riderLabel, useDeskQueue } from "@/lib/warehouse";
 import { EXCEPTION_STATUS, EXCEPTION_TYPE, pick, useOpsQuery, type ExceptionRow } from "@/lib/warehouse-live";
@@ -203,7 +203,7 @@ export default function WarehouseLegDetailPage() {
                 <div key={`${item.productId ?? item.name}-${i}`} className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-slate-900">{fr && item.nameFr ? item.nameFr : item.name}</p>
-                    {item.variant && <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)}</p>}
+                    {legItemVariant(item, fr) && <p className="text-xs text-slate-500">{fr && item.variantFr?.trim() ? item.variantFr.trim() : localizeVariant(legItemVariant(item, fr), fr)}</p>}
                   </div>
                   <span className="text-sm font-medium">{fr ? "Qté" : "Qty"}: {item.qty}</span>
                 </div>

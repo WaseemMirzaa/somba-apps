@@ -9,6 +9,11 @@
  * every box arrived; a box scanned by its code records the arrival and scans the leg in on the last one; a manager marks a box by
  * hand (an operator cannot) and it is audited. (4) The delivery leg: boxes scanned out, on the road, drop-off scans before the
  * customer's code, then delivered. (5) With requireParcelScan off nothing blocks, and scanning still records.
+ * (6) Same-day orders in ONE box set: the seller's candidate clusters (server-paged) put two same-day orders of one customer and
+ * address together and keep a different address apart; packing them gives one set of boxes whose label lists every order's
+ * products; a double click on "package ready" never makes a second set; a rider scan, a desk scan, an assignment and the
+ * customer's handover code serve every order of the set at once; `parcels:resolve` is role-scoped (a seller never gets the
+ * street or the phone); the seller can take an order out of a set before pickup.
  * It switches settings for itself and puts them back.
  */
 const { io } = require('socket.io-client');
@@ -235,6 +240,149 @@ const CODE = /^PKG-[2-9A-HJ-NP-Z]{8}$/;
     ok(a.ok && a.data.task.status === 'delivered', 'the desk scans the leg in with no arrival scan', a.error ?? '');
     const row = ((await req(admin.sock, 'logistics:queue', { status: 'all', limit: 500 })).data?.tasks ?? []).find((t) => t.id === pickup3.id);
     ok(row && row.scanRequired === false, 'the leg view says the rule is off', JSON.stringify(row?.scanRequired));
+
+    // ── 6. Same-day orders in one box set ───────────────────────────────────────────────────────────────────────────
+    section('Two same-day orders of one customer share ONE set of boxes');
+    await set('requireParcelScan', 'true');
+    const FAR = { commune: 'Limete', pin: { lat: -4.3792, lng: 15.3534 } };
+    const placeAt = async (p, qty = 1) => {
+      const r = await req(cust.sock, 'orders:create', { items: [{ productId: prod.id, qty }], paymentMethod: 'stripe_card', shippingAddress: addr(p) });
+      if (!r.ok) throw new Error(`orders:create: ${r.error}`);
+      return r.data;
+    };
+    const oA = await placeAt(KALAMU, 1);
+    const oB = await placeAt(KALAMU, 2);
+    const oC = await placeAt(FAR, 1);
+    const pA = await until(async () => (await legs(oA.id, 'pickup'))[0]);
+    const pB = await until(async () => (await legs(oB.id, 'pickup'))[0]);
+    const pC = await until(async () => (await legs(oC.id, 'pickup'))[0]);
+    ok(pA && pB && pC, 'three orders, each with a pickup leg');
+    a = await req(shop.sock, 'orders:sellerGroups', { limit: 10 });
+    ok(a.ok && Array.isArray(a.data.clusters) && typeof a.data.total === 'number' && a.data.limit === 10, 'orders:sellerGroups answers clusters, total, limit and offset', a.error ?? JSON.stringify(a.data));
+    const mine = (a.data?.clusters ?? []).find((c) => c.orders.some((o) => o.id === oA.id));
+    ok(mine && mine.orders.some((o) => o.id === oB.id) && !mine.orders.some((o) => o.id === oC.id), 'the same-day, same-address orders are one cluster; the other address is not in it', JSON.stringify(mine?.orders?.map((o) => o.reference)));
+    ok(mine && mine.area === 'Kalamu, Kinshasa' && !JSON.stringify(a.data).match(/811 111 111|Test Street|phone/i), 'the cluster names the area only (no street, no phone)', JSON.stringify(mine?.area));
+    ok(mine?.orders.every((o) => o.items?.length && o.customerFirstName), 'each order lists its products and the customer\'s first name');
+    a = await req(shop.sock, 'orders:sellerPack', { orderIds: [oA.id, oC.id] });
+    ok(!a.ok && /cannot share a label/.test(a.error ?? ''), 'orders for two addresses cannot be packed together', a.error ?? 'was allowed');
+    a = await req(cust.sock, 'orders:sellerPack', { orderIds: [oA.id, oB.id] });
+    ok(!a.ok, 'a customer cannot pack', a.error ?? 'was allowed');
+    a = await req(shop.sock, 'orders:sellerPack', { orderIds: [oA.id, oB.id], boxCount: 2 });
+    ok(a.ok && a.data.boxCount === 2 && a.data.labels.length === 2 && a.data.orders.length === 2 && a.data.tasks.length === 2, 'packing the two orders makes ONE set of 2 boxes', a.error ?? JSON.stringify(a.data));
+    const set1 = a.data;
+    const lab = set1.labels[0];
+    ok(lab && CODE.test(lab.code) && lab.storeName && lab.destinationArea === 'Kalamu, Kinshasa' && lab.groupId === set1.groupId, 'the label has the code, store, area and the set', JSON.stringify(lab));
+    ok(lab?.contents?.length === 2 && lab.contents.reduce((n, l) => n + l.qty, 0) === 3 && lab.contents.some((l) => l.orderReference === oA.reference) && lab.contents.some((l) => l.orderReference === oB.reference), 'it lists every order\'s product x quantity (1 + 2)', JSON.stringify(lab?.contents));
+    ok(!JSON.stringify(set1).match(/811 111 111|Test Street|phone/i), 'no street or phone on the labels');
+    a = await req(shop.sock, 'orders:sellerLabels', { groupId: set1.groupId });
+    ok(a.ok && a.data.labels.map((l) => l.code).join() === set1.labels.map((l) => l.code).join(), 'orders:sellerLabels { groupId } returns the same boxes', a.error ?? '');
+    a = await req(shop.sock, 'orders:sellerLabels', { orderId: oB.id });
+    ok(a.ok && a.data.groupId === set1.groupId, 'asking by either order returns the set', a.error ?? '');
+    a = await req(shop.sock, 'orders:sellerReady', { orderId: oA.id });
+    ok(a.ok && a.data.labels.map((l) => l.code).join() === set1.labels.map((l) => l.code).join(), '"package ready" again on one of them just reads the set back (no new boxes)', a.error ?? '');
+    a = await req(shop.sock, 'orders:sellerGroups', { limit: 10 });
+    ok(!(a.data?.clusters ?? []).some((c) => c.orders.some((o) => o.id === oC.id)), 'a cluster of one is not offered');
+
+    section('A double click on "package ready" never makes a second set');
+    const [r1, r2] = await Promise.all([req(shop.sock, 'orders:sellerReady', { orderId: oC.id, boxCount: 2 }), req(shop.sock, 'orders:sellerReady', { orderId: oC.id, boxCount: 2 })]);
+    ok(r1.ok && r2.ok && r1.data.labels.map((l) => l.code).join() === r2.data.labels.map((l) => l.code).join(), 'two simultaneous clicks answer the same two labels', r1.error ?? r2.error ?? '');
+    a = await req(shop.sock, 'orders:sellerLabels', { orderId: oC.id });
+    ok(a.ok && a.data.labels.length === 2 && a.data.labels.map((l) => l.code).join() === r1.data.labels.map((l) => l.code).join(), 'and the order has exactly 2 live labels', a.error ?? '');
+    ok(a.data?.groupId !== set1.groupId && a.data?.labels.every((l) => !set1.labels.some((x) => x.code === l.code)), 'the other address has its own boxes');
+
+    section('A set is assigned, scanned and handed over once for all its orders');
+    await assign(pA.id);
+    const legB = async () => (await req(admin.sock, 'logistics:legParcels', { taskId: pB.id })).data;
+    const rows = (await req(rider.sock, 'rider:tasks')).data;
+    ok(rows.find((t) => t.id === pB.id)?.riderId === rider.user.id || rows.some((t) => t.id === pB.id), 'the sibling order\'s pickup went to the same rider', JSON.stringify(rows.map((t) => t.id)));
+    const tA = rows.find((t) => t.id === pA.id);
+    ok(tA?.parcelContents?.length === 2 && tA.parcelOrders?.length === 2 && tA.parcels?.length === 2, 'the leg carries the products and the orders of the set', JSON.stringify([tA?.parcelContents, tA?.parcelOrders]));
+    ok(tA?.items?.every((i) => 'variant' in i), 'cargo lines carry their option field');
+    a = await scan(pA.id, set1.labels[0].code, 'pickup');
+    ok(a.ok && a.data.scanned === 1 && a.data.contents?.length === 2, 'scanning box 1 on one order ticks 1 of 2 and answers the contents', a.error ?? '');
+    let lp = await legB();
+    ok(lp?.parcels?.filter((p) => p.pickupScannedAt).length === 1, 'the same scan ticked the sibling order\'s leg too', JSON.stringify(lp?.parcels));
+    await scan(pA.id, set1.labels[1].code, 'pickup');
+    a = await move(pB.id, 'picked_up');
+    ok(a.ok && a.data.status === 'picked_up', 'the sibling order is collected without scanning again', a.error ?? '');
+    a = await move(pA.id, 'picked_up');
+    ok(a.ok && a.data.status === 'picked_up', 'and so is the first', a.error ?? '');
+    a = await req(shop.sock, 'orders:sellerBoxes', { groupId: set1.groupId, boxCount: 1 });
+    ok(!a.ok && /already scanned/.test(a.error ?? ''), 'the set\'s box count is locked after the first scan', a.error ?? 'was allowed');
+    a = await req(shop.sock, 'orders:sellerGroupEdit', { groupId: set1.groupId, remove: [oB.id] });
+    ok(!a.ok, 'the set\'s orders cannot change after the first scan', a.error ?? 'was allowed');
+
+    section('Scanning a box tells each role what it is, as much as it may know');
+    const code0 = set1.labels[0].code;
+    a = await req(rider.sock, 'parcels:resolve', { code: code0 });
+    ok(a.ok && a.data.boxNo === 1 && a.data.boxCount === 2 && a.data.contents.length === 2 && a.data.orders.length === 2 && a.data.destination.area === 'Kalamu, Kinshasa', 'a rider resolves the box with its contents and orders', a.error ?? JSON.stringify(a.data));
+    ok(a.ok && a.data.destination.address === null && a.data.destination.phone === null, 'on a pickup leg the rider gets the area only', JSON.stringify(a.data?.destination));
+    a = await req(shop.sock, 'parcels:resolve', { code: code0 });
+    ok(a.ok && a.data.contents.length === 2 && a.data.destination.address === null && a.data.destination.phone === null && !JSON.stringify(a.data).match(/811 111 111|Test Street/), 'a seller resolves their box and never gets the street or the phone', a.error ?? '');
+    a = await req(admin.sock, 'parcels:resolve', { code: code0 });
+    ok(a.ok && /Test Street/.test(a.data.destination.address ?? '') && /811 111 111/.test(a.data.destination.phone ?? ''), 'an admin resolves the full address and phone', a.error ?? JSON.stringify(a.data?.destination));
+    a = await req(operator.sock, 'parcels:resolve', { code: code0 });
+    ok(a.ok && /Test Street/.test(a.data.destination.address ?? ''), 'staff of the warehouse resolve it too', a.error ?? '');
+    a = await req(cust.sock, 'parcels:resolve', { code: code0 });
+    ok(!a.ok, 'a customer cannot resolve a box', a.error ?? 'was allowed');
+    a = await req(rider.sock, 'parcels:resolve', { code: 'PKG-ZZZZZZZZ' });
+    ok(!a.ok && a.error === 'Parcel not found.', 'an unknown box is "Parcel not found." (same as one that is not theirs)', a.error ?? '');
+    const otherShop = await register('pshopb', 'seller');
+    a = await req(otherShop.sock, 'parcels:resolve', { code: code0 });
+    ok(!a.ok, 'a seller with no store (or another store) cannot resolve it', a.error ?? 'was allowed');
+    otherShop.sock.close();
+
+    section('At the warehouse one scan serves both orders; one handover code serves both');
+    await scan(pA.id, set1.labels[0].code, 'dropoff');
+    a = await req(operator.sock, 'logistics:scanIn', { code: set1.labels[1].code });
+    ok(!a.ok || a.data.completed === false || a.data.task, 'the desk scans a box by its code');
+    a = await scan(pA.id, set1.labels[1].code, 'dropoff');
+    lp = await legB();
+    ok(lp?.dropoffComplete === true, 'both boxes are scanned in on the sibling order\'s leg as well', JSON.stringify(lp?.parcels));
+    a = await req(operator.sock, 'logistics:scanIn', { taskId: pA.id });
+    ok(a.ok || /already|delivered|closed/i.test(a.error ?? ''), 'the first order\'s leg is scanned in', a.error ?? '');
+    a = await req(operator.sock, 'logistics:scanIn', { taskId: pB.id });
+    ok(a.ok || /already|delivered|closed/i.test(a.error ?? ''), 'and the second order\'s', a.error ?? '');
+    const dA = await until(async () => (await legs(oA.id, 'delivery'))[0]);
+    const dB = await until(async () => (await legs(oB.id, 'delivery'))[0]);
+    ok(dA && dB, 'each order has its delivery leg');
+    const cA = (await req(cust.sock, 'orders:deliveryCode', { orderId: oA.id })).data;
+    const cB = (await req(cust.sock, 'orders:deliveryCode', { orderId: oB.id })).data;
+    ok(cA?.code && cA.code === cB?.code, 'ONE handover code for the set\'s deliveries', JSON.stringify([cA, cB]));
+    await assign(dA.id);
+    const rows2 = (await req(rider.sock, 'rider:tasks')).data;
+    ok(rows2.some((t) => t.id === dB.id), 'the sibling delivery is assigned with it', JSON.stringify(rows2.map((t) => t.id)));
+    a = await req(rider.sock, 'parcels:resolve', { code: code0 });
+    ok(a.ok && /Test Street/.test(a.data.destination.address ?? '') && /811 111 111/.test(a.data.destination.phone ?? ''), 'on a customer delivery the rider resolves the street and phone', a.error ?? JSON.stringify(a.data?.destination));
+    await scan(dA.id, set1.labels[0].code, 'pickup');
+    a = await scan(dA.id, set1.labels[1].code, 'pickup');
+    for (const d of [dA, dB]) {
+      a = await req(operator.sock, 'logistics:dispatchTransfer', { taskId: d.id });
+      ok(a.ok && a.data.status === 'picked_up', 'handed to the rider', a.error ?? '');
+      await move(d.id, 'in_transit');
+    }
+    await scan(dA.id, set1.labels[0].code, 'dropoff');
+    await scan(dA.id, set1.labels[1].code, 'dropoff');
+    a = await move(dA.id, 'delivered', { code: cA.code });
+    ok(a.ok && a.data.status === 'delivered', 'the first order is delivered with the code', a.error ?? '');
+    a = await move(dB.id, 'delivered', { code: cA.code });
+    ok(a.ok && a.data.status === 'delivered', 'the second with the same code (the boxes were scanned once)', a.error ?? '');
+
+    section('The seller can take an order out of a set before pickup');
+    const oD = await placeAt(KALAMU, 1);
+    const oE = await placeAt(KALAMU, 1);
+    await until(async () => (await legs(oE.id, 'pickup'))[0]);
+    a = await req(shop.sock, 'orders:sellerPack', { orderIds: [oD.id, oE.id], boxCount: 1 });
+    const set2 = a.data;
+    ok(a.ok && set2.orders.length === 2 && set2.labels.length === 1, 'two more orders, one box', a.error ?? '');
+    a = await req(shop.sock, 'orders:sellerGroupEdit', { groupId: set2.groupId, remove: [oE.id] });
+    ok(a.ok && a.data.orders.length === 1 && a.data.orders[0].orderId === oD.id, 'taking one out leaves the set with the other', a.error ?? JSON.stringify(a.data));
+    a = await req(shop.sock, 'orders:sellerLabels', { orderId: oE.id });
+    ok(a.ok && a.data.orders.length === 1 && a.data.groupId !== set2.groupId && a.data.labels.length === 1, 'the order taken out has a set of its own', a.error ?? '');
+    a = await req(shop.sock, 'orders:sellerGroupEdit', { groupId: set2.groupId, add: [oE.id] });
+    ok(a.ok && a.data.orders.length === 2, 'and it can be added back', a.error ?? '');
+    a = await req(shop.sock, 'orders:sellerLabels', { orderId: oD.id });
+    ok(a.ok && a.data.contentsRev >= 1, 'a change after labels existed bumps contentsRev (reprint hint)', JSON.stringify(a.data?.contentsRev));
   } finally {
     await restore();
   }

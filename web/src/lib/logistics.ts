@@ -15,6 +15,7 @@ import { formatTransit } from "@/lib/quote-text";
 import { canUnlockDeliveryCode } from "@/lib/code-lock";
 import type { DeliveryMode } from "@/lib/realtime/types";
 import type { LegKind, L } from "@/lib/leg-kinds";
+import type { ParcelContentLine } from "@/lib/parcel-labels";
 
 export { formatTransit };
 export type { DeliveryMode };
@@ -44,6 +45,7 @@ export interface LegItem {
   nameFr?: string | null;
   qty: number;
   variant?: string | null;
+  variantFr?: string | null;
 }
 
 export interface DeskFlags {
@@ -56,6 +58,7 @@ export interface DeskFlags {
 /** One box of a leg's checklist (`TaskView.parcels`, `rider:legParcels`). */
 export interface ParcelLine {
   code: string;
+  groupId?: string | null;
   boxNo: number;
   boxCount: number;
   pickupScannedAt: string | null;
@@ -67,6 +70,9 @@ export interface ParcelChecklist {
   parcels: ParcelLine[];
   pickupComplete: boolean;
   dropoffComplete: boolean;
+  /** What is in the boxes (every product x qty with its options, of every order packed into them) and which orders. */
+  contents?: ParcelContentLine[];
+  orders?: { orderId: string; reference: string }[];
   taskId?: string;
   taskIds?: string[];
   stage?: "pickup" | "dropoff";
@@ -135,6 +141,9 @@ export interface TaskView {
   pickupComplete?: boolean;
   dropoffComplete?: boolean;
   scanRequired?: boolean;
+  /** What is in those boxes (every product x qty with its options, of every order packed into them) and which orders; empty with no labelled parcel. */
+  parcelContents?: ParcelContentLine[];
+  parcelOrders?: { orderId: string; reference: string }[];
 }
 
 export interface Hub {
@@ -356,7 +365,7 @@ export function legRoute(t: Pick<TaskView, "from" | "to">, fr: boolean): string 
   return `${endpointName(t.from, fr)} → ${endpointName(t.to, fr)}`;
 }
 
-export { legItemName, legItemsText } from "@/lib/leg-items";
+export { legItemName, legItemVariant, legItemsText } from "@/lib/leg-items";
 
 /** Customer-facing journey: ordered stages of an order built from its legs (order flow only). */
 export function orderJourney(legs: TaskView[]): TaskView[] {

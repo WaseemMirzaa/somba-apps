@@ -109,5 +109,23 @@ test("what a scan just answered stays on top of what the screen was given", () =
   assert.equal(out[1].pickupScannedAt, null);
   assert.deepEqual(m.overlayBoxes([], live), live, "the scan's list is used when the screen has none yet");
   assert.deepEqual(m.overlayBoxes(given, null), given);
-  assert.equal(m.mergeBoxes([{ parcels: given }, { parcels: live }, {}]).length, 4);
+  assert.equal(m.mergeBoxes([{ parcels: given }, { parcels: live }, {}]).length, 3, "the box both lists carry counts once");
+});
+
+test("sibling legs list the same box: it counts once and is scanned only when every leg has the scan", () => {
+  const a = [box("PKG-AAAAAAAA", 1, 2, T), box("PKG-BBBBBBBB", 2, 2)];
+  const b = [box("PKG-AAAAAAAA", 1, 2, T), box("PKG-BBBBBBBB", 2, 2, T)];
+  const merged = m.mergeBoxes([{ parcels: a }, { parcels: b }]);
+  assert.equal(merged.length, 2);
+  assert.equal(m.stageCounts(merged, "pickup").total, 2);
+  assert.equal(merged.find((x) => x.code === "PKG-AAAAAAAA").pickupScannedAt, T);
+  assert.equal(merged.find((x) => x.code === "PKG-BBBBBBBB").pickupScannedAt, null);
+});
+
+test("the contents of sibling legs are listed once", () => {
+  const line = (name, qty, ref, variant = null) => ({ name, variant, qty, orderReference: ref });
+  const same = [line("Lamp", 1, "SOM-1"), line("Cap", 2, "SOM-2", "One size")];
+  const out = m.mergeContents([{ parcelContents: same }, { parcelContents: same }, {}]);
+  assert.equal(out.length, 2);
+  assert.deepEqual(m.mergeContents([]), []);
 });

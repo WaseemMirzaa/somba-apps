@@ -17,6 +17,11 @@ const EXACT: Record<string, string> = {
   "The rider already scanned these boxes. Contact support to change them.": "Le livreur a déjà scanné ces colis. Contactez l'assistance pour les modifier.",
   "Mark the package ready first: the labels are made then.": "Marquez d'abord le colis prêt : les étiquettes sont créées à ce moment-là.",
   "This package was delivered: its labels can no longer be printed.": "Ce colis a été livré : ses étiquettes ne peuvent plus être imprimées.",
+  "Choose at least one order to pack.": "Choisissez au moins une commande à préparer.",
+  "These orders cannot share a label: they differ in customer, day, delivery address or delivery mode.": "Ces commandes ne peuvent pas partager une étiquette : le client, le jour, l'adresse de livraison ou le mode de livraison diffèrent.",
+  "A rider already collected these boxes. The orders in them cannot change; pack the other orders in a new set.": "Un livreur a déjà récupéré ces colis. Les commandes qu'ils contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.",
+  "Orders with several sellers keep their own labels: they cannot be packed together.": "Les commandes de plusieurs vendeurs gardent leurs propres étiquettes : elles ne peuvent pas être préparées ensemble.",
+  "A label set needs at least one order.": "Un ensemble d'étiquettes doit contenir au moins une commande.",
   "Labels are not available.": "Les étiquettes ne sont pas disponibles.",
   "Boxes must be a whole number from 1 to 20.": "Le nombre de colis doit être un nombre entier de 1 à 20.",
   "Part of this order was already delivered. Contact support to stop the rest.": "Une partie de cette commande a déjà été livrée. Contactez l'assistance pour arrêter le reste.",
@@ -448,6 +453,8 @@ const areaField = (f: string) => AREA_FIELDS_FR[f] ?? f;
 
 /** French for the reasons of a refused account deletion, or null when one of them is not known. */
 const BLOCKED_REASONS: [RegExp, (m: RegExpExecArray) => string][] = [
+  [/^Pack at most (\d+) orders at once\.$/, (m) => `Préparez au plus ${m[1]} commandes à la fois.`],
+  [/^(.+): A rider already collected these boxes\. The orders in them cannot change; pack the other orders in a new set\.$/, (m) => `${m[1]} : un livreur a déjà récupéré ces colis. Les commandes qu'ils contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.`],
   [/^Your wallet still holds \$([\d.,]+): spend it or ask support to pay it out first\./, (m) => `Votre portefeuille contient encore ${m[1].replace(".", ",")} $ : dépensez-le ou demandez à l'assistance de vous le verser d'abord.`],
   [/^You have (\d+) orders? that (?:is|are) not finished yet: [^.]*?first\./, (m) => (m[1] === "1" ? "Vous avez 1 commande qui n'est pas terminée : attendez qu'elle soit livrée, ou annulez-la, d'abord." : `Vous avez ${m[1]} commandes qui ne sont pas terminées : attendez qu'elles soient livrées, ou annulez-les, d'abord.`)],
   [/^You have (\d+) open return, exchange or replacement requests?: [^.]*?first\./, (m) => (m[1] === "1" ? "Vous avez 1 demande de retour, d'échange ou de remplacement en cours : attendez qu'elle soit terminée d'abord." : `Vous avez ${m[1]} demandes de retour, d'échange ou de remplacement en cours : attendez qu'elles soient terminées d'abord.`)],
