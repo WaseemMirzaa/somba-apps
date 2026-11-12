@@ -6,6 +6,7 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { useCatalog, priceView, type PriceView } from "@/lib/catalog";
 import { localizeVariantText } from "@/lib/i18n-fields";
 import { currentLocale, localizeApiError } from "@/lib/api-errors";
+import { mergeCartLines, signedOut } from "@/lib/cart-merge";
 
 /**
  * A cart line. `id` IS the live backend product id, so checkout can send
@@ -188,15 +189,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         syncedUser.current = customerId;
         serverSaved.current = sc.saved ?? [];
         const remote = fromServer(sc.lines);
-        setCart((cur) => {
-          const byKey = new Map(cur.map((c) => [`${c.id}|${c.variant}`, c]));
-          for (const r of remote) {
-            const k = `${r.id}|${r.variant}`;
-            const mine = byKey.get(k);
-            if (!mine || r.qty > mine.qty) byKey.set(k, r);
-          }
-          return [...byKey.values()];
-        });
+        setCart((cur) => mergeCartLines(cur, remote));
       })
       .catch(() => {
         /* offline: this browser's cart keeps working, the merge runs on the next connection */
@@ -214,6 +207,22 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       serverSaved.current = [];
     }
   }, [customerId]);
+
+  // Signed out: this browser's cart belonged to that account (the account keeps its own copy and brings it back at the
+  // next sign-in). Without this the cart stayed in the browser, the next person to sign in merged it into THEIR account,
+  // and a guest after a sign-out saw the previous shopper's items. `rt.user` (not `customerId`) drives it: the socket
+  // flips to "connecting" on every network blip, but the signed-in user only goes away on a real sign-out.
+  const signedInId = rt.user?.role === "customer" ? rt.user.id : null;
+  const previousSignedIn = useRef<string | null>(null);
+  useEffect(() => {
+    if (signedOut(previousSignedIn.current, signedInId)) {
+      setCart([]);
+      setPromoCode(null);
+      setPromoDiscount(0);
+      setPromoSellerId(null);
+    }
+    previousSignedIn.current = signedInId;
+  }, [signedInId]);
 
   // Push every change (debounced) once merged.
   useEffect(() => {

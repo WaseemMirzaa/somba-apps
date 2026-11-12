@@ -25,6 +25,7 @@ import { formatCurrency } from "@/lib/utils";
 import { chooseEstimate, dayLabel, estimateFor } from "@/lib/delivery-estimate";
 import { ExpressBadge } from "@/components/shop/partial-delivery";
 import { AddressMapPicker } from "@/components/shop/address-map-picker";
+import { areaCentre } from "@/lib/area-centre";
 import type { AddressGeo, PickedMeta, PickedParts } from "@/lib/google-maps";
 import { useVerificationStatus } from "@/lib/shop-live";
 import type { Address } from "@/lib/realtime/types";
@@ -212,7 +213,7 @@ function CheckoutContent() {
 
           {showAdd ? (
             <div className="space-y-3 rounded-xl border border-dashed border-blue-200 p-4">
-              <AddressMapPicker value={form.geo} onPick={applyPick} fr={fr} />
+              <AddressMapPicker value={form.geo} onPick={applyPick} fr={fr} areaCentre={areaCentre(area?.chain, fr)} />
               <AreaPicker fr={fr} hint={hint} onChange={setArea} />
               <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Libellé (Domicile, Bureau...)" : "Label (Home, Office...)"} value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} />
               <input className="input-premium w-full px-4 py-2 text-sm" placeholder={fr ? "Adresse (rue, numéro)" : "Street address"} value={form.line1} onChange={(e) => setForm({ ...form, line1: e.target.value })} />

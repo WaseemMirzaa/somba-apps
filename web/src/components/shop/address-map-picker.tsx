@@ -14,6 +14,7 @@ import {
   type PickedMeta,
   type PickedParts,
 } from "@/lib/google-maps";
+import type { AreaCentre } from "@/lib/area-centre";
 
 type Status = "nokey" | "loading" | "ready" | "error";
 type LatLng = { lat: number; lng: number };
@@ -35,11 +36,14 @@ export function AddressMapPicker({
   value,
   onPick,
   fr,
+  areaCentre,
 }: {
   value: AddressGeo | null;
   /** `meta.components` are Google's raw address components (in the UI language), for `geo:resolve`. */
   onPick: (geo: AddressGeo, parts: PickedParts, meta: PickedMeta) => void;
   fr: boolean;
+  /** The centre of the area the shopper chose: offered as an approximate pin while the map is unavailable. */
+  areaCentre?: AreaCentre | null;
 }) {
   const mapDiv = useRef<HTMLDivElement>(null);
   const searchDiv = useRef<HTMLDivElement>(null);
@@ -167,7 +171,7 @@ export function AddressMapPicker({
   }
 
   if (status === "nokey" || status === "error") {
-    return <ManualPin value={pinned} onPick={(g) => { setPinned(g); onPick(g, {}, { components: [] }); }} fr={fr} />;
+    return <ManualPin value={pinned} onPick={(g) => { setPinned(g); onPick(g, {}, { components: [] }); }} fr={fr} areaCentre={areaCentre ?? null} />;
   }
 
   return (
@@ -203,7 +207,7 @@ export function AddressMapPicker({
  * Fallback when Google Maps cannot load: the shopper can still pin the address with the device location or by typing
  * the coordinates (e.g. copied from a maps app), so a delivery never gets blocked by the map being down.
  */
-function ManualPin({ value, onPick, fr }: { value: AddressGeo | null; onPick: (geo: AddressGeo) => void; fr: boolean }) {
+function ManualPin({ value, onPick, fr, areaCentre }: { value: AddressGeo | null; onPick: (geo: AddressGeo) => void; fr: boolean; areaCentre: AreaCentre | null }) {
   const [lat, setLat] = useState(value ? String(value.lat) : "");
   const [lng, setLng] = useState(value ? String(value.lng) : "");
   const [err, setErr] = useState<string | null>(null);
@@ -233,6 +237,13 @@ function ManualPin({ value, onPick, fr }: { value: AddressGeo | null; onPick: (g
       { enableHighAccuracy: true, timeout: 10000 },
     );
   }
+  function pinAtCentre() {
+    if (!areaCentre) return;
+    setErr(null);
+    setLat(areaCentre.lat.toFixed(6));
+    setLng(areaCentre.lng.toFixed(6));
+    onPick({ lat: areaCentre.lat, lng: areaCentre.lng, formatted: fr ? `Centre de ${areaCentre.name} (approximatif)` : `Centre of ${areaCentre.name} (approximate)` });
+  }
   return (
     <div role="group" aria-label={fr ? "Épingler l'adresse" : "Pin the address"} className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
       <span className="inline-flex items-center gap-2 font-medium">
@@ -252,6 +263,16 @@ function ManualPin({ value, onPick, fr }: { value: AddressGeo | null; onPick: (g
           {locating ? (fr ? "Localisation…" : "Locating…") : fr ? "Ma position" : "Use my location"}
         </button>
       </div>
+      {areaCentre ? (
+        <div className="space-y-1">
+          <button type="button" data-testid="pin-area-centre" onClick={pinAtCentre} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
+            {fr ? `Épingler au centre de ${areaCentre.name}` : `Pin at the centre of ${areaCentre.name}`}
+          </button>
+          <p className="text-xs">{fr ? "Position approximative : écrivez bien la rue et le numéro, le livreur s'en servira pour trouver la porte." : "An approximate position: write the street and number clearly, the rider uses them to find your door."}</p>
+        </div>
+      ) : (
+        <p className="text-xs">{fr ? "Pas de coordonnées ? Choisissez d'abord la province, la ville et la commune ci-dessous : vous pourrez épingler au centre de la commune." : "No coordinates? Pick the province, city and commune below first: you can then pin at the centre of the commune."}</p>
+      )}
       {err && <p role="alert" className="text-xs text-red-700">{err}</p>}
       {value && !err && <p className="text-xs">{fr ? "Position épinglée" : "Pinned"}: {value.lat.toFixed(5)}, {value.lng.toFixed(5)}</p>}
     </div>

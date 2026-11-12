@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AddressMapPicker } from "@/components/shop/address-map-picker";
 import { AreaPicker, type AreaSelection } from "@/components/geo/area-picker";
 import { addressTextFromChain, type AreaHint } from "@/lib/areas";
+import { areaCentre } from "@/lib/area-centre";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useToast } from "@/context/toast-context";
 import type { AddressGeo, PickedMeta, PickedParts } from "@/lib/google-maps";
@@ -69,7 +70,7 @@ export function AddressPinEditor({
       <p className="text-sm font-medium text-slate-800">
         {fr ? "Épingler" : "Pin"} « {address.label} » — {[address.line1, address.city].filter(Boolean).join(", ")}
       </p>
-      <AddressMapPicker value={geo} onPick={onPick} fr={fr} />
+      <AddressMapPicker value={geo} onPick={onPick} fr={fr} areaCentre={areaCentre(area?.chain ?? address.areaChain, fr)} />
       <AreaPicker fr={fr} hint={hint} initialChain={address.areaChain ?? null} onChange={setArea} />
       <div className="flex gap-2">
         <Button onClick={save} disabled={saving || !geo}>{saving ? "…" : fr ? "Enregistrer l'épingle" : "Save pin"}</Button>
