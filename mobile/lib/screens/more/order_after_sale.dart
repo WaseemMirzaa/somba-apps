@@ -63,7 +63,7 @@ String receiptText(Strings s, OrderDto o) {
   b
     ..writeln('')
     ..writeln('${s.subtotal}: ${money(o.subtotalUsd)}')
-    ..writeln('${s.delivery}: ${money(o.deliveryFeeUsd)}');
+    ..writeln('${s.platformFee}: ${money(o.platformFeeUsd)}');
   if (o.discountUsd > 0) b.writeln('${s.receiptDiscount}${o.promoCode != null ? ' (${o.promoCode})' : ''}: -${money(o.discountUsd)}');
   if (o.refundedUsd > 0) b.writeln('${s.receiptRefunded}: -${money(o.refundedUsd)}');
   b

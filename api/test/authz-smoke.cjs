@@ -11,6 +11,8 @@ const API = process.env.API_URL ?? 'http://localhost:3001';
 const PW = 'Somba@2026';
 const tag = Date.now().toString().slice(-8);
 const PHONE = '+243812345678';
+// The delivery price numbers: staff-only (customers see one "Platform commission" line, never how it is built).
+const FEE_KEYS = ['deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd'];
 // Delivery needs an address in a served area: a plain Kinshasa address resolves to the city, which Entrepôt Kinshasa covers.
 const ADDRESS = JSON.stringify({ line1: '1 Test', city: 'Kinshasa' });
 
@@ -299,7 +301,14 @@ const register = async (label, role = 'customer') => {
   ok(!(await req(admin.sock, 'settings:set', { key: 'deliveryBaseUsd', value: 9999 })).ok, 'an absurd delivery fee is rejected');
   ok(!(await req(admin.sock, 'settings:set', { key: 'deliveryZones', value: '[]' })).ok, 'delivery zones can no longer be written');
   const pubSettings = (await req(cust.sock, 'settings:get')).data;
-  ok('deliveryBaseUsd' in pubSettings && 'deliveryPerKmUsd' in pubSettings && !('commissionPct' in pubSettings), 'customers read only the public settings (delivery fee numbers included)');
+  ok(!('commissionPct' in pubSettings) && !FEE_KEYS.some((k) => k in pubSettings) && 'returnWindowDays' in pubSettings, 'customers read only the public settings (no commission, no delivery fee numbers: they see one "Platform commission" line)');
+  const settingsOf = async (who) => (await req(who.sock, 'settings:get')).data ?? {};
+  const guestSettings = await settingsOf(guest);
+  const sellerSettings = await settingsOf(sellerA);
+  const adminSettings = await settingsOf(admin);
+  ok(!FEE_KEYS.some((k) => k in guestSettings), 'guests do not read the delivery fee numbers either');
+  ok(!FEE_KEYS.some((k) => k in sellerSettings), 'sellers do not read the delivery fee numbers');
+  ok(['deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd'].every((k) => k in adminSettings), 'the admin reads every delivery fee number');
   ok('commissionPct' in (await req(finance.sock, 'settings:get')).data, 'finance reads all settings');
   ok(!(await req(finance.sock, 'roles:staff')).ok, 'only the super admin lists staff accounts');
   ok(!(await req(finance.sock, 'roles:setRole', { id: cust.user.id, role: 'admin' })).ok, 'only the super admin changes roles');

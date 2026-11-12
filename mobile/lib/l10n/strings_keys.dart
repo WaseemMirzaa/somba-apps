@@ -33,6 +33,9 @@ extension StringsKeys on Strings {
   String get checkout => t('checkout');
   String get subtotal => t('subtotal');
   String get delivery => t('delivery');
+
+  /// The ONE fee line a customer sees: the sum of every fee they pay, delivery included.
+  String get platformFee => t('platformFee');
   String get total => t('total');
   String get free => t('free');
   String get promoHint => t('promoHint');

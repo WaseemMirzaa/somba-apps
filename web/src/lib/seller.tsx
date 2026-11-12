@@ -160,7 +160,7 @@ export interface PayoutAvailability {
   earned: number;
   committed: number;
   available: number;
-  /** The CURRENT rate: it applies to new orders; each past order keeps the rate stored when it was placed. */
+  /** The DEFAULT rate (Settings): a category can set its own. It applies to new orders; each past order keeps the rate stored when it was placed. */
   commissionPct: number;
   /** Commission already deducted from `earned` (sum of the amounts stored on the lines). */
   commissionUsd?: number;

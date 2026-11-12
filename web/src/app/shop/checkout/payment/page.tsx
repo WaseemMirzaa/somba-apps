@@ -26,6 +26,7 @@ import {
   useVerificationStatus,
 } from "@/lib/shop-live";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
+import { platformFee, platformFeeLabel } from "@/lib/quote-text";
 import { DeliveryQuoteCard } from "@/components/shop/delivery-quote";
 import { notServedArea, notServedCityNames, notServedFromError, notServedText, type NotServedInfo } from "@/lib/areas";
 import { pinRequiredText } from "@/components/shop/address-pin-editor";
@@ -57,7 +58,7 @@ function PaymentContent() {
     lines: quoteLines,
     enabled: !!address && pinned,
   });
-  const deliveryFee = quote?.feeUsd ?? 0;
+  const deliveryFee = platformFee(quote);
   const discount = Math.min(promoDiscount, subtotal);
   const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
 
@@ -138,7 +139,7 @@ function PaymentContent() {
       return;
     }
     if (!quote) {
-      setError(quoteError ?? (fr ? "Les frais de livraison ne sont pas encore calculés." : "The delivery fee is not worked out yet."));
+      setError(quoteError ?? (fr ? "La commission de la plateforme n'est pas encore calculée." : "The platform commission is not worked out yet."));
       return;
     }
     if (mobile && msisdn.replace(/\D/g, "").length < 9) {
@@ -233,7 +234,7 @@ function PaymentContent() {
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"} (${promoCode})`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
-          { label: fr ? "Livraison" : "Delivery", value: notServed ? (fr ? "Zone non desservie" : "Not served yet") : !quote ? (fr ? "Calcul…" : "Calculating…") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
+          { label: platformFeeLabel(fr), value: notServed ? (fr ? "Zone non desservie" : "Not served yet") : !quote ? (fr ? "Calcul…" : "Calculating…") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
         ]} />
         <div className="mt-4">
           <DeliveryQuoteCard quote={quote} loading={quoteLoading} error={quoteError} fr={fr} locale={locale} notServed={notServed ?? orderNotServed} />

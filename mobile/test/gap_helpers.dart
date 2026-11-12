@@ -36,12 +36,12 @@ BackendUser gapUser({String phone = '', String id = 'u1', String role = 'custome
       'emailVerified': true,
     });
 
-/// The server's answer to `delivery:quote` (a pinned address in Gombe unless told otherwise).
+/// The server's answer to `delivery:quote` for a customer (a pinned address in Gombe unless told otherwise). [transfer] > 0
+/// only says that a parcel changes warehouse: the amount is never sent to customers.
 Map<String, dynamic> gapQuoteJson({double fee = 3, bool pinned = true, String hub = 'Kinshasa Hub', double transfer = 0, String? fallback}) => {
+      // A customer's quote: one fee (`platformFeeUsd`, with `feeUsd` as the same total for older servers) and no breakdown.
       'feeUsd': fee,
-      'deliveryUsd': fee - transfer,
-      'transferUsd': transfer,
-      'distanceKm': 2.5,
+      'platformFeeUsd': fee,
       'destinationHubId': 'hub-kin',
       'destinationHub': {'id': 'hub-kin', 'name': hub, 'city': 'Kinshasa'},
       'originHubIds': ['hub-kin'],

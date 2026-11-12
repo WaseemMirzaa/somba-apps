@@ -177,6 +177,8 @@ export interface Order {
   paymentMethod: "stripe_card" | "airtel_money" | "wallet";
   subtotalUsd: number;
   deliveryFeeUsd: number;
+  /** The ONE fee a customer sees ("Platform commission"): the sum of every fee they pay. Only on the customer's own view; staff read `deliveryFeeUsd`. */
+  platformFeeUsd?: number;
   /** Promo-code discount already deducted from the total. */
   discountUsd?: number;
   /** Campaign discount already deducted from subtotalUsd / totalUsd. */
@@ -281,6 +283,11 @@ export interface Category {
   productCount?: number;
   /** Listings (live or not, never removed) that point at it: the server refuses to delete a category that has any. */
   usedBy?: number;
+  /**
+   * Seller commission (%) for listings in this category; null = the global default rate. Sent to sellers and staff only
+   * (customers and guests never receive it).
+   */
+  commissionPct?: number | null;
 }
 
 export interface Address {

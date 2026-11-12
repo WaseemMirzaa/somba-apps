@@ -36,6 +36,7 @@ const EXACT: Record<string, string> = {
   "Express fee per km must be a number between 0 and 50.": "Les frais express par km doivent être un nombre entre 0 et 50.",
   "Maximum express fee must be a number between 0 and 500.": "Le plafond des frais express doit être un nombre entre 0 et 500.",
   "Express maximum distance must be a number between 0 and 100.": "La distance maximale express doit être un nombre entre 0 et 100.",
+  "Seller commission must be a number between 0 and 60.": "La commission vendeur doit être un nombre entre 0 et 60.",
 
   // ── generic / auth ──
   "Request failed.": "La requête a échoué.",

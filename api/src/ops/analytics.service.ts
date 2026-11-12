@@ -105,6 +105,7 @@ export class AnalyticsService {
     return `CAST(DATE(${expr}) AS CHAR)`;
   }
 
+  /** The DEFAULT seller commission rate (Settings), for display: a category can set its own and every order line keeps the rate stored when it was placed. */
   private async commissionPct(): Promise<number> {
     const raw = Number(await this.settings.get('commissionPct'));
     return Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : FALLBACK_COMMISSION_PCT;
@@ -192,7 +193,7 @@ export class AnalyticsService {
       commissionUsd: storedCommission.collected,
       ordersByStatus: byStatus,
       // — additions —
-      // The CURRENT rate (applies to new orders); commissionUsd above is the sum stored on past order lines.
+      // The DEFAULT rate (applies to new orders unless their category sets its own); commissionUsd above is the sum stored on past order lines.
       commissionPct,
       gmvByCategory: categories,
       ordersToday: n(agg?.ordersToday),

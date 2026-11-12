@@ -233,15 +233,16 @@ export function OrderRouting({ order, sellers }: { order: Order; sellers: Seller
           { label: fr ? "Frais facturés" : "Fee charged", value: formatCurrency(order.deliveryFeeUsd, locale) },
           {
             label: fr ? "Distance (tarif actuel)" : "Distance (today's rates)",
-            value: quote ? `${quote.distanceKm.toFixed(1)} km` : quoteError ? "—" : pin ? "…" : "—",
+            // Staff and admins get the full breakdown from `delivery:quote`; customers never do.
+            value: quote && quote.distanceKm != null ? `${quote.distanceKm.toFixed(1)} km` : quoteError ? "—" : pin ? "…" : "—",
           },
         ]}
       />
       {quote && (
         <p className="text-xs text-slate-500">
           {fr ? "Sur les tarifs actuels : " : "On today's rates: "}
-          {formatCurrency(quote.deliveryUsd, locale)} {fr ? "livraison" : "delivery"}
-          {quote.transfer ? ` + ${formatCurrency(quote.transferUsd, locale)} ${fr ? "transfert" : "transfer"}` : ""} = {formatCurrency(quote.feeUsd, locale)}
+          {formatCurrency(quote.deliveryUsd ?? 0, locale)} {fr ? "livraison" : "delivery"}
+          {quote.transfer ? ` + ${formatCurrency(quote.transferUsd ?? 0, locale)} ${fr ? "transfert" : "transfer"}` : ""} = {formatCurrency(quote.feeUsd, locale)}
         </p>
       )}
       {quote?.fallback && (

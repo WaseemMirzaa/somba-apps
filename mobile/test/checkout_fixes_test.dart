@@ -202,12 +202,14 @@ void main() {
       expect(find.text(const Strings('en').checkoutFromHub('Limete Hub')), findsOneWidget);
     });
 
-    testWidgets('a transfer between warehouses is explained under the fee', (tester) async {
+    testWidgets('a transfer between warehouses adds no fee line: one platform commission row carries the whole amount', (tester) async {
       RealtimeStore.instance.debugCallRequest = gapCalls(quote: (_) => gapQuoteJson(fee: 4.5, transfer: 1.5));
       ShopState.instance.addToCart(productByUuid('p1')!);
       await openCheckout(tester);
-      expect(find.byKey(const ValueKey('checkout-transfer')), findsOneWidget);
-      expect(find.text(const Strings('en').checkoutTransferFee(money(1.5))), findsOneWidget);
+      expect(find.byKey(const ValueKey('checkout-transfer')), findsNothing);
+      expect(find.text(const Strings('en').platformFee), findsOneWidget);
+      expect(find.text(money(4.5)), findsWidgets);
+      expect(find.textContaining('Includes'), findsNothing);
     });
 
     testWidgets('an address without a pin must be pinned first when the shop requires it', (tester) async {

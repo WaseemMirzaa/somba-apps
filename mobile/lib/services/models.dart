@@ -626,6 +626,10 @@ class OrderDto {
   final String paymentMethod;
   final double subtotalUsd;
   final double deliveryFeeUsd;
+
+  /// The ONE fee line the customer sees ("Platform commission"): the sum of every fee they pay, delivery included.
+  /// An older server sends only [deliveryFeeUsd], which is then the same number.
+  final double platformFeeUsd;
   final double discountUsd;
   final String? promoCode;
   final double totalUsd;
@@ -679,6 +683,7 @@ class OrderDto {
     required this.totalUsd,
     this.subtotalUsd = 0,
     this.deliveryFeeUsd = 0,
+    double? platformFeeUsd,
     this.discountUsd = 0,
     this.promoCode,
     this.createdAt,
@@ -694,7 +699,7 @@ class OrderDto {
     this.routeBySeller = const {},
     this.deliveryMode = 'standard',
     this.partiallyDeliveredRaw,
-  });
+  }) : platformFeeUsd = platformFeeUsd ?? deliveryFeeUsd;
 
   bool get isExpress => deliveryMode == 'express';
 
@@ -779,6 +784,7 @@ class OrderDto {
         paymentMethod: j['paymentMethod'] as String? ?? 'wallet',
         subtotalUsd: (j['subtotalUsd'] as num?)?.toDouble() ?? 0,
         deliveryFeeUsd: (j['deliveryFeeUsd'] as num?)?.toDouble() ?? 0,
+        platformFeeUsd: (j['platformFeeUsd'] as num?)?.toDouble(),
         discountUsd: (j['discountUsd'] as num?)?.toDouble() ?? 0,
         promoCode: j['promoCode'] as String?,
         totalUsd: (j['totalUsd'] as num?)?.toDouble() ?? 0,

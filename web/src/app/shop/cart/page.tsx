@@ -12,6 +12,7 @@ import { useToast } from "@/context/toast-context";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
+import { platformFee, platformFeeLabel } from "@/lib/quote-text";
 import { DeliveryQuoteCard, NotServedNotice, QuoteFeeValue, SellerAreaNotice } from "@/components/shop/delivery-quote";
 import { chainText } from "@/lib/areas";
 import { formatCurrency } from "@/lib/utils";
@@ -38,7 +39,7 @@ export default function ShopCartPage() {
 
   const discount = Math.min(promoDiscount, subtotal);
 
-  // The delivery fee is quoted by the server from the address (nearest warehouse + distance): never guessed here.
+  // The platform commission (the one customer fee line, delivery included) is quoted by the server from the address (nearest warehouse + distance): never guessed here.
   const [pickedAddress, setPickedAddress] = useState<string | null>(null);
   const addresses = rt.addresses;
   const addressId = useMemo(() => {
@@ -56,7 +57,7 @@ export default function ShopCartPage() {
   // An address outside every served area: no fee, and checkout stays closed until another address is chosen.
   const deepestArea = address?.areaChain?.[address.areaChain.length - 1] ?? null;
   const notServed = quoteNotServed ?? (address && address.served === false ? { area: deepestArea?.name ?? address.commune ?? address.city ?? "", areaEn: deepestArea?.nameEn ?? undefined } : null);
-  const delivery = quote?.feeUsd ?? 0;
+  const delivery = platformFee(quote);
   const total = Math.max(0, subtotal - discount) + delivery;
 
   const grouped = lines.reduce<Record<string, typeof lines>>((acc, item) => {
@@ -211,13 +212,13 @@ export default function ShopCartPage() {
         {!rt.user ? (
           <p className="text-xs text-slate-500">
             {fr
-              ? "Les frais de livraison sont calculés à partir de votre adresse épinglée. Connectez-vous pour les voir."
-              : "The delivery fee is worked out from your pinned address. Sign in to see it."}{" "}
+              ? "La commission de la plateforme est calculée à partir de votre adresse épinglée. Connectez-vous pour la voir."
+              : "The platform commission is worked out from your pinned address. Sign in to see it."}{" "}
             <Link href="/shop/login?next=/shop/cart" className="font-medium text-[var(--primary)] hover:underline">{fr ? "Se connecter" : "Sign in"}</Link>
           </p>
         ) : addresses.length === 0 ? (
           <p className="text-xs text-slate-500">
-            {fr ? "Ajoutez une adresse épinglée sur la carte pour connaître les frais de livraison." : "Add an address pinned on the map to see your delivery fee."}{" "}
+            {fr ? "Ajoutez une adresse épinglée sur la carte pour connaître la commission de la plateforme." : "Add an address pinned on the map to see your platform commission."}{" "}
             <Link href="/shop/checkout" className="font-medium text-[var(--primary)] hover:underline">{fr ? "Ajouter une adresse" : "Add an address"}</Link>
           </p>
         ) : (
@@ -272,7 +273,7 @@ export default function ShopCartPage() {
             </div>
           )}
           <div className="flex justify-between">
-            <span>{fr ? "Livraison" : "Delivery"}</span>
+            <span>{platformFeeLabel(fr)}</span>
             <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={fr ? "Selon votre adresse" : "Based on your address"} />
           </div>
           <div className="flex justify-between border-t border-[var(--border)] pt-2 text-lg font-bold">

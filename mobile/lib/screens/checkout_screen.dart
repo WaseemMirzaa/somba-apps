@@ -354,7 +354,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // The fee is the server's quote for this address and these lines; `orders:create` charges exactly it.
     _quote.update(_address, _lines);
     final quote = _quote.quote;
-    final deliveryFee = quote?.feeUsd ?? 0;
+    final deliveryFee = quote?.platformFeeUsd ?? 0;
     final needsPin = _needsPin;
     final notServed = _notServedText(s);
     final quoteFailed = _address != null && !needsPin && notServed == null && !_quote.loading && quote == null;
@@ -532,7 +532,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       key: const ValueKey('checkout-savings'), style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
                 ),
               const SizedBox(height: 8),
-              _row(quote?.isExpress == true ? s.deliveryExpressRow : s.delivery, unpriced ? (_quote.loading ? '…' : '—') : deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
+              _row(s.platformFee, unpriced ? (_quote.loading ? '…' : '—') : deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
               if (quote != null) DeliveryRouteLines(quote: quote),
               if (discount > 0) ...[
                 const SizedBox(height: 8),

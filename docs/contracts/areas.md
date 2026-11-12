@@ -152,6 +152,12 @@ Changing coverage never reroutes an order already placed; it recomputes every st
     splitAfterHours: number }                                // setting `splitDeliveryAfterHours` (0 = never split)
   // each origins[] also carries { prepDays, routeDays, estimatedDeliveryDate } (that seller's own numbers; null for a seller with no line)
   ```
+  **Role-aware (platform commission).** A customer sees ONE fee line, "Platform commission" / "Commission de la plateforme": `platformFeeUsd`,
+  the sum of every fee they pay (delivery included; it equals `feeUsd`, which stays for older app builds). The reply above is the **staff and
+  admin** shape (every admin role and warehouse staff). For customers, guests, sellers and riders the server drops `deliveryUsd`, `transferUsd`,
+  `defaultTransferUsd`, `distanceKm`, `feeOverrideUsd` and every `hops[].costUsd` / `laneCost`; the route, the estimate and the date are unchanged,
+  and `platformFeeUsd` is on every reply. Orders: the customer's order views (`orders:create` / `list` / `byRequest` / `cancel`, `order:created` / `order:updated`)
+  carry `platformFeeUsd` (= `deliveryFeeUsd`, kept) and no `items[].commissionPct` / `commissionUsd` (the seller's commission is never shown to customers).
   `fallback`: `'city'` = the covering warehouse has no active rider and the nearest staffed warehouse **of the same city** delivers;
   `'nearest'` = none in the city, the nearest staffed one **of the same province**; `'no_riders'` = nobody nearby has a rider, the
   order stays on the covering warehouse and admins are told. `null` otherwise (an address without a pin is simply `pinned: false`,
@@ -203,7 +209,11 @@ Changing coverage never reroutes an order already placed; it recomputes every st
 - `localDeliveryDays` (`'1'` default, whole number 0–30) — public, admin-writable: the platform's hub -> customer days, added to every seller's preparation
 - `splitDeliveryAfterHours` (`'24'`, 0–720; 0 = never), `expressDeliveryEnabled` (`'false'`), `expressDeliveryDays` (`'0'`), `expressBaseUsd` / `expressPerKmUsd` /
   `expressMaxUsd` (`'2'` / `'0.5'` / `'15'`), `expressMaxKm` (`'0'` = no limit) — public, admin-writable; see logistics.md §2 and §17
-- Existing: `deliveryBaseUsd`, `deliveryPerKmUsd`, `deliveryMaxUsd`, `deliveryTransferUsd`
+- Existing: `deliveryBaseUsd`, `deliveryPerKmUsd`, `deliveryMaxUsd`, `deliveryTransferUsd`. **Staff-only** (with `expressBaseUsd` / `expressPerKmUsd` / `expressMaxUsd`):
+  `settings:get` and `settings:updated` send them to warehouse staff and admin roles only, never to customers, guests, sellers or riders.
+- `commissionPct` (the seller commission, admin) is the **default** rate; `categories.commissionPct` (float, NULL = default, 0 is a real rate, 0-60) overrides it per category.
+  `orders:create` freezes the line's rate (category rate, else default) on `order_items.commissionPct`. `categories:list` / `categories:updated` carry `commissionPct`
+  for sellers and staff only; customers and guests get categories without it.
 
 ## Seed accounts (dev seed)
 - Warehouses:

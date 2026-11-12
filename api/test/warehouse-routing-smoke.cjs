@@ -106,7 +106,8 @@ const addr = (p, extra = {}) => JSON.stringify({ line1: '1 Test Street', city: p
     const prodL = products.find((p) => (p.sellerName ?? '') === 'Limete Wholesale' && p.stock > 20);
     ok(prodK && prodL, 'two demo sellers have stock (Gombe and Limete)', JSON.stringify([prodK?.name, prodL?.name]));
     const line = (p, qty = 1) => ({ productId: p.id, qty });
-    const quote = (p, lines, extra = {}) => req(cust.sock, 'delivery:quote', { geo: p?.pin, city: p?.city ?? 'Kinshasa', ...(p?.commune ? { commune: p.commune } : {}), lines, ...extra });
+    // An admin asks: staff get the full fee breakdown (a customer gets only `platformFeeUsd`, see the check below).
+    const quote = (p, lines, extra = {}) => req(admin.sock, 'delivery:quote', { geo: p?.pin, city: p?.city ?? 'Kinshasa', ...(p?.commune ? { commune: p.commune } : {}), lines, ...extra });
     const areaOf = async (q, level) => ((await req(cust.sock, 'geo:search', { q, level, limit: 20 })).data ?? []).find((x) => fold(x.name) === fold(q)) ?? null;
     const [gombe, limeteA, masina, kalamu, funa, montAmba, tshangu, gomaCity] = await Promise.all([
       areaOf('Gombe', 'commune'), areaOf('Limete', 'commune'), areaOf('Masina', 'commune'), areaOf('Kalamu', 'commune'),
@@ -166,7 +167,9 @@ const addr = (p, extra = {}) => JSON.stringify({ line1: '1 Test Street', city: p
     await req(admin.sock, 'settings:set', { key: 'deliveryMaxUsd', value: 15 });
     await req(admin.sock, 'settings:set', { key: 'deliveryTransferUsd', value: 1.5 });
     const pub = (await req(cust.sock, 'settings:get')).data ?? {};
-    ok(pub.deliveryBaseUsd === '2' && pub.deliveryPerKmUsd === '0.5' && pub.deliveryMaxUsd === '15' && pub.deliveryTransferUsd === '1.5', 'the four fee numbers are public settings');
+    ok(!['deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd'].some((k) => k in pub), 'the four fee numbers are NOT public settings: a customer sees one "Platform commission" line');
+    const staffSettings = (await req(admin.sock, 'settings:get')).data ?? {};
+    ok(staffSettings.deliveryBaseUsd === '2' && staffSettings.deliveryPerKmUsd === '0.5' && staffSettings.deliveryMaxUsd === '15' && staffSettings.deliveryTransferUsd === '1.5', 'the four fee numbers are staff settings');
     ok(!(await req(admin.sock, 'settings:set', { key: 'deliveryBaseUsd', value: -1 })).ok, 'a negative fee is refused');
     ok(!(await req(admin.sock, 'settings:set', { key: 'deliveryZones', value: '[]' })).ok, 'zones can no longer be written');
 

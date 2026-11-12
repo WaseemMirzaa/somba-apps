@@ -38,7 +38,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PayoutsService } from '../payouts/payouts.service';
 import { DisputesService } from '../disputes/disputes.service';
-import { CategoriesService } from '../catalog/categories.service';
+import { CategoriesService, seesCategoryRates } from '../catalog/categories.service';
 import { AddressesService } from '../addresses/addresses.service';
 import { notServedFields } from '../geo/geo.service';
 import { ReviewsService } from '../content/reviews.service';
@@ -483,8 +483,9 @@ export class RealtimeGateway
 
   // Public — categories for the storefront (guests included).
   @SubscribeMessage('categories:list')
-  async categoriesList() {
-    return ok(await this.categories.list());
+  async categoriesList(@ConnectedSocket() client: AuthedSocket) {
+    // The seller commission rate per category is for sellers and staff only; customers and guests get the list without it.
+    return ok(await this.categories.list({ withRates: seesCategoryRates(client.data.user?.role) }));
   }
 
   @SubscribeMessage('products:create')
@@ -1567,7 +1568,9 @@ export class RealtimeGateway
     // Everyone may read the public pricing/checkout settings; the rest is admin-only.
     const role = client.data.user?.role ?? 'guest';
     // Apps also get the computed `cardPayments` flag ('stripe' | 'off').
-    return ok(this.can(role, 'config') ? await this.settings.all() : await this.settings.clientView());
+    // The delivery price numbers are staff-only: customers, guests, sellers and riders never receive them.
+    if (this.can(role, 'config')) return ok(await this.settings.all());
+    return ok(this.isAdmin(role) || role === 'warehouse_staff' ? await this.settings.staffView() : await this.settings.clientView());
   }
 
   @SubscribeMessage('settings:set')
@@ -2491,7 +2494,9 @@ export class RealtimeGateway
   ) {
     try {
       const user = this.requireUser(client);
-      return ok(await this.orders.cancel(user, String(body?.orderId ?? '')));
+      // Only the order's own customer gets here: the customer view (one fee line, no seller commission).
+      const cancelled = await this.orders.cancel(user, String(body?.orderId ?? ''));
+      return ok((await this.orders.customerViews([cancelled]))[0] ?? cancelled);
     } catch (e) {
       return fail((e as Error).message);
     }

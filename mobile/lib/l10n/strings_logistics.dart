@@ -18,7 +18,6 @@ extension StringsLogistics on Strings {
   String get checkoutPinCta => t('checkout_pin_cta');
   String get checkoutQuoteFailed => t('checkout_quote_failed');
   String checkoutFromHub(Object? hub) => t('checkout_from_hub', {'hub': hub});
-  String checkoutTransferFee(Object? fee) => t('checkout_transfer_fee', {'fee': fee});
   String get checkoutQuoteWait => t('checkout_quote_wait');
   String get storeCouponsTitle => t('store_coupons_title');
   String storeCouponApplies(Object? store) => t('store_coupon_applies', {'store': store});
@@ -65,7 +64,6 @@ extension StringsLogistics on Strings {
   String get journeyTitle => t('journey_title');
   String get journeyWaiting => t('journey_waiting');
 
-  String checkoutExpress(Object? fee) => t('checkout_express', {'fee': fee});
   String get deliveryEstimateHintExpress => t('delivery_estimate_hint_express');
   String get orderExpressNote => t('order_express_note');
   String get orderPartDelivered => t('order_part_delivered');
@@ -77,7 +75,6 @@ extension StringsLogistics on Strings {
   String get deliveryLegExpress => t('delivery_leg_express');
   String deliveryLegItems(int n) => n == 1 ? t('delivery_leg_items_one') : t('delivery_leg_items', {'n': n});
   String get deliveryLegLast => t('delivery_leg_last');
-  String get deliveryExpressRow => t('delivery_express_row');
 
   /// "Delivery attempt 1 failed: Customer not reachable. The rider will try again."
   String deliveryAttemptFailed(int n, String? reason, bool retry) {

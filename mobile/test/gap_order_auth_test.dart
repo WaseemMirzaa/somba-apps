@@ -69,7 +69,7 @@ void main() {
         expect(t, contains('1 × Charger — ${money(20)}'), reason: 'the Default variant is not printed');
         expect(t, isNot(contains('(Default)')));
         expect(t, contains('${s.subtotal}: ${money(60)}'));
-        expect(t, contains('${s.delivery}: ${money(3)}'));
+        expect(t, contains('${s.platformFee}: ${money(3)}'));
         expect(t, contains('${s.total}: ${money(63)}'));
         expect(t, contains('${s.receiptPaidWith}: ${s.paymentLabel('wallet')}'));
         expect(t, contains(s.receiptTitle));

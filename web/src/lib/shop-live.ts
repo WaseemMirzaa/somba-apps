@@ -39,7 +39,7 @@ export interface PublicSettings {
   returnWindowDays: number;
   /** Hours a seller has to answer a return. */
   sellerResponseHours: number;
-  /** Delivery fee rules (base + per km, capped, plus a transfer fee between warehouses). */
+  /** Delivery fee rules (base + per km, capped, plus a transfer fee between warehouses). STAFF ONLY: the server sends them to warehouse staff and admins, never to customers, guests or sellers (they see one "Platform commission" line), so a customer page must never print them. */
   deliveryBaseUsd: number;
   deliveryPerKmUsd: number;
   deliveryMaxUsd: number;

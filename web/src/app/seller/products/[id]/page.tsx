@@ -219,7 +219,7 @@ export default function SellerProductDetailPage() {
                     full: true,
                   }]
                 : []),
-              { label: fr ? "Commission" : "Commission", value: `${product.commission}%` },
+              { label: fr ? "Commission (taux par défaut)" : "Commission (default rate)", value: `${product.commission}%` },
               { label: fr ? "Revenu net par vente" : "Net per sale", value: formatCurrency(product.netRevenue, locale) },
             ]} />
           </DetailGridSection>

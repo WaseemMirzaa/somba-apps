@@ -194,6 +194,7 @@ test("the delivery model's errors read in French", () => {
     ["Express delivery must be true or false.", /livraison express/],
     ["Local delivery days must be a whole number between 0 and 30.", /livraison locale/],
     ["Maximum express fee must be a number between 0 and 500.", /plafond des frais express/],
+    ["Seller commission must be a number between 0 and 60.", /commission vendeur/],
     ["An express delivery that is delivered cannot become failed.", /Une livraison express « delivered » ne peut pas passer à « failed »/],
   ];
   for (const [en, re] of cases) {

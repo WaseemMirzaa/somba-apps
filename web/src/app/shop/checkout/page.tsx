@@ -19,6 +19,7 @@ import { AreaPicker, type AreaSelection } from "@/components/geo/area-picker";
 import { addressTextFromChain, chainText, notServedArea, notServedText, type AreaHint, type NotServedInfo } from "@/lib/areas";
 import { AddressPinEditor, UnpinnedWarning, pinRequiredText } from "@/components/shop/address-pin-editor";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
+import { platformFee, platformFeeLabel } from "@/lib/quote-text";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
@@ -75,7 +76,7 @@ function CheckoutContent() {
   const addressUnserved = !!address && address.served === false;
   const deepestArea = address?.areaChain?.[address.areaChain.length - 1] ?? null;
   const notServed = quoteNotServed ?? (addressUnserved ? { area: deepestArea?.name ?? address?.commune ?? address?.city ?? "", areaEn: deepestArea?.nameEn ?? undefined } : null);
-  const deliveryFee = quote?.feeUsd ?? 0;
+  const deliveryFee = platformFee(quote);
   const discount = Math.min(promoDiscount, subtotal);
   const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
 
@@ -262,7 +263,7 @@ function CheckoutContent() {
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"}${promoCode ? ` (${promoCode})` : ""}`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
-          { label: fr ? "Frais de livraison" : "Delivery fee", value: <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={address && !pinned ? (fr ? "Épinglez l'adresse" : "Pin the address") : undefined} /> },
+          { label: platformFeeLabel(fr), value: <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={address && !pinned ? (fr ? "Épinglez l'adresse" : "Pin the address") : undefined} /> },
           { label: "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
         ]} />
       </DetailSection>

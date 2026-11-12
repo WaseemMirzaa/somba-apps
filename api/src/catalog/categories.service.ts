@@ -11,7 +11,13 @@ import { planWrite } from '../translation/translatable';
 import type { WritePlan, WriteState } from '../translation/translatable';
 import { isLocale } from '../translation/translator.provider';
 
-/** A category as clients receive it (plan §2.2). */
+/**
+ * Who may see the per-category seller commission rate: sellers (they pay it) and staff. Customers and guests never do
+ * (the rate is the platform's business; they see one "Platform commission" line on an order, never a seller rate).
+ */
+export const seesCategoryRates = (role: string | undefined | null): boolean => !!role && (role === 'seller' || role === 'warehouse_staff' || role.startsWith('admin'));
+
+/** A category as clients receive it (plan §2.2). `commissionPct` is absent for customers and guests. */
 export type ServedCategory = Category & {
   nameFr: string | null;
   /** Live listings in the category. */
@@ -44,12 +50,13 @@ export class CategoriesService {
     });
   }
 
-  async list(): Promise<ServedCategory[]> {
-    return this.present(await this.repo.find({ order: { sortOrder: 'ASC' } }));
+  /** `withRates`: include each category's `commissionPct` (sellers and staff); false = the customer / guest view without it. */
+  async list(opts: { withRates?: boolean } = {}): Promise<ServedCategory[]> {
+    return this.present(await this.repo.find({ order: { sortOrder: 'ASC' } }), opts);
   }
 
   /** Categories as served: both languages, how many listings use them, translation state. */
-  async present(cats: Category[]): Promise<ServedCategory[]> {
+  async present(cats: Category[], opts: { withRates?: boolean } = {}): Promise<ServedCategory[]> {
     if (!cats.length) return [];
     const [texts, counts] = await Promise.all([
       this.translations.present('category', cats),
@@ -66,7 +73,7 @@ export class CategoriesService {
     return cats.map((c) => {
       const t = texts.get(c.id)!;
       const n = by.get(c.id);
-      return Object.assign(Object.create(Object.getPrototypeOf(c)), c, {
+      const served = Object.assign(Object.create(Object.getPrototypeOf(c)), c, {
         name: t.texts.name ?? c.name,
         nameFr: t.texts.nameFr ?? c.name,
         productCount: Number(n?.live ?? 0),
@@ -74,6 +81,9 @@ export class CategoriesService {
         machineTranslated: t.machineTranslated,
         translationStatus: t.translationStatus,
       }) as ServedCategory;
+      // The seller commission is not for shoppers: the key is gone, not null.
+      if (!opts.withRates) delete (served as Partial<ServedCategory>).commissionPct;
+      return served;
     });
   }
 
@@ -109,9 +119,14 @@ export class CategoriesService {
     return hit.id;
   }
 
+  /** Pushes the list to everyone who shows categories; returns the one with rates (what the writing admin gets back). */
   private async pushAll(): Promise<ServedCategory[]> {
-    const cats = await this.list();
-    this.emitter.toRoles(['customer', 'guest', ...ADMIN_ROLES], 'categories:updated', cats);
+    const cats = await this.list({ withRates: true });
+    this.emitter.toRoles(['customer', 'guest'], 'categories:updated', cats.map((c) => {
+      const { commissionPct: _rate, ...shopper } = c;
+      return shopper;
+    }));
+    this.emitter.toRoles(['seller', 'warehouse_staff', ...ADMIN_ROLES], 'categories:updated', cats);
     return cats;
   }
 
@@ -121,6 +136,10 @@ export class CategoriesService {
     if (data?.icon !== undefined) out.icon = optStr(data.icon, 'Icon', 100);
     if (data?.image !== undefined) out.image = optStr(data.image, 'Image', 500);
     if (data?.sortOrder !== undefined) out.sortOrder = num(data.sortOrder, 'Sort order', { min: 0, max: 100000, int: true });
+    // Seller commission (%): blank / null = use the global default; 0 is a real rate.
+    if (data?.commissionPct !== undefined) {
+      out.commissionPct = data.commissionPct === null || (typeof data.commissionPct === 'string' && data.commissionPct.trim() === '') ? null : num(data.commissionPct, 'Seller commission', { min: 0, max: 60 });
+    }
     return out;
   }
 

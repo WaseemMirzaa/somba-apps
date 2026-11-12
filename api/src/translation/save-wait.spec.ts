@@ -152,7 +152,7 @@ describe('the first publish carries both languages', () => {
     expect(c.nameFr).toBe('[fr] Gadgets');
     const first = emitter.sent.find((e) => e.event === 'categories:updated');
     expect((first?.payload as { id: string; nameFr: string }[]).find((x) => x.id === c.id)?.nameFr).toBe('[fr] Gadgets');
-    expect(emitter.sent.filter((e) => e.event === 'categories:updated')).toHaveLength(1); // no second, redundant publish
+    expect(emitter.sent.filter((e) => e.event === 'categories:updated' && e.to === 'customer,guest')).toHaveLength(1); // no second, redundant publish
   });
 
   it('a slow translator: the first publish goes out in one language, the finished job publishes again with both', async () => {
@@ -161,7 +161,8 @@ describe('the first publish carries both languages', () => {
     const { cats, emitter } = build(slow.provider);
     const c = await cats.create({ name: 'Gadgets' });
     expect(c.nameFr).toBe('Gadgets');
-    const pushes = () => emitter.sent.filter((e) => e.event === 'categories:updated');
+    // One publish = one push to shoppers (+ one to sellers and staff with the rates): count the shoppers'.
+    const pushes = () => emitter.sent.filter((e) => e.event === 'categories:updated' && e.to === 'customer,guest');
     expect(pushes()).toHaveLength(1);
     slow.release();
     await until(async () => pushes().length >= 2);

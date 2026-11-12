@@ -57,6 +57,7 @@ add("Express base fee must be a number between 0 and 100", "Les frais de base ex
 add("Express fee per km must be a number between 0 and 50", "Les frais express par km doivent être un nombre entre 0 et 50.");
 add("Maximum express fee must be a number between 0 and 500", "Le plafond des frais express doit être un nombre entre 0 et 500.");
 add("Express maximum distance must be a number between 0 and 100", "La distance maximale express doit être un nombre entre 0 et 100.");
+add("Seller commission must be a number between 0 and 60", "La commission vendeur doit être un nombre entre 0 et 60.");
 
 // ── Logistics (contracts/logistics.md §10) ─────────────────────────────────────────────────────────────────────────
 add("Your warehouse assigns your tasks. You cannot accept a task yourself", "Votre entrepôt vous assigne vos tâches. Vous ne pouvez pas en accepter une vous-même.");

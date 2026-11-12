@@ -246,15 +246,17 @@ void main() {
         expect(shown(t, 'delivery-estimate'), dayLabel(estimateFor([productByUuid('p1')!.shipDays], null, deliveryTotalDaysMax, 2), lang));
       });
 
-      testWidgets('an express quote: the "Express delivery" line with the fee and "straight from the store", no warehouse lines ($lang)', (t) async {
+      testWidgets('an express quote: the "Express delivery" note ("straight from the store", no price: the fee is the one commission row), no warehouse lines ($lang)', (t) async {
         await openCheckout(t, {
           ...gapQuoteJson(fee: 4.5, hub: 'Entrepôt Gombe'),
           'estimatedDeliveryDate': '2027-01-04',
           'deliveryMode': 'express',
           'express': true,
         });
-        expect(shown(t, 'checkout-express'), s.checkoutExpress(money(4.5)));
-        expect(shown(t, 'checkout-express'), lang == 'en' ? 'Express delivery: ${money(4.5)}, straight from the store to you.' : 'Livraison express : ${money(4.5)}, directement de la boutique chez vous.');
+        expect(shown(t, 'checkout-express'), s.orderExpressNote);
+        expect(shown(t, 'checkout-express'), lang == 'en' ? 'Express delivery: straight from the store to you.' : 'Livraison express : directement de la boutique chez vous.');
+        expect(find.textContaining(money(4.5)), findsWidgets, reason: 'the one fee row still carries the amount');
+        expect(find.text(s.platformFee), findsOneWidget);
         expect(find.byKey(const ValueKey('checkout-hub')), findsNothing, reason: 'no warehouse on an express delivery');
         expect(find.byKey(const ValueKey('checkout-transfer')), findsNothing);
         expect(shown(t, 'delivery-estimate'), dayLabel('2027-01-04', lang));
@@ -480,7 +482,7 @@ void main() {
       for (final lang in ['en', 'fr']) {
         final s = Strings(lang);
         final texts = [
-          s.checkoutExpress('\$4.50'),
+          s.platformFee,
           s.deliveryEstimateHintExpress,
           s.orderExpressNote,
           s.orderPartDelivered,
@@ -565,9 +567,11 @@ void main() {
   });
 
   group('an express order is not a warehouse delivery', () {
-    test('the delivery row says express and straight from the store (EN / FR)', () {
-      expect(const Strings('en').deliveryExpressRow, 'Express delivery (straight from the store)');
-      expect(const Strings('fr').deliveryExpressRow, 'Livraison express (directement depuis la boutique)');
+    test('the fee row is the one platform commission line; express says "straight from the store" (EN / FR)', () {
+      expect(const Strings('en').platformFee, 'Platform commission');
+      expect(const Strings('fr').platformFee, 'Commission de la plateforme');
+      expect(const Strings('en').orderExpressNote, 'Express delivery: straight from the store to you.');
+      expect(const Strings('fr').orderExpressNote, 'Livraison express : directement de la boutique chez vous.');
     });
   });
 }

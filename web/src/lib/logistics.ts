@@ -248,10 +248,14 @@ export interface Custody {
 }
 
 export interface DeliveryQuote {
+  /** The total fee (what the order is charged); the same number as `platformFeeUsd`, kept for older servers. */
   feeUsd: number;
-  deliveryUsd: number;
-  transferUsd: number;
-  distanceKm: number;
+  /** The ONE fee a customer sees ("Platform commission"): the sum of every fee they pay, delivery included. Absent on an old server (use `feeUsd`). */
+  platformFeeUsd?: number;
+  /** The breakdown below is sent to staff and admins only (the customer's quote has none of it): never read it on a customer screen. */
+  deliveryUsd?: number;
+  transferUsd?: number;
+  distanceKm?: number;
   destinationHubId: string | null;
   destinationHub: { id: string; name: string; city: string } | null;
   originHubIds: string[];
@@ -275,7 +279,7 @@ export interface DeliveryQuote {
   routeBySeller?: Record<string, string[]>;
   interCity?: boolean;
   interCityDays?: number;
-  /** A flat fee of the area replaced base + per km. */
+  /** Staff only: a flat fee of the area replaced base + per km. */
   feeOverrideUsd?: number | null;
   /** Delivery model: `express` = a rider goes straight from the seller to the customer (no warehouse hop). */
   deliveryMode?: DeliveryMode;

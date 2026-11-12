@@ -118,7 +118,8 @@ const KIKWIT_PIN = { lat: -5.0412, lng: 18.8162 };
     ok(addrGombe?.isDefault && addrMasina && myAddrs.length === 2, 'the demo customer has two addresses: Gombe (default) and Masina', JSON.stringify(myAddrs.map((a) => a.commune)));
 
     const ship = (p, extra = {}) => JSON.stringify({ line1: '1 Test Street', city: p.city ?? 'Kinshasa', ...(p.commune ? { commune: p.commune } : {}), ...(p.areaId ? { areaId: p.areaId } : {}), ...(p.pin ? { geo: p.pin } : {}), ...extra });
-    const quote = (p, lines, extra = {}) => req(cust.sock, 'delivery:quote', { ...(p.areaId ? { areaId: p.areaId } : {}), ...(p.pin ? { geo: p.pin } : {}), city: p.city ?? 'Kinshasa', ...(p.commune ? { commune: p.commune } : {}), lines, ...extra });
+    // An admin asks: staff get the full fee breakdown (a customer gets only `platformFeeUsd`, see the check below).
+    const quote = (p, lines, extra = {}) => req(admin.sock, 'delivery:quote', { ...(p.areaId ? { areaId: p.areaId } : {}), ...(p.pin ? { geo: p.pin } : {}), city: p.city ?? 'Kinshasa', ...(p.commune ? { commune: p.commune } : {}), lines, ...extra });
     const place = (lines, p, extra = {}) => req(cust.sock, 'orders:create', { items: lines, paymentMethod: 'stripe_card', shippingAddress: ship(p), ...extra });
     const queueOf = async (u, extra = {}) => (await req(u.sock, 'logistics:queue', { status: 'all', limit: 500, ...extra })).data;
     const tasksOf = async (orderId) => (await queueOf(admin)).tasks.filter((t) => t.orderId === orderId).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));

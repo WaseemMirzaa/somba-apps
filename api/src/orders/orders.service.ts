@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
+  Category,
   DeliveryTask,
   Hub,
   ItemFulfilment,
@@ -17,6 +18,7 @@ import {
 import { ProductsService } from '../products/products.service';
 import type { PricedProduct } from '../products/products.service';
 import { pageOf } from '../common/paging';
+import { platformFeeUsd } from './platform-fee';
 import {
   ADMIN_ROLES,
   NotificationsService,
@@ -349,8 +351,18 @@ export class OrdersService {
     // A seller may not buy their own listing (inflates sales, reviews and payouts).
     const buyerKeys = await this.sellerKeys(customer.id);
 
-    // The platform commission in force NOW is frozen on every line (later rate changes never touch this order).
-    const commissionPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12) || 0));
+    // The seller commission in force NOW is frozen on every line (later rate changes never touch this order): the line's
+    // category rate when the admin set one (0 is a real rate), else the global default.
+    const defaultPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12) || 0));
+    const categoryRates = new Map<string, number | null>();
+    const rateFor = async (categoryId: string | null | undefined): Promise<number> => {
+      if (!categoryId) return defaultPct;
+      if (!categoryRates.has(categoryId)) {
+        const c = await this.orders.manager.findOne(Category, { where: { id: categoryId }, select: ['id', 'commissionPct'] });
+        categoryRates.set(categoryId, typeof c?.commissionPct === 'number' && Number.isFinite(c.commissionPct) ? Math.min(100, Math.max(0, c.commissionPct)) : null);
+      }
+      return categoryRates.get(categoryId) ?? defaultPct;
+    };
 
     const items: OrderItem[] = [];
     // The French name / option label each line carries, written next to the order as a snapshot (plan §2.1).
@@ -394,7 +406,9 @@ export class OrdersService {
       let campaignPct = 0;
       let sellerId: string | null = null;
       let sellerName: string | null = null;
+      let commissionPct = defaultPct;
       if (product) {
+        commissionPct = await rateFor(product.categoryId);
         sellerId = product.sellerId ?? null;
         sellerName = product.sellerName ?? null;
         // The shopper must have chosen every option the seller defined; stored in its canonical form.
@@ -849,7 +863,7 @@ export class OrdersService {
    * lines to the warehouse that collects from them, because `origins` follows no line order). `tracking` is null before the
    * first delivery task exists. Never carries a phone, an address or the handover code of anyone else.
    */
-  async customerViews(orders: Order[]): Promise<(Order & { rider?: RiderContact; tracking: SellerTracking | null; partiallyDelivered: boolean; hubs: { destination: HubName | null; origins: HubName[]; bySeller: Record<string, HubName> } })[]> {
+  async customerViews(orders: Order[]): Promise<(Order & { platformFeeUsd: number; rider?: RiderContact; tracking: SellerTracking | null; partiallyDelivered: boolean; hubs: { destination: HubName | null; origins: HubName[]; bySeller: Record<string, HubName> } })[]> {
     const withRider = await this.withRiders(orders);
     if (!orders.length) return [];
     const hubIds = [...new Set(orders.flatMap((o) => hubsOfOrder(o)))];
@@ -865,6 +879,15 @@ export class OrdersService {
     const tracking = await sellerTracking(this.orders.manager, orders.map((o) => o.id), undefined, { hubs: names }).catch(() => new Map<string, SellerTracking>());
     return withRider.map((o) =>
       Object.assign(Object.create(Object.getPrototypeOf(o)), o, {
+        // The one fee line the customer sees (the sum of every fee they pay, delivery included); `deliveryFeeUsd` stays for old app builds.
+        platformFeeUsd: platformFeeUsd(o.deliveryFeeUsd),
+        // The seller's commission on each line is the seller's business: it never reaches the customer.
+        items: (o.items ?? []).map((i) => {
+          const line = Object.assign(Object.create(Object.getPrototypeOf(i)), i) as Partial<OrderItem>;
+          delete line.commissionPct;
+          delete line.commissionUsd;
+          return line as OrderItem;
+        }),
         tracking: tracking.get(o.id) ?? null,
         // Some live line reached the customer while another has not (a split order between its legs). A fully delivered order is simply delivered.
         partiallyDelivered: isPartiallyDelivered(o.items),

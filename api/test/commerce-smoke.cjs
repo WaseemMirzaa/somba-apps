@@ -506,8 +506,11 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
     a = await order([{ productId: cm.id, qty: 2 }, { productId: ct.id, qty: 1 }], cpn.code);
     const cOrder = a.data;
     ok(a.ok && near(cOrder.discountUsd, 20) && near(cOrder.totalUsd, cOrder.subtotalUsd - 20 + cOrder.deliveryFeeUsd) && cOrder.promoCode === cpn.code, 'checkout applies the coupon', a.error ?? JSON.stringify(cOrder));
-    const mineLine = cOrder?.items?.find((i) => i.productId === cm.id);
-    const theirLine = cOrder?.items?.find((i) => i.productId === ct.id);
+    // The customer's own view carries no seller commission; the stored amounts are read from the admin's view of the same order.
+    ok(cOrder.platformFeeUsd === cOrder.deliveryFeeUsd && !/commission/i.test(JSON.stringify(cOrder.items)), 'the customer sees platformFeeUsd and no seller commission on the lines');
+    const adminOrder = ((await req(admin.sock, 'orders:list', { limit: 100 })).data ?? []).find((o) => o.id === cOrder.id);
+    const mineLine = adminOrder?.items?.find((i) => i.productId === cm.id);
+    const theirLine = adminOrder?.items?.find((i) => i.productId === ct.id);
     ok(mineLine && near(mineLine.couponDiscountUsd, 20) && near(mineLine.commissionUsd, 8) && theirLine && near(theirLine.couponDiscountUsd, 0) && near(theirLine.commissionUsd, 10), 'the store pays: its line carries 20 off and 10% commission on 80; the other store’s line is untouched', JSON.stringify([mineLine?.couponDiscountUsd, mineLine?.commissionUsd, theirLine?.couponDiscountUsd]));
     const usePush = await waitFor(shop1, 'coupon:updated', (c) => c.code === cpn.code && c.uses >= 1, 0, 8000);
     ok(!!usePush, 'the first use of the coupon reaches the seller live (coupon:updated with the new count)', JSON.stringify(shop1.events.filter((e) => e.ev === 'coupon:updated').map((e) => [e.payload.code, e.payload.uses])));
