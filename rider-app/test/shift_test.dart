@@ -365,7 +365,10 @@ void main() {
     });
 
     testWidgets('an open shift shows when it started, the hours so far and the break time', (t) async {
-      final started = DateTime.now().subtract(const Duration(minutes: 90));
+      // 90 minutes ago, but never before today's midnight (a run just after midnight would otherwise say "yesterday").
+      final now = DateTime.now();
+      final ago = now.subtract(const Duration(minutes: 90));
+      final started = ago.day == now.day ? ago : DateTime(now.year, now.month, now.day);
       server.open = {'id': 'o', 'startedAt': started.toUtc().toIso8601String(), 'endedAt': null, 'breakMinutes': 10, 'onBreak': false, 'breakStartedAt': null, 'workedMinutes': 80, 'endReason': null};
       await open(t, 'en');
       final s = Strings('en');
