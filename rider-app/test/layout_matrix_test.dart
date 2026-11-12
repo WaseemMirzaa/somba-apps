@@ -8,6 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:somba_rider/l10n/strings.dart';
 import 'package:somba_rider/screens/deliveries_screen.dart';
+import 'package:somba_rider/screens/parcel_scan_screen.dart';
+import 'package:somba_rider/services/parcels.dart';
+import 'parcel_fakes.dart';
 import 'package:somba_rider/screens/delivery_proof_sheet.dart';
 import 'package:somba_rider/services/auth_service.dart' show ApiException;
 import 'package:somba_rider/screens/work_screen.dart';
@@ -29,7 +32,7 @@ import 'proof_fakes.dart';
 import 'task_fixtures.dart';
 
 /// What a screen is shown with.
-enum _Scenario { cards, single, empty, runs }
+enum _Scenario { cards, single, empty, runs, stop, contents }
 
 Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   SharedPreferences.setMockInitialValues({});
@@ -79,6 +82,29 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
       store.myTasks.add(leg('delivery', id: 'a3', status: 'in_transit'));
     case _Scenario.empty:
       break;
+    case _Scenario.stop:
+      // Two orders of one box set met at one address, on the road with the customer's code to ask, and a set of two orders to collect.
+      store.myTasks.addAll([
+        DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'})),
+        DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'})),
+        DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p1', orderId: 'o-a', reference: 'SOM-1042')),
+        DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p2', orderId: 'o-b', reference: 'SOM-1043')),
+      ]);
+    case _Scenario.contents:
+      // A lone leg whose box holds products with options, and an older leg whose payload carries no contents at all.
+      store.myTasks.addAll([
+        DeliveryTaskDto.fromJson({
+          ...legJson('delivery', id: 'c1', status: 'in_transit'),
+          'parcels': setBoxes(picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}),
+          'parcelContents': setContents,
+          'parcelOrders': [
+            {'orderId': 'o-a', 'reference': 'SOM-1042'}
+          ],
+        }),
+        DeliveryTaskDto.fromJson(legJson('pickup', id: 'c2', orderItems: [
+          {'productName': 'Running shoes', 'productNameFr': 'Chaussures de course', 'variant': 'Size 42 / Black', 'variantFr': 'Pointure 42 / Noir', 'qty': 2}
+        ])),
+      ]);
     case _Scenario.runs:
       // Transfer runs in every state, one of them a hop of a two-hop route, with long warehouse names.
       const kin = 'Entrepôt de Kinshasa – Gombe, Boulevard du 30 Juin';
@@ -153,6 +179,8 @@ void main() {
             await tester.pump(const Duration(milliseconds: 300));
           };
 
+  final scanCamera = FakeParcelScanner();
+
   // name -> (screen, interaction after the first pump, scenario)
   final screens = <String, (Widget Function(Locale l), Future<void> Function(WidgetTester)?, _Scenario)>{
     'deliveries: active cards, every leg kind': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.cards),
@@ -165,6 +193,44 @@ void main() {
         }, _Scenario.runs),
     'deliveries: done runs': ((l) => const Scaffold(body: DeliveriesScreen()), (t) => tab(t, 1)!(), _Scenario.runs),
     'profile: covered areas': ((l) => Scaffold(body: ProfileScreen(locale: l, onLocaleChanged: (_) {})), null, _Scenario.runs),
+    'deliveries: one stop for two orders (shared contents, one code)': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.stop),
+    'deliveries: contents with options on a leg': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.contents),
+    'delivery code dialog: one code for a stop': ((l) => Scaffold(body: Center(child: DeliveryCodeDialog(legCount: 2, onSubmit: (_) async {}))), null, _Scenario.stop),
+    'parcel scanner: contents and the box resolved': ((l) => ParcelScanScreen(
+          title: 'SOM-1042 · SOM-1043',
+          stage: ParcelStage.dropoff,
+          parcels: () => [for (final b in setBoxes(picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'})) ParcelDto.tryParse(b)!],
+          contents: () => [for (final c in setContents) ParcelContent.tryParse(c)!],
+          showOrders: true,
+          refresh: ValueNotifier(0),
+          scanner: scanCamera,
+          onScan: (code, manual) async => ParcelScan.fromJson({'parcels': setBoxes(picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {code}), 'code': code, 'scanned': 1, 'total': 2}),
+          onResolve: (code) async => ParcelResolution.fromJson({
+            'code': code,
+            'boxNo': 1,
+            'boxCount': 2,
+            'storeName': 'Boutique Les Merveilles de Kinshasa',
+            'destinationArea': 'Gombe',
+            'destination': {'area': 'Gombe', 'address': '12, avenue du Commerce, près du marché central, Gombe, Kinshasa', 'phone': '+243812345678', 'recipient': 'Aline Kabila Mwamba'},
+            'contents': setContents,
+            'orders': [
+              {'orderId': 'o-a', 'reference': 'SOM-1042'},
+              {'orderId': 'o-b', 'reference': 'SOM-1043'}
+            ],
+            'legs': [
+              {'id': 's1', 'orderId': 'o-a', 'orderReference': 'SOM-1042', 'kind': 'delivery', 'status': 'in_transit'},
+              {'id': 's2', 'orderId': 'o-b', 'orderReference': 'SOM-1043', 'kind': 'delivery', 'status': 'in_transit'},
+            ],
+          }),
+        ), (t) async {
+          scanCamera.emit('PKG-7KQ2M9XA');
+          await t.pump();
+          await t.pump(const Duration(milliseconds: 300));
+          // The scan's snackbar floats over the page for a few seconds: the layout of the page itself is what is checked.
+          t.state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger).first).hideCurrentSnackBar();
+          await t.pump(const Duration(milliseconds: 400));
+          await t.pump(const Duration(milliseconds: 400));
+        }, _Scenario.stop),
     'deliveries: nothing assigned': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.empty),
     'profile': ((l) => Scaffold(body: ProfileScreen(locale: l, onLocaleChanged: (_) {})), null, _Scenario.cards),
     'my work': ((l) => const Scaffold(body: WorkScreen()), null, _Scenario.cards),
@@ -213,11 +279,19 @@ void main() {
     'support: closed thread': ((l) => const SupportThreadScreen(ticketId: '2'), null, _Scenario.cards),
   };
 
+  // The screens that list products or group legs are also run at the narrowest phone and the largest text.
+  const stressed = {
+    'deliveries: one stop for two orders (shared contents, one code)',
+    'deliveries: contents with options on a leg',
+    'delivery code dialog: one code for a stop',
+    'parcel scanner: contents and the box resolved',
+  };
+
   for (final e in screens.entries) {
     testWidgets('layout matrix: ${e.key}', (tester) async {
       addTearDown(tester.view.reset);
       final found = <String>[];
-      for (final c in layoutConfigs) {
+      for (final c in [...layoutConfigs, if (stressed.contains(e.key)) ...stressConfigs]) {
         await _seed(c.lang, scenario: e.value.$3);
         final locale = Locale(c.lang);
         final app = MaterialApp(

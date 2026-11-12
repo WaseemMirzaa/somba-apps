@@ -97,6 +97,53 @@ Map<String, dynamic> legJson(
   return json;
 }
 
+/// The box set two same-day orders of one customer share (docs/contracts/logistics.md section 19): two boxes, every product of
+/// both orders with its options, one line each.
+List<Map<String, dynamic>> setBoxes({Set<String> picked = const {}, Set<String> dropped = const {}}) => [
+      for (final (i, code) in const ['PKG-7KQ2M9XA', 'PKG-4HT8W3NB'].indexed)
+        {
+          'code': code,
+          'boxNo': i + 1,
+          'boxCount': 2,
+          'groupId': 'g1',
+          'pickupScannedAt': picked.contains(code) ? '2026-10-24T08:00:00.000Z' : null,
+          'dropoffScannedAt': dropped.contains(code) ? '2026-10-24T09:00:00.000Z' : null,
+        }
+    ];
+
+final setContents = <Map<String, dynamic>>[
+  {'name': 'Running shoes Air Comfort Pro', 'nameFr': 'Chaussures de course Air Comfort Pro', 'variant': 'Size 42 / Black', 'variantFr': 'Pointure 42 / Noir', 'qty': 2, 'orderReference': 'SOM-1042'},
+  {'name': 'Wireless earphones', 'nameFr': 'Écouteurs sans fil', 'variant': null, 'qty': 1, 'orderReference': 'SOM-1042'},
+  {'name': 'Phone case', 'nameFr': 'Coque de téléphone', 'variant': 'Blue', 'variantFr': 'Bleu', 'qty': 3, 'orderReference': 'SOM-1043'},
+];
+
+/// One leg of a two-order box set: the same boxes, contents and `parcelOrders` on both legs, its own order and id.
+Map<String, dynamic> siblingLegJson(
+  String kind, {
+  required String id,
+  required String orderId,
+  required String reference,
+  String status = 'assigned',
+  Set<String> picked = const {},
+  Set<String> dropped = const {},
+}) {
+  final boxes = setBoxes(picked: picked, dropped: dropped);
+  return {
+    ...legJson(kind, id: id, status: status),
+    'orderId': orderId,
+    'orderReference': reference,
+    'parcels': boxes,
+    'pickupComplete': boxes.every((b) => b['pickupScannedAt'] != null),
+    'dropoffComplete': boxes.every((b) => b['dropoffScannedAt'] != null),
+    'scanRequired': true,
+    'parcelContents': setContents,
+    'parcelOrders': [
+      {'orderId': 'o-a', 'reference': 'SOM-1042'},
+      {'orderId': 'o-b', 'reference': 'SOM-1043'},
+    ],
+  };
+}
+
 DeliveryTaskDto leg(String kind, {String? id, String status = 'assigned', String? failure, int attempts = 1, bool legacy = false, bool partial = false}) =>
     DeliveryTaskDto.fromJson(legJson(kind, id: id, status: status, failure: failure, attempts: attempts, legacy: legacy, partial: partial));
 

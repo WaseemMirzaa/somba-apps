@@ -15,6 +15,8 @@ import 'package:somba_rider/services/models.dart';
 import 'package:somba_rider/services/parcel_scanner.dart';
 import 'package:somba_rider/services/parcels.dart';
 import 'package:somba_rider/services/rider_store.dart';
+import 'package:somba_rider/screens/parcel_checklist.dart';
+import 'package:somba_rider/screens/parcel_scan_screen.dart';
 import 'package:somba_rider/theme/app_theme.dart';
 
 import 'button_rules.dart';
@@ -445,6 +447,444 @@ void main() {
     });
   });
 
+
+  group('contents of a leg', () {
+    test('an order line reads its options; French when asked; an older payload has none', () {
+      final t = DeliveryTaskDto.fromJson(legJson('delivery', id: 'c', orderItems: [
+        {'productName': 'Running shoes', 'productNameFr': 'Chaussures de course', 'variant': 'Size 42 / Black', 'variantFr': 'Pointure 42 / Noir', 'qty': 2},
+        {'productName': 'Earphones', 'variant': 'Blue', 'qty': 1}, // no French twin: the stored one stands in
+        {'productName': 'Phone case', 'qty': 3}, // no options
+      ]));
+      expect(t.items.map((i) => i.text('en')), ['2× Running shoes (Size 42 / Black)', '1× Earphones (Blue)', '3× Phone case']);
+      expect(t.items.map((i) => i.text('fr')), ['2× Chaussures de course (Pointure 42 / Noir)', '1× Earphones (Blue)', '3× Phone case']);
+      // The legacy shape: no `variant` key at all.
+      expect(leg('delivery').items.map((i) => i.text('en')), ['1× Chaussures de course Air Comfort Pro'.replaceFirst('1×', '2×'), '1× Écouteurs sans fil']);
+    });
+
+    test('a leg reads the box set contents and orders; a leg without them has empty lists (an older server)', () {
+      final t = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042'));
+      expect(t.parcelContents.map((c) => c.text('en')), [
+        '2× Running shoes Air Comfort Pro (Size 42 / Black)',
+        '1× Wireless earphones',
+        '3× Phone case (Blue)',
+      ]);
+      expect(t.parcelContents.map((c) => c.text('fr')), [
+        '2× Chaussures de course Air Comfort Pro (Pointure 42 / Noir)',
+        '1× Écouteurs sans fil',
+        '3× Coque de téléphone (Bleu)',
+      ]);
+      expect(t.parcelContents.map((c) => c.orderReference), ['SOM-1042', 'SOM-1042', 'SOM-1043']);
+      expect(t.parcelOrders.map((o) => (o.orderId, o.reference)), [('o-a', 'SOM-1042'), ('o-b', 'SOM-1043')]);
+      expect(t.parcels.every((p) => p.groupId == 'g1'), isTrue);
+      final old = leg('delivery');
+      expect(old.parcelContents, isEmpty);
+      expect(old.parcelOrders, isEmpty);
+    });
+
+    test('a push (no order snapshot) keeps the contents the list knew when it carries none', () {
+      final old = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042'));
+      final push = DeliveryTaskDto.fromJson({...legJson('delivery', id: 's1', withOrder: false), 'orderId': 'o-a'});
+      expect(push.withOrderFrom(old).parcelContents, hasLength(3));
+      expect(push.withOrderFrom(old).parcelOrders, hasLength(2));
+    });
+
+    testWidgets('a lone leg with boxes lists what is in them, with options, in the rider\'s language', (t) async {
+      await show(t, [
+        {..._task('pickup', 'assigned'), 'parcelContents': setContents, 'parcelOrders': [{'orderId': 'o-a', 'reference': 'SOM-1042'}]}
+      ]);
+      expect(find.text('In the parcels'), findsOneWidget);
+      expect(find.textContaining('2× Running shoes Air Comfort Pro (Size 42 / Black)', findRichText: true), findsOneWidget);
+      expect(find.textContaining('3× Phone case (Blue)', findRichText: true), findsOneWidget);
+      expect(find.byKey(const ValueKey('t1-contents-line-0')), findsOneWidget);
+    });
+
+    testWidgets('in French the contents use the French name and options', (t) async {
+      await show(t, [
+        {..._task('pickup', 'assigned'), 'parcelContents': setContents}
+      ], lang: 'fr');
+      expect(find.text('Dans les colis'), findsOneWidget);
+      expect(find.textContaining('2× Chaussures de course Air Comfort Pro (Pointure 42 / Noir)', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('a leg without box contents (an older server) still lists its own lines, with their options', (t) async {
+      await show(t, [
+        {
+          ..._task('pickup', 'assigned', parcels: []),
+          'order': {
+            ...legJson('pickup', id: 't1')['order'] as Map<String, dynamic>,
+            'items': [
+              {'productName': 'Running shoes', 'variant': 'Size 42 / Black', 'qty': 2}
+            ],
+          },
+        }
+      ]);
+      expect(find.textContaining('2× Running shoes (Size 42 / Black)'), findsOneWidget);
+      expect(find.text('In the parcels'), findsNothing);
+    });
+  });
+
+  group('sibling legs, one stop', () {
+    List<Map<String, dynamic>> pair(String kind, String status, {Set<String> picked = const {}, Set<String> dropped = const {}}) => [
+          siblingLegJson(kind, id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: status, picked: picked, dropped: dropped),
+          siblingLegJson(kind, id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: status, picked: picked, dropped: dropped),
+        ];
+
+    List<DeliveryTaskDto> dtos(List<Map<String, dynamic>> rows) => rows.map(DeliveryTaskDto.fromJson).toList();
+
+    test('legs with the same box set, kind and status are one stop, whatever the order of their orders', () {
+      final rows = dtos(pair('delivery', 'in_transit'));
+      rows[1].parcelOrders = rows[1].parcelOrders.reversed.toList();
+      final stops = groupStops(rows);
+      expect(stops, hasLength(1));
+      expect(stops.single.legs.map((l) => l.id), ['s1', 's2']);
+      expect(stops.single.references, ['SOM-1042', 'SOM-1043']);
+      expect(stops.single.isGroup, isTrue);
+    });
+
+    test('a different status or kind, a set of one order, a finished leg and a legacy leg stand alone', () {
+      final a = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit'));
+      final b = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: 'assigned'));
+      final pickup = DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit'));
+      final done1 = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 'd1', orderId: 'o-a', reference: 'SOM-1042', status: 'delivered'));
+      final done2 = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 'd2', orderId: 'o-b', reference: 'SOM-1043', status: 'delivered'));
+      final lone = DeliveryTaskDto.fromJson({...siblingLegJson('delivery', id: 'l1', orderId: 'o-c', reference: 'SOM-1050', status: 'in_transit'), 'parcelOrders': [{'orderId': 'o-c', 'reference': 'SOM-1050'}]});
+      final legacy = leg('delivery', id: 'old', status: 'in_transit');
+      final stops = groupStops([a, b, pickup, done1, done2, lone, legacy]);
+      expect(stops.map((s) => s.legs.map((l) => l.id).toList()), [['s1'], ['s2'], ['p1'], ['d1'], ['d2'], ['l1'], ['old']]);
+      expect(stops.every((s) => !s.isGroup), isTrue);
+    });
+
+    test('a box both legs hold counts once, and is scanned only when every leg has it', () {
+      final rows = dtos([
+        siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'}),
+        siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}),
+      ]);
+      final stop = groupStops(rows).single;
+      expect(stop.parcels.map((p) => p.code), ['PKG-7KQ2M9XA', 'PKG-4HT8W3NB']);
+      expect(scanCount(stop.parcels, ParcelStage.pickup), (scanned: 2, total: 2));
+      expect(scanCount(stop.parcels, ParcelStage.dropoff), (scanned: 0, total: 2), reason: 'only one of the two legs has it');
+      expect(stop.scanBlocks(ParcelStage.dropoff), isTrue);
+    });
+
+    testWidgets('the list shows ONE card for the two orders: both references, the combined contents, the boxes counted once', (t) async {
+      await show(t, pair('delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}));
+      expect(find.byKey(const ValueKey('task-s1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('task-s2')), findsNothing);
+      expect(find.text('SOM-1042 · SOM-1043'), findsOneWidget);
+      expect(find.text('2 orders'), findsOneWidget);
+      expect(find.text('Same address: SOM-1042, SOM-1043'), findsOneWidget);
+      expect(find.text('Active · 1'), findsOneWidget);
+      // The whole box set, each line with its order.
+      expect(find.textContaining('2× Running shoes Air Comfort Pro (Size 42 / Black) · SOM-1042', findRichText: true), findsOneWidget);
+      expect(find.textContaining('3× Phone case (Blue) · SOM-1043', findRichText: true), findsOneWidget);
+      // Two boxes, not four; both legs' scans are one count.
+      expect(find.text('0 of 2 scanned'), findsOneWidget);
+      expect(find.text('Scan parcels (0 of 2)'), findsOneWidget);
+      expect(find.byKey(const ValueKey('scan-parcels-s1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('scan-parcels-s2')), findsNothing);
+      expectButtonRules(t);
+    });
+
+    testWidgets('in French', (t) async {
+      await show(t, pair('delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}), lang: 'fr');
+      expect(find.text('2 commandes'), findsOneWidget);
+      expect(find.text('Même adresse : SOM-1042, SOM-1043'), findsOneWidget);
+      expect(find.textContaining('3× Coque de téléphone (Bleu) · SOM-1043', findRichText: true), findsOneWidget);
+      expect(find.text('0 sur 2 scanné'), findsOneWidget);
+    });
+
+    testWidgets('legacy single-order legs are untouched: one card each', (t) async {
+      await show(t, [_task('pickup', 'assigned', id: 'a'), _task('pickup', 'assigned', id: 'b')]);
+      expect(find.byKey(const ValueKey('task-a')), findsOneWidget);
+      expect(find.byKey(const ValueKey('task-b')), findsOneWidget);
+      expect(find.text('2 orders'), findsNothing);
+    });
+
+    // The fake server of a two-order box set: a scan is recorded for both legs and answered as one line per box.
+    late Set<String> pk, dr;
+    late List<Map<String, dynamic>> updates;
+    Object? Function(Map<String, dynamic> body)? refuse;
+    Object? resolveAnswer;
+    late List<String> resolved;
+
+    Map<String, dynamic> scanAnswer(Map<String, dynamic> body) {
+      final stage = body['stage'] as String;
+      final set = stage == 'pickup' ? pk : dr;
+      final code = body['code'] as String;
+      final already = !set.add(code);
+      return {
+        'parcels': setBoxes(picked: pk, dropped: dr),
+        'pickupComplete': pk.length == 2,
+        'dropoffComplete': dr.length == 2,
+        'taskId': body['taskId'],
+        'stage': stage,
+        'code': code,
+        'scanned': set.length,
+        'total': 2,
+        'already': already,
+        'required': true,
+        'contents': setContents,
+        'orders': [
+          {'orderId': 'o-a', 'reference': 'SOM-1042'},
+          {'orderId': 'o-b', 'reference': 'SOM-1043'}
+        ],
+      };
+    }
+
+    Future<FakeParcelScanner> showSet(WidgetTester t, String kind, String status, {Set<String> picked = const {}, Set<String> dropped = const {}, String lang = 'en', bool code = false}) async {
+      pk = {...picked};
+      dr = {...dropped};
+      updates = [];
+      resolved = [];
+      refuse = null;
+      resolveAnswer = null;
+      RiderStore.instance.requireDeliveryCode = code;
+      final scanner = await show(t, pair(kind, status, picked: picked, dropped: dropped), lang: lang);
+      final base = RiderStore.instance.transport!;
+      RiderStore.instance.transport = (event, body) async {
+        switch (event) {
+          case 'rider:scanParcel':
+            sent.add(body!);
+            return scanAnswer(body);
+          case 'rider:legParcels':
+            return {'parcels': setBoxes(picked: pk, dropped: dr), 'pickupComplete': pk.length == 2, 'dropoffComplete': dr.length == 2, 'required': true, 'contents': setContents};
+          case 'parcels:resolve':
+            resolved.add(body!['code'] as String);
+            final a = resolveAnswer;
+            if (a is Exception) throw a;
+            return a ?? {'code': body['code']};
+          case 'delivery:updateStatus':
+            updates.add(body!);
+            final err = refuse?.call(body);
+            if (err != null) throw err;
+            return {'ok': true};
+        }
+        return base(event, body);
+      };
+      return scanner;
+    }
+
+    testWidgets('one scan on the stop ticks the box on BOTH legs and counts it once; the stop then moves as one', (t) async {
+      final scanner = await showSet(t, 'pickup', 'assigned');
+      expect(enabled(t, 'next-s1'), isFalse);
+      await t.tap(find.byKey(const ValueKey('scan-parcels-s1')));
+      await settle(t);
+      scanner.emit('PKG-7KQ2M9XA');
+      await settle(t);
+      // One request, for the first leg; both legs now show the box as scanned and the answer counts it once.
+      expect(sent.map((b) => b['taskId']), ['s1']);
+      expect(find.text('PKG-7KQ2M9XA scanned (1 of 2).'), findsWidgets);
+      expect(find.text('1 of 2 scanned'), findsWidgets);
+      final tasks = RiderStore.instance.myTasks;
+      expect(tasks.map((x) => x.parcels.where((p) => p.pickupScannedAt != null).length), [1, 1]);
+      scanner.emit('PKG-4HT8W3NB');
+      await settle(t);
+      expect(tasks.map((x) => x.pickupComplete), [true, true]);
+      expect(find.text('All parcels scanned. You can continue.'), findsWidgets);
+      await t.tap(find.byKey(const ValueKey('parcel-finish')));
+      await settle(t);
+      expect(enabled(t, 'next-s1'), isTrue);
+      // "Picked up" moves BOTH legs; the outcome says how many orders.
+      await t.tap(find.byKey(const ValueKey('next-s1')));
+      await settle(t);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(updates.map((u) => (u['taskId'], u['status'])), [('s1', 'picked_up'), ('s2', 'picked_up')]);
+      expect(find.text('${Strings.current.donePickedUp} (2 orders)'), findsOneWidget);
+    });
+
+    testWidgets('the scanner of a stop names both orders and lists the whole box set', (t) async {
+      final scanner = await showSet(t, 'pickup', 'assigned');
+      await t.tap(find.byKey(const ValueKey('scan-parcels-s1')));
+      await settle(t);
+      expect(find.descendant(of: find.byType(AppBar), matching: find.text('SOM-1042 · SOM-1043')), findsOneWidget);
+      final onScanner = find.byType(ParcelScanScreen);
+      expect(find.descendant(of: onScanner, matching: find.byType(ParcelContentsList)), findsOneWidget);
+      expect(find.descendant(of: onScanner, matching: find.textContaining('3× Phone case (Blue) · SOM-1043', findRichText: true)), findsOneWidget);
+      scanner.emit('PKG-7KQ2M9XA');
+      await settle(t);
+    });
+
+    testWidgets('one handover code is asked ONCE and sent with each leg', (t) async {
+      await showSet(t, 'delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, code: true);
+      expect(find.byKey(const ValueKey('code-hint-s1')), findsOneWidget);
+      expect(find.textContaining('One delivery code for all 2 orders.'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('next-s1')));
+      await settle(t);
+      // The proof sheet comes once for the stop; with nothing captured "Continue" just closes it.
+      expect(find.byKey(const ValueKey('proof-continue')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('proof-continue')));
+      await settle(t);
+      expect(find.byKey(const ValueKey('delivery-code-field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('delivery-code-shared')), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('delivery-code-field')), '4821');
+      await t.tap(find.byKey(const ValueKey('delivery-code-submit')));
+      await settle(t);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(updates.map((u) => (u['taskId'], u['status'], u['code'])), [('s1', 'delivered', '4821'), ('s2', 'delivered', '4821')]);
+      expect(find.byKey(const ValueKey('delivery-code-field')), findsNothing);
+      expect(find.text('${Strings.current.doneDelivered} (2 orders)'), findsOneWidget);
+    });
+
+    testWidgets('a wrong code keeps the dialog open and spends ONE attempt (the second leg is not tried); the right one then goes through', (t) async {
+      await showSet(t, 'delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, code: true);
+      refuse = (b) => b['code'] == '1111' ? ApiException('Wrong delivery code. Ask the customer for the 4-digit code shown in their app.', 400) : null;
+      await t.tap(find.byKey(const ValueKey('next-s1')));
+      await settle(t);
+      await t.tap(find.byKey(const ValueKey('proof-continue')));
+      await settle(t);
+      await t.enterText(find.byKey(const ValueKey('delivery-code-field')), '1111');
+      await t.tap(find.byKey(const ValueKey('delivery-code-submit')));
+      await settle(t);
+      expect(updates.map((u) => u['taskId']), ['s1']);
+      expect(find.byKey(const ValueKey('delivery-code-error')), findsOneWidget);
+      await t.enterText(find.byKey(const ValueKey('delivery-code-field')), '4821');
+      await t.tap(find.byKey(const ValueKey('delivery-code-submit')));
+      await settle(t);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(updates.map((u) => (u['taskId'], u['code'])), [('s1', '1111'), ('s1', '4821'), ('s2', '4821')]);
+    });
+
+    testWidgets('a leg the server refuses is named in the snackbar, with the others done (English)', (t) async {
+      await showSet(t, 'pickup', 'assigned', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'});
+      refuse = (b) => b['taskId'] == 's2' ? ApiException('This delivery was just updated. Refresh and try again.', 409) : null;
+      await t.tap(find.byKey(const ValueKey('next-s1')));
+      await settle(t);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(updates.map((u) => u['taskId']), ['s1', 's2']);
+      expect(find.text('Done for 1 of 2 orders. Not done: SOM-1043: This delivery was just updated. Refresh and try again.'), findsOneWidget);
+    });
+
+    testWidgets('and in French', (t) async {
+      await showSet(t, 'pickup', 'assigned', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, lang: 'fr');
+      refuse = (b) => b['taskId'] == 's2' ? ApiException('This delivery was just updated. Refresh and try again.', 409) : null;
+      await t.tap(find.byKey(const ValueKey('next-s1')));
+      await settle(t);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(find.text('Fait pour 1 sur 2 commandes. Non fait : SOM-1043 : Cette livraison vient d’être mise à jour. Actualisez et réessayez.'), findsOneWidget);
+    });
+
+    testWidgets('the first leg refused (nothing changed): its refusal is shown and the second leg is not touched', (t) async {
+      await showSet(t, 'pickup', 'assigned', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'});
+      refuse = (b) => ApiException('This delivery is no longer available.', 400);
+      await t.tap(find.byKey(const ValueKey('next-s1')));
+      await settle(t);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(updates.map((u) => u['taskId']), ['s1']);
+      expect(find.text('This delivery is no longer available.'), findsOneWidget);
+    });
+
+    testWidgets('could-not-deliver on the stop fails every order with one reason', (t) async {
+      await showSet(t, 'delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'});
+      await t.tap(find.byKey(const ValueKey('fail-s1')));
+      await settle(t);
+      await t.tap(find.byKey(const ValueKey('reason-unreachable')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('reason-submit')));
+      await settle(t);
+      await t.pump(const Duration(milliseconds: 400));
+      expect(updates.map((u) => (u['taskId'], u['status'])), [('s1', 'failed'), ('s2', 'failed')]);
+      expect(updates[0]['reason'], updates[1]['reason']);
+    });
+
+    Map<String, dynamic> resolveJson({bool priv = true, bool voided = false}) => {
+          'code': 'PKG-7KQ2M9XA',
+          'boxNo': 1,
+          'boxCount': 2,
+          'voided': voided,
+          'storeName': 'Boutique Les Merveilles de Kinshasa',
+          'destinationArea': 'Gombe',
+          'destination': {'area': 'Gombe', 'address': priv ? '12, avenue du Commerce, Gombe' : null, 'phone': priv ? '+243812345678' : null, 'recipient': priv ? 'Aline Kabila Mwamba' : null},
+          'contents': setContents,
+          'orders': [
+            {'orderId': 'o-a', 'reference': 'SOM-1042'},
+            {'orderId': 'o-b', 'reference': 'SOM-1043'}
+          ],
+          'group': {'id': 'g1', 'orders': 2, 'locked': true, 'contentsRev': 1},
+          'legs': [
+            {'id': 's1', 'orderId': 'o-a', 'orderReference': 'SOM-1042', 'kind': 'delivery', 'status': 'in_transit'},
+            {'id': 's2', 'orderId': 'o-b', 'orderReference': 'SOM-1043', 'kind': 'delivery', 'status': 'in_transit'},
+          ],
+        };
+
+    Future<void> scanOne(WidgetTester t, FakeParcelScanner scanner) async {
+      await t.tap(find.byKey(const ValueKey('scan-parcels-s1')));
+      await settle(t);
+      scanner.emit('PKG-7KQ2M9XA');
+      await settle(t);
+    }
+
+    testWidgets('after a scan the box is resolved: contents, orders, legs, and the street, phone and recipient the server sent', (t) async {
+      final scanner = await showSet(t, 'delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'});
+      resolveAnswer = resolveJson();
+      await scanOne(t, scanner);
+      expect(resolved, ['PKG-7KQ2M9XA']);
+      expect(find.byKey(const ValueKey('parcel-resolved-PKG-7KQ2M9XA')), findsOneWidget);
+      expect(find.text('Box 1/2 · PKG-7KQ2M9XA'), findsOneWidget);
+      expect(find.text('Store: Boutique Les Merveilles de Kinshasa'), findsOneWidget);
+      expect(find.text('To: Gombe'), findsOneWidget);
+      expect(find.text('Aline Kabila Mwamba'), findsOneWidget);
+      expect(find.text('12, avenue du Commerce, Gombe'), findsOneWidget);
+      expect(find.text('+243812345678'), findsOneWidget);
+      expect(find.text('SOM-1042 · SOM-1043'), findsWidgets);
+      expect(find.byKey(const ValueKey('resolved-contents-line-2')), findsOneWidget);
+      expect(find.text('SOM-1043 · Delivery · In transit'), findsOneWidget);
+    });
+
+    testWidgets('no street, phone or recipient from the server (a pickup, a box that is not yours): none is drawn', (t) async {
+      final scanner = await showSet(t, 'pickup', 'assigned');
+      resolveAnswer = resolveJson(priv: false);
+      await scanOne(t, scanner);
+      expect(find.byKey(const ValueKey('parcel-resolved-PKG-7KQ2M9XA')), findsOneWidget);
+      expect(find.byKey(const ValueKey('parcel-resolved-area')), findsOneWidget);
+      expect(find.byKey(const ValueKey('parcel-resolved-address')), findsNothing);
+      expect(find.byKey(const ValueKey('parcel-resolved-phone')), findsNothing);
+      expect(find.byKey(const ValueKey('parcel-resolved-recipient')), findsNothing);
+      expect(find.textContaining('avenue du Commerce'), findsNothing);
+    });
+
+    testWidgets('a cancelled label says so', (t) async {
+      final scanner = await showSet(t, 'pickup', 'assigned');
+      resolveAnswer = resolveJson(voided: true);
+      await scanOne(t, scanner);
+      expect(find.text('This label was cancelled. Use the new one.'), findsOneWidget);
+    });
+
+    for (final (lang, scanMsg, notFound) in [
+      ('en', 'PKG-7KQ2M9XA is not part of this pickup.', 'Parcel not found.'),
+      ('fr', 'PKG-7KQ2M9XA ne fait pas partie de cette collecte.', 'Colis introuvable.'),
+    ]) {
+      testWidgets('a box the server does not know: "Parcel not found." ($lang)', (t) async {
+        final scanner = await showSet(t, 'pickup', 'assigned', lang: lang);
+        resolveAnswer = ApiException('Parcel not found.', 404);
+        RiderStore.instance.transport = (event, body) async {
+          if (event == 'rider:scanParcel') throw ApiException('PKG-7KQ2M9XA is not part of this pickup.', 400);
+          if (event == 'parcels:resolve') throw ApiException('Parcel not found.', 404);
+          return [];
+        };
+        await scanOne(t, scanner);
+        expect(find.text(scanMsg), findsWidgets);
+        expect(find.byKey(const ValueKey('parcel-resolve-error')), findsOneWidget);
+        expect(find.text(notFound), findsOneWidget);
+      });
+    }
+
+    testWidgets('a lookup that fails for another reason stays quiet: the scan\'s own answer already said what happened', (t) async {
+      final scanner = await showSet(t, 'pickup', 'assigned');
+      resolveAnswer = ApiException('Socket not connected.', 0);
+      await scanOne(t, scanner);
+      expect(find.text('PKG-7KQ2M9XA scanned (1 of 2).'), findsWidgets);
+      expect(find.byKey(const ValueKey('parcel-resolved-PKG-7KQ2M9XA')), findsNothing);
+    });
+
+    test('a resolve answer with only a code is still read (older or narrower answers)', () {
+      final r = ParcelResolution.fromJson({'code': 'PKG-7KQ2M9XA'});
+      expect(r.contents, isEmpty);
+      expect(r.orders, isEmpty);
+      expect(r.legs, isEmpty);
+      expect((r.destination.hasPrivate, r.voided), (false, false));
+    });
+  });
+
   group('French server errors', () {
     const fr = Strings('fr');
     test('every scan refusal has a French text; English stays English', () {
@@ -461,6 +901,19 @@ void main() {
         'This leg is already closed.': 'Cette étape est déjà clôturée.',
         'Delivery task not found.': 'Livraison introuvable.',
         'Scan every parcel first: 2 of 3 scanned.': 'Scannez d’abord chaque colis : 2 sur 3 scannés.',
+        // docs/contracts/logistics.md section 19 (same-day parcel groups)
+        'Parcel not found.': 'Colis introuvable.',
+        'Choose at least one order to pack.': 'Choisissez au moins une commande à préparer.',
+        'Pack at most 30 orders at once.': 'Préparez au plus 30 commandes à la fois.',
+        'These orders cannot share a label: they differ in customer, day, delivery address or delivery mode.':
+            'Ces commandes ne peuvent pas partager une étiquette : le client, le jour, l’adresse de livraison ou le mode de livraison diffèrent.',
+        'A rider already collected these boxes. The orders in them cannot change; pack the other orders in a new set.':
+            'Un livreur a déjà récupéré ces boîtes. Les commandes qu’elles contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.',
+        'SOM-1042: A rider already collected these boxes. The orders in them cannot change; pack the other orders in a new set.':
+            'SOM-1042 : un livreur a déjà récupéré ces boîtes. Les commandes qu’elles contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.',
+        'Orders with several sellers keep their own labels: they cannot be packed together.':
+            'Les commandes de plusieurs vendeurs gardent leurs propres étiquettes : elles ne peuvent pas être préparées ensemble.',
+        'A label set needs at least one order.': 'Un ensemble d’étiquettes doit contenir au moins une commande.',
       };
       cases.forEach((en, expected) {
         expect(translateServerError(en, fr), expected, reason: en);
@@ -474,6 +927,9 @@ void main() {
       expect(s.parcelCounter(1, 3), '1 sur 3 scanné');
       expect(s.parcelCounter(2, 3), '2 sur 3 scannés');
       expect(s.parcelBox(2, 3), 'Boîte 2/3');
+      expect(s.stopOrdersPill(2), '2 commandes');
+      expect(s.stopOneCode(2), 'Un seul code de livraison pour les 2 commandes.');
+      expect(s.parcelContentsTitle, 'Dans les colis');
     });
   });
 }

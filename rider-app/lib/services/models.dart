@@ -351,13 +351,19 @@ class OrderLine {
 
   /// The name as the order snapshotted it in French (empty on older servers and old orders).
   final String nameFr;
-  const OrderLine(this.name, this.qty, {this.nameFr = ''});
+
+  /// The size/options label ("128 GB / Black") and its French form; null for a product without options (and on older servers).
+  final String? variant, variantFr;
+  const OrderLine(this.name, this.qty, {this.nameFr = '', this.variant, this.variantFr});
 
   /// The product name in the rider's language: French when asked and present, else the stored name.
   String displayName(String lang) => lang == 'fr' && nameFr.trim().isNotEmpty ? nameFr.trim() : name;
 
-  /// "2× Phone" in [lang].
-  String text(String lang) => '$qty× ${displayName(lang)}';
+  /// The size/options in [lang]; null when there are none.
+  String? variantText(String lang) => variantIn(lang, variant, variantFr);
+
+  /// "2× Phone" or "2× Phone (128 GB / Black)" in [lang].
+  String text(String lang) => contentLineText(qty, displayName(lang), variantText(lang));
 }
 
 /// One leg of a delivery (a task): what the warehouse assigned, plus a snapshot of its order. Old payloads (no `kind`,
@@ -433,6 +439,11 @@ class DeliveryTaskDto {
   /// The labelled boxes this leg carries and where their scans stand (empty: nothing to scan). Updated in place by the store
   /// when a scan is answered, so the buttons react at once; a `task:updated` push replaces the whole task.
   List<ParcelDto> parcels;
+
+  /// Everything in the box set this leg's boxes belong to (all the orders of the set), and the orders it serves. Empty for a leg
+  /// without labelled boxes and on older servers; a set of one order lists only that order. Refreshed by every scan answer.
+  List<ParcelContent> parcelContents;
+  List<ParcelOrderRef> parcelOrders;
   bool pickupComplete;
   bool dropoffComplete;
 
@@ -483,6 +494,8 @@ class DeliveryTaskDto {
     this.partial = false,
     this.partialKnown = false,
     this.parcels = const [],
+    this.parcelContents = const [],
+    this.parcelOrders = const [],
     bool? pickupComplete,
     bool? dropoffComplete,
     this.scanRequired = true,
@@ -596,6 +609,8 @@ class DeliveryTaskDto {
                 textOrNull(e['productName']) ?? textOrNull(e['name']) ?? '',
                 (e['qty'] as num?)?.toInt() ?? 1,
                 nameFr: textOrNull(e['productNameFr']) ?? textOrNull(e['nameFr']) ?? '',
+                variant: textOrNull(e['variant']),
+                variantFr: textOrNull(e['variantFr']),
               ))
           .toList();
 
@@ -651,6 +666,8 @@ class DeliveryTaskDto {
       partial: LegKind.customerKinds.contains(kindRaw ?? LegKind.delivery) && (o['partial'] == true || j['completesOrder'] == false),
       partialKnown: o['partial'] is bool || j['completesOrder'] is bool,
       parcels: ParcelDto.listFrom(j['parcels']),
+      parcelContents: ParcelContent.listFrom(j['parcelContents']),
+      parcelOrders: ParcelOrderRef.listFrom(j['parcelOrders']),
       pickupComplete: j['pickupComplete'] is bool ? j['pickupComplete'] as bool : null,
       dropoffComplete: j['dropoffComplete'] is bool ? j['dropoffComplete'] as bool : null,
       scanRequired: j['scanRequired'] != false,
@@ -705,6 +722,8 @@ class DeliveryTaskDto {
       partial: partialKnown ? partial : old.partial,
       partialKnown: partialKnown || old.partialKnown,
       parcels: parcels,
+      parcelContents: parcelContents.isNotEmpty ? parcelContents : old.parcelContents,
+      parcelOrders: parcelOrders.isNotEmpty ? parcelOrders : old.parcelOrders,
       pickupComplete: pickupComplete,
       dropoffComplete: dropoffComplete,
       scanRequired: scanRequired,

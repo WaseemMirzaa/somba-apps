@@ -19,6 +19,13 @@ enum ConnStatus { disconnected, connecting, connected, error }
 /// Realtime state of the rider app. One authenticated Socket.IO connection:
 /// the rider claims deliveries, advances their status and streams GPS — all of
 /// which reach the customer app and the dashboards live. Nothing is polled.
+/// A leg of a stop whose status change the server refused (the others went through).
+class LegFailure {
+  const LegFailure(this.orderReference, this.error);
+  final String orderReference;
+  final Object error;
+}
+
 class RiderStore extends ChangeNotifier {
   RiderStore._() {
     // Any call the server refuses with `password_change_required` (socket or REST) holds the app at the change screen.
@@ -624,15 +631,29 @@ class RiderStore extends ChangeNotifier {
   /// The scan rule is on for this run: at least one of its legs says so and carries boxes.
   bool runScanRequired(TransferRun run) => tasksOfRun(run).any((t) => t.scanRequired && t.hasParcels);
 
-  /// The rider scans one box of [task] (`rider:scanParcel`). The answer updates the task at once, so the buttons react.
+  /// The legs worked together with [task] (itself included): its stop, i.e. the open sibling legs of the same box set.
+  List<DeliveryTaskDto> stopLegsOf(DeliveryTaskDto task) {
+    for (final stop in groupStops(active)) {
+      if (stop.legs.any((l) => l.id == task.id)) return stop.legs;
+    }
+    return [task];
+  }
+
+  /// The rider scans one box of [task] (`rider:scanParcel`). The answer updates the task at once, so the buttons react. One
+  /// scan ticks the box on every sibling leg too (the server records it on each), so the whole stop is updated.
   /// Throws what the server refuses with ("PKG-... is not part of this pickup.").
   Future<ParcelScan> scanParcel(DeliveryTaskDto task, String code, ParcelStage stage, {bool manual = false}) async {
     final res = await request('rider:scanParcel', {'taskId': task.id, 'code': code, 'stage': stage.wire, if (manual) 'manual': true});
     final scan = ParcelScan.fromJson(_map(res));
-    _applyChecklist([task], scan.parcels, scan.required, single: true, pickupComplete: scan.pickupComplete, dropoffComplete: scan.dropoffComplete);
+    _applyChecklist(stopLegsOf(task), scan.parcels, scan.required,
+        single: true, pickupComplete: scan.pickupComplete, dropoffComplete: scan.dropoffComplete, contents: scan.contents, orders: scan.orders);
     notifyListeners();
     return scan;
   }
+
+  /// What a box is (`parcels:resolve`): its contents, orders and legs, and (only for the rider's own customer delivery or
+  /// express leg) the street, phone and recipient. Throws what the server refuses with ("Parcel not found.").
+  Future<ParcelResolution> resolveParcel(String code) async => ParcelResolution.fromJson(_map(await request('parcels:resolve', {'code': code})));
 
   /// Same, for a whole transfer run: one checklist over every leg of the run.
   Future<ParcelScan> scanRunParcel(TransferRun run, String code, ParcelStage stage, {bool manual = false}) async {
@@ -647,8 +668,12 @@ class RiderStore extends ChangeNotifier {
   Future<void> legParcels(DeliveryTaskDto task) async {
     try {
       final m = _map(await request('rider:legParcels', {'taskId': task.id}));
-      _applyChecklist([task], ParcelDto.listFrom(m['parcels']), m['required'] != false,
-          single: true, pickupComplete: m['pickupComplete'] as bool?, dropoffComplete: m['dropoffComplete'] as bool?);
+      _applyChecklist(stopLegsOf(task), ParcelDto.listFrom(m['parcels']), m['required'] != false,
+          single: true,
+          pickupComplete: m['pickupComplete'] as bool?,
+          dropoffComplete: m['dropoffComplete'] as bool?,
+          contents: ParcelContent.listFrom(m['contents']),
+          orders: ParcelOrderRef.listFrom(m['orders']));
       notifyListeners();
     } catch (_) {/* keep what the card knew */}
   }
@@ -664,10 +689,14 @@ class RiderStore extends ChangeNotifier {
 
   /// Puts the server's boxes onto [tasks]: each task keeps its own boxes (matched by code) with the fresh scan times; with
   /// [single] the answer is that one leg's own list.
-  void _applyChecklist(List<DeliveryTaskDto> tasks, List<ParcelDto> fresh, bool required, {bool single = false, bool? pickupComplete, bool? dropoffComplete}) {
+  void _applyChecklist(List<DeliveryTaskDto> tasks, List<ParcelDto> fresh, bool required,
+      {bool single = false, bool? pickupComplete, bool? dropoffComplete, List<ParcelContent> contents = const [], List<ParcelOrderRef> orders = const []}) {
     final byCode = {for (final p in fresh) p.code: p};
     for (final t in tasks) {
       t.scanRequired = required;
+      // The answer's box-set contents and orders are the same for every leg of the set; absent (older server): keep what the leg had.
+      if (contents.isNotEmpty) t.parcelContents = contents;
+      if (orders.isNotEmpty) t.parcelOrders = orders;
       t.parcels = single ? fresh : [for (final p in t.parcels) byCode[p.code] ?? p];
       t.pickupComplete = single && pickupComplete != null ? pickupComplete : stageComplete(t.parcels, ParcelStage.pickup);
       t.dropoffComplete = single && dropoffComplete != null ? dropoffComplete : stageComplete(t.parcels, ParcelStage.dropoff);
@@ -683,6 +712,31 @@ class RiderStore extends ChangeNotifier {
       if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
     });
     await refresh(light: true);
+  }
+
+  /// Moves every leg of a stop to [status] (the customer's one 4-digit [code] is sent with each leg: sibling deliveries share
+  /// it). The first leg goes alone: if the server refuses it (wrong code, scans missing) nothing changed and the refusal is
+  /// thrown, so the caller can ask again without spending the other legs' attempts. Once it went through, the other legs
+  /// follow and a refusal of one of them does not stop the rest: the result lists the legs that failed (empty: all went
+  /// through). The list is refreshed once at the end.
+  Future<List<LegFailure>> advanceLegs(List<DeliveryTaskDto> legs, String status, {String? reason, String? code}) async {
+    final failures = <LegFailure>[];
+    Future<void> one(DeliveryTaskDto leg) => request('delivery:updateStatus', {
+          'taskId': leg.id,
+          'status': status,
+          if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+          if (code != null && code.trim().isNotEmpty) 'code': code.trim(),
+        });
+    await one(legs.first);
+    for (final leg in legs.skip(1)) {
+      try {
+        await one(leg);
+      } catch (e) {
+        failures.add(LegFailure(leg.orderReference, e));
+      }
+    }
+    await refresh(light: true);
+    return failures;
   }
 
   Future<void> sendLocation(String taskId, double lat, double lng) async {
