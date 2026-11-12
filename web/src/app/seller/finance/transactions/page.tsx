@@ -15,7 +15,7 @@ import { useToast } from "@/context/toast-context";
 import { localDay } from "@/lib/dates";
 import { sellerRequest } from "@/lib/seller-api";
 import { TXN_KIND_OPTIONS, saveCsvText, txnKindLabel, txnKindVariant, useTransactions } from "@/lib/seller-finance";
-import { errMessage, orderStatusLabel, payoutStatusLabel } from "@/lib/seller-labels";
+import { errMessage, orderStatusLabel, payoutStatusLabel, transactionDetail } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
 
 const PAGE = 25;
@@ -107,7 +107,7 @@ export default function SellerTransactionsPage() {
               columns={[
                 { key: "at", label: t("date"), render: (row) => localDay(row.at as string) },
                 { key: "reference", label: fr ? "Référence" : "Reference" },
-                { key: "description", label: fr ? "Détail" : "Description", render: (row) => localized(row, "description", fr) },
+                { key: "description", label: fr ? "Détail" : "Description", render: (row) => transactionDetail(localized(row, "description", fr), fr) },
                 { key: "kind", label: "Type", render: (row) => <Badge variant={txnKindVariant(String(row.kind))}>{txnKindLabel(String(row.kind), fr)}</Badge> },
                 { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (row) => (row.kind === "payout" ? "—" : money(row.grossUsd as number)) },
                 { key: "commissionUsd", label: "Commission", render: (row) => (row.kind === "payout" ? "—" : money(row.commissionUsd as number)) },

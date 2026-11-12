@@ -140,7 +140,7 @@ export default function AdminWarehousesPage() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title={fr ? "Total hubs" : "Total hubs"} value={rows.length} icon={Boxes} />
+        <StatCard title={fr ? "Total des hubs" : "Total hubs"} value={rows.length} icon={Boxes} />
         <StatCard title={fr ? "Actifs" : "Active"} value={activeCount} icon={CheckCircle2} trend={`${totalCapacity.toLocaleString()} ${fr ? "colis de capacité" : "parcels capacity"}`} />
         <StatCard title={fr ? "Villes desservies" : "Served cities"} value={footprint.ready ? footprint.cities.length : "…"} icon={Globe2} trend={footprint.cities.map((c) => areaName(c, fr)).join(", ") || undefined} />
         <StatCard title={fr ? "Hors carte" : "Not on the map"} value={unplaced} icon={MapPinOff} trend={unplaced ? (fr ? "Absents de la carte de couverture" : "Missing from the coverage map") : undefined} />

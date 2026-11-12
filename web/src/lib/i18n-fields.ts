@@ -62,6 +62,7 @@ export function resolutionText(d: { resolution?: string | null; resolutionFr?: s
 const SUPPORT_CATEGORIES: Record<string, { en: string; fr: string }> = {
   general: { en: "General", fr: "Général" },
   orders: { en: "Orders", fr: "Commandes" },
+  order: { en: "Orders", fr: "Commandes" }, // the demo seed writes the singular
   payment: { en: "Payment", fr: "Paiement" },
   delivery: { en: "Delivery", fr: "Livraison" },
   returns: { en: "Returns & refunds", fr: "Retours et remboursements" },
@@ -222,6 +223,20 @@ const VARIANT_TOKENS_FR: Record<string, string> = {
   Gray: "Gris",
   Red: "Rouge",
   Green: "Vert",
+  Yellow: "Jaune",
+  Pink: "Rose",
+  Purple: "Violet",
+  Brown: "Marron",
+  Gold: "Or",
+  Navy: "Bleu marine",
+  // The option group names a seller most often types (the "Size: 40" form of a stock line or an order line).
+  "Size:": "Taille :",
+  "Colour:": "Couleur :",
+  "Color:": "Couleur :",
+  "Material:": "Matière :",
+  "Storage:": "Stockage :",
+  "Capacity:": "Capacité :",
+  "Style:": "Style :",
 };
 
 /** The option label of a line when the server stored no translation: known colour / size tokens only. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { failureReasonText } from "@/lib/rider-actions";
 import { mapsLinkTo } from "@/lib/google-maps";
 import { LEG_KIND, pickL, fmtDateTime } from "@/lib/logistics";
 import { useParams } from "next/navigation";
@@ -79,7 +80,7 @@ export default function RiderTaskDetailPage() {
       {task.failureReason && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           <strong>{fr ? "Motif d'échec : " : "Failure reason: "}</strong>
-          {task.failureReason}
+          {failureReasonText(task.failureReason, fr)}
         </div>
       )}
 
@@ -182,7 +183,7 @@ export default function RiderTaskDetailPage() {
             { time: fmtDateTime(task.createdAt, fr), label: fr ? "Tâche assignée" : "Task created", done: true },
             { time: fmtDateTime(task.pickedUpAt, fr), label: fr ? "Colis récupéré" : "Picked up", done: !!task.pickedUpAt },
             task.status === "failed"
-              ? { time: fmtDateTime(task.updatedAt, fr), label: `${fr ? "Échec" : "Failed"}${task.failureReason ? `: ${task.failureReason}` : ""}`, done: true }
+              ? { time: fmtDateTime(task.updatedAt, fr), label: `${fr ? "Échec" : "Failed"}${task.failureReason ? `: ${failureReasonText(task.failureReason, fr)}` : ""}`, done: true }
               : { time: fmtDateTime(task.deliveredAt ?? task.receivedAt, fr), label: task.hubBound ? (fr ? "Scanné à l'entrepôt" : "Scanned in at the warehouse") : fr ? "Remis" : "Handed over", done: task.status === "delivered" },
           ]}
         />

@@ -288,6 +288,7 @@ export const EXCEPTION_TYPE: Record<string, L> = {
 /** Where the dispatch of a replacement stands (`dispatchStatus`). */
 export const DISPATCH_STATUS: Record<string, L> = {
   pending: { en: "Pending", fr: "En attente" },
+  ready: { en: "Ready to dispatch", fr: "Prêt à expédier" },
   dispatched: { en: "Dispatched", fr: "Expédié" },
   delivered: { en: "Delivered", fr: "Livré" },
 };

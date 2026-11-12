@@ -34,6 +34,9 @@ const EXACT: Record<string, string> = {
 
   // ── generic / auth ──
   "Request failed.": "La requête a échoué.",
+  "Only JPEG, PNG or WebP images are allowed.": "Seules les images JPEG, PNG ou WebP sont acceptées.",
+  "That image is larger than 5 MB.": "Cette image dépasse 5 Mo.",
+  "Upload failed.": "Le téléversement a échoué.",
   "Socket not connected.": "Connexion perdue. Réessayez dans un instant.",
   "Sign in to continue.": "Connectez-vous pour continuer.",
   "Not allowed.": "Action non autorisée.",

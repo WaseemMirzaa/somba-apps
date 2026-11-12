@@ -1,5 +1,6 @@
 "use client";
 
+import { planName } from "@/lib/admin-i18n";
 import { localDay, localDateTime } from "@/lib/dates";
 import { useState } from "react";
 import Link from "next/link";
@@ -314,7 +315,7 @@ export default function AdminFinancePage() {
 }
 
 function PaymentSubject({ row, fr }: { row: PaymentRow; fr: boolean }) {
-  if (row.purpose === "plan") return <span>{fr ? "Abonnement" : "Plan"} {row.subject ?? ""}</span>;
+  if (row.purpose === "plan") return <span>{fr ? "Abonnement" : "Plan"} {planName(row.subject, fr)}</span>;
   if (row.orderId) return <Link href={`/admin/orders/${row.orderId}`} className="text-[var(--primary)] hover:underline">{String(row.orderReference)}</Link>;
   return <span>{fr ? "Recharge" : "Top-up"}</span>;
 }

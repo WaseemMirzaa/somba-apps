@@ -75,3 +75,13 @@ test("an express run is delivered by the rider, not handed over to a warehouse",
   assert.equal(m.nextStep({ status: "in_transit", hubBound: false }), "deliver");
   assert.equal(m.nextStep({ status: "assigned", hubBound: false }), "picked_up");
 });
+
+test("a failure reason reads in French: the rider's presets, the system's void reasons, the rider's own note untouched", () => {
+  assert.equal(m.failureReasonText("Customer unavailable", true), "Client indisponible");
+  assert.equal(m.failureReasonText("Customer not reachable: the phone was switched off.", true), "Client injoignable : the phone was switched off.");
+  assert.equal(m.failureReasonText("Order cancelled", true), "Commande annulée");
+  assert.equal(m.failureReasonText("Parcel missing from run RUN-7", true), "Colis manquant dans la tournée RUN-7");
+  assert.equal(m.failureReasonText("Le client a refusé", true), "Le client a refusé");
+  assert.equal(m.failureReasonText("Customer unavailable", false), "Customer unavailable");
+  assert.equal(m.failureReasonText(null, true), "");
+});

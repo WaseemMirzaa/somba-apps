@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePortalTitle } from "@/components/layout/portal-title";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -199,6 +200,17 @@ export function DashboardLayout({
       activeHref = item.href;
     }
   }
+  const activeItem = (navItems as NavItem[]).find((item) => item.href === activeHref);
+  usePortalTitle(
+    activeItem && activeItem.href !== portalRoot
+      ? activeItem.i18n
+        ? t(activeItem.label as Parameters<typeof t>[0])
+        : locale === "fr" && activeItem.labelFr
+          ? activeItem.labelFr
+          : activeItem.label
+      : null,
+    t(config.title),
+  );
 
   const renderNavItem = (item: NavItem) => {
     const active = item.href === activeHref;

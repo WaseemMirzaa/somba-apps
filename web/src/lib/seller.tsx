@@ -15,7 +15,8 @@ import {
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
 import { frInForm, pickText, variantDisplay } from "@/lib/i18n-fields";
-import { campaignStatusLabel } from "@/lib/seller-labels";
+import { campaignStatusLabel, sellerBadgeLabel } from "@/lib/seller-labels";
+import { readVariantLabels, readVariants } from "@/lib/variants";
 import { formatCurrency } from "@/lib/utils";
 import { localDay, localDateTime } from "@/lib/dates";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -398,7 +399,7 @@ export async function uploadImage(file: File): Promise<string> {
   };
   if (!res.ok || !json.url) {
     const msg = httpErrorText(json, currentLocale());
-    throw new Error(msg ?? `Upload failed (${res.status}).`);
+    throw new Error(msg ?? (currentLocale() === "fr" ? `Échec du téléversement (${res.status}).` : `Upload failed (${res.status}).`));
   }
   return json.url;
 }
@@ -532,6 +533,9 @@ function buildSellerData(input: BuildInput) {
       brandName: p.brand ?? "",
       weightGrams: p.weightGrams ?? null,
       variantStock: p.variantStock ?? null,
+      /** The option groups and their display labels in both languages (stock lines are keyed by the canonical text). */
+      variantGroups: readVariants(p.variants),
+      variantLabelSet: readVariantLabels(p.variantLabels),
       status: p.status, // REAL: live | pending | rejected | draft | removed
       description: pickText(fr, p.description, p.descriptionFr),
       descriptionFr: pickText(true, p.description, p.descriptionFr),
@@ -903,12 +907,7 @@ function buildSellerData(input: BuildInput) {
     rating: seller?.rating || avgRating,
     status: seller?.status ?? "pending",
     pickupAddress: seller?.pickupAddress ?? "",
-    badge:
-      seller?.badge === "somba_assured"
-        ? "KOMORIKO Assured"
-        : seller?.badge
-          ? seller.badge.charAt(0).toUpperCase() + seller.badge.slice(1)
-          : "Bronze",
+    badge: sellerBadgeLabel(seller?.badge, fr),
   };
 
   const paidOut = stats?.paidOut ?? payoutList.filter((p) => p.status === "paid").reduce((s, p) => s + p.amount, 0);

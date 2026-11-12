@@ -17,7 +17,7 @@ import { useToast } from "@/context/toast-context";
 import { useSellerAccess, useSellerData } from "@/lib/seller";
 import { useLiveQuery, useSocketEvent, sellerRequest } from "@/lib/seller-api";
 import { downloadCsv, errMessage, productStatusLabel, productStatusVariant } from "@/lib/seller-labels";
-import { variantLabels, type StockLowPush, type StockOverview } from "@/lib/seller-stock";
+import { stockVariantText, variantLabels, type StockLowPush, type StockOverview } from "@/lib/seller-stock";
 
 const PAGE_SIZE = 25;
 
@@ -54,7 +54,7 @@ export default function SellerInventoryPage() {
   // A product crossing its low-stock line: say so and mark its row for a few seconds.
   useSocketEvent<StockLowPush>("stock:low", (p) => {
     const name = sellerProductList.find((x) => x.id === p.productId)?.name ?? (fr ? "Un produit" : "A product");
-    const where = p.variant ? ` (${p.variant})` : "";
+    const where = p.variant ? ` (${stockVariantText(p.variant, sellerProductList.find((x) => x.id === p.productId), fr)})` : "";
     toast(
       p.outOfStock
         ? fr ? `Rupture de stock : ${name}${where}` : `Out of stock: ${name}${where}`
@@ -182,7 +182,7 @@ export default function SellerInventoryPage() {
                         {labels.length > 0 && (
                           <ul className="space-y-0.5 text-xs text-slate-500">
                             {labels.map((l) => (
-                              <li key={l}>{l}: <span className="font-medium text-slate-700">{it.variantStock?.[l]}</span></li>
+                              <li key={l}>{stockVariantText(l, sellerProductList.find((p) => p.id === it.productId), fr)}: <span className="font-medium text-slate-700">{it.variantStock?.[l]}</span></li>
                             ))}
                             <li>{fr ? "Réserve commune" : "Shared pool"}: <span className="font-medium text-slate-700">{it.pool}</span></li>
                           </ul>

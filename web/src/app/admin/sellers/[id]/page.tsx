@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { DetailGrid, DetailGridSection } from "@/components/ui/detail-grid";
 import { InfoGrid } from "@/components/ui/info-grid";
 import { Badge } from "@/components/ui/badge";
+import { sellerBadgeLabel } from "@/lib/seller-labels";
 import { DataTable } from "@/components/ui/data-table";
 import { KycDocuments } from "@/components/admin/kyc-documents";
 import { SellerStatusActions } from "@/components/admin/status-actions";
@@ -114,7 +115,7 @@ export default function AdminSellerDetailPage() {
           <InfoGrid items={[
             { label: fr ? "Nom de la boutique" : "Store name", value: seller.name },
             { label: fr ? "Adresse d'enlèvement" : "Pickup address", value: seller.pickupAddress || "—", full: true },
-            { label: fr ? "Badge" : "Badge", value: seller.badge.replace(/_/g, " ") },
+            { label: fr ? "Badge" : "Badge", value: sellerBadgeLabel(seller.badge, fr) },
             { label: fr ? "Note moyenne" : "Rating", value: seller.rating > 0 ? `★ ${Number(seller.rating).toFixed(1)}` : "—" },
             { label: fr ? "Formule" : "Plan", value: `${planLabel(plans, seller.plan, fr)}${seller.planExpiresAt ? ` · ${fr ? "jusqu'au" : "until"} ${localDay(String(seller.planExpiresAt))}` : ""}` },
             { label: fr ? "Produits" : "Products", value: sellerProducts.length },

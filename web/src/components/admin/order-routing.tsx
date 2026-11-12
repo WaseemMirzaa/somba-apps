@@ -1,5 +1,6 @@
 "use client";
 
+import { failureReasonText } from "@/lib/rider-actions";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
@@ -289,7 +290,7 @@ export function OrderRouting({ order, sellers }: { order: Order; sellers: Seller
                 {fmtDateTime(String(r.createdAt), fr)}
                 {r.doneAt ? <><br />{fr ? "Terminé" : "Done"}: {fmtDateTime(String(r.doneAt), fr)}</> : null}
                 {Number(r.attempts) > 1 ? <><br />{fr ? "Tentatives" : "Attempts"}: {String(r.attempts)}</> : null}
-                {r.failureReason ? <><br /><span className="text-red-600">{String(r.failureReason)}</span></> : null}
+                {r.failureReason ? <><br /><span className="text-red-600">{failureReasonText(String(r.failureReason), fr)}</span></> : null}
               </span>
             ),
           },

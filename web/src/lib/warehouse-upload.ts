@@ -1,13 +1,13 @@
-import { httpErrorText, currentLocale } from "@/lib/api-errors";
+import { httpErrorText, currentLocale, localizeApiError } from "@/lib/api-errors";
 import { authApi } from "@/lib/realtime/auth-api";
 
 /** Upload one photo (JPEG/PNG/WebP, ≤ 5 MB) to the platform and return its URL (used for support attachments). */
 export async function uploadPhoto(file: File): Promise<string> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    throw new Error("Only JPEG, PNG or WebP images are allowed.");
+    throw new Error(localizeApiError("Only JPEG, PNG or WebP images are allowed.", currentLocale()));
   }
   if (file.size > 5 * 1024 * 1024) {
-    throw new Error("That image is larger than 5 MB.");
+    throw new Error(localizeApiError("That image is larger than 5 MB.", currentLocale()));
   }
   const send = (token: string | null) => {
     const fd = new FormData();
@@ -33,7 +33,7 @@ export async function uploadPhoto(file: File): Promise<string> {
   const json = (await res.json().catch(() => ({}))) as { url?: string; message?: string | string[]; messageFr?: string | string[] };
   if (!res.ok || !json.url) {
     const msg = httpErrorText(json, currentLocale());
-    throw new Error(msg ?? `Upload failed (${res.status}).`);
+    throw new Error(msg ?? (currentLocale() === "fr" ? `Échec du téléversement (${res.status}).` : `Upload failed (${res.status}).`));
   }
   return json.url;
 }

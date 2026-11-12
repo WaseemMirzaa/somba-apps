@@ -7,6 +7,7 @@
  * Nothing here is invented: a step is "done" only when a leg says so.
  */
 
+import { failureReasonText } from "@/lib/rider-actions";
 import { useMemo } from "react";
 import { localDay, localDateTime } from "@/lib/dates";
 import { useLocale } from "@/context/locale-context";
@@ -238,7 +239,7 @@ export function buildJourney(o: JourneyInput, fr: boolean): JourneyEvent[] {
   const rider = (l: TrackingLeg | null) => (l?.riderFirstName ? T(`Rider: ${l.riderFirstName}`, `Livreur : ${l.riderFirstName}`) : undefined);
   const failed = (l: TrackingLeg | null) =>
     l && (l.attempts > 1 || l.failureReason)
-      ? T(`Attempt ${l.attempts}${l.failureReason ? ` — ${l.failureReason}` : ""}`, `Tentative ${l.attempts}${l.failureReason ? ` — ${l.failureReason}` : ""}`)
+      ? T(`Attempt ${l.attempts}${l.failureReason ? ` — ${l.failureReason}` : ""}`, `Tentative ${l.attempts}${l.failureReason ? ` — ${failureReasonText(l.failureReason, true)}` : ""}`)
       : undefined;
   const packageDone = ["ready", "at_hub", "shipped", "out_for_delivery", "delivered"].includes(o.packageStatus);
   const pickupAssigned = !!pickup && pickup.status !== "unassigned";

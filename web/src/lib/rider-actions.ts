@@ -19,6 +19,31 @@ export const FAIL_REASONS = [
   { value: "Other", fr: "Autre" },
 ];
 
+/** Why a leg is closed when the system (not the rider) voided it, as the server writes it. */
+const VOID_REASONS_FR: Record<string, string> = {
+  "Order cancelled": "Commande annulée",
+  "Seller cancelled": "Annulé par le vendeur",
+  "Returned to seller": "Retourné au vendeur",
+};
+
+/**
+ * A leg's failure reason in the viewer's language. The rider picks one of FAIL_REASONS (stored in English, optionally
+ * followed by ": a note"), and the system writes the void reasons above; the note itself is the rider's own words and
+ * stays as typed. Anything unknown comes back untouched.
+ */
+export function failureReasonText(reason: string | null | undefined, fr: boolean): string {
+  const text = (reason ?? "").trim();
+  if (!fr || !text) return text;
+  if (VOID_REASONS_FR[text]) return VOID_REASONS_FR[text];
+  const missing = /^Parcel missing from run (.+)$/.exec(text);
+  if (missing) return `Colis manquant dans la tournée ${missing[1]}`;
+  for (const r of FAIL_REASONS) {
+    if (text === r.value) return r.fr;
+    if (text.startsWith(`${r.value}:`)) return `${r.fr} :${text.slice(r.value.length + 1)}`;
+  }
+  return text;
+}
+
 export type RiderStep = "picked_up" | "in_transit" | "deliver" | "handover" | "none";
 
 /**

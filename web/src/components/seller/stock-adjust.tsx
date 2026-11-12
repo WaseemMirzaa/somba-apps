@@ -7,7 +7,8 @@ import { useLocale } from "@/context/locale-context";
 import { useToast } from "@/context/toast-context";
 import { sellerRequest } from "@/lib/seller-api";
 import { errMessage } from "@/lib/seller-labels";
-import { ADJUST_REASONS, removableUnits, variantLabels, type StockItem } from "@/lib/seller-stock";
+import { useSellerData } from "@/lib/seller";
+import { ADJUST_REASONS, removableUnits, stockVariantText, variantLabels, type StockItem } from "@/lib/seller-stock";
 
 type Target = Pick<StockItem, "productId" | "name" | "stock" | "variantStock" | "pool">;
 
@@ -36,6 +37,8 @@ export function StockAdjust({
   const { locale } = useLocale();
   const fr = locale === "fr";
   const { toast } = useToast();
+  const { sellerProductList } = useSellerData();
+  const product = sellerProductList.find((p) => p.id === item.productId);
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"add" | "remove">("add");
   const [qty, setQty] = useState("");
@@ -140,7 +143,7 @@ export function StockAdjust({
             <select value={variant} onChange={(e) => setVariant(e.target.value)} className={`${field} mt-1`}>
               <option value="">{fr ? "Réserve commune (hors option)" : "Shared pool (not tied to an option)"}</option>
               {labels.map((l) => (
-                <option key={l} value={l}>{l} ({item.variantStock?.[l] ?? 0})</option>
+                <option key={l} value={l}>{stockVariantText(l, product, fr)} ({item.variantStock?.[l] ?? 0})</option>
               ))}
             </select>
           </label>

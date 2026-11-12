@@ -1,5 +1,7 @@
 "use client";
 
+import { failureReasonText } from "@/lib/rider-actions";
+import { localizeVariant } from "@/lib/i18n-fields";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -82,7 +84,7 @@ export default function WarehouseLegDetailPage() {
       {task.failureReason && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           <strong>{fr ? "Dernière tentative échouée : " : "Last attempt failed: "}</strong>
-          {task.failureReason}
+          {failureReasonText(task.failureReason, fr)}
         </div>
       )}
       {task.kind === "express" && (
@@ -201,7 +203,7 @@ export default function WarehouseLegDetailPage() {
                 <div key={`${item.productId ?? item.name}-${i}`} className="flex items-center gap-4 rounded-lg border border-[var(--border)] p-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-slate-900">{fr && item.nameFr ? item.nameFr : item.name}</p>
-                    {item.variant && <p className="text-xs text-slate-500">{item.variant}</p>}
+                    {item.variant && <p className="text-xs text-slate-500">{localizeVariant(item.variant, fr)}</p>}
                   </div>
                   <span className="text-sm font-medium">{fr ? "Qté" : "Qty"}: {item.qty}</span>
                 </div>

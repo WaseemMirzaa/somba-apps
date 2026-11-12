@@ -1,5 +1,6 @@
 "use client";
 
+import { storeStatusLabel } from "@/lib/seller-labels";
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import { useLocale } from "@/context/locale-context";
@@ -17,7 +18,7 @@ export default function SellerPendingPage() {
       <h1 className="mt-4 text-2xl font-bold">{fr ? "En attente d'approbation" : "Pending Approval"}</h1>
       {seller && (
         <p className="mt-1 text-sm font-medium text-slate-700">
-          {seller.name} · {fr ? "statut" : "status"}: <span className="uppercase">{state}</span>
+          {seller.name} · {fr ? "statut" : "status"}: <span className="uppercase">{storeStatusLabel(state, fr)}</span>
         </p>
       )}
       {seller?.kycSubmittedAt && (

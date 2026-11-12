@@ -39,6 +39,7 @@ import { HorizontalBarChart } from "@/components/charts/dashboard-charts";
 import { useRealtime } from "@/context/realtime-context";
 import { categoryLabel } from "@/lib/i18n-fields";
 import { useLocale } from "@/context/locale-context";
+import { auditActionLabel, auditEntityLabel } from "@/lib/admin-i18n";
 import { ORDER_STATUS_BADGE, orderStatusLabel, useFinanceVersion, useLiveKey, useServerList } from "@/lib/admin-live";
 import { rankSellers, useSocketQuery, type AdminStatsFull, type RevenuePoint } from "@/lib/admin-stats";
 import type { Seller } from "@/lib/realtime/types";
@@ -329,7 +330,7 @@ export default function AdminDashboard() {
               audit.items.slice(0, 6).map((item) => (
                 <div key={item.id} className="border-b border-slate-100 pb-3 last:border-0 last:pb-0">
                   <p className="text-xs text-slate-400">{item.timestamp ?? (item.createdAt ? localDateTime(item.createdAt) : "")}</p>
-                  <p className="mt-1 break-words text-sm text-slate-700">{item.actor} · {item.action} · {item.entity}</p>
+                  <p className="mt-1 break-words text-sm text-slate-700">{item.actor} · {auditActionLabel(item.action, fr)} · {auditEntityLabel(item.entity, fr)}</p>
                 </div>
               ))
             )}

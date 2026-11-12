@@ -1,5 +1,6 @@
 "use client";
 
+import { localizeVariant } from "@/lib/i18n-fields";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeftRight } from "lucide-react";
@@ -101,7 +102,7 @@ export default function WarehouseExchangeDetailPage() {
             <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{fr ? "Article retourné" : "Item being returned"}</p>
               <p className="font-medium text-slate-900">{fr && exc.fromNameFr ? exc.fromNameFr : exc.fromName}</p>
-              <p className="text-xs text-slate-500">SKU: {exc.fromSku}{exc.fromVariant ? ` · ${exc.fromVariant}` : ""}</p>
+              <p className="text-xs text-slate-500">SKU: {exc.fromSku}{exc.fromVariant ? ` · ${localizeVariant(exc.fromVariant, fr)}` : ""}</p>
             </div>
             <div className="flex items-center justify-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-600">
@@ -111,7 +112,7 @@ export default function WarehouseExchangeDetailPage() {
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
               <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">{fr ? "Nouvel article" : "Replacement item"}</p>
               <p className="font-medium text-slate-900">{fr && exc.toNameFr ? exc.toNameFr : exc.toName}</p>
-              <p className="text-xs text-slate-500">SKU: {exc.toSku}{exc.toVariant ? ` · ${exc.toVariant}` : ""}</p>
+              <p className="text-xs text-slate-500">SKU: {exc.toSku}{exc.toVariant ? ` · ${localizeVariant(exc.toVariant, fr)}` : ""}</p>
             </div>
           </div>
         </DetailGridSection>

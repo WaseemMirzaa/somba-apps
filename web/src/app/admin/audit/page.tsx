@@ -9,7 +9,7 @@ import { LoadMore } from "@/components/ui/load-more";
 import { EmptyState, SectionError, SectionLoading } from "@/components/admin/query-state";
 import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { adminBreadcrumb } from "@/lib/admin-i18n";
+import { adminBreadcrumb, auditActionLabel, auditEntityLabel, auditRoleLabel } from "@/lib/admin-i18n";
 import { AUDIT_PAGE_SIZE, EMPTY_AUDIT_FILTERS, auditRangeError, auditRequest, hasAuditFilters, type AuditFilters } from "@/lib/audit-filter";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -112,7 +112,7 @@ export default function AdminAuditPage() {
           <select id="audit-action" className={field} value={filters.action} onChange={(e) => update({ action: e.target.value })}>
             <option value="">{fr ? "Toutes les actions" : "All actions"}</option>
             {facets.actions.map((a) => (
-              <option key={a} value={a}>{a}</option>
+              <option key={a} value={a}>{auditActionLabel(a, fr)}</option>
             ))}
           </select>
         </div>
@@ -121,7 +121,7 @@ export default function AdminAuditPage() {
           <select id="audit-role" className={field} value={filters.role} onChange={(e) => update({ role: e.target.value })}>
             <option value="">{fr ? "Tous les rôles" : "All roles"}</option>
             {facets.roles.map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r}>{auditRoleLabel(r, fr)}</option>
             ))}
           </select>
         </div>
@@ -164,11 +164,11 @@ export default function AdminAuditPage() {
           <Card key={log.id}>
             <CardContent className="p-5">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="primary">{log.action}</Badge>
+                <Badge variant="primary">{auditActionLabel(log.action, fr)}</Badge>
                 <span className="text-xs text-slate-400">{log.timestamp ?? (log.createdAt ? localDateTime(log.createdAt) : "")}</span>
               </div>
               <p className="mt-2 break-words text-sm">
-                <strong>{log.actor}</strong> <span className="text-slate-400">({log.role})</span> · {log.entity}{" "}
+                <strong>{log.actor}</strong> <span className="text-slate-400">({auditRoleLabel(log.role, fr)})</span> · {auditEntityLabel(log.entity, fr)}{" "}
                 <code className="break-all text-[var(--primary)]">{log.entityId}</code>
                 {log.detail ? <span className="text-slate-500"> · {log.detail}</span> : null}
               </p>
