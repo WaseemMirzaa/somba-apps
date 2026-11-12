@@ -8,6 +8,7 @@ import { addressPin, useDeliveryQuote, type DeliveryQuote } from "@/lib/logistic
 import { NotServedNotice } from "@/components/shop/delivery-quote";
 import { feeOriginText, quoteFallbackNote } from "@/lib/quote-text";
 import { formatCurrency } from "@/lib/utils";
+import { addressLabelText } from "@/lib/address-label";
 
 /**
  * "What would delivery cost me?" on the product page: the server quotes it (the warehouse of the area + distance) for one of
@@ -66,7 +67,7 @@ export function ProductFeeCheck({ productId, fr, locale, onQuote }: { productId:
             }}
           >
             {pinned.map((a) => (
-              <option key={a.id} value={a.id}>{a.label} — {[a.commune, a.city].filter(Boolean).join(", ")}</option>
+              <option key={a.id} value={a.id}>{addressLabelText(a.label, fr)} — {[a.commune, a.city].filter(Boolean).join(", ")}</option>
             ))}
           </select>
         )}

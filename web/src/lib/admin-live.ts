@@ -1,5 +1,7 @@
 "use client";
 
+import { httpErrorText, currentLocale } from "@/lib/api-errors";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { useToast } from "@/context/toast-context";
@@ -485,7 +487,7 @@ export async function uploadImage(file: File): Promise<string> {
     headers: { authorization: `Bearer ${authApi.getAccess() ?? ""}` },
     body: form,
   });
-  const json = (await res.json().catch(() => ({}))) as { url?: string; message?: string | string[] };
-  if (!res.ok || !json.url) throw new Error(Array.isArray(json.message) ? json.message.join(" ") : (json.message ?? "Upload failed."));
+  const json = (await res.json().catch(() => ({}))) as { url?: string; message?: string | string[]; messageFr?: string | string[] };
+  if (!res.ok || !json.url) throw new Error(httpErrorText(json, currentLocale()) ?? "Upload failed.");
   return json.url;
 }

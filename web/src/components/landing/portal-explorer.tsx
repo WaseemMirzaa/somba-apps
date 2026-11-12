@@ -141,7 +141,7 @@ export function PortalExplorer({
       <div className="grid lg:grid-cols-5">
         <div className="relative border-b border-[var(--border)] lg:col-span-2 lg:border-b-0 lg:border-r">
           <div className="relative min-h-[20rem] lg:h-full lg:min-h-[320px]">
-            <Image src={portal.image} alt={portal.name} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 40vw" />
+            <Image src={portal.image} alt={fr ? portal.nameFr : portal.name} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 40vw" />
             <div className="absolute inset-0 bg-[var(--primary)]/45" />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/95 via-slate-900/40 to-slate-900/10 lg:bg-gradient-to-r" />
             <div className="relative flex flex-col justify-end p-8 text-white lg:absolute lg:inset-0">

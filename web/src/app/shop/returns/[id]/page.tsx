@@ -20,6 +20,7 @@ import { formatCurrency } from "@/lib/utils";
 import { pickText } from "@/lib/i18n-fields";
 import type { Dispute, DisputeMessage } from "@/lib/realtime/types";
 import { resolutionText } from "@/lib/i18n-fields";
+import { authorRoleLabel } from "@/lib/author-role";
 
 function Photos({ urls, fr }: { urls: string[]; fr: boolean }) {
   if (!urls.length) return null;
@@ -214,7 +215,7 @@ function RequestStatus() {
                   <div key={m.id} className={`rounded-xl p-3 text-sm ${mine ? "bg-blue-50" : "bg-slate-50"}`}>
                     <p className="text-xs font-semibold text-slate-700">
                       {mine ? (fr ? "Vous" : "You") : m.authorName}
-                      <span className="ml-1 font-normal text-slate-500">· {m.role === "seller" ? (fr ? "vendeur" : "seller") : m.role.startsWith("admin") ? "KOMORIKO" : m.role} · {new Date(m.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</span>
+                      <span className="ml-1 font-normal text-slate-500">· {authorRoleLabel(m.role, fr)} · {new Date(m.createdAt).toLocaleString(fr ? "fr-FR" : "en-GB")}</span>
                     </p>
                     <p className="mt-1 whitespace-pre-line text-slate-800">{m.text}</p>
                     <Photos urls={m.attachments ?? []} fr={fr} />

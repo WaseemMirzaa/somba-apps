@@ -610,11 +610,12 @@ export const SELL_ONLINE_FAQ = [
   { q: "Who can sell on KOMORIKO?", qFr: "Qui peut vendre sur KOMORIKO ?", a: "Any registered business or individual seller can apply. You need a valid seller subscription (Starter, Pro, or Enterprise) and completed business verification.", aFr: "Toute entreprise ou vendeur individuel inscrit peut postuler. Abonnement vendeur (Starter, Pro ou Entreprise) et vérification requis." },
   { q: "What are the seller fees?", qFr: "Quels sont les frais vendeur ?", a: "Monthly plans start at $49/mo (Starter). Platform commission applies per category (typically 8–15%). No hidden listing fees on Pro and Enterprise.", aFr: "Plans mensuels à partir de 49 $/mois (Starter). Commission par catégorie (8–15 % en général). Pas de frais de listing cachés sur Pro et Entreprise." },
   { q: "How does fulfillment work?", qFr: "Comment fonctionne le fulfillment ?", a: "You can self-ship or use KOMORIKO's hybrid fulfillment — warehouse receives, sorts, and dispatches to riders for last-mile delivery.", aFr: "Expédition autonome ou fulfillment hybride KOMORIKO — entrepôt, tri et livraison dernier kilomètre." },
-  { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Payouts are processed weekly after order delivery and return window. Request payouts from your seller finance dashboard.", aFr: "Demandes de paiementmadaires après livraison et délai de retour. Demandez depuis le tableau de bord finance vendeur." },
+  { q: "When do I get paid?", qFr: "Quand suis-je payé ?", a: "Payouts are processed weekly after order delivery and return window. Request payouts from your seller finance dashboard.", aFr: "Les versements sont traités chaque semaine, après la livraison et la fin du délai de retour. Demandez-les depuis le tableau de bord finance vendeur." },
   { q: "How fast can I go live?", qFr: "Quel délai pour être en ligne ?", a: "Most sellers list their first products within 24 hours of subscribing. Our onboarding team can help with catalog setup.", aFr: "La plupart des vendeurs listent leurs premiers produits sous 24 h après abonnement. Notre équipe aide à la mise en place du catalogue." },
 ] as const;
 
 export const SELL_ONLINE_IMAGE = {
   src: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?q=85&w=2400&auto=format&fit=crop",
   alt: "Business team growing online sales",
+  altFr: "Équipe de vendeurs qui développe ses ventes en ligne",
 } as const;

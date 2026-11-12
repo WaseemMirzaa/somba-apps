@@ -1,5 +1,7 @@
 "use client";
 
+import { httpErrorText, currentLocale } from "@/lib/api-errors";
+
 import { isExpressOrder } from "@/lib/split-delivery";
 import {
   createContext,
@@ -392,9 +394,10 @@ export async function uploadImage(file: File): Promise<string> {
   const json = (await res.json().catch(() => ({}))) as {
     url?: string;
     message?: string | string[];
+    messageFr?: string | string[];
   };
   if (!res.ok || !json.url) {
-    const msg = Array.isArray(json.message) ? json.message.join(" ") : json.message;
+    const msg = httpErrorText(json, currentLocale());
     throw new Error(msg ?? `Upload failed (${res.status}).`);
   }
   return json.url;

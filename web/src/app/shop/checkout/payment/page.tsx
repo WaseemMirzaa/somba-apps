@@ -32,6 +32,7 @@ import { pinRequiredText } from "@/components/shop/address-pin-editor";
 import { formatCurrency } from "@/lib/utils";
 import type { Order } from "@/lib/realtime/types";
 import { newAttemptKey, outcomeUnknown, placeOrderAttempt } from "@/lib/checkout-attempt";
+import { addressLabelText } from "@/lib/address-label";
 
 function PaymentContent() {
   const { locale } = useLocale();
@@ -227,7 +228,7 @@ function PaymentContent() {
         <OrderLines lines={lines} />
         <OneDeliveryNote lines={lines} className="mt-4" />
         <InfoGrid items={[
-          { label: fr ? "Livraison à" : "Deliver to", value: `${address.label} — ${[address.line1, address.commune, address.city].filter(Boolean).join(", ")}`, full: true },
+          { label: fr ? "Livraison à" : "Deliver to", value: `${addressLabelText(address.label, fr)} — ${[address.line1, address.commune, address.city].filter(Boolean).join(", ")}`, full: true },
           { label: fr ? "Articles" : "Items", value: lines.reduce((s, l) => s + l.qty, 0) },
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),

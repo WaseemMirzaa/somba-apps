@@ -17,6 +17,7 @@ import { chainText } from "@/lib/areas";
 import { formatCurrency } from "@/lib/utils";
 import { useCatalog } from "@/lib/catalog";
 import { variantDisplay } from "@/components/shop/order-products";
+import { addressLabelText } from "@/lib/address-label";
 
 function qtyOptions(qty: number, stock: number | null): number[] {
   const max = Math.max(1, Math.min(10, stock ?? 10));
@@ -117,7 +118,7 @@ export default function ShopCartPage() {
             {items.map((item) => (
               <div key={`${item.id}-${item.variant}`} className="flex gap-4">
                 <Link href={`/shop/products/${item.id}`} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-                  {item.image && <Image src={item.image} alt={item.name} fill className="object-cover" sizes="80px" />}
+                  {item.image && <Image src={item.image} alt={fr ? item.nameFr : item.name} fill className="object-cover" sizes="80px" />}
                 </Link>
                 <div className="flex-1">
                   <Link href={`/shop/products/${item.id}`} className="font-medium text-slate-900 hover:text-[var(--primary)]">
@@ -229,7 +230,7 @@ export default function ShopCartPage() {
             >
               {addresses.map((a) => (
                 <option key={a.id} value={a.id}>
-                  {a.label} — {[a.line1, a.commune, a.city].filter(Boolean).join(", ")}
+                  {addressLabelText(a.label, fr)} — {[a.line1, a.commune, a.city].filter(Boolean).join(", ")}
                   {addressPin(a) ? "" : fr ? " (sans épingle)" : " (not pinned)"}
                   {a.served === false ? (fr ? " (non desservie)" : " (not served)") : ""}
                 </option>

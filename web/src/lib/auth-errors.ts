@@ -31,6 +31,18 @@ const FR: Record<string, string> = {
   "this sign-in expired. enter your password again": "Cette connexion a expiré. Saisissez à nouveau votre mot de passe.",
   "too many wrong codes. try again in a few minutes": "Trop de codes erronés. Réessayez dans quelques minutes.",
   "two-factor authentication code required": "Saisissez le code de vérification à 6 chiffres.",
+  "you must set a new password before you can continue": "Vous devez définir un nouveau mot de passe avant de continuer.",
+  "choose a new password that is different from the temporary one": "Choisissez un nouveau mot de passe différent du mot de passe temporaire.",
+  "account not found": "Compte introuvable.",
+  "sessions are not available": "Les sessions ne sont pas disponibles.",
+  "start the setup first": "Commencez d'abord la configuration.",
+  "two-factor authentication is already on": "La vérification en deux étapes est déjà activée.",
+  "two-factor authentication is already on. turn it off first to set it up again": "La vérification en deux étapes est déjà activée. Désactivez-la d'abord pour la reconfigurer.",
+  "two-factor authentication is not on": "La vérification en deux étapes n'est pas activée.",
+  "two-factor authentication is not on for this account": "La vérification en deux étapes n'est pas activée pour ce compte.",
+  "two-factor sign-in is not available": "La connexion avec vérification en deux étapes n'est pas disponible.",
+  "only staff accounts can be reset here": "Seuls les comptes du personnel peuvent être réinitialisés ici.",
+  "super admin only": "Réservé au super administrateur.",
 };
 
 const EN_FRIENDLY = {
@@ -54,12 +66,19 @@ export function authErrorText(err: unknown, fr: boolean): string {
   const words = fr ? FR_FRIENDLY : EN_FRIENDLY;
   if (!raw) return words.generic;
 
+  // The server's own French (HTTP `messageFr`) wins in French; the list below covers what it did not translate.
+  const sent = (err as { messageFr?: unknown } | null)?.messageFr;
+  if (fr && typeof sent === "string" && sent.trim()) return sent.trim();
+
   // The browser's own message when the API cannot be reached.
   if (/failed to fetch|networkerror|network request failed|load failed|cannot reach the server/i.test(raw)) return words.unreachable;
   // @nestjs/throttler.
   if (/too many requests|throttl/i.test(raw)) return words.tooMany;
   // class-validator on the e-mail field ("email must be an email", possibly followed by other fields' messages).
   if (/\bemail must be an email\b/i.test(raw)) return words.invalidEmail;
+
+  // class-validator's default sentences ("name should not be empty", "phone must be a string").
+  if (/\b(should not be empty|must be a string|must be a number|must be a number conforming)\b/i.test(raw)) return fr ? "Renseignez tous les champs obligatoires." : raw;
 
   const status = /^request failed \((\d{3})\)$/i.exec(raw);
   if (status) return fr ? `La requête a échoué (${status[1]}).` : raw;

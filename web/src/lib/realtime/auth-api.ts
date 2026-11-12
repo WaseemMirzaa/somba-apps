@@ -11,6 +11,8 @@ export class AuthApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** The server's French (`messageFr`, a string or a list joined with a space), when it sent one. */
+    readonly messageFr?: string,
   ) {
     super(message);
   }
@@ -58,7 +60,13 @@ async function post<T>(
   if (!res.ok) {
     // Nest validation errors arrive as an array of messages.
     const msg = Array.isArray(json?.message) ? json.message.join(" ") : json?.message;
-    throw new AuthApiError(msg ?? `Request failed (${res.status})`, res.status);
+    // `messageFr` (docs/contracts/error-text.md): the same shape as `message`, in French. Callers show it when the page is French.
+    const fr = Array.isArray(json?.messageFr)
+      ? json.messageFr.filter((x: unknown) => typeof x === "string").join(" ")
+      : typeof json?.messageFr === "string"
+        ? json.messageFr
+        : undefined;
+    throw new AuthApiError(msg ?? `Request failed (${res.status})`, res.status, fr?.trim() || undefined);
   }
   return json as T;
 }

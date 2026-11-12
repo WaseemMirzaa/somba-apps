@@ -136,7 +136,7 @@ function OpsPortalCard({
       className="group isolate flex w-full flex-col overflow-hidden rounded-lg bg-clip-padding [backface-visibility:hidden] border border-slate-200 bg-slate-50/80 text-left transition-all hover:border-[var(--primary)]/25 hover:bg-white hover:shadow-md max-lg:transition-none lg:rounded-xl"
     >
       <div className="relative h-28 overflow-hidden">
-        <Image src={portal.image} alt={portal.name} fill className="object-cover opacity-80 transition-transform group-hover:scale-105" sizes="200px" />
+        <Image src={portal.image} alt={fr ? portal.nameFr : portal.name} fill className="object-cover opacity-80 transition-transform group-hover:scale-105" sizes="200px" />
         <div className="absolute inset-0 bg-slate-900/50" />
         <div className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-lg bg-white/90 text-[var(--primary)]">
           <Icon className="h-4 w-4" />

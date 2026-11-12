@@ -48,3 +48,11 @@ test("a revoked or switched-off rider session reads as a plain 'sign in again' i
   assert.equal(authErrorText(new Error("This account has been suspended. Contact support."), true), "Ce compte a été suspendu. Contactez le support.");
   assert.equal(authErrorText(new Error("Current password is incorrect."), true), "Le mot de passe actuel est incorrect.");
 });
+
+test("an HTTP error's messageFr wins in French, English readers keep the English", async () => {
+  const err = Object.assign(new Error("Invalid email or password."), { messageFr: "E-mail ou mot de passe incorrect (serveur)." });
+  assert.equal(authErrorText(err, true), "E-mail ou mot de passe incorrect (serveur).");
+  assert.equal(authErrorText(err, false), "Invalid email or password.");
+  // no messageFr: the local list still applies
+  assert.equal(authErrorText(new Error("Invalid email or password."), true), "E-mail ou mot de passe incorrect.");
+});

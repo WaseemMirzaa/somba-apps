@@ -568,7 +568,7 @@ export interface Review {
  * Standard ack envelope returned by every request→ack socket handler. A refusal may carry structured fields next to
  * `error` (e.g. `code: 'not_served'` with `areaName`, `areaNameEn` and `servedCities`, docs/contracts/areas.md).
  */
-export type Ack<T> = { ok: true; data: T } | ({ ok: false; error: string; code?: string } & Record<string, unknown>);
+export type Ack<T> = { ok: true; data: T } | ({ ok: false; error: string; errorFr?: string; code?: string } & Record<string, unknown>);
 
 /** The Error `socketClient.request` rejects with: the localised message, plus the server's own sentence and fields. */
 export type RequestError = Error & {
@@ -578,4 +578,6 @@ export type RequestError = Error & {
   code?: string;
   /** The whole refusal as sent (every structured field next to `error`). */
   ack?: Record<string, unknown>;
+  /** The server did not answer in time (socket.io ack timeout): `message` is already in the reader's language. */
+  timedOut?: boolean;
 };
