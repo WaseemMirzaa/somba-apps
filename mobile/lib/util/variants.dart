@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'variant_words.dart';
+
 /// A product option type the shopper picks, e.g. Size (39, 40…) or Colour (Black, White).
 /// Mirrors api/src/common/variants/variants.ts: the choice travels as "Size: 42 · Colour: Black" ("Default" = none).
 class VariantGroup {
@@ -80,7 +82,8 @@ List<VariantGroup>? _alignedLabels(List<VariantGroup> groups, Object? raw) {
 String variantGroupName(List<VariantGroup> groups, VariantLabels labels, int groupIndex, String lang) {
   final l = labels[lang];
   if (l != null && groupIndex >= 0 && groupIndex < l.length) return l[groupIndex].name;
-  return groupIndex >= 0 && groupIndex < groups.length ? groups[groupIndex].name : '';
+  final canonical = groupIndex >= 0 && groupIndex < groups.length ? groups[groupIndex].name : '';
+  return lang == 'fr' ? frenchOptionWord(canonical, group: true) : canonical;
 }
 
 /// One option (Black, 42…) in [lang]; the canonical text when there is no label.
@@ -90,7 +93,8 @@ String variantOptionName(List<VariantGroup> groups, VariantLabels labels, int gr
     return l[groupIndex].options[optionIndex];
   }
   if (groupIndex >= 0 && groupIndex < groups.length && optionIndex >= 0 && optionIndex < groups[groupIndex].options.length) {
-    return groups[groupIndex].options[optionIndex];
+    final canonical = groups[groupIndex].options[optionIndex];
+    return lang == 'fr' ? frenchOptionWord(canonical, group: false) : canonical;
   }
   return '';
 }
@@ -101,7 +105,9 @@ String variantPair(String group, String option) => '$group: $option';
 /// Turns a canonical choice ("Size: 42 · Colour: Black") into [lang] using the labels. Only the text SHOWN changes:
 /// the cart line keeps the canonical value. Anything that does not parse is returned unchanged.
 String localizeVariantText(List<VariantGroup> groups, VariantLabels labels, String canonicalText, String lang) {
-  if (canonicalText == defaultVariant || labels[lang] == null || groups.isEmpty) return canonicalText;
+  if (canonicalText == defaultVariant) return canonicalText;
+  // No labels from the server for this language: the known words in French, the seller's text otherwise.
+  if (labels[lang] == null || groups.isEmpty) return lang == 'fr' ? frenchVariantText(canonicalText) : canonicalText;
   final parts = canonicalText.split(' · ');
   final out = <String>[];
   for (final part in parts) {

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'auth_service.dart' show ApiException;
+import 'auth_service.dart' show ApiException, frenchText;
 import 'env.dart';
 import 'realtime_store.dart';
 
@@ -32,7 +32,7 @@ class UploadService {
       final url = json['url'];
       if (res.statusCode >= 200 && res.statusCode < 300 && url is String && url.isNotEmpty) return url;
       final msg = json['message'];
-      throw ApiException(msg is List ? msg.join(' ') : '${msg ?? 'Upload failed.'}', res.statusCode);
+      throw ApiException(msg is List ? msg.join(' ') : '${msg ?? 'Upload failed.'}', res.statusCode, frenchText(json['messageFr'], separator: ' '));
     } on TimeoutException {
       throw ApiException.local('err_timeout');
     } on http.ClientException {

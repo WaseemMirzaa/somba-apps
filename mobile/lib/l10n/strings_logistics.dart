@@ -1,4 +1,5 @@
 // Typed accessors for the texts in messages_logistics.dart (delivery quote, legs and addresses).
+import 'notice_rules.dart';
 import 'strings.dart';
 
 extension StringsLogistics on Strings {
@@ -80,7 +81,8 @@ extension StringsLogistics on Strings {
 
   /// "Delivery attempt 1 failed: Customer not reachable. The rider will try again."
   String deliveryAttemptFailed(int n, String? reason, bool retry) {
-    final clean = (reason ?? '').trim().replaceAll(RegExp(r'[.!?\s]+$'), '');
+    final said = (reason ?? '').trim();
+    final clean = (isFr ? translateReasonText(said) : said).replaceAll(RegExp(r'[.!?\s]+$'), '');
     final why = clean.isEmpty ? '' : ': $clean';
     return '${t('attempt_failed', {'n': n})}$why. ${t(retry ? 'attempt_retry' : 'attempt_contact')}';
   }

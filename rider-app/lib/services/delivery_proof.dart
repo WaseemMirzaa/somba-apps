@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'auth_service.dart' show ApiException;
+import 'auth_service.dart' show ApiException, frenchText;
 import 'env.dart';
 import 'models.dart';
 import 'rider_store.dart';
@@ -109,7 +109,7 @@ class HttpProofUploader implements ProofUploader {
     } catch (_) {/* not JSON */}
     final m = json['message'];
     final text = m is List ? m.join('\n') : m?.toString();
-    throw text == null ? ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode}) : ApiException(text, res.statusCode, json['code'] is String ? json['code'] as String : null);
+    throw text == null ? ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode}) : ApiException(text, res.statusCode, json['code'] is String ? json['code'] as String : null, frenchText(json['messageFr']));
   }
 }
 

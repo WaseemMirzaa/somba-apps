@@ -76,20 +76,25 @@ class ApiException implements Exception {
   /// The other fields of the refusal's ack (everything but `ok`, `error` and `code`); empty when there are none.
   final Map<String, Object?> details;
 
-  ApiException(this.message, [this.status])
+  /// The server's own French sentence (`errorFr` of an ack, `messageFr` of an HTTP body), when it sent one. Shown
+  /// instead of the English text when the app is in French (docs/contracts/error-text.md, section 4).
+  final String? messageFr;
+
+  ApiException(this.message, [this.status, this.messageFr])
       : localKey = null,
         args = null,
         code = null,
         details = const {};
 
   /// A refusal with its structured fields (see [ApiException.fromAck]).
-  ApiException.refusal(this.message, {this.status, this.code, this.details = const {}})
+  ApiException.refusal(this.message, {this.status, this.code, this.details = const {}, this.messageFr})
       : localKey = null,
         args = null;
 
   /// A client-side failure (offline, timeout…): the text comes from the strings layer.
   ApiException.local(String key, {this.status, this.args})
       : localKey = key,
+        messageFr = null,
         message = const Strings('en').t(key, args),
         code = null,
         details = const {};
@@ -103,15 +108,28 @@ class ApiException implements Exception {
     return ApiException.refusal(
       error.toString(),
       code: code is String && code.trim().isNotEmpty ? code.trim() : null,
+      messageFr: frenchText(ack['errorFr']),
       details: {
         for (final e in ack.entries)
-          if (!const {'ok', 'error', 'code'}.contains(e.key)) e.key.toString(): e.value,
+          if (!const {'ok', 'error', 'errorFr', 'code'}.contains(e.key)) e.key.toString(): e.value,
       },
     );
   }
 
   @override
-  String toString() => localKey != null ? Strings.current.t(localKey!, args) : Strings.current.serverError(message);
+  String toString() {
+    if (localKey != null) return Strings.current.t(localKey!, args);
+    final fr = messageFr;
+    if (fr != null && fr.trim().isNotEmpty && Strings.current.isFr) return fr.trim();
+    return Strings.current.serverError(message);
+  }
+}
+
+/// The French version the server sent with an error: a string, or a list of strings (joined with [separator] like
+/// the English `message`). Null when absent or blank, which is normal: the server only sends it when it knows the sentence.
+String? frenchText(Object? v, {String separator = '\n'}) {
+  final text = v is List ? v.map((e) => '$e'.trim()).where((e) => e.isNotEmpty).join(separator) : (v is String ? v.trim() : '');
+  return text.isEmpty ? null : text;
 }
 
 /// REST is used ONLY for one-shot calls that happen before a socket exists
@@ -162,7 +180,7 @@ class AuthService {
       if (text == null) {
         throw ApiException.local('err_request_failed', status: res.statusCode, args: {'code': res.statusCode});
       }
-      throw ApiException(text, res.statusCode);
+      throw ApiException(text, res.statusCode, frenchText(json['messageFr']));
     }
     return json;
   }

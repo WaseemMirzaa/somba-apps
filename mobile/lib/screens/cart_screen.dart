@@ -203,8 +203,9 @@ class _CartScreenState extends State<CartScreen> {
           const SizedBox(height: 6),
           Text(s.cartEmptyHint, style: const TextStyle(color: AppColors.muted)),
           const SizedBox(height: 22),
-          SizedBox(
-            width: 220,
+          // A minimum, not a fixed width: the French label ("Commencer mes achats") is longer than 220 pt allows.
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 220),
             child: FilledButton(
               onPressed: () => Navigator.pop(context),
               child: Text(s.startShopping),

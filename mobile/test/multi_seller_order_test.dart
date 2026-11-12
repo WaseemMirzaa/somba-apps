@@ -253,7 +253,8 @@ void main() {
         await show(tester, OrderDetailScreen(locale: Locale(lang), orderId: 'multi'), lang);
         final name = tester.widget<Text>(find.text('Item p2'));
         expect(name.style?.decoration, TextDecoration.lineThrough);
-        expect(find.text(s.lineCancelledReason('Out of stock')), findsOneWidget);
+        // The seller's stock phrase is worded in French by the phone ("Out of stock" -> "Rupture de stock").
+        expect(find.text(s.lineCancelledReason(lang == 'fr' ? 'Rupture de stock' : 'Out of stock')), findsOneWidget);
         expect(find.text(s.lineRefundedWallet(money(20))), findsOneWidget);
         // Live lines are not struck through.
         expect(tester.widget<Text>(find.text('Item p1')).style?.decoration, isNot(TextDecoration.lineThrough));

@@ -5,6 +5,7 @@ import '../../services/aftersale_store.dart';
 import '../../services/models.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
+import '../../util/variant_words.dart';
 import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/photo_picker.dart';
@@ -399,7 +400,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
               Text(passed ? s.asWinClosedTitle : s.asWinUnavailableTitle, style: const TextStyle(color: AppColors.dangerStrong, fontWeight: FontWeight.w800, fontSize: 16)),
               const SizedBox(height: 2),
               Text(
-                passed ? s.asWinClosedBody(e.windowDays, s.date(e.endsAt!)) : s.serverError(e.reason ?? ''),
+                passed ? s.asWinClosedBody(e.windowDays, s.date(e.endsAt!)) : s.serverErrorOr(e.reason ?? '', e.reasonFr),
                 key: const ValueKey('return-closed-body'),
                 style: const TextStyle(color: AppColors.inkSoft, fontSize: 13, height: 1.35),
               ),
@@ -486,7 +487,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
   Widget _itemRow(Strings s, EligibleLine l) {
     final line = _orderLine(l);
     final name = line?.displayName(s.lang) ?? l.productName;
-    final variant = line != null && line.hasVariant ? line.displayVariant(s.lang) : (l.hasVariant ? l.variant : '');
+    final variant = line != null && line.hasVariant ? line.displayVariant(s.lang) : (l.hasVariant ? (s.isFr ? frenchVariantText(l.variant) : l.variant) : '');
     final qty = _qty[l.itemId] ?? 0;
     return Padding(
       key: ValueKey('line-${l.itemId}'),

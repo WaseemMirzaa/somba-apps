@@ -267,8 +267,9 @@ void main() {
       testWidgets('Add to cart without choosing says "Choose a Size" and adds nothing ($lang)', (tester) async {
         await open(tester, 'shoe', lang: lang);
         await tapAdd(tester);
-        expect(snack(s.chooseOption('Size')), findsOneWidget);
-        expect(snack(lang == 'en' ? 'Choose a size first' : 'Choisissez d’abord : size'), findsOneWidget, reason: 'the option name reads in lower case');
+        // No variantLabels from the server: the phone words the well-known option names itself (Size -> Taille).
+        expect(snack(s.chooseOption(lang == 'en' ? 'Size' : 'Taille')), findsOneWidget);
+        expect(snack(lang == 'en' ? 'Choose a size first' : 'Choisissez d’abord : taille'), findsOneWidget, reason: 'the option name reads in lower case');
         expect(ShopState.instance.cart, isEmpty);
         expect(snack(s.addedToCart), findsNothing);
       });
@@ -277,7 +278,7 @@ void main() {
         await open(tester, 'shoe', lang: lang);
         await choose(tester, 'Size', '42');
         await tapAdd(tester);
-        expect(snack(s.chooseOption('Colour')), findsOneWidget);
+        expect(snack(s.chooseOption(lang == 'en' ? 'Colour' : 'Couleur')), findsOneWidget);
         expect(ShopState.instance.cart, isEmpty);
       });
 
@@ -287,7 +288,7 @@ void main() {
         await choose(tester, 'Colour', 'Black');
         expect(tester.widget<ChoiceChip>(find.byKey(const ValueKey('variant-Size-42'))).selected, isTrue);
         expect(tester.widget<ChoiceChip>(find.byKey(const ValueKey('variant-Size-41'))).selected, isFalse);
-        expect(tester.widget<Text>(find.byKey(const ValueKey('variant-title-Size'))).data, 'Size: 42');
+        expect(tester.widget<Text>(find.byKey(const ValueKey('variant-title-Size'))).data, lang == 'en' ? 'Size: 42' : 'Taille: 42');
         await tapAdd(tester);
         final line = ShopState.instance.cart.single;
         expect(line.variant, 'Size: 42 · Colour: Black');

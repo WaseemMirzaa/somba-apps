@@ -10,6 +10,7 @@ const Map<String, (String, String)> kMessages = {
   ...kShiftMessages,
   ...kComplianceMessages,
   ...kParcelMessages,
+  'app_title': ('KOMORIKO Rider', 'KOMORIKO Livreur'), // the name in the task switcher
   'close': ('Close', 'Fermer'),
   'cancel': ('Cancel', 'Annuler'),
   'email': ('Email', 'E-mail'),

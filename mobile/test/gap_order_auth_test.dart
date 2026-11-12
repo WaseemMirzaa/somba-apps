@@ -64,7 +64,8 @@ void main() {
         expect(t, contains('${s.receiptDate}: 01/10/2026 09:30'));
         expect(t, contains('${s.receiptCustomer}: Aline Mbuyi'));
         expect(t, contains('${s.receiptDeliverTo}: 12 Avenue de la Paix, Gombe, Kinshasa'));
-        expect(t, contains('2 × Phone case (Size: 42 · Colour: Black) — ${money(40)}'));
+        // The line has no variantFr: French gets the well-known option names and colours from the phone.
+        expect(t, contains('2 × Phone case (${lang == 'en' ? 'Size: 42 · Colour: Black' : 'Taille: 42 · Couleur: Noir'}) — ${money(40)}'));
         expect(t, contains('1 × Charger — ${money(20)}'), reason: 'the Default variant is not printed');
         expect(t, isNot(contains('(Default)')));
         expect(t, contains('${s.subtotal}: ${money(60)}'));

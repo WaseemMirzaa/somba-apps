@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../l10n/notice_rules.dart';
 import '../../l10n/strings.dart';
 import '../../services/aftersale_models.dart';
 import '../../services/aftersale_store.dart';
@@ -216,7 +217,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       SectionTitle(s.asDecision),
                       if (outcomeLabel(s, d.outcome).isNotEmpty) Text(outcomeLabel(s, d.outcome), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                      if ((d.resolution ?? '').isNotEmpty) Text(d.resolution!, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5, height: 1.4)),
+                      if ((d.resolution ?? '').isNotEmpty) Text(s.isFr ? translateResolution(d.resolution!) : d.resolution!, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5, height: 1.4)),
                     ]),
                   ),
                 ],

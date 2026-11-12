@@ -1,3 +1,4 @@
+import '../util/variant_words.dart';
 import 'models.dart' show pickLang;
 
 /// Models for returns, disputes, replacements and exchanges (`docs/contracts/after-sale.md` §2 and §3).
@@ -56,7 +57,7 @@ class DisputeItemView {
 
   String displayName(String lang) => pickLang(lang, productName, productNameFr);
   bool get hasVariant => variant.isNotEmpty && variant != 'Default';
-  String displayVariant(String lang) => lang == 'fr' && variantFr.trim().isNotEmpty ? variantFr.trim() : variant;
+  String displayVariant(String lang) => lang != 'fr' ? variant : variantInFrench(variant, variantFr);
 
   /// What this line is worth if refunded in full (the price paid times the units).
   double get valueUsd => unitPriceUsd * qty;
@@ -310,12 +311,15 @@ class EligibleLine {
 
 /// What `disputes:eligibility` says about an order.
 class ReturnEligibility {
-  const ReturnEligibility({required this.eligible, this.reason, this.windowDays = 0, this.deliveredAt, this.endsAt, this.items = const []});
+  const ReturnEligibility({required this.eligible, this.reason, this.reasonFr, this.windowDays = 0, this.deliveredAt, this.endsAt, this.items = const []});
 
   final bool eligible;
 
   /// The server's English reason when [eligible] is false.
   final String? reason;
+
+  /// The server's French version of [reason] (`reasonFr`), when it sent one.
+  final String? reasonFr;
   final int windowDays;
   final DateTime? deliveredAt;
   final DateTime? endsAt;
@@ -327,6 +331,7 @@ class ReturnEligibility {
   factory ReturnEligibility.fromJson(Map<String, dynamic> j) => ReturnEligibility(
         eligible: j['eligible'] == true,
         reason: _strOrNull(j['reason']),
+        reasonFr: _strOrNull(j['reasonFr']),
         windowDays: _int(j['windowDays']),
         deliveredAt: _date(j['deliveredAt']),
         endsAt: _date(j['endsAt']),

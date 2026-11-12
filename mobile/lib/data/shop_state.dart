@@ -209,7 +209,7 @@ class ShopState {
       }
       appliedPromo = null;
       final reason = res['reason']?.toString();
-      return reason == null ? Strings.current.promoInvalid : Strings.current.serverError(reason);
+      return reason == null ? Strings.current.promoInvalid : Strings.current.serverErrorOr(reason, res['reasonFr']?.toString());
     } catch (e) {
       return Strings.current.errorText(e);
     }

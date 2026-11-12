@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n/notification_text.dart' show translateReason;
 import '../l10n/parcel_strings.dart';
 import '../l10n/strings.dart';
 import '../services/history_filter.dart';
@@ -436,7 +437,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
             child: Row(children: [
               const Icon(Icons.error_outline_rounded, size: 18, color: AppColors.danger),
               const SizedBox(width: 8),
-              Expanded(child: Text(s.failedWithReason(t.failureReason), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700, fontSize: 13))),
+              Expanded(child: Text(s.failedWithReason(s.isFr ? translateReason(t.failureReason!) : t.failureReason), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700, fontSize: 13))),
             ]),
           ),
         if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(s, t)),

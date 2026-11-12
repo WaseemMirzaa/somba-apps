@@ -13,6 +13,7 @@ import 'gap_helpers.dart';
 import 'layout_checks.dart';
 
 /// [seed] prepares the fakes for one language before each pump; [tearDownFakes] undoes them after each test.
+/// [i18nOnly] keeps just the untranslated-text findings (the i18n audit, which is not a layout test).
 /// [afterPump] runs once the screen is up (open a sheet, scroll...) before the checks.
 void registerLayoutMatrix(
   Map<String, Widget Function(Locale l)> screens, {
@@ -20,6 +21,7 @@ void registerLayoutMatrix(
   void Function()? tearDownFakes,
   Future<void> Function(WidgetTester tester, String screen)? afterPump,
   bool buttonRules = true,
+  bool i18nOnly = false,
 }) {
   setUpAll(() async {
     await initializeDateFormatting();
@@ -47,7 +49,7 @@ void registerLayoutMatrix(
         );
         final problems = await layoutProblems(tester, c, app, interact: afterPump == null ? null : () => afterPump(tester, e.key));
         for (final p in problems) {
-          found.add('[$c] $p');
+          if (!i18nOnly || p.startsWith('i18n:')) found.add('[$c] $p');
         }
         if (buttonRules) {
           try {
