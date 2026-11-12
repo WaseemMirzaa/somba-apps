@@ -109,8 +109,6 @@ void main() {
       expect(c.previewFor('en'), 'Hello');
       expect(c.previewFor('fr'), 'Bonjour');
       expect(const ChatConversation(id: 'c', lastMessagePreview: 'Bonjour').previewFor('en'), 'Bonjour');
-      expect(c.copyWith(unread: 2).lastMessageI18n, c.lastMessageI18n, reason: 'a copy keeps it');
-      expect(c.copyWith(lastMessageI18n: null).lastMessageI18n, isNull, reason: 'and can clear it');
     });
   });
 

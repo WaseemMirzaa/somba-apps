@@ -45,11 +45,11 @@ void main() {
 
     test('a reloaded list keeps the thread of a request that was opened', () async {
       server.handlers['disputes:get'] = (_) => disputeJson(messages: [msgJ('m1')]);
-      server.handlers['disputes:list'] = (_) => [disputeJson(stage: 'escalated')];
+      server.handlers['disputes:list'] = (_) => [disputeJson(stage: 'approved')];
       await store.fetchDispute('d1');
       await store.loadDisputes();
       final d = store.disputeById('d1')!;
-      expect(d.stage, 'escalated');
+      expect(d.stage, 'approved');
       expect(d.messages, hasLength(1));
     });
 
@@ -65,11 +65,10 @@ void main() {
   });
 
   group('calls', () {
-    test('eligibility, open (with siblings), reply, escalate and cancel send the contract payloads', () async {
+    test('eligibility, open (with siblings), reply and cancel send the contract payloads (there is no escalate: support decides)', () async {
       server.handlers['disputes:eligibility'] = (_) => eligibilityJson();
       server.handlers['disputes:open'] = (_) => {...disputeJson(id: 'n1'), 'siblings': ['n2', 'n3']};
       server.handlers['disputes:reply'] = (b) => msgJ('m9', role: 'customer', text: b!['message'] as String);
-      server.handlers['disputes:escalate'] = (_) => disputeJson(stage: 'escalated');
       server.handlers['disputes:cancel'] = (_) => disputeJson(status: 'rejected', stage: 'closed', resolution: 'Cancelled by the customer');
 
       final e = await store.eligibility('o1');
@@ -106,10 +105,6 @@ void main() {
       await store.fetchDispute('d1');
       await store.reply('d1', 'Here it is', attachments: ['/uploads/b.jpg']);
       expect(server.bodiesOf('disputes:reply').single, {'id': 'd1', 'message': 'Here it is', 'attachments': ['/uploads/b.jpg']});
-      await store.escalate('d1', note: '  please help ');
-      expect(server.bodiesOf('disputes:escalate').single, {'id': 'd1', 'note': 'please help'});
-      await store.escalate('d1');
-      expect(server.bodiesOf('disputes:escalate').last, {'id': 'd1'});
       await store.cancel('d1');
       expect(server.bodiesOf('disputes:cancel').single, {'id': 'd1'});
       expect(store.disputeById('d1')!.wasCancelled, isTrue);
@@ -147,15 +142,15 @@ void main() {
     test('dispute:created adds a request, dispute:updated changes it', () {
       RealtimeStore.instance.debugEmit('dispute:created', disputeJson(id: 'z', reference: 'DP-5', type: 'dispute'));
       expect(store.disputeById('z')!.reference, 'DP-5');
-      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(id: 'z', reference: 'DP-5', type: 'dispute', stage: 'seller_replied', updatedAt: '2026-10-25T00:00:00Z'));
+      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(id: 'z', reference: 'DP-5', type: 'dispute', stage: 'approved', updatedAt: '2026-10-25T00:00:00Z'));
       expect(store.disputes, hasLength(1));
-      expect(store.disputeById('z')!.stage, 'seller_replied');
+      expect(store.disputeById('z')!.stage, 'approved');
     });
 
     test('an older copy never replaces a newer one', () {
-      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(stage: 'escalated', updatedAt: '2026-10-25T10:00:00Z'));
-      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(stage: 'awaiting_seller', updatedAt: '2026-10-25T09:00:00Z'));
-      expect(store.disputeById('d1')!.stage, 'escalated');
+      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(stage: 'approved', updatedAt: '2026-10-25T10:00:00Z'));
+      RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(stage: 'awaiting_support', updatedAt: '2026-10-25T09:00:00Z'));
+      expect(store.disputeById('d1')!.stage, 'approved');
     });
 
     test('an update keeps the thread already fetched', () async {

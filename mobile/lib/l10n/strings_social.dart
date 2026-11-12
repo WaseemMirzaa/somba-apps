@@ -5,24 +5,18 @@ extension StringsSocial on Strings {
   // chat
   String get chatInboxTitle => t('chat_inbox_title');
   String get chatInboxEmpty => t('chat_inbox_empty');
-  String get chatMessageSeller => t('chat_message_seller');
+  String get chatClosedNote => t('chat_closed_note');
+  String supportAboutProduct(String name) => t('support_about_product', {'name': name});
+  String get supportEarlierChats => t('support_earlier_chats');
   String get chatStoreFallback => t('chat_store_fallback');
   String chatCtxProduct(String name) => t('chat_ctx_product', {'name': name});
   String chatCtxOrder(String ref) => t('chat_ctx_order', {'ref': ref});
   String get chatCtxOrderPlain => t('chat_ctx_order_plain');
-  String get chatComposeTitle => t('chat_compose_title');
-  String chatComposeIntro(String store) => t('chat_compose_intro', {'store': store});
-  String get chatComposeHint => t('chat_compose_hint');
-  String get chatComposeSend => t('chat_compose_send');
   String get chatComposeRequired => t('chat_compose_required');
   String get chatInputHint => t('chat_input_hint');
   String get chatOlder => t('chat_older');
   String get chatMoreConvs => t('chat_more_convs');
-  String get chatSent => t('chat_sent');
-  String chatSentTo(String store) => t('chat_sent_to', {'store': store});
-  String get chatReadOnly => t('chat_read_only');
   String get chatPhotoAlt => t('chat_photo_alt');
-  String chatUnreadN(int n) => t('chat_unread_n', {'n': n});
   String get chatAttach => t('chat_attach');
   String get chatEmptyThread => t('chat_empty_thread');
   String chatViewPhoto(int n, int total) => t('chat_view_photo', {'n': n, 'total': total});

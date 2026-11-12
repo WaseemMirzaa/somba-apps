@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../l10n/notice_rules.dart';
 import '../../l10n/strings.dart';
 import '../../services/aftersale_models.dart';
 import '../../services/aftersale_store.dart';
@@ -9,11 +8,13 @@ import '../../widgets/feedback.dart';
 import '../../widgets/kit.dart';
 import '../../widgets/photo_picker.dart';
 import 'aftersale_widgets.dart';
-import 'chat_entry.dart';
+import '../../widgets/translatable_text.dart';
+import 'support_entry.dart';
 import 'return_parcel_card.dart';
 
-/// One return or dispute request: where it stands, the items and the refund, the conversation with the seller
-/// and KOMORIKO support, and what the customer may do next. Follows the live pushes while it is open.
+/// One return or dispute request: where it stands (with KOMORIKO support, which decides), the items and the refund, the
+/// conversation with support, and what the customer may do next (add details, cancel, contact support). Follows the live
+/// pushes while it is open.
 class ReturnStatusScreen extends StatefulWidget {
   const ReturnStatusScreen({super.key, this.locale = const Locale('en'), this.returnRequest, this.requestId, this.siblings = const []})
       : assert(returnRequest != null || requestId != null, 'give the request or its id');
@@ -151,23 +152,6 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
     }
   }
 
-  Future<void> _escalate(DisputeView d) async {
-    final s = Strings.of(context);
-    final note = await showDialog<String>(context: context, builder: (_) => const EscalateDialog());
-    if (note == null || !mounted) return;
-    setState(() => _acting = true);
-    try {
-      await _store.escalate(d.id, note: note);
-      if (!mounted) return;
-      setState(() => _acting = false);
-      showSnack(context, s.asEscalateDone);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _acting = false);
-      showError(context, e);
-    }
-  }
-
   Future<void> _cancel(DisputeView d) async {
     final s = Strings.of(context);
     final ok = await showDialog<bool>(context: context, builder: (_) => const CancelRequestDialog());
@@ -209,7 +193,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
               children: [
                 _banner(banner, d),
                 if (widget.siblings.isNotEmpty) ...[const SizedBox(height: AppSpace.lg), _siblings(s, d)],
-                if (d.canEscalate || d.canCancel) ...[const SizedBox(height: AppSpace.lg), _actions(s, d)],
+                if (d.canCancel) ...[const SizedBox(height: AppSpace.lg), _actions(s, d)],
                 if (_showDecision(s, d)) ...[
                   const SizedBox(height: AppSpace.lg),
                   Panel(
@@ -217,7 +201,7 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       SectionTitle(s.asDecision),
                       if (outcomeLabel(s, d.outcome).isNotEmpty) Text(outcomeLabel(s, d.outcome), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                      if ((d.resolution ?? '').isNotEmpty) Text(s.isFr ? translateResolution(d.resolution!) : d.resolution!, style: const TextStyle(color: AppColors.inkSoft, fontSize: 13.5, height: 1.4)),
+                      if ((d.resolution ?? '').isNotEmpty) _resolution(s, d),
                     ]),
                   ),
                 ],
@@ -228,11 +212,9 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
                 if (d.items.isNotEmpty) ...[const SizedBox(height: AppSpace.lg), _items(s, d)],
                 const SizedBox(height: AppSpace.lg),
                 _reasonPanel(s, d),
-                if (_hasSellerPanel(d)) ...[const SizedBox(height: AppSpace.lg), _sellerPanel(s, d)],
-                if (d.sellerId != null) ...[
-                  const SizedBox(height: AppSpace.sm),
-                  MessageSellerButton(sellerId: d.sellerId!, orderId: d.orderId, locale: widget.locale),
-                ],
+                if (_hasEarlierAnswer(d)) ...[const SizedBox(height: AppSpace.lg), _earlierAnswer(s, d)],
+                const SizedBox(height: AppSpace.sm),
+                ContactSupportButton(orderId: d.orderId, locale: widget.locale),
                 const SizedBox(height: AppSpace.lg),
                 _thread(s, d),
               ],
@@ -275,7 +257,6 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
       );
 
   Widget _actions(Strings s, DisputeView d) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (d.canEscalate) SubmitButton(s.asEscalate, key: const ValueKey('escalate'), busy: _acting, onPressed: () => _escalate(d)),
         if (d.canCancel)
           TextButton(
             key: const ValueKey('cancel-request'),
@@ -394,7 +375,15 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(s.yourMessage, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
           const SizedBox(height: 4),
-          Text(d.reason, key: const ValueKey('request-reason'), style: const TextStyle(fontSize: 13.5, height: 1.4)),
+          TranslatableText(
+            kind: 'dispute_reason',
+            id: d.id,
+            auto: true,
+            i18n: d.reasonI18n,
+            text: d.reason,
+            style: const TextStyle(fontSize: 13.5, height: 1.4),
+            key: const ValueKey('request-reason'),
+          ),
           if (d.attachments.isNotEmpty) ...[
             const SizedBox(height: AppSpace.md),
             Text(s.asSecPhotos, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
@@ -404,29 +393,34 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
         ]),
       );
 
-  bool _hasSellerPanel(DisputeView d) =>
-      (d.sellerReason ?? '').isNotEmpty ||
-      (d.isReturn && d.sellerRespondedAt != null && !const {'seller_rejected'}.contains(d.stage)) ||
-      (d.isOpen && d.stage == 'awaiting_seller' && d.sellerDueAt != null);
+  /// A note from before KOMORIKO support decided everything: the store's old answer stays on the request as history.
+  bool _hasEarlierAnswer(DisputeView d) => (d.sellerReason ?? '').isNotEmpty;
 
-  Widget _sellerPanel(Strings s, DisputeView d) => Panel(
+  Widget _earlierAnswer(Strings s, DisputeView d) => Panel(
         key: const ValueKey('seller-panel'),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SectionTitle(s.asSecSeller),
-          if (d.isReturn && d.sellerRespondedAt != null && (d.sellerReason ?? '').isEmpty)
-            Text(s.asSellerAccepted, style: const TextStyle(fontSize: 13.5, height: 1.4)),
-          if ((d.sellerReason ?? '').isNotEmpty) ...[
-            Text(s.asSellerReason, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-            const SizedBox(height: 2),
-            Text(d.sellerReason!, key: const ValueKey('seller-reason'), style: const TextStyle(fontSize: 13.5, height: 1.4)),
-          ],
-          if (d.sellerRespondedAt != null) ...[
-            const SizedBox(height: AppSpace.sm),
-            Text(s.asSellerAnswered(s.when(d.sellerRespondedAt!)), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
-          ] else if (d.isOpen && d.sellerDueAt != null)
-            Text(s.asSellerDue(s.when(d.sellerDueAt!)), key: const ValueKey('seller-due'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          Text(s.asSellerReason, style: const TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          const SizedBox(height: 2),
+          TranslatableText(
+            kind: 'dispute_reply',
+            id: d.id,
+            auto: true,
+            i18n: d.sellerReasonI18n,
+            text: d.sellerReason!,
+            style: const TextStyle(fontSize: 13.5, height: 1.4),
+            key: const ValueKey('seller-reason'),
+          ),
         ]),
       );
+
+  /// The decision text support wrote: its own words with the translation that came with them; the fixed sentences the
+  /// server writes itself are put into French by the app.
+  Widget _resolution(Strings s, DisputeView d) {
+    const style = TextStyle(color: AppColors.inkSoft, fontSize: 13.5, height: 1.4);
+    if (d.resolutionI18n == null) return Text(resolutionText(s, d), key: const ValueKey('request-resolution'), style: style);
+    return TranslatableText(kind: 'dispute_resolution', id: d.id, auto: true, i18n: d.resolutionI18n, text: d.resolution!, style: style, key: const ValueKey('request-resolution'));
+  }
 
   String _author(Strings s, DisputeMessageView m) {
     if (m.isCustomer) return s.asThreadYou;
@@ -481,7 +475,8 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(_author(s, m), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: mine ? AppColors.primaryDark : AppColors.inkSoft)),
           const SizedBox(height: 2),
-          if (m.text.isNotEmpty) Text(m.text, style: const TextStyle(fontSize: 13.5, height: 1.35)),
+          if (m.text.isNotEmpty)
+            TranslatableText(kind: 'dispute_message', id: m.id, auto: true, i18n: m.textI18n, text: m.text, style: const TextStyle(fontSize: 13.5, height: 1.35)),
           if (m.attachments.isNotEmpty) ...[const SizedBox(height: AppSpace.sm), RemotePhotos(urls: m.attachments, size: 64)],
           if (m.createdAt != null) ...[
             const SizedBox(height: 4),
@@ -513,47 +508,6 @@ class _ReturnStatusScreenState extends State<ReturnStatusScreen> {
           child: _sending ? const ButtonSpinner() : Text(s.send),
         ),
       ]);
-}
-
-/// "Ask KOMORIKO support to decide?": explains, takes an optional note, pops the note (null when the customer backs out).
-class EscalateDialog extends StatefulWidget {
-  const EscalateDialog({super.key});
-  @override
-  State<EscalateDialog> createState() => EscalateDialogState();
-}
-
-class EscalateDialogState extends State<EscalateDialog> {
-  final _note = TextEditingController();
-
-  @override
-  void dispose() {
-    _note.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = Strings.of(context);
-    return AlertDialog(
-      title: Text(s.asEscalateTitle),
-      content: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(s.asEscalateBody),
-          const SizedBox(height: AppSpace.md),
-          AppField(key: const ValueKey('escalate-note'), label: s.asEscalateNote, controller: _note, maxLines: 3),
-        ]),
-      ),
-      actions: [
-        SizedBox(
-          width: double.infinity,
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            FilledButton(key: const ValueKey('escalate-confirm'), onPressed: () => Navigator.pop(context, _note.text), child: ButtonLabel(s.asEscalateConfirm)),
-            TextButton(key: const ValueKey('escalate-back'), onPressed: () => Navigator.pop(context), child: ButtonLabel(s.cancel)),
-          ]),
-        ),
-      ],
-    );
-  }
 }
 
 /// "Cancel this request?": pops true when the customer confirms.

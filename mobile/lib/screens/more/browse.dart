@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../services/realtime_store.dart';
 import '../../util/format.dart';
 import '../../util/text_fold.dart';
+import '../../widgets/category_image.dart';
 import '../../widgets/kit.dart';
 import 'shop_extra.dart';
 
@@ -165,7 +166,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                     () => setState(() {
                           q.category = c.name;
                           q.categoryId = c.id;
-                        }))),
+                        }),
+                    leading: CategoryImage(category: c, lang: s.lang, size: 22, radius: 6, decorative: true))),
               ]),
               const SizedBox(height: 20),
               Row(children: [
@@ -221,16 +223,19 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   Widget _label(String t) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(t, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)));
 
-  Widget _chip(String label, bool sel, VoidCallback onTap) => GestureDetector(
+  Widget _chip(String label, bool sel, VoidCallback onTap, {Widget? leading}) => GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+          padding: EdgeInsets.fromLTRB(leading == null ? 15 : 8, 9, 15, 9),
           decoration: BoxDecoration(
             color: sel ? AppColors.primary : AppColors.background,
             borderRadius: BorderRadius.circular(100),
             border: Border.all(color: sel ? AppColors.primary : AppColors.line),
           ),
-          child: Text(label, style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (leading != null) ...[leading, const SizedBox(width: AppSpace.sm)],
+            Flexible(child: Text(label, style: TextStyle(color: sel ? Colors.white : AppColors.inkSoft, fontWeight: FontWeight.w700, fontSize: 12.5))),
+          ]),
         ),
       );
 }

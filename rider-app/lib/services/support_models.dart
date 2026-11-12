@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'models.dart' show textOrNull;
+import 'text_i18n.dart';
 
 /// A support ticket's states that no longer accept a reply: the rider opens a new ticket instead.
 const kClosedTicketStatuses = {'closed', 'resolved'};
@@ -9,7 +10,7 @@ const kSupportCategories = ['general', 'delivery', 'orders', 'payment', 'account
 
 /// One message of a ticket thread: `{id, from, fromId, role, text, at, attachments: [urls]}`.
 class SupportMessage {
-  const SupportMessage({required this.id, required this.from, this.fromId, this.role = '', this.text = '', this.at, this.attachments = const []});
+  const SupportMessage({required this.id, required this.from, this.fromId, this.role = '', this.text = '', this.at, this.attachments = const [], this.textI18n});
 
   final String id;
   final String from;
@@ -18,6 +19,9 @@ class SupportMessage {
   final String text;
   final DateTime? at;
   final List<String> attachments;
+
+  /// [text] in English and French, as the server already has them (null when it has none).
+  final TextI18n? textI18n;
 
   /// The rider wrote it (`userId` is the signed-in account); staff and admin messages are the other side.
   bool isMine(String? userId) => userId != null && fromId == userId;
@@ -33,6 +37,7 @@ class SupportMessage {
       text: m['text'] is String ? m['text'] as String : '',
       at: m['at'] is String ? DateTime.tryParse(m['at'] as String)?.toLocal() : null,
       attachments: m['attachments'] is List ? (m['attachments'] as List).whereType<String>().toList() : const [],
+      textI18n: TextI18n.tryParse(m['textI18n']),
     );
   }
 }
@@ -44,6 +49,7 @@ class SupportTicket {
     required this.id,
     this.reference = '',
     this.subject = '',
+    this.subjectI18n,
     this.category = 'general',
     this.orderId,
     this.status = 'open',
@@ -57,6 +63,9 @@ class SupportTicket {
   final String id;
   final String reference;
   final String subject;
+
+  /// [subject] in English and French, as the server already has them (null when it has none).
+  final TextI18n? subjectI18n;
   final String category;
   final String? orderId;
   final String status;
@@ -76,6 +85,7 @@ class SupportTicket {
         id: id,
         reference: reference,
         subject: subject,
+        subjectI18n: subjectI18n,
         category: category,
         orderId: orderId,
         status: status,
@@ -105,6 +115,7 @@ class SupportTicket {
         id: j['id'] as String,
         reference: j['reference'] is String ? j['reference'] as String : '',
         subject: j['subject'] is String ? j['subject'] as String : '',
+        subjectI18n: TextI18n.tryParse(j['subjectI18n']),
         category: textOrNull(j['category']) ?? 'general',
         orderId: textOrNull(j['orderId']),
         status: textOrNull(j['status']) ?? 'open',

@@ -29,7 +29,7 @@ String? chatContextLine(Strings s, ChatConversation c) {
   return null;
 }
 
-/// Messages: the shopper's conversations with stores, newest first, with unread badges, live.
+/// Earlier chats: the shopper's old conversations with stores, newest first. Read-only: messaging stores is closed.
 class ChatInboxScreen extends StatefulWidget {
   const ChatInboxScreen({super.key, this.locale = const Locale('en')});
   final Locale locale;
@@ -45,7 +45,8 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   @override
   void initState() {
     super.initState();
-    _reload(initial: true);
+    // After this build: the store tells its listeners it is loading, and other screens (Support) listen to it.
+    Future.microtask(() => _reload(initial: true));
   }
 
   /// A failure on an empty screen is shown in place with a retry button; on a list already on screen it is a snackbar.
@@ -82,7 +83,6 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               await _reload();
-              await _store.refreshUnread().catchError((Object _) {});
             },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -124,12 +124,9 @@ class ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = Strings.of(context);
     final c = conversation;
-    final unread = c.unread > 0;
     final ctx = chatContextLine(s, c);
     final name = chatStoreName(s, c);
-    return Semantics(
-      label: unread ? s.chatUnreadN(c.unread) : null,
-      child: Material(
+    return Material(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
         elevation: 0,
@@ -151,7 +148,7 @@ class ConversationTile extends StatelessWidget {
                         child: Text(name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontWeight: unread ? FontWeight.w800 : FontWeight.w700, fontSize: 14.5)),
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
                       ),
                       const SizedBox(width: AppSpace.sm),
                       Text(chatTime(s, c.lastMessageAt), maxLines: 1, style: const TextStyle(color: AppColors.muted, fontSize: 11.5)),
@@ -166,9 +163,8 @@ class ConversationTile extends StatelessWidget {
                         child: Text(c.previewFor(s.lang),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: unread ? AppColors.ink : AppColors.muted, fontSize: 13, height: 1.3, fontWeight: unread ? FontWeight.w600 : FontWeight.w400)),
+                            style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.3)),
                       ),
-                      if (unread) ...[const SizedBox(width: AppSpace.sm), CountBadge(c.unread, semanticLabel: s.chatUnreadN(c.unread))],
                     ]),
                   ]),
                 ),
@@ -176,7 +172,6 @@ class ConversationTile extends StatelessWidget {
             ),
           ),
         ),
-      ),
     );
   }
 }

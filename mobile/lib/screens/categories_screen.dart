@@ -5,7 +5,7 @@ import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
 import '../util/text_fold.dart';
-import '../widgets/product_image.dart';
+import '../widgets/category_image.dart';
 import 'more/catalog_extra.dart';
 import 'more/browse.dart';
 import 'more/search_screen.dart';
@@ -68,22 +68,22 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         physics: const NeverScrollableScrollPhysics(),
         // Height from the content (icon, a two-line name, the count) at the current text size, not a fixed ratio.
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, mainAxisExtent: 104 + MediaQuery.textScalerOf(context).scale(58), crossAxisSpacing: 14, mainAxisSpacing: 14),
+            crossAxisCount: 2, mainAxisExtent: 110 + MediaQuery.textScalerOf(context).scale(58), crossAxisSpacing: 14, mainAxisSpacing: 14),
         itemCount: cats.length,
         itemBuilder: (_, i) {
           final cat = cats[i];
-          final grad = AppColors.tileGradients[i % AppColors.tileGradients.length];
           return GestureDetector(
+            key: ValueKey('category-tile-${cat.id}'),
             onTap: () => _openCategory(cat),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: grad),
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(22),
                 boxShadow: AppShadow.card,
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(height: 50, width: 50, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(16)), child: Icon(categoryIcon(cat.name), color: AppColors.primary, size: 26)),
+                CategoryImage(category: cat, lang: lang, size: 56, tint: i),
                 const Spacer(),
                 Text(cat.displayName(lang), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 2),
@@ -95,11 +95,10 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       ),
       const SizedBox(height: 22),
       Row(children: [
-        Text(s.popularStores, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-        const Spacer(),
+        Expanded(child: Text(s.popularStores, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
         TextButton(
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => SellersDirectoryScreen(locale: widget.locale))),
-          child: Text(s.seeAll, style: TextStyle(fontWeight: FontWeight.w700)),
+          child: Text(s.seeAll, style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       ]),
       const SizedBox(height: 6),
@@ -129,7 +128,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
         const SizedBox(height: 8),
         ...cats.map((c) => ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: Container(height: 42, width: 42, decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)), child: Icon(categoryIcon(c.name), color: AppColors.primary)),
+              leading: CategoryImage(category: c, lang: s.lang, size: 44, tint: cats.indexOf(c), radius: AppRadius.sm, decorative: true),
               title: Text(c.displayName(s.lang), style: const TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Text(s.itemsCount(liveCategoryCountOf(c))),
               trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.faint),

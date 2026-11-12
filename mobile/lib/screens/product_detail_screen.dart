@@ -21,7 +21,7 @@ import '../widgets/translatable_text.dart';
 import 'cart_screen.dart';
 import 'checkout_screen.dart';
 import 'more/aftersale_widgets.dart' show RemotePhotos;
-import 'more/chat_entry.dart';
+import 'more/support_entry.dart';
 import 'more/engage_qa.dart';
 import 'more/shop_extra.dart';
 
@@ -330,7 +330,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     visualDensity: VisualDensity.compact),
                 child: Text(s.pdVisitStore, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
               ),
-            if (p.sellerId != null) MessageSellerButton(sellerId: p.sellerId!, storeName: name, productId: p.uuid, locale: widget.locale),
+            ContactSupportButton(about: p.displayName(s.lang), locale: widget.locale),
           ]),
         ),
       ]),

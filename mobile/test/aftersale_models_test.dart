@@ -7,6 +7,7 @@ import 'package:lipcart/l10n/strings.dart';
 import 'package:lipcart/screens/more/aftersale_status.dart';
 import 'package:lipcart/screens/more/aftersale_widgets.dart';
 import 'package:lipcart/services/aftersale_models.dart';
+import 'package:lipcart/theme/app_theme.dart';
 
 import 'aftersale_helpers.dart';
 import 'gap_helpers.dart';
@@ -29,7 +30,6 @@ void main() {
         sellerReason: 'Worn out',
         sellerDueAt: '2026-10-26T09:30:00Z',
         sellerRespondedAt: '2026-10-25T09:30:00Z',
-        canEscalate: true,
         canCancel: true,
         refundUsd: 12.5,
         refundTo: 'phone',
@@ -40,7 +40,7 @@ void main() {
       expect(d.id, 'd1');
       expect(d.reference, 'RET-1001');
       expect(d.isReturn, isTrue);
-      expect(d.stage, 'seller_rejected');
+      expect(d.stage, 'awaiting_support', reason: 'an old seller stage reads as with support');
       expect(d.isOpen, isTrue);
       expect(d.attachments, ['/uploads/a.jpg', '/uploads/b.jpg']);
       expect(d.items.single.qty, 2);
@@ -51,7 +51,6 @@ void main() {
       expect(d.items.single.displayName('en'), 'Running shoes');
       expect(d.sellerReason, 'Worn out');
       expect(d.sellerDueAt, isNotNull);
-      expect(d.canEscalate, isTrue);
       expect(d.canCancel, isTrue);
       expect(d.refundUsd, 12.5);
       expect(d.refundTo, 'phone');
@@ -69,8 +68,7 @@ void main() {
       expect(open.attachments, isEmpty);
       expect(open.messages, isNull);
       expect(open.hasStage, isFalse);
-      expect(open.stage, 'awaiting_seller', reason: 'an open old request waits for review');
-      expect(open.canEscalate, isFalse);
+      expect(open.stage, 'awaiting_support', reason: 'an open old request waits for support');
       expect(open.canCancel, isFalse);
       expect(open.refundUsd, 0);
       expect(open.refundTo, 'wallet');
@@ -103,7 +101,7 @@ void main() {
       for (final s in ['approved', 'pickup', 'received']) {
         expect(DisputeView.fromJson(disputeJson(stage: s)).inPickupFlow, isTrue, reason: s);
       }
-      expect(DisputeView.fromJson(disputeJson(stage: 'awaiting_seller')).inPickupFlow, isFalse);
+      expect(DisputeView.fromJson(disputeJson(stage: 'awaiting_support')).inPickupFlow, isFalse);
       expect(DisputeView.fromJson(disputeJson(type: 'dispute', stage: 'approved')).inPickupFlow, isFalse);
     });
 
@@ -113,7 +111,7 @@ void main() {
       expect(row.messages, isNull);
       final merged = row.keepingMessagesOf(detail);
       expect(merged.messages, hasLength(1));
-      expect(merged.stage, 'escalated');
+      expect(merged.stage, 'awaiting_support');
     });
 
     test('sellers appear by first name only', () {
@@ -179,7 +177,7 @@ void main() {
   group('wording', () {
     test('every stage of a request has a banner in English and in French', () {
       for (final lang in [en, fr]) {
-        for (final stage in ['awaiting_seller', 'seller_replied', 'seller_rejected', 'seller_timeout', 'escalated', 'approved', 'pickup', 'received']) {
+        for (final stage in ['awaiting_support', ...kLegacySupportStages, 'approved', 'pickup', 'received']) {
           final d = DisputeView.fromJson(disputeJson(stage: stage, type: stage == 'seller_replied' ? 'dispute' : 'return'));
           final b = stageBanner(lang, d);
           expect(b.title, isNotEmpty, reason: '$stage ${lang.lang}');
@@ -191,12 +189,27 @@ void main() {
       expect(stageBanner(fr, DisputeView.fromJson(disputeJson(stage: 'escalated'))).title, 'Chez le support KOMORIKO');
     });
 
-    test('the seller deadline is shown, and a passed one says so', () {
+    test('every old seller stage reads as "With support" in the badge, in English and French', () {
+      for (final stage in ['awaiting_support', ...kLegacySupportStages]) {
+        final d = DisputeView.fromJson(disputeJson(stage: stage));
+        expect(stageLabel(en, d), 'With support', reason: stage);
+        expect(stageLabel(fr, d), 'Chez le support', reason: stage);
+        expect(stageColors(d).color, AppColors.amber, reason: stage);
+      }
+    });
+
+    test('the support deadline is shown, and a passed one says so; nothing names the seller', () {
       final soon = DateTime.now().add(const Duration(days: 1)).toUtc().toIso8601String();
       final late = DateTime.now().subtract(const Duration(days: 1)).toUtc().toIso8601String();
-      expect(stageBanner(en, DisputeView.fromJson(disputeJson(sellerDueAt: soon))).body, startsWith('The seller has until '));
-      expect(stageBanner(en, DisputeView.fromJson(disputeJson(sellerDueAt: late))).body, contains('has passed'));
-      expect(stageBanner(fr, DisputeView.fromJson(disputeJson(sellerDueAt: late))).body, contains('dépassé'));
+      expect(stageBanner(en, DisputeView.fromJson(disputeJson(sellerDueAt: soon))).body, startsWith('KOMORIKO support will decide on your return by '));
+      expect(stageBanner(en, DisputeView.fromJson(disputeJson(sellerDueAt: late))).body, contains('taking longer than usual'));
+      expect(stageBanner(fr, DisputeView.fromJson(disputeJson(sellerDueAt: late))).body, contains('plus de temps que d’habitude'));
+      for (final lang in [en, fr]) {
+        for (final stage in ['awaiting_support', ...kLegacySupportStages]) {
+          final b = stageBanner(lang, DisputeView.fromJson(disputeJson(stage: stage, sellerDueAt: soon)));
+          expect('${b.title} ${b.body}'.toLowerCase(), isNot(anyOf(contains('seller'), contains('vendeur'))), reason: '$stage ${lang.lang}');
+        }
+      }
     });
 
     test('closed requests: refund to the wallet, refund to the phone, replacement, declined, cancelled, old', () {

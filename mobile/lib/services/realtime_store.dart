@@ -7,7 +7,6 @@ import '../l10n/strings.dart';
 import '../util/format.dart' show marketNotifier;
 import 'account_deletion.dart';
 import 'auth_service.dart';
-import 'chat_store.dart';
 import 'feature_hooks.dart';
 import 'models.dart';
 import 'notification_sound.dart';
@@ -423,9 +422,9 @@ class RealtimeStore extends ChangeNotifier {
     _socket.on('notification:new', (d) {
       final n = NotificationDto.fromJson(_map(d));
       notifications.insert(0, n);
-      // Every notice type sounds here (orders, payments, deliveries, returns, disputes, support, promotions, chat...);
-      // a chat notice stays quiet while that very conversation is on screen.
-      if (!shouldMuteNotice(n.type, n.entityId, ChatStore.instance.openConversationId)) NotificationSound.instance.play();
+      // Every notice type sounds here (orders, payments, deliveries, returns, disputes, support, promotions...) except a chat
+      // notice: messaging stores is closed, so an old build's server can no longer produce one that is news.
+      if (!isSilentNotice(n.type)) NotificationSound.instance.play();
       notifyListeners();
     });
     _socket.on('delivery:location', (d) {

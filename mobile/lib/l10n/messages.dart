@@ -426,7 +426,7 @@ const Map<String, (String, String)> _kMessagesBase = {
   'pd_qa': ('Questions & answers', 'Questions et réponses'),
   'pd_ask': ('Ask', 'Poser une question'),
   'pd_no_questions': ('No questions yet.', 'Aucune question pour le moment.'),
-  'pd_awaiting': ('Awaiting seller response…', 'En attente de la réponse du vendeur…'),
+  'pd_awaiting': ('Awaiting a decision from KOMORIKO support…', 'En attente de la décision du support KOMORIKO…'),
   'pd_ask_title': ('Ask a question', 'Poser une question'),
   'pd_ask_hint': ('Ask the seller about this product…', 'Posez votre question au vendeur sur ce produit…'),
   'pd_question_sent': ('Question sent to the seller', 'Question envoyée au vendeur'),

@@ -87,7 +87,7 @@ void main() {
       expect(find.byKey(const ValueKey('notify-payout')), findsNothing);
       expect(find.byKey(const ValueKey('notify-stock')), findsNothing);
       expect(find.text('Orders and delivery'), findsOneWidget);
-      expect(find.text('Messages and support'), findsOneWidget);
+      expect(find.text('Support replies'), findsOneWidget);
       expect(find.textContaining('Switch a kind off'), findsOneWidget);
       // the existing switches are still there
       expect(find.text('Push notifications'), findsOneWidget);

@@ -153,7 +153,7 @@ class _ReturnsListScreenState extends State<ReturnsListScreen> with SingleTicker
   Widget _disputeCard(Strings s, DisputeView d) {
     final c = stageColors(d);
     final first = d.items.isEmpty ? null : d.items.first;
-    final summary = first != null ? '${first.displayName(s.lang)}${d.items.length > 1 ? ' +${d.items.length - 1}' : ''}' : d.reason;
+    final summary = first != null ? '${first.displayName(s.lang)}${d.items.length > 1 ? ' +${d.items.length - 1}' : ''}' : storedText(s, d.reason, d.reasonI18n);
     return PressableCard(
       key: ValueKey('request-${d.id}'),
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReturnStatusScreen(locale: widget.locale, returnRequest: d))),

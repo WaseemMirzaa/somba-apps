@@ -189,7 +189,7 @@ void main() {
       expect(find.byType(QrImageView), findsOneWidget);
     });
 
-    for (final stage in ['received', 'closed', 'awaiting_seller']) {
+    for (final stage in ['received', 'closed', 'awaiting_support']) {
       testWidgets('hidden at stage $stage', (tester) async {
         server.handlers['disputes:get'] = (b) => disputeJson(stage: stage, messages: []);
         await open(tester);

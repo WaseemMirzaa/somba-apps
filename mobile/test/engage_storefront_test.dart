@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:lipcart/data/shop_state.dart';
 import 'package:lipcart/l10n/strings.dart';
-import 'package:lipcart/screens/more/chat_entry.dart';
+import 'package:lipcart/screens/more/support_entry.dart';
 import 'package:lipcart/screens/more/shop_extra.dart';
 import 'package:lipcart/screens/product_detail_screen.dart';
 import 'package:lipcart/services/auth_service.dart' show ApiException;
@@ -291,13 +291,13 @@ void main() {
       expect(find.byKey(const ValueKey('pd-sku')), findsNothing);
     });
 
-    testWidgets('the seller card carries the message-the-seller entry with the product', (tester) async {
+    testWidgets('the seller card carries "Contact support" with the product, and no message-the-seller entry', (tester) async {
       await engageReset(products: [engageDto('p1')]);
       await _page(tester, 'p1');
-      final b = tester.widget<MessageSellerButton>(find.byType(MessageSellerButton));
-      expect(b.sellerId, 's1');
-      expect(b.storeName, 'Kinshasa Traders');
-      expect(b.productId, 'p1');
+      final b = tester.widget<ContactSupportButton>(find.byType(ContactSupportButton));
+      expect(b.about, 'Item p1', reason: 'the product the shopper is asking about');
+      expect(b.orderId, isNull);
+      expect(find.byKey(const ValueKey('message-seller')), findsNothing);
     });
   });
 
@@ -419,11 +419,11 @@ void main() {
       expect(find.text('Boutique introuvable.'), findsOneWidget);
     });
 
-    testWidgets('the store page carries the message-the-seller entry', (tester) async {
+    testWidgets('the store page carries "Contact support" about the store, and no message-the-seller entry', (tester) async {
       await open(tester);
-      final b = tester.widget<MessageSellerButton>(find.byType(MessageSellerButton));
-      expect(b.sellerId, 's1');
-      expect(b.storeName, 'Kinshasa Traders');
+      final b = tester.widget<ContactSupportButton>(find.byType(ContactSupportButton));
+      expect(b.about, 'Kinshasa Traders');
+      expect(find.byKey(const ValueKey('message-seller')), findsNothing);
     });
 
     testWidgets('the vacation state of the listings follows on the cards of the store page', (tester) async {

@@ -6,6 +6,7 @@ import '../services/rider_store.dart';
 import '../services/support_models.dart';
 import '../services/support_store.dart';
 import '../theme/app_theme.dart';
+import '../widgets/translated_text.dart';
 import '../widgets/ui.dart';
 
 /// Route names, so a support notice can replace the support screens already open.
@@ -120,7 +121,7 @@ class _SupportScreenState extends State<SupportScreen> {
 
   Widget _ticketCard(Strings s, SupportTicket t) {
     final last = t.last;
-    final preview = last == null ? '' : (last.text.isNotEmpty ? last.text : s.photoAlt);
+    final preview = last == null ? '' : (last.text.isNotEmpty ? i18nText(s.lang, last.text, last.textI18n) : s.photoAlt);
     return SurfaceCard(
       key: ValueKey('ticket-${t.id}'),
       onTap: () => Navigator.of(context).push(supportThreadRoute(t.id)),
@@ -135,7 +136,7 @@ class _SupportScreenState extends State<SupportScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t.subject, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+            Text(i18nText(s.lang, t.subject, t.subjectI18n), key: ValueKey('ticket-subject-${t.id}'), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
             const SizedBox(height: 2),
             Text('${t.reference} · ${_stamp(t.updatedAt ?? t.createdAt)}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
             if (preview.isNotEmpty) ...[
@@ -554,7 +555,7 @@ class _SupportThreadScreenState extends State<SupportThreadScreen> {
       child: SurfaceCard(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t.subject, key: const ValueKey('thread-subject'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, height: 1.25)),
+          TranslatedText(idKey: 'subject-${t.id}', text: t.subject, i18n: t.subjectI18n, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, height: 1.25), key: const ValueKey('thread-subject')),
           const SizedBox(height: 8),
           Wrap(spacing: 6, runSpacing: 6, children: [
             _statusBadge(s, t.status, key: const ValueKey('thread-status')),
@@ -583,7 +584,12 @@ class _SupportThreadScreenState extends State<SupportThreadScreen> {
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('$who · ${_stamp(m.at)}', style: const TextStyle(color: AppColors.muted, fontSize: 11.5, fontWeight: FontWeight.w600)),
-            if (m.text.isNotEmpty) ...[const SizedBox(height: 4), Text(m.text, style: const TextStyle(fontSize: 14, height: 1.35))],
+            if (m.text.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              mine
+                  ? Text(m.text, style: const TextStyle(fontSize: 14, height: 1.35))
+                  : TranslatedText(idKey: 'msg-${m.id}', text: m.text, i18n: m.textI18n, style: const TextStyle(fontSize: 14, height: 1.35)),
+            ],
             if (m.attachments.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(spacing: 8, runSpacing: 8, children: [for (final u in m.attachments) _Thumb(url: u)]),

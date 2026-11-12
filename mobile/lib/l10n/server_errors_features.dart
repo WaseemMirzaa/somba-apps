@@ -34,6 +34,23 @@ const Map<String, String> kServerErrorsAfterSale = {
   'It is too late to cancel: the return is already on its way.': 'Il est trop tard pour annuler : le retour est déjà en cours.',
   'This request is closed.': 'Cette demande est close.',
   'Pick the item to replace.': 'Choisissez l’article à remplacer.',
+  // admin controls after sale (docs/contracts/admin-controls.md section 8): support decides, chat is closed, policies, express
+  'Messaging sellers is closed. Contact support from your account.':
+      'La messagerie avec les vendeurs est fermée. Contactez le support depuis votre compte.',
+  'Returns are decided by KOMORIKO support.': 'Les retours sont décidés par le support KOMORIKO.',
+  'Your request is already with KOMORIKO support.': 'Votre demande est déjà entre les mains du support KOMORIKO.',
+  'Not enough stock to send a replacement. Ask the seller to restock the item, or reject the request.':
+      'Stock insuffisant pour envoyer un remplacement. Demandez au vendeur de réapprovisionner l’article, ou refusez la demande.',
+  'Not enough stock for this exchange. Ask the seller to restock the item, or reject the request.':
+      'Stock insuffisant pour cet échange. Demandez au vendeur de réapprovisionner l’article, ou refusez la demande.',
+  'This store has no pinned pickup location. Ask the seller to pin it in Store settings before turning on express delivery.':
+      'Cette boutique n’a pas de lieu de collecte placé sur la carte. Demandez au vendeur de le placer dans les paramètres de la boutique avant d’activer la livraison express.',
+  'Policy change not found.': 'Modification de politique introuvable.',
+  'This policy change was already decided.': 'Cette modification de politique a déjà été traitée.',
+  'Tell the seller why the policy was not approved.': 'Expliquez au vendeur pourquoi la politique n’a pas été approuvée.',
+  'Nothing to publish: write at least one policy.': 'Rien à publier : rédigez au moins une politique.',
+  'Status must be pending, approved, rejected or all.': 'Le statut doit être en attente, approuvé, refusé ou tous.',
+  'Support response time': 'Le délai de réponse du support',
   // replacements and exchanges
   'That item is not on this order.': 'Cet article ne fait pas partie de cette commande.',
   'You already asked for a replacement of this item.': 'Vous avez déjà demandé le remplacement de cet article.',

@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import '../data/catalog_live.dart' show productByUuid;
 import '../services/aftersale_store.dart';
-import '../services/chat_store.dart';
 import '../services/realtime_store.dart';
 import 'more/account_more.dart';
 import 'more/aftersale_status.dart';
-import 'more/chat_inbox.dart';
-import 'more/chat_thread.dart';
 import 'more/order_screens.dart';
 import 'more/returns_extra.dart';
 import 'more/support_extra.dart';
@@ -15,7 +12,7 @@ import 'product_detail_screen.dart';
 import 'wallet_screen.dart';
 
 /// Where a notification takes the customer.
-enum NoticeDest { product, deals, order, tracking, wallet, returnStatus, replacementStatus, exchangeStatus, returns, ticket, support, chat, messages, notifications }
+enum NoticeDest { product, deals, order, tracking, wallet, returnStatus, replacementStatus, exchangeStatus, returns, ticket, support, notifications }
 
 class NoticeRoute {
   const NoticeRoute(this.dest, [this.id]);
@@ -58,9 +55,6 @@ NoticeRoute noticeRoute(String type, String? entityId, {required bool Function(S
       return id != null ? NoticeRoute(NoticeDest.product, id) : const NoticeRoute(NoticeDest.notifications);
     case 'flash':
       return const NoticeRoute(NoticeDest.deals);
-    case 'chat':
-      // The notice's entityId is the conversation id.
-      return id != null ? NoticeRoute(NoticeDest.chat, id) : const NoticeRoute(NoticeDest.messages);
     default:
       return const NoticeRoute(NoticeDest.notifications);
   }
@@ -111,11 +105,6 @@ Future<void> openNotice(
       screen = t != null ? SupportTicketDetailScreen(ticket: t, locale: locale) : SupportListScreen(locale: locale);
     case NoticeDest.support:
       screen = SupportListScreen(locale: locale);
-    case NoticeDest.chat:
-      final c = await ChatStore.instance.conversationById(route.id!);
-      screen = c != null ? ChatThreadScreen(conversation: c, locale: locale) : ChatInboxScreen(locale: locale);
-    case NoticeDest.messages:
-      screen = ChatInboxScreen(locale: locale);
     case NoticeDest.notifications:
       // Already on the list: nothing more to open.
       screen = fromInbox ? null : NotificationsScreen(locale: locale);

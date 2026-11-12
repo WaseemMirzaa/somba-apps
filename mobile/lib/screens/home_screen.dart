@@ -7,11 +7,11 @@ import '../services/engage_store.dart';
 import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
+import '../widgets/category_image.dart';
 import '../widgets/common.dart';
 import '../widgets/flash_section.dart';
 import '../widgets/product_actions.dart';
 import '../widgets/product_card.dart';
-import '../widgets/product_image.dart';
 import 'cart_screen.dart';
 import 'categories_screen.dart';
 import 'deals_screen.dart';
@@ -466,8 +466,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // ---- Categories row ----
   Widget _categories(String lang) {
     final cats = liveCategories();
+    // The tile (64) + gap + a name of up to two lines at the current text size, so 200% text does not overflow.
+    final labelHeight = MediaQuery.textScalerOf(context).scale(11.5) * 1.35 * 2;
     return SizedBox(
-      height: 104,
+      height: 64 + 7 + labelHeight + 6,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -475,26 +477,20 @@ class _HomeScreenState extends State<HomeScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 14),
         itemBuilder: (_, i) {
           final cat = cats[i];
-          final grad = AppColors.tileGradients[i % AppColors.tileGradients.length];
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProductListScreen(locale: widget.locale, category: cat.name, categoryId: cat.id))),
             child: Column(
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                        begin: Alignment.topLeft, end: Alignment.bottomRight, colors: grad),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: AppShadow.card,
-                  ),
-                  child: Icon(categoryIcon(cat.name), color: AppColors.primary, size: 28),
+                DecoratedBox(
+                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), boxShadow: AppShadow.card),
+                  child: CategoryImage(key: ValueKey('home-category-${cat.id}'), category: cat, lang: lang, size: 64, tint: i, radius: 20),
                 ),
                 const SizedBox(height: 7),
-                Text(cat.displayName(lang),
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                SizedBox(
+                  width: 76,
+                  child: Text(cat.displayName(lang), textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w600)),
+                ),
               ],
             ),
           );

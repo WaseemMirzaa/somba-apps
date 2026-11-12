@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'feature_hooks.dart';
 import 'models.dart' show pickLang;
-import 'notification_sound.dart';
 import 'text_i18n.dart';
 import 'realtime_store.dart';
 
@@ -19,11 +17,9 @@ DateTime? _date(dynamic v) {
   return DateTime.tryParse(v)?.toLocal();
 }
 
-const Object _keep = Object();
-
 int _int(dynamic v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
 
-/// One customer <-> store thread, as the viewer sees it (`chat:list`, `chat:start`, `chat:messages`, `chat:message`).
+/// One customer <-> store thread, as the viewer sees it (`chat:list`, `chat:messages`).
 /// Every field the server may leave out has a safe default, so an older or partial payload still renders.
 class ChatConversation {
   const ChatConversation({
@@ -101,41 +97,9 @@ class ChatConversation {
         lastMessageI18n: TextI18n.tryParse(j['lastMessageI18n']),
         unread: _int(j['unread']),
       );
-
-  /// [lastMessageI18n]: pass `null` explicitly to clear it (the preview moved on to a message without translations).
-  ChatConversation copyWith({int? unread, String? lastMessagePreview, DateTime? lastMessageAt, Object? lastMessageI18n = _keep}) => ChatConversation(
-        id: id,
-        side: side,
-        buyerId: buyerId,
-        buyerName: buyerName,
-        sellerId: sellerId,
-        storeName: storeName,
-        storeLogo: storeLogo,
-        productId: productId,
-        productName: productName,
-        productNameFr: productNameFr,
-        productImage: productImage,
-        orderId: orderId,
-        orderReference: orderReference,
-        lastMessageAt: lastMessageAt ?? this.lastMessageAt,
-        lastMessagePreview: lastMessagePreview ?? this.lastMessagePreview,
-        lastMessageI18n: identical(lastMessageI18n, _keep) ? this.lastMessageI18n : lastMessageI18n as TextI18n?,
-        unread: unread ?? this.unread,
-      );
-
-  /// Does this thread cover the same store and context as a message started from [productId] / [orderId]?
-  /// The server keeps one thread per customer + store + context; an order wins over a product.
-  bool coversContext({required String sellerId, String? productId, String? orderId}) {
-    if (this.sellerId != sellerId) return false;
-    final o = (orderId ?? '').isEmpty ? null : orderId;
-    final p = (productId ?? '').isEmpty ? null : productId;
-    if (o != null) return this.orderId == o;
-    if (p != null) return this.productId == p && this.orderId == null;
-    return this.productId == null && this.orderId == null;
-  }
 }
 
-/// One message of a thread (`chat:messages`, `chat:send`, `chat:start`, `chat:message`).
+/// One message of a thread (`chat:messages`).
 class ChatMessage {
   const ChatMessage({
     required this.id,
@@ -199,8 +163,9 @@ class ChatPage {
       );
 }
 
-/// The shopper's chats with stores: the inbox list, the unread total behind the badge, and the live pushes.
-/// Plugs into the shared socket session through [hook] (see `feature_hooks.dart`).
+/// The shopper's OLD chats with stores. Messaging stores is closed (`docs/contracts/admin-controls.md` section 3): the
+/// server still answers `chat:list` and `chat:messages`, so history stays readable, and nothing can be sent. The store
+/// binds no live pushes, loads nothing at sign-in and keeps no unread count; it only forgets everything on sign-out.
 class ChatStore extends ChangeNotifier {
   ChatStore._();
   static final ChatStore instance = ChatStore._();
@@ -212,55 +177,22 @@ class ChatStore extends ChangeNotifier {
   /// Conversations as the customer sees them, newest activity first.
   List<ChatConversation> get conversations => List.unmodifiable(_conversations);
 
-  /// Unread messages across the customer's chats (the badge).
-  int unread = 0;
   bool loaded = false;
   bool loading = false;
 
   /// More conversations exist beyond the ones loaded.
   bool hasMoreConversations = false;
 
-  /// The thread on screen: a message that arrives for it is marked read at once.
-  String? openConversationId;
-
-  final StreamController<ChatMessage> _incoming = StreamController<ChatMessage>.broadcast();
-
-  /// Every message pushed live (`chat:message`), for the thread screen that shows its conversation.
-  Stream<ChatMessage> get incoming => _incoming.stream;
-
   Future<dynamic> _call(String event, [Map<String, dynamic>? body]) => RealtimeStore.instance.call(event, body);
 
-  FeatureHook get hook => FeatureHook(
-        name: 'chat',
-        pushes: {'chat:message': onMessagePush, 'chat:read': onReadPush},
-        hydrate: (_) => refresh(),
-        reset: reset,
-      );
+  FeatureHook get hook => FeatureHook(name: 'chat', reset: reset);
 
   void reset() {
     _conversations.clear();
-    unread = 0;
     loaded = false;
     loading = false;
     hasMoreConversations = false;
-    openConversationId = null;
     notifyListeners();
-  }
-
-  // ---- reads ----
-
-  /// Reloads the unread total and the first page of the inbox (after sign-in, a reconnect, pull to refresh).
-  Future<void> refresh() async {
-    await Future.wait([refreshUnread().catchError((Object _) {}), loadConversations()]);
-  }
-
-  Future<void> refreshUnread() async {
-    final res = await _call('chat:unread');
-    if (res is Map) {
-      final m = _asMap(res);
-      unread = _int(m.containsKey('buyer') ? m['buyer'] : m['total']);
-      notifyListeners();
-    }
   }
 
   /// Loads the inbox; with [more] the next page is appended. Throws when the server refuses (offline…).
@@ -290,14 +222,6 @@ class ChatStore extends ChangeNotifier {
     }
   }
 
-  /// The thread for this store and context when the inbox already has one.
-  ChatConversation? existingFor({required String sellerId, String? productId, String? orderId}) {
-    for (final c in _conversations) {
-      if (c.coversContext(sellerId: sellerId, productId: productId, orderId: orderId)) return c;
-    }
-    return null;
-  }
-
   /// A conversation by id: from the inbox, or asked of the server. Null when it can't be found.
   Future<ChatConversation?> conversationById(String id) async {
     for (final c in _conversations) {
@@ -310,128 +234,14 @@ class ChatStore extends ChangeNotifier {
     }
   }
 
-  /// One page of a thread (`chat:messages`). Also brings the inbox row up to date.
+  /// One page of a thread (`chat:messages`), oldest first.
   Future<ChatPage> messages(String conversationId, {String? before, int limit = 30}) async {
     final res = await _call('chat:messages', {
       'conversationId': conversationId,
       if (before != null) 'before': before,
       'limit': limit,
     });
-    final page = ChatPage.fromJson(_asMap(res));
-    final c = page.conversation;
-    if (c != null && c.side == 'buyer') _upsert(c);
-    return page;
-  }
-
-  // ---- writes ----
-
-  /// First message to a store (`chat:start`): creates the thread, or reuses the one for the same context.
-  Future<({ChatConversation conversation, ChatMessage message})> start({
-    required String sellerId,
-    String? productId,
-    String? orderId,
-    required String text,
-    List<String> attachments = const [],
-  }) async {
-    final res = _asMap(await _call('chat:start', {
-      'sellerId': sellerId,
-      if ((productId ?? '').isNotEmpty) 'productId': productId,
-      if ((orderId ?? '').isNotEmpty) 'orderId': orderId,
-      'text': text,
-      if (attachments.isNotEmpty) 'attachments': attachments,
-    }));
-    final conversation = ChatConversation.fromJson(_asMap(res['conversation']));
-    final message = ChatMessage.fromJson(_asMap(res['message']));
-    _upsert(conversation.copyWith(unread: 0));
-    return (conversation: conversation, message: message);
-  }
-
-  /// Sends a message in an existing thread (`chat:send`).
-  Future<ChatMessage> send(String conversationId, {String text = '', List<String> attachments = const []}) async {
-    final res = _asMap(await _call('chat:send', {
-      'conversationId': conversationId,
-      'text': text,
-      if (attachments.isNotEmpty) 'attachments': attachments,
-    }));
-    final message = ChatMessage.fromJson(_asMap(res['message']));
-    final i = _conversations.indexWhere((c) => c.id == conversationId);
-    if (i != -1) {
-      _conversations[i] = _conversations[i].copyWith(
-        lastMessagePreview: text.trim().isNotEmpty ? text.trim() : '📷',
-        lastMessageAt: message.createdAt ?? DateTime.now(),
-        lastMessageI18n: null, // what the customer wrote is shown as written
-      );
-      _sort();
-      notifyListeners();
-    }
-    return message;
-  }
-
-  /// The customer read the thread: its unread count goes to zero here at once and on the server.
-  Future<void> markRead(String conversationId) async {
-    final i = _conversations.indexWhere((c) => c.id == conversationId);
-    if (i != -1 && _conversations[i].unread > 0) {
-      unread = (unread - _conversations[i].unread).clamp(0, 1 << 30);
-      _conversations[i] = _conversations[i].copyWith(unread: 0);
-      notifyListeners();
-    }
-    try {
-      await _call('chat:markRead', {'conversationId': conversationId});
-    } catch (_) {
-      // Background: the next refresh corrects the counters.
-    }
-  }
-
-  // ---- live pushes ----
-
-  @visibleForTesting
-  void onMessagePush(dynamic data) {
-    if (data is! Map) return;
-    final d = _asMap(data);
-    if (d['conversation'] is! Map || d['message'] is! Map) return;
-    final conv = ChatConversation.fromJson(_asMap(d['conversation']));
-    if (conv.id.isEmpty || conv.side != 'buyer') return;
-    final message = ChatMessage.fromJson(_asMap(d['message']));
-    final known = _conversations.any((c) => c.id == conv.id);
-    final open = openConversationId == conv.id;
-    // The thread on screen reads what arrives at once.
-    // The store's text in both languages (when it came) lets the inbox preview follow the app language.
-    final withI18n = conv.copyWith(lastMessageI18n: message.mine ? null : (message.textI18n ?? conv.lastMessageI18n));
-    _upsert(open && !message.mine ? withI18n.copyWith(unread: 0) : withI18n);
-    if (!known) unawaited(refreshUnread().catchError((Object _) {}));
-    _incoming.add(message);
-    // A message from the store chimes unless that thread is the one on screen.
-    if (!message.mine && !open) NotificationSound.instance.play();
-    if (open && !message.mine) unawaited(markRead(conv.id));
-  }
-
-  @visibleForTesting
-  void onReadPush(dynamic data) {
-    if (data is! Map) return;
-    final d = _asMap(data);
-    if (d['side']?.toString() == 'seller') return; // the store read our messages: nothing to change here
-    final id = d['conversationId']?.toString() ?? '';
-    final i = _conversations.indexWhere((c) => c.id == id);
-    if (i == -1 || _conversations[i].unread == 0) return;
-    unread = (unread - _conversations[i].unread).clamp(0, 1 << 30);
-    _conversations[i] = _conversations[i].copyWith(unread: 0);
-    notifyListeners();
-  }
-
-  // ---- helpers ----
-
-  /// Replaces (or adds) a conversation and keeps [unread] in step with its unread count.
-  void _upsert(ChatConversation c) {
-    final i = _conversations.indexWhere((x) => x.id == c.id);
-    final before = i == -1 ? 0 : _conversations[i].unread;
-    if (i == -1) {
-      _conversations.add(c);
-    } else {
-      _conversations[i] = c;
-    }
-    unread = (unread + c.unread - before).clamp(0, 1 << 30);
-    _sort();
-    notifyListeners();
+    return ChatPage.fromJson(_asMap(res));
   }
 
   void _sort() {

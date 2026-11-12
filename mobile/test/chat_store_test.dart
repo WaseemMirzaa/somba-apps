@@ -1,5 +1,5 @@
-// Customer <-> seller chat: parsing (incl. missing fields), the store (unread, paging, live pushes), the feature hook and
-// the French server errors of the chat contract.
+// Old customer <-> store chats (messaging is closed): parsing (incl. missing fields), the read-only store (inbox paging, thread
+// pages, nothing to send), the feature hook and the French server errors of the chat contract, incl. "messaging is closed".
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:lipcart/l10n/server_errors.dart';
@@ -94,20 +94,6 @@ void main() {
       expect(empty.hasMore, isFalse);
       expect(empty.conversation, isNull);
     });
-
-    test('which thread a message from a product or an order belongs to', () {
-      final general = ChatConversation.fromJson(convJson(id: 'g'));
-      final product = ChatConversation.fromJson(convJson(id: 'p', productId: 'p1'));
-      final order = ChatConversation.fromJson(convJson(id: 'o', orderId: 'o1', productId: 'p1'));
-      expect(general.coversContext(sellerId: 's1'), isTrue);
-      expect(general.coversContext(sellerId: 's1', productId: 'p1'), isFalse);
-      expect(product.coversContext(sellerId: 's1', productId: 'p1'), isTrue);
-      expect(product.coversContext(sellerId: 's1', productId: 'p2'), isFalse);
-      expect(product.coversContext(sellerId: 's2', productId: 'p1'), isFalse, reason: 'another store');
-      expect(order.coversContext(sellerId: 's1', orderId: 'o1'), isTrue);
-      expect(order.coversContext(sellerId: 's1', orderId: 'o1', productId: 'p9'), isTrue, reason: 'an order wins over a product');
-      expect(order.coversContext(sellerId: 's1', productId: 'p1'), isFalse, reason: 'a product-only start never reuses an order thread');
-    });
   });
 
   group('the store', () {
@@ -136,105 +122,28 @@ void main() {
       expect(ChatStore.instance.conversations, hasLength(ChatStore.pageSize * 2));
     });
 
-    test('refreshUnread reads the buyer total', () async {
-      server.handlers['chat:unread'] = (_) => {'total': 7, 'buyer': 4, 'seller': 3};
-      await ChatStore.instance.refreshUnread();
-      expect(ChatStore.instance.unread, 4);
+    test('the store is read-only: nothing in it can send, start, mark read or count unread', () {
+      // The API of the store is the reads only; a message cannot be written from the app any more.
+      final store = ChatStore.instance;
+      expect(() => (store as dynamic).send('a', text: 'x'), throwsA(isA<NoSuchMethodError>()));
+      expect(() => (store as dynamic).start(sellerId: 's1', text: 'x'), throwsA(isA<NoSuchMethodError>()));
+      expect(() => (store as dynamic).markRead('a'), throwsA(isA<NoSuchMethodError>()));
+      expect(() => (store as dynamic).unread, throwsA(isA<NoSuchMethodError>()));
     });
 
-    test('a live message raises the unread count, updates the preview and moves the thread to the top', () async {
-      server.handlers['chat:list'] = (_) => [convJson(id: 'a', at: '2026-10-24T08:00:00Z', unread: 1), convJson(id: 'b', at: '2026-10-23T08:00:00Z')];
-      server.handlers['chat:unread'] = (_) => {'total': 1, 'buyer': 1, 'seller': 0};
-      await ChatStore.instance.refresh();
-      expect(ChatStore.instance.unread, 1);
-
-      RealtimeStore.instance.debugEmit('chat:message', {
-        'conversation': convJson(id: 'b', unread: 1, preview: 'We have it in blue', at: '2026-10-24T10:00:00Z'),
-        'message': msgJson('m9', convId: 'b', text: 'We have it in blue'),
-      });
-      final c = ChatStore.instance;
-      expect(c.unread, 2);
-      expect(c.conversations.first.id, 'b');
-      expect(c.conversations.first.lastMessagePreview, 'We have it in blue');
-      expect(c.conversations.first.unread, 1);
-    });
-
-    test('a message in a thread the phone does not know yet adds it and re-reads the total from the server', () async {
-      server.handlers['chat:unread'] = (_) => {'total': 1, 'buyer': 1, 'seller': 0};
-      RealtimeStore.instance.debugEmit('chat:message', {
-        'conversation': convJson(id: 'new', unread: 1),
-        'message': msgJson('m1', convId: 'new'),
-      });
-      await Future<void>.delayed(Duration.zero);
-      expect(ChatStore.instance.conversations.single.id, 'new');
-      expect(ChatStore.instance.unread, 1);
-      expect(server.countOf('chat:unread'), 1);
-    });
-
-    test('chat:read from the customer side clears that thread; the store reading is ignored', () async {
-      server.handlers['chat:list'] = (_) => [convJson(id: 'a', unread: 3)];
-      server.handlers['chat:unread'] = (_) => {'total': 3, 'buyer': 3, 'seller': 0};
-      await ChatStore.instance.refresh();
-      RealtimeStore.instance.debugEmit('chat:read', {'conversationId': 'a', 'side': 'seller', 'readBy': 'staff'});
-      expect(ChatStore.instance.unread, 3);
-      RealtimeStore.instance.debugEmit('chat:read', {'conversationId': 'a', 'side': 'buyer', 'readBy': 'u1'});
-      expect(ChatStore.instance.unread, 0);
-      expect(ChatStore.instance.conversations.single.unread, 0);
-    });
-
-    test('a thread the store sees as its own (side seller) never shows in the customer app', () {
-      RealtimeStore.instance.debugEmit('chat:message', {'conversation': convJson(id: 'x', side: 'seller', unread: 5), 'message': msgJson('m1', convId: 'x')});
-      expect(ChatStore.instance.conversations, isEmpty);
-      expect(ChatStore.instance.unread, 0);
-    });
-
-    test('garbage pushes are ignored', () {
-      RealtimeStore.instance.debugEmit('chat:message', 'nope');
-      RealtimeStore.instance.debugEmit('chat:message', {'conversation': 3});
-      RealtimeStore.instance.debugEmit('chat:read', null);
-      expect(ChatStore.instance.conversations, isEmpty);
-    });
-
-    test('markRead zeroes the count here and calls the server', () async {
-      server.handlers['chat:list'] = (_) => [convJson(id: 'a', unread: 2), convJson(id: 'b', unread: 1, at: '2026-10-23T08:00:00Z')];
-      server.handlers['chat:unread'] = (_) => {'total': 3, 'buyer': 3, 'seller': 0};
-      await ChatStore.instance.refresh();
-      await ChatStore.instance.markRead('a');
-      expect(ChatStore.instance.unread, 1);
-      expect(server.bodiesOf('chat:markRead').single, {'conversationId': 'a'});
-    });
-
-    test('a failing markRead is silent (a background call)', () async {
-      server.handlers['chat:markRead'] = (_) => throw serverError('Conversation not found.');
-      await ChatStore.instance.markRead('a');
-    });
-
-    test('start sends the context and the photos; the new thread joins the inbox', () async {
-      server.handlers['chat:start'] = (b) => {
-            'conversation': convJson(id: 'new', productId: 'p1', productName: 'Shoes', preview: b!['text'] as String),
-            'message': msgJson('m1', convId: 'new', side: 'buyer', text: b['text'] as String),
-          };
-      final r = await ChatStore.instance.start(sellerId: 's1', productId: 'p1', text: 'Is it waterproof?', attachments: ['/uploads/a.jpg']);
-      expect(server.bodiesOf('chat:start').single, {'sellerId': 's1', 'productId': 'p1', 'text': 'Is it waterproof?', 'attachments': ['/uploads/a.jpg']});
-      expect(r.conversation.id, 'new');
-      expect(r.message.mine, isTrue);
-      expect(ChatStore.instance.existingFor(sellerId: 's1', productId: 'p1')!.id, 'new');
-      expect(ChatStore.instance.unread, 0);
-    });
-
-    test('start leaves out the context and photos it was not given', () async {
-      server.handlers['chat:start'] = (b) => {'conversation': convJson(id: 'g'), 'message': msgJson('m1', convId: 'g', side: 'buyer')};
-      await ChatStore.instance.start(sellerId: 's1', text: 'Hi');
-      expect(server.bodiesOf('chat:start').single, {'sellerId': 's1', 'text': 'Hi'});
-    });
-
-    test('send carries the text and photos and refreshes the row', () async {
-      server.handlers['chat:list'] = (_) => [convJson(id: 'a', preview: 'old')];
+    test('a live chat push changes nothing (nothing is bound to it)', () async {
+      server.handlers['chat:list'] = (_) => [convJson(id: 'a')];
       await ChatStore.instance.loadConversations();
-      server.handlers['chat:send'] = (b) => {'message': msgJson('m5', convId: 'a', side: 'buyer', text: b!['text'] as String)};
-      await ChatStore.instance.send('a', text: 'Thanks', attachments: ['/uploads/a.jpg', '/uploads/b.jpg']);
-      expect(server.bodiesOf('chat:send').single, {'conversationId': 'a', 'text': 'Thanks', 'attachments': ['/uploads/a.jpg', '/uploads/b.jpg']});
-      expect(ChatStore.instance.conversations.single.lastMessagePreview, 'Thanks');
+      RealtimeStore.instance.debugEmit('chat:message', {'conversation': convJson(id: 'a', unread: 1, preview: 'New'), 'message': msgJson('m1', convId: 'a')});
+      expect(ChatStore.instance.conversations.single.lastMessagePreview, isNot('New'));
+    });
+
+    test('messages() reads one page of a thread, oldest first, with the cursor', () async {
+      server.handlers['chat:messages'] = (b) => {'conversation': convJson(id: 'a'), 'messages': [msgJson('m1'), msgJson('m2')], 'hasMore': true};
+      final page = await ChatStore.instance.messages('a', before: 'm9', limit: 2);
+      expect(server.bodiesOf('chat:messages').single, {'conversationId': 'a', 'before': 'm9', 'limit': 2});
+      expect(page.messages.map((m) => m.id), ['m1', 'm2']);
+      expect(page.hasMore, isTrue);
     });
 
     test('conversationById finds it in the inbox, else asks the server, else null', () async {
@@ -248,17 +157,14 @@ void main() {
   });
 
   group('feature hook', () {
-    test('the chat hook is registered, binds both pushes, hydrates and resets', () async {
+    test('the chat hook is registered, binds no pushes, hydrates nothing and resets on sign-out', () async {
       final hook = buildFeatureHooks().firstWhere((h) => h.name == 'chat');
-      expect(hook.pushes.keys, containsAll(['chat:message', 'chat:read']));
-      server.handlers['chat:list'] = (_) => [convJson(id: 'a', unread: 2)];
-      server.handlers['chat:unread'] = (_) => {'total': 2, 'buyer': 2, 'seller': 0};
-      await hook.hydrate!(RealtimeStore.instance);
-      expect(ChatStore.instance.conversations, hasLength(1));
-      expect(ChatStore.instance.unread, 2);
+      expect(hook.pushes, isEmpty);
+      expect(hook.hydrate, isNull);
+      server.handlers['chat:list'] = (_) => [convJson(id: 'a')];
+      await ChatStore.instance.loadConversations();
       hook.reset!();
       expect(ChatStore.instance.conversations, isEmpty);
-      expect(ChatStore.instance.unread, 0);
       expect(ChatStore.instance.loaded, isFalse);
     });
   });
@@ -266,6 +172,7 @@ void main() {
   group('French server errors of the chat contract', () {
     const fr = Strings('fr');
     const contract = [
+      'Messaging sellers is closed. Contact support from your account.',
       'Only shoppers can message a store.',
       'Store not found.',
       'You cannot message your own store.',

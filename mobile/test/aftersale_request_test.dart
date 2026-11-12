@@ -37,9 +37,12 @@ void main() {
 
   group('the banner follows the stage', () {
     final cases = <(String, String, String)>[
-      ('awaiting_seller', 'Waiting for the seller', 'En attente du vendeur'),
-      ('seller_rejected', 'The seller declined your return', 'Le vendeur a refusé votre retour'),
-      ('seller_timeout', 'The seller did not answer in time', 'Le vendeur n’a pas répondu à temps'),
+      ('awaiting_support', 'With KOMORIKO support', 'Chez le support KOMORIKO'),
+      // The stages of the old seller flow read as "with support" (docs/contracts/admin-controls.md section 1.1).
+      ('awaiting_seller', 'With KOMORIKO support', 'Chez le support KOMORIKO'),
+      ('seller_replied', 'With KOMORIKO support', 'Chez le support KOMORIKO'),
+      ('seller_rejected', 'With KOMORIKO support', 'Chez le support KOMORIKO'),
+      ('seller_timeout', 'With KOMORIKO support', 'Chez le support KOMORIKO'),
       ('escalated', 'With KOMORIKO support', 'Chez le support KOMORIKO'),
       ('approved', 'Return accepted', 'Retour accepté'),
       ('pickup', 'Pickup arranged', 'Collecte organisée'),
@@ -56,19 +59,24 @@ void main() {
       }
     }
 
-    testWidgets('a dispute that the seller answered says support will decide', (tester) async {
-      current = disputeJson(type: 'dispute', stage: 'seller_replied', category: 'missing', messages: []);
+    testWidgets('a dispute says KOMORIKO support reviews it and decides; there is no seller step', (tester) async {
+      current = disputeJson(type: 'dispute', stage: 'awaiting_support', category: 'missing', messages: []);
       await open(tester);
-      expect(banner(tester), 'The seller replied');
-      expect(body(tester), contains('KOMORIKO support will review'));
+      expect(banner(tester), 'With KOMORIKO support');
+      expect(body(tester), contains('KOMORIKO support is reviewing your report and will decide'));
       expect(find.text('Dispute'), findsOneWidget);
     });
 
-    testWidgets('while the seller has time, the deadline is shown', (tester) async {
+    testWidgets('a return shows the support deadline while it has time, and says so when it is late', (tester) async {
       current = disputeJson(sellerDueAt: DateTime.now().add(const Duration(days: 1)).toUtc().toIso8601String(), messages: []);
       await open(tester);
-      expect(body(tester), startsWith('The seller has until '));
-      expect(find.byKey(const ValueKey('seller-due')), findsOneWidget);
+      expect(body(tester), startsWith('KOMORIKO support will decide on your return by '));
+      current = disputeJson(sellerDueAt: DateTime.now().subtract(const Duration(days: 1)).toUtc().toIso8601String(), messages: []);
+      await open(tester);
+      expect(body(tester), contains('taking longer than usual'));
+      for (final seller in ['seller', 'Seller']) {
+        expect(body(tester), isNot(contains(seller)));
+      }
     });
 
     testWidgets('an OLD payload (no stage, items, photos or thread) renders', (tester) async {
@@ -78,7 +86,6 @@ void main() {
       expect(body(tester), 'Our team is reviewing your request.');
       expect(find.byKey(const ValueKey('request-items')), findsNothing);
       expect(find.text('Too small'), findsOneWidget);
-      expect(find.byKey(const ValueKey('escalate')), findsNothing);
       expect(find.byKey(const ValueKey('cancel-request')), findsNothing);
     });
 
@@ -133,69 +140,34 @@ void main() {
       expect(find.byKey(const ValueKey('closed-note')), findsOneWidget);
       expect(find.byKey(const ValueKey('reply-field')), findsNothing);
       expect(find.byKey(const ValueKey('reply-send')), findsNothing);
-      expect(find.byKey(const ValueKey('escalate')), findsNothing);
     });
   });
 
   group('what the customer may do', () {
-    testWidgets('escalate and cancel appear only when the server allows them', (tester) async {
-      current = disputeJson(stage: 'awaiting_seller', canCancel: true, messages: []);
-      await open(tester);
-      expect(find.byKey(const ValueKey('escalate')), findsNothing);
-      expect(find.byKey(const ValueKey('cancel-request')), findsOneWidget);
-
-      current = disputeJson(stage: 'seller_rejected', canEscalate: true, canCancel: true, messages: []);
-      await open(tester);
-      expect(find.byKey(const ValueKey('escalate')), findsOneWidget);
-      expect(find.byKey(const ValueKey('cancel-request')), findsOneWidget);
-
-      current = disputeJson(stage: 'pickup', canEscalate: false, canCancel: false, messages: []);
+    testWidgets('cancel appears only when the server allows it, and there is no escalate button at any stage', (tester) async {
+      for (final stage in ['awaiting_support', 'seller_rejected', 'seller_timeout', 'escalated']) {
+        // Even an old server that still says canEscalate: true gets no button (support already decides).
+        current = disputeJson(stage: stage, canCancel: true, messages: [])..['canEscalate'] = true;
+        await open(tester);
+        expect(find.byKey(const ValueKey('escalate')), findsNothing, reason: stage);
+        expect(find.byKey(const ValueKey('cancel-request')), findsOneWidget, reason: stage);
+      }
+      current = disputeJson(stage: 'pickup', canCancel: false, messages: []);
       await open(tester);
       expect(find.byKey(const ValueKey('escalate')), findsNothing);
       expect(find.byKey(const ValueKey('cancel-request')), findsNothing);
     });
 
-    testWidgets('escalating asks first, sends the note, and confirms with a snackbar', (tester) async {
-      current = disputeJson(stage: 'seller_rejected', canEscalate: true, canCancel: true, sellerReason: 'Worn out', messages: []);
-      server.handlers['disputes:escalate'] = (_) {
-        current = disputeJson(stage: 'escalated', messages: [], updatedAt: '2026-10-26T00:00:00Z');
-        return current;
-      };
+    testWidgets('"Contact support" opens a new ticket form with the request\'s order filled in; there is no message-the-seller button', (tester) async {
+      current = disputeJson(messages: []);
       await open(tester);
-      await asTap(tester, 'escalate');
+      expect(find.byKey(const ValueKey('message-seller')), findsNothing, reason: 'messaging the seller is closed');
+      await tester.ensureVisible(find.byKey(const ValueKey('contact-support')));
+      await asTap(tester, 'contact-support');
       await asSettle(tester);
-      expect(find.text('Ask KOMORIKO support to decide?'), findsOneWidget);
-      expect(server.countOf('disputes:escalate'), 0, reason: 'nothing is sent before the customer confirms');
-      await tester.enterText(find.byKey(const ValueKey('escalate-note')).hitTestable(), 'The shoes were new');
-      await tester.tap(find.byKey(const ValueKey('escalate-confirm')));
-      await asSettle(tester);
-      expect(server.bodiesOf('disputes:escalate').single, {'id': 'd1', 'note': 'The shoes were new'});
-      expect(asSnack(tester), 'Sent to KOMORIKO support.');
-      expect(banner(tester), 'With KOMORIKO support');
-      expect(find.byKey(const ValueKey('escalate')), findsNothing, reason: 'no longer allowed');
-    });
-
-    testWidgets('backing out of the escalate dialog sends nothing', (tester) async {
-      current = disputeJson(stage: 'seller_timeout', canEscalate: true, messages: []);
-      await open(tester);
-      await asTap(tester, 'escalate');
-      await asSettle(tester);
-      await tester.tap(find.byKey(const ValueKey('escalate-back')));
-      await asSettle(tester);
-      expect(server.countOf('disputes:escalate'), 0);
-      expect(find.text('Ask KOMORIKO support to decide?'), findsNothing);
-    });
-
-    testWidgets('a refused escalation is shown in French and the screen stays usable', (tester) async {
-      current = disputeJson(stage: 'seller_rejected', canEscalate: true, messages: []);
-      server.handlers['disputes:escalate'] = (_) => throw asServerError('Wait for the seller to answer, or for the response time to pass.');
-      await open(tester, lang: 'fr');
-      await asTap(tester, 'escalate');
-      await asSettle(tester);
-      await tester.tap(find.byKey(const ValueKey('escalate-confirm')));
-      await asSettle(tester);
-      expect(asSnack(tester), 'Attendez la réponse du vendeur, ou la fin du délai de réponse.');
-      expect(find.byKey(const ValueKey('escalate')), findsOneWidget);
+      expect(find.byKey(const ValueKey('ticket-subject')), findsOneWidget, reason: 'the new-ticket form');
+      final order = tester.widget<DropdownButtonFormField<String?>>(find.byKey(const ValueKey('ticket-order')));
+      expect(order.initialValue, 'o1', reason: 'the request\'s order is filled in');
     });
 
     testWidgets('cancelling asks first; keeping the request sends nothing', (tester) async {
@@ -256,11 +228,15 @@ void main() {
       expect(find.byKey(const ValueKey('photo-1')), findsOneWidget);
     });
 
-    testWidgets('the seller’s answer: the reason, when, and the deadline while they have not answered', (tester) async {
-      current = disputeJson(stage: 'seller_rejected', sellerReason: 'The shoes show wear', sellerRespondedAt: '2026-10-25T09:30:00Z', canEscalate: true, messages: []);
+    testWidgets('a store answer from before support decided stays as history under "Earlier answer"; no answer, no panel', (tester) async {
+      current = disputeJson(stage: 'awaiting_support', sellerReason: 'The shoes show wear', sellerRespondedAt: '2026-10-25T09:30:00Z', messages: []);
       await open(tester);
       expect(find.byKey(const ValueKey('seller-panel')), findsOneWidget);
+      expect(find.text('Earlier answer'), findsOneWidget);
       expect(find.text('The shoes show wear'), findsOneWidget);
+      current = disputeJson(sellerDueAt: DateTime.now().add(const Duration(days: 1)).toUtc().toIso8601String(), messages: []);
+      await open(tester);
+      expect(find.byKey(const ValueKey('seller-panel')), findsNothing, reason: 'there is no seller deadline to show any more');
     });
 
     testWidgets('the return’s pickup progress: a rider will collect, then received', (tester) async {
@@ -277,7 +253,7 @@ void main() {
     });
 
     testWidgets('a dispute has no pickup progress', (tester) async {
-      current = disputeJson(type: 'dispute', stage: 'seller_replied', messages: []);
+      current = disputeJson(type: 'dispute', stage: 'awaiting_support', messages: []);
       await open(tester);
       expect(find.byKey(const ValueKey('return-progress')), findsNothing);
     });
@@ -361,7 +337,7 @@ void main() {
     testWidgets('dispute:updated changes the open screen', (tester) async {
       current = disputeJson(canCancel: true, messages: []);
       await open(tester);
-      expect(banner(tester), 'Waiting for the seller');
+      expect(banner(tester), 'With KOMORIKO support');
       RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(stage: 'approved', messages: null, updatedAt: '2026-10-27T00:00:00Z'));
       await tester.pump();
       expect(banner(tester), 'Return accepted');
@@ -382,7 +358,7 @@ void main() {
       await open(tester);
       RealtimeStore.instance.debugEmit('dispute:updated', disputeJson(id: 'other', stage: 'escalated', updatedAt: '2026-10-27T00:00:00Z'));
       await tester.pump();
-      expect(banner(tester), 'Waiting for the seller');
+      expect(banner(tester), 'With KOMORIKO support');
     });
 
     testWidgets('closing while open: the push turns the composer into the note', (tester) async {
@@ -398,7 +374,7 @@ void main() {
 
   group('opening by id (a notice) and failures', () {
     testWidgets('fetches the request by its id', (tester) async {
-      current = disputeJson(stage: 'escalated', messages: []);
+      current = disputeJson(stage: 'awaiting_support', messages: []);
       await open(tester, byId: true);
       expect(server.bodiesOf('disputes:get').first, {'id': 'd1'});
       expect(banner(tester), 'With KOMORIKO support');
@@ -411,22 +387,22 @@ void main() {
       expect(find.text('Dispute not found.'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('as-retry')));
       await asSettle(tester);
-      expect(banner(tester), 'Waiting for the seller');
+      expect(banner(tester), 'With KOMORIKO support');
     });
 
     testWidgets('with the request in hand and the thread failing, a snackbar and a retry link', (tester) async {
       server.handlers['disputes:get'] = (_) => throw asServerError('Not allowed.');
       await asOpen(tester, ReturnStatusScreen(returnRequest: DisputeView.fromJson(disputeJson())));
       await asSettle(tester);
-      expect(banner(tester), 'Waiting for the seller');
+      expect(banner(tester), 'With KOMORIKO support');
       expect(asSnack(tester), 'Not allowed.');
       expect(find.byKey(const ValueKey('thread-retry')), findsOneWidget);
     });
   });
 
   group('rules', () {
-    testWidgets('one filled button, no icon on label buttons (escalate case)', (tester) async {
-      current = disputeJson(stage: 'seller_rejected', canEscalate: true, canCancel: true, messages: [msgJ('m1')]);
+    testWidgets('one filled button, no icon on label buttons', (tester) async {
+      current = disputeJson(stage: 'awaiting_support', canCancel: true, messages: [msgJ('m1')]);
       await open(tester);
       expectButtonRules(tester);
     });

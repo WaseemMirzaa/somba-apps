@@ -73,14 +73,12 @@ void main() {
     });
   });
 
-  test('every notice type the API sends sounds (only a chat notice for the open thread is muted)', () {
+  test('every notice type the API sends sounds, except a chat notice (messaging stores is closed)', () {
     final types = apiNoticeTypes();
     expect(types.length, greaterThan(20), reason: 'the API type list was read');
     expect(types, containsAll(['order', 'payment', 'delivery', 'return', 'dispute', 'support', 'campaign', 'chat', 'task']));
     for (final t in types) {
-      expect(shouldMuteNotice(t, 'e1', null), isFalse, reason: t);
-      expect(shouldMuteNotice(t, 'e1', 'other'), isFalse, reason: t);
-      expect(shouldMuteNotice(t, 'e1', 'e1'), t == 'chat', reason: t);
+      expect(isSilentNotice(t), t == 'chat', reason: t);
     }
   });
 

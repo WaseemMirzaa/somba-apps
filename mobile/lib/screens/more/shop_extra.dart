@@ -17,7 +17,7 @@ import '../../widgets/translatable_text.dart' show MachineNote;
 import '../product_detail_screen.dart' show reviewTile;
 import 'browse.dart' show BrowseSearchField, ProductQuery, runQuery;
 import 'catalog_extra.dart';
-import 'chat_entry.dart';
+import 'support_entry.dart';
 
 /// Store front: the store's live listings, plus its badge/rating when the
 /// server publishes them.
@@ -277,7 +277,7 @@ class _StoreScreenState extends State<StoreScreen> {
         if (storeId != null) ...[
           FollowStoreButton(sellerId: storeId, storeName: _name(s)),
           const SizedBox(height: 10),
-          MessageSellerButton(sellerId: storeId, storeName: _name(s), locale: widget.locale),
+          ContactSupportButton(about: _name(s), locale: widget.locale),
         ],
       ]),
     );

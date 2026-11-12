@@ -3,32 +3,26 @@
 
 const Map<String, (String, String)> kMessagesSocial = {
   // ---- chat: inbox, thread, compose ----
-  'chat_inbox_title': ('My messages', 'Mes messages'),
+  'chat_inbox_title': ('Earlier store chats', 'Anciennes discussions avec les boutiques'),
   'chat_inbox_empty': (
-    'No conversations yet. Message a store from a product, an order or a store page.',
-    'Aucune conversation pour le moment. Écrivez à une boutique depuis un produit, une commande ou une page boutique.'
+    'No earlier chats. Messaging stores is closed: contact support instead.',
+    'Aucune ancienne discussion. La messagerie avec les boutiques est fermée : contactez plutôt le support.'
   ),
-  'chat_message_seller': ('Message the seller', 'Écrire au vendeur'),
+  'chat_closed_note': (
+    'Messaging stores is closed, so this chat is read-only. For anything new, contact KOMORIKO support.',
+    'La messagerie avec les boutiques est fermée : cette discussion est en lecture seule. Pour toute nouvelle demande, contactez le support KOMORIKO.'
+  ),
+  'support_about_product': ('About: {name}', 'À propos de : {name}'),
+  'support_earlier_chats': ('Earlier chats with stores (read-only)', 'Anciennes discussions avec les boutiques (lecture seule)'),
   'chat_store_fallback': ('Store', 'Boutique'),
   'chat_ctx_product': ('About: {name}', 'À propos de : {name}'),
   'chat_ctx_order': ('Order {ref}', 'Commande {ref}'),
   'chat_ctx_order_plain': ('About an order', 'À propos d’une commande'),
-  'chat_compose_title': ('New message', 'Nouveau message'),
-  'chat_compose_intro': ('Your message goes straight to {store}.', 'Votre message est envoyé directement à {store}.'),
-  'chat_compose_hint': ('Write your message…', 'Écrivez votre message…'),
-  'chat_compose_send': ('Send message', 'Envoyer le message'),
   'chat_compose_required': ('Write a message first.', 'Écrivez d’abord un message.'),
   'chat_input_hint': ('Write a message…', 'Écrire un message…'),
   'chat_older': ('Load earlier messages', 'Charger les messages précédents'),
   'chat_more_convs': ('Show more conversations', 'Afficher plus de conversations'),
-  'chat_sent': ('Message sent.', 'Message envoyé.'),
-  'chat_sent_to': ('Message sent to {store}.', 'Message envoyé à {store}.'),
-  'chat_read_only': (
-    'This store is suspended for now: you can read the messages but not reply.',
-    'Cette boutique est suspendue pour le moment : vous pouvez lire les messages mais pas y répondre.'
-  ),
   'chat_photo_alt': ('Photo sent in the conversation', 'Photo envoyée dans la conversation'),
-  'chat_unread_n': ('Unread messages: {n}', 'Messages non lus : {n}'),
   'chat_attach': ('Add photos', 'Ajouter des photos'),
   'chat_empty_thread': ('No messages yet.', 'Aucun message pour le moment.'),
   'chat_view_photo': ('Photo {n} of {total}', 'Photo {n} sur {total}'),
@@ -72,8 +66,8 @@ const Map<String, (String, String)> kMessagesSocial = {
   ),
   'notif_order': ('Orders and delivery', 'Commandes et livraison'),
   'notif_order_sub': ('Payments, delivery, returns and refunds', 'Paiements, livraison, retours et remboursements'),
-  'notif_message': ('Messages and support', 'Messages et assistance'),
-  'notif_message_sub': ('Replies from sellers and from KOMORIKO support', 'Réponses des vendeurs et de l’assistance KOMORIKO'),
+  'notif_message': ('Support replies', 'Réponses du support'),
+  'notif_message_sub': ('Replies from KOMORIKO support', 'Réponses de l’assistance KOMORIKO'),
   'notif_question': ('Product questions', 'Questions sur les produits'),
   'notif_question_sub': ('Answers to the questions you asked', 'Réponses aux questions que vous avez posées'),
   'notif_review': ('Reviews', 'Avis'),
