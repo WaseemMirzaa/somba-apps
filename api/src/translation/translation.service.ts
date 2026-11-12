@@ -32,7 +32,7 @@ import {
   variantStrings,
 } from './translatable';
 import type { RowLite, WorkItem, WritePlan } from './translatable';
-import { TRANSLATOR, isLocale } from './translator.provider';
+import { LOCALES, TRANSLATOR, isLocale, otherLocale } from './translator.provider';
 import type { Locale, TranslatorProvider } from './translator.provider';
 
 /** Backoff between attempts: 1 m, 5 m, 30 m, 2 h, 12 h; the 6th failure ends the job. */
@@ -42,6 +42,27 @@ export const MAX_ATTEMPTS = 6;
 export const LOOKUP_CHUNK = 500;
 /** Estimated Google price, USD per million characters. */
 export const USD_PER_MILLION_CHARS = 20;
+
+/**
+ * Both languages of one stored text, served next to the text itself (docs/contracts/stored-text-i18n.md).
+ * `sourceLang`: the language the author wrote in (translator-detected), null when unknown. `en` / `fr`: the text in that
+ * language (the original for the source language, the machine translation for the other); a key exists only when the
+ * value exists and is not stale.
+ */
+export interface TextI18n {
+  sourceLang: string | null;
+  en?: string;
+  fr?: string;
+}
+
+/** What {@link TranslationService.translateForSave} learned about a text before it is stored. */
+export interface SaveTranslation {
+  sourceLang: string;
+  /** The text in every other platform language (never the source language itself). */
+  others: Partial<Record<Locale, string>>;
+  /** sourceHash(sourceLang, trimmed text): the same hash `translateStored` and `i18nFor` check. */
+  sourceHash: string;
+}
 
 export type TranslationStatus = 'done' | 'pending' | 'failed' | 'off';
 
@@ -504,6 +525,116 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
     return changed;
   }
 
+  // ── Translate first, then store (reviews, replies, questions, answers, chat) ───────────
+
+  /**
+   * Translate a person's text BEFORE it is stored, so both languages are saved together. Never throws: returns null
+   * when translation is off, the text has no language to translate, today's budget would be crossed, the language is
+   * undetermined, the provider fails, or it takes longer than `TRANSLATE_SAVE_TIMEOUT_MS` (default 4000, read now). The
+   * caller then stores the text untranslated and `translate:text` stays the fallback.
+   *
+   * One `detect` call (into `hint`'s other language, else French) recognises the source; the text is translated again
+   * only for a locale that detect did not already cover (a text in neither English nor French, or already in the first target).
+   */
+  async translateForSave(text: string | null | undefined, hint?: string | null): Promise<SaveTranslation | null> {
+    try {
+      if (!this.enabled) return null;
+      const t = String(text ?? '').trim();
+      if (!shouldTranslate(t)) return null;
+      const raw = Number(process.env.TRANSLATE_SAVE_TIMEOUT_MS ?? 4000);
+      const timeoutMs = Number.isFinite(raw) && raw > 0 ? raw : 4000;
+      const work = this.detectAndTranslate(t, hint);
+      work.catch(() => undefined); // a slow provider that fails after the timeout must not become an unhandled rejection
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([work, new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), timeoutMs)))]);
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (e) {
+      this.logger.warn(`translate before save skipped: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
+  private async detectAndTranslate(t: string, hint?: string | null): Promise<SaveTranslation | null> {
+    await this.usedToday();
+    this.reserve(t.length);
+    const firstTarget: Locale = isLocale(hint) ? otherLocale(hint) : 'fr';
+    const [det] = await this.provider.detect([t], firstTarget);
+    const sourceLang = String(det?.sourceLang ?? 'und').toLowerCase().split('-')[0];
+    if (!det || !sourceLang || sourceLang === 'und') return null;
+    const others: Partial<Record<Locale, string>> = {};
+    for (const locale of LOCALES) {
+      if (locale === sourceLang) continue;
+      if (locale === firstTarget) {
+        others[locale] = det.text;
+        continue;
+      }
+      this.reserve(t.length);
+      [others[locale]] = await this.provider.translate([t], sourceLang, locale);
+    }
+    for (const locale of LOCALES) {
+      const v = others[locale];
+      if (typeof v !== 'string' || !v.trim()) delete others[locale];
+    }
+    return { sourceLang, others, sourceHash: sourceHash(sourceLang, t) };
+  }
+
+  /**
+   * Write what {@link translateForSave} found as machine rows of the saved record. A failure is logged and swallowed:
+   * the save has happened and must not fail because of a translator. Machine rows of the same field for a language the
+   * new text no longer needs (an edit that switched the source language) are removed.
+   */
+  async saveTranslated(kind: StoredKind, id: string, saved: SaveTranslation | null | undefined): Promise<void> {
+    if (!saved || !isStoredKind(kind) || !id) return;
+    const { field } = STORED_KINDS[kind];
+    try {
+      for (const locale of LOCALES) {
+        const value = saved.others[locale];
+        if (typeof value !== 'string' || !value) continue;
+        await this.writeMachine(kind, id, { field, locale, value, sourceLang: saved.sourceLang, sourceHash: saved.sourceHash });
+      }
+      const stale = LOCALES.filter((l) => !saved.others[l]);
+      if (stale.length) await this.rows.delete({ entityType: kind, entityId: id, field, origin: 'machine', locale: In([...stale]) } as never);
+    } catch (e) {
+      this.logger.warn(`could not store translations of ${kind} ${id}: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * Both languages of stored texts, ready to serve: ONE chunked query for all the ids (no N+1). A record with no
+   * usable (current) row gets no entry: its field is then absent from the payload and clients use `translate:text`.
+   */
+  async i18nFor(kind: StoredKind, items: { id: string; text: string | null | undefined }[]): Promise<Map<string, TextI18n>> {
+    const out = new Map<string, TextI18n>();
+    if (!isStoredKind(kind)) return out;
+    const withText = items.filter((i) => i.id && typeof i.text === 'string' && i.text.trim());
+    if (!withText.length) return out;
+    const { field } = STORED_KINDS[kind];
+    let rows: Map<string, Translation[]>;
+    try {
+      rows = await this.rowsFor(kind, withText.map((i) => i.id));
+    } catch (e) {
+      this.logger.warn(`could not read translations of ${kind}: ${(e as Error).message}`);
+      return out;
+    }
+    for (const { id, text } of withText) {
+      const original = text as string;
+      const trimmed = original.trim();
+      const live = (rows.get(id) ?? []).filter(
+        (r) => r.field === field && isLocale(r.locale) && !!r.sourceLang && !!r.value && r.sourceHash === sourceHash(r.sourceLang, trimmed),
+      );
+      if (!live.length) continue;
+      const sourceLang = live[0].sourceLang as string;
+      const view: TextI18n = { sourceLang };
+      for (const r of live) if (r.sourceLang === sourceLang) view[r.locale as Locale] = r.value;
+      if (isLocale(sourceLang) && view[sourceLang] === undefined) view[sourceLang] = original;
+      out.set(id, view);
+    }
+    return out;
+  }
+
   // ── Budget ──────────────────────────────────────────────────────────────────────────────
 
   /** Characters sent to the translator today (UTC): this process's count, seeded from today's machine rows after a restart. */
@@ -583,6 +714,10 @@ export class TranslationService implements OnModuleInit, OnModuleDestroy {
     if (cached && cached.sourceLang && cached.sourceHash === sourceHash(cached.sourceLang, text)) {
       return { text: cached.value, sourceLang: cached.sourceLang, same: cached.sourceLang === target };
     }
+    // Written at save: the other language's row proves what language the text is in, so no second detect call is needed.
+    const sibling = await this.rows.find({ where: { entityType: kind, entityId: id, field: spec.field } });
+    const known = sibling.find((r) => r.sourceLang === target && r.sourceHash === sourceHash(target, text));
+    if (known) return { text, sourceLang: target, same: true };
     const unavailable = 'Translation is not available right now. Try again later.';
     if (!this.enabled) throw new Error(unavailable);
     try {

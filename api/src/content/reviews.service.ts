@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { In } from 'typeorm';
@@ -10,6 +10,8 @@ import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ADMIN_ROLES } from '../notifications/notifications.service';
 import { ProductsService } from '../products/products.service';
 import { cleanAttachments } from '../common/attachments';
+import { TranslationService } from '../translation/translation.service';
+import type { TextI18n } from '../translation/translation.service';
 
 /** Photos a customer may attach to one review. */
 export const MAX_REVIEW_PHOTOS = 4;
@@ -18,6 +20,11 @@ export const MAX_REVIEW_PHOTOS = 4;
 const REPLY_STAFF = ['admin', 'admin_operations', 'admin_moderation'];
 /** Staff who receive reported reviews. */
 export const MODERATORS = REPLY_STAFF;
+
+/** A review as served: the row plus both languages of its text and of the seller's reply (each ABSENT when unknown). */
+export type ReviewView = Review & { textI18n?: TextI18n; replyI18n?: TextI18n };
+/** A question as served: the row plus both languages of the question and of the answer (each ABSENT when unknown). */
+export type QuestionView = ProductQuestion & { questionI18n?: TextI18n; answerI18n?: TextI18n };
 
 /** A question as the seller's inbox receives it: the question plus the product it is about. */
 /** A question as shoppers and guests read it: the asker's FIRST name only, no account id, no store id. */
@@ -30,9 +37,12 @@ export interface PublicQuestion {
   answeredBy: string | null;
   answeredAt: Date | null;
   createdAt: Date;
+  /** Both languages of `question` / `answer`; absent when no translation is known (use `translate:text`). */
+  questionI18n?: TextI18n;
+  answerI18n?: TextI18n;
 }
 
-export function publicQuestion(q: ProductQuestion): PublicQuestion {
+export function publicQuestion(q: QuestionView): PublicQuestion {
   return {
     id: q.id,
     productId: q.productId,
@@ -42,10 +52,12 @@ export function publicQuestion(q: ProductQuestion): PublicQuestion {
     answeredBy: q.answeredBy ?? null,
     answeredAt: q.answeredAt ?? null,
     createdAt: q.createdAt,
+    ...(q.questionI18n ? { questionI18n: q.questionI18n } : {}),
+    ...(q.answerI18n ? { answerI18n: q.answerI18n } : {}),
   };
 }
 
-export type SellerQuestion = ProductQuestion & { productName: string; productNameFr: string; productImage: string | null };
+export type SellerQuestion = QuestionView & { productName: string; productNameFr: string; productImage: string | null };
 
 @Injectable()
 export class ReviewsService {
@@ -61,7 +73,44 @@ export class ReviewsService {
     private readonly productsSvc: ProductsService,
     @InjectRepository(ReviewReport) private readonly reports: Repository<ReviewReport>,
     @InjectRepository(ReviewHelpful) private readonly helpfulVotes: Repository<ReviewHelpful>,
+    @Optional() private readonly translations?: TranslationService,
   ) {}
+
+  /** Add `textI18n` / `replyI18n` to reviews, in place: two batched lookups for the whole list. A review with nothing known gets no key. */
+  private async withReviewI18n<T extends Review>(rows: T[]): Promise<(T & { textI18n?: TextI18n; replyI18n?: TextI18n })[]> {
+    if (!this.translations || !rows.length) return rows;
+    const [text, reply] = await Promise.all([
+      this.translations.i18nFor('review', rows.map((r) => ({ id: r.id, text: r.text }))),
+      this.translations.i18nFor('review_reply', rows.map((r) => ({ id: r.id, text: r.sellerReply }))),
+    ]);
+    for (const r of rows as ReviewView[]) {
+      const t = text.get(r.id);
+      const p = reply.get(r.id);
+      if (t) r.textI18n = t;
+      else delete r.textI18n;
+      if (p) r.replyI18n = p;
+      else delete r.replyI18n;
+    }
+    return rows;
+  }
+
+  /** Add `questionI18n` / `answerI18n` to questions, in place. */
+  private async withQuestionI18n<T extends ProductQuestion>(rows: T[]): Promise<(T & { questionI18n?: TextI18n; answerI18n?: TextI18n })[]> {
+    if (!this.translations || !rows.length) return rows;
+    const [question, answer] = await Promise.all([
+      this.translations.i18nFor('question', rows.map((q) => ({ id: q.id, text: q.question }))),
+      this.translations.i18nFor('answer', rows.map((q) => ({ id: q.id, text: q.answer }))),
+    ]);
+    for (const q of rows as QuestionView[]) {
+      const a = question.get(q.id);
+      const b = answer.get(q.id);
+      if (a) q.questionI18n = a;
+      else delete q.questionI18n;
+      if (b) q.answerI18n = b;
+      else delete q.answerI18n;
+    }
+    return rows;
+  }
 
   /** The account that owns a product's store (null when the product or store is gone). */
   private async sellerUserOfProduct(product: Pick<Product, 'sellerId'> | null): Promise<string | null> {
@@ -71,22 +120,24 @@ export class ReviewsService {
   }
 
   /** Public list: hidden (moderated) reviews are left out unless a moderator asks for them. */
-  listForProduct(productId: string, includeHidden = false): Promise<Review[]> {
-    return this.reviews.find({
+  async listForProduct(productId: string, includeHidden = false): Promise<ReviewView[]> {
+    const rows = await this.reviews.find({
       where: includeHidden ? { productId } : { productId, status: 'visible' },
       order: { createdAt: 'DESC' },
       take: 500,
     });
+    return this.withReviewI18n(rows);
   }
 
   /** Moderation queue: reviews across the catalogue, newest first, with the product name. */
-  async listForModeration(filter: { status?: ReviewStatus; productId?: string; reported?: boolean }, paging?: unknown): Promise<Review[]> {
+  async listForModeration(filter: { status?: ReviewStatus; productId?: string; reported?: boolean }, paging?: unknown): Promise<ReviewView[]> {
     const { take, skip } = pageOf(paging, { def: 200 });
     const where: Record<string, unknown> = {};
     if (filter.status) where.status = filter.status;
     if (filter.productId) where.productId = filter.productId;
     const rows = await this.reviews.find({ where: where as never, order: { createdAt: 'DESC' }, take, skip });
     const picked = filter.reported ? rows.filter((r) => r.reportCount > 0) : rows;
+    await this.withReviewI18n(picked);
     const names = await this.productsSvc.names(picked.map((r) => r.productId));
     return picked.map((r) => Object.assign(r, { productName: names.get(r.productId)?.name ?? '', productNameFr: names.get(r.productId)?.nameFr ?? '' }));
   }
@@ -100,7 +151,7 @@ export class ReviewsService {
    * Mark a review helpful. One vote per person: voting again changes nothing (the counter stays), and the answer says
    * whether this vote counted.
    */
-  async markHelpful(id: string, userId: string): Promise<Review & { counted: boolean }> {
+  async markHelpful(id: string, userId: string): Promise<ReviewView & { counted: boolean }> {
     const review = await this.reviews.findOne({ where: { id } });
     if (!review) throw new Error('Review not found.');
     // C-V1: one vote per user and review, enforced by the unique index as well.
@@ -115,12 +166,13 @@ export class ReviewsService {
       await this.reviews.createQueryBuilder().update(Review).set({ helpful: () => 'helpful + 1' }).where('id = :id', { id }).execute();
     }
     const saved = (await this.reviews.findOne({ where: { id } }))!;
+    await this.withReviewI18n([saved]);
     if (counted) this.emitter.toRoles(['customer', ...MODERATORS], 'review:updated', saved);
     return Object.assign(saved, { counted });
   }
 
   /** Every review across a seller's catalogue, newest first. */
-  async listForSeller(sellerId: string | string[], paging?: unknown): Promise<Review[]> {
+  async listForSeller(sellerId: string | string[], paging?: unknown): Promise<ReviewView[]> {
     const { take, skip } = pageOf(paging);
     const owned = await this.products.find({
       where: { sellerId: In(Array.isArray(sellerId) ? sellerId : [sellerId]) },
@@ -133,6 +185,7 @@ export class ReviewsService {
       take,
       skip,
     });
+    await this.withReviewI18n(rows);
     // Attach the product name (both languages) so the seller UI needn't re-join client-side.
     const names = await this.productsSvc.names(rows.map((r) => r.productId));
     return rows.map((r) =>
@@ -143,7 +196,7 @@ export class ReviewsService {
   async create(
     user: { id: string; name: string },
     input: { productId: string; rating: number; text: string; photos?: unknown },
-  ): Promise<Review> {
+  ): Promise<ReviewView> {
     const text = String(input?.text ?? '').trim();
     const rating = Number(input?.rating);
     if (!input?.productId || !Number.isFinite(rating) || text.length < 3) {
@@ -167,16 +220,21 @@ export class ReviewsService {
     if (await this.reviews.count({ where: { productId: input.productId, userId: user.id } })) {
       throw new BadRequestException('You have already reviewed this product.');
     }
-    const review = await this.reviews.save(
+    // Translate first, then store: both languages are saved together (null: stored untranslated, as before).
+    const body = text.slice(0, 2000);
+    const translated = await this.translations?.translateForSave(body);
+    const review: ReviewView = await this.reviews.save(
       this.reviews.create({
         productId: input.productId,
         userId: user.id,
         author: user.name,
         rating: Math.min(5, Math.max(1, Math.round(rating))),
-        text: text.slice(0, 2000),
+        text: body,
         photos,
       }),
     );
+    await this.translations?.saveTranslated('review', review.id, translated);
+    await this.withReviewI18n([review]);
     await this.recomputeRating(input.productId);
     this.emitter.toRoles(['customer', ...MODERATORS], 'review:created', review);
     // The seller hears about it at once.
@@ -234,6 +292,7 @@ export class ReviewsService {
     }
     await this.reviews.createQueryBuilder().update(Review).set({ reportCount: () => 'reportCount + 1' }).where('id = :id', { id: review.id }).execute();
     const fresh = (await this.reviews.findOne({ where: { id: review.id } }))!;
+    await this.withReviewI18n([fresh]);
     this.emitter.toRoles(MODERATORS, 'review:reported', { review: fresh, report, productName: product?.name ?? '' });
     await this.notifications.toRole('admin_moderation', {
       title: 'Review reported',
@@ -245,7 +304,7 @@ export class ReviewsService {
   }
 
   /** Moderators hide / restore a review. Hidden reviews drop out of public lists and the product rating. */
-  async setStatus(reviewId: string, status: ReviewStatus, rawReason?: unknown): Promise<Review> {
+  async setStatus(reviewId: string, status: ReviewStatus, rawReason?: unknown): Promise<ReviewView> {
     const review = await this.reviews.findOne({ where: { id: reviewId } });
     if (!review) throw new NotFoundException('Review not found.');
     const reason = String(rawReason ?? '').trim().slice(0, 500);
@@ -260,6 +319,7 @@ export class ReviewsService {
       if (review.reportCount) await this.reviews.update({ id: review.id }, { reportCount: 0 });
       review.reportCount = 0;
     }
+    await this.withReviewI18n([review]);
     // Shoppers only learn that it is gone (no content); staff get the full row.
     this.emitter.toRoles(
       ['customer', 'guest'],
@@ -298,7 +358,7 @@ export class ReviewsService {
    * The seller of the reviewed product (or an admin) answers publicly. A second
    * reply replaces the first. The author is notified live.
    */
-  async reply(actor: { id: string; role: string; name: string }, reviewId: string, rawText: unknown): Promise<Review> {
+  async reply(actor: { id: string; role: string; name: string }, reviewId: string, rawText: unknown): Promise<ReviewView> {
     const text = String(rawText ?? '').trim();
     if (text.length < 2 || text.length > 1000) throw new BadRequestException('Write a reply of 2 to 1000 characters.');
     const review = await this.reviews.findOne({ where: { id: reviewId } });
@@ -310,9 +370,13 @@ export class ReviewsService {
       // Same answer for "missing" and "not yours" so reviews of other stores cannot be probed.
       if (actor.role !== 'seller' || !mine) throw new NotFoundException('Review not found.');
     }
+    // Translate first, then store; a replaced reply is translated again (rows of the old text are stale by their hash).
+    const translated = await this.translations?.translateForSave(text);
     review.sellerReply = text;
     review.sellerReplyAt = new Date();
-    const saved = await this.reviews.save(review);
+    const saved: ReviewView = await this.reviews.save(review);
+    await this.translations?.saveTranslated('review_reply', saved.id, translated);
+    await this.withReviewI18n([saved]);
     if (saved.status === 'visible') this.emitter.toRoles(['customer', 'guest'], 'review:updated', saved);
     this.emitter.toRoles(MODERATORS, 'review:updated', saved);
     this.emitter.toUser(saved.userId, 'review:updated', saved);
@@ -336,6 +400,7 @@ export class ReviewsService {
   async listQuestions(productId: string, paging?: unknown): Promise<PublicQuestion[]> {
     const { take, skip } = pageOf(paging, { def: 200 });
     const rows = await this.questions.find({ where: { productId }, order: { createdAt: 'DESC', id: 'ASC' }, take, skip });
+    await this.withQuestionI18n(rows);
     return rows.map(publicQuestion);
   }
 
@@ -356,6 +421,7 @@ export class ReviewsService {
     if (filter.status === 'unanswered') qb.andWhere('q.answer IS NULL');
     else if (filter.status === 'answered') qb.andWhere('q.answer IS NOT NULL');
     const rows = await qb.getMany();
+    await this.withQuestionI18n(rows);
     const names = await this.productsSvc.names(rows.map((r) => r.productId));
     const images = new Map(owned.map((p) => [p.id, p.image]));
     return rows.map((q) =>
@@ -380,9 +446,11 @@ export class ReviewsService {
   private async askUnchecked(
     user: { id: string; name: string },
     input: { productId: string; question: string },
-  ): Promise<ProductQuestion> {
+  ): Promise<QuestionView> {
     const product = await this.products.findOne({ where: { id: input.productId } });
-    const q = await this.questions.save(
+    // Translate first, then store (null: stored untranslated, as before).
+    const translated = await this.translations?.translateForSave(input.question);
+    const q: QuestionView = await this.questions.save(
       this.questions.create({
         productId: input.productId,
         askedBy: user.name,
@@ -391,6 +459,8 @@ export class ReviewsService {
         question: input.question,
       }),
     );
+    await this.translations?.saveTranslated('question', q.id, translated);
+    await this.withQuestionI18n([q]);
     // Shoppers get the public view (first name, no ids); the store and the admins get the full row.
     this.emitter.toRoles(['customer'], 'question:created', publicQuestion(q));
     this.emitter.toRoles(MODERATORS, 'question:created', q);
@@ -425,7 +495,7 @@ export class ReviewsService {
   async ask(
     user: { id: string; name: string },
     input: { productId: string; question: string },
-  ): Promise<ProductQuestion> {
+  ): Promise<QuestionView> {
     const question = String(input?.question ?? '').trim();
     if (!input?.productId || question.length < 3) {
       throw new BadRequestException('Write your question first.');
@@ -437,10 +507,15 @@ export class ReviewsService {
     id: string,
     answer: string,
     answeredBy: string,
-  ): Promise<ProductQuestion | null> {
+  ): Promise<QuestionView | null> {
+    if (!(await this.questions.count({ where: { id } }))) return null; // never bill the translator for an id that is not a question
+    // Translate first, then store; a replaced answer is translated again (rows of the old text are stale by their hash).
+    const translated = await this.translations?.translateForSave(answer);
     await this.questions.update({ id }, { answer, answeredBy, answeredAt: new Date() });
-    const q = await this.questions.findOne({ where: { id } });
+    const q: QuestionView | null = await this.questions.findOne({ where: { id } });
     if (!q) return null;
+    await this.translations?.saveTranslated('answer', q.id, translated);
+    await this.withQuestionI18n([q]);
     this.emitter.toRoles(['customer', 'guest'], 'question:updated', publicQuestion(q));
     this.emitter.toRoles(MODERATORS, 'question:updated', q);
     const product = await this.products.findOne({ where: { id: q.productId } });
