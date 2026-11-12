@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { CartLine, Product, Seller } from '../database/entities';
+import { CartLine, Product, Seller, SellerPolicyRevision } from '../database/entities';
 import { addProduct, addSeller, recordingEmitter, testDb, testTranslations } from '../testing/test-db';
 import {
   EMPTY_GOALS,
@@ -17,6 +17,7 @@ import {
   vacationError,
   vacationNotice,
 } from './storefront';
+import { SellerPolicyService } from './policy.service';
 import { EXPRESS_NEEDS_PIN, EXPRESS_NOT_BOOLEAN, StorefrontService, touchesStorefront } from './storefront.service';
 import { sellerView } from '../database/entities/seller.entity';
 import { cleanPayoutAccount, maskAccount } from './payout-account';
@@ -182,7 +183,9 @@ describe('storefront with a database', () => {
       const notices: { to: string; title: string }[] = [];
       const translations = testTranslations(ds);
       const sellersSvc = { withPlanState: async (s: Seller) => ({ id: s.id, legalName: 'Mama SARL', idNumber: 'ID-1', rccm: 'RC-1', taxNumber: 'TX-1', documentUrls: ['/uploads/x'], phone: '+243800000000', onVacation: onVacation(s), vacationUntil: s.vacationUntil, handlingDays: s.handlingDays, expressDelivery: s.expressDelivery, returnsPolicy: s.returnsPolicy }) };
-      const svc = new StorefrontService(ds.getRepository(Seller), sellersSvc as never, emitter as never, { toUser: async (to: string, n: { title: string }) => void notices.push({ to, title: n.title }) } as never, translations);
+      const notifications = { toUser: async (to: string, n: { title: string }) => void notices.push({ to, title: n.title }), toRole: async () => undefined };
+      const policies = new SellerPolicyService(ds.getRepository(SellerPolicyRevision), ds.getRepository(Seller), { ...sellersSvc, present: async (rows: Seller[]) => rows } as never, emitter as never, notifications as never, { get: async () => null } as never, translations);
+      const svc = new StorefrontService(ds.getRepository(Seller), sellersSvc as never, emitter as never, notifications as never, policies);
       return { svc, emitter, notices, translations };
     }
     const ctxOf = (seller: Seller, isOwner = true) => ({ seller, isOwner, member: isOwner ? 'owner' : 'manager', user: { id: 'u', role: 'seller', name: 'u' }, actor: { id: seller.userId ?? 'u', name: 'u', role: 'seller' }, ownerIds: [seller.id], suspended: false, permissions: [] }) as unknown as SellerContext;
@@ -216,60 +219,67 @@ describe('storefront with a database', () => {
       }
     });
 
-    describe('express delivery switch', () => {
+    describe('express delivery: KOMORIKO admin switches it, not the seller', () => {
       const PIN = { pickupLat: -4.3152, pickupLng: 15.3098 };
       const stored = async (id: string) => (await ds.getRepository(Seller).findOneByOrFail({ id })).expressDelivery;
 
-      it('turns on for a store with a pinned pickup location, tells the owner and the admins, and turns off again', async () => {
-        const { svc, emitter } = make();
+      it('setExpress turns it on for a store with a pinned pickup location, tells the owner (live and a notice) and the admins, and turns off again', async () => {
+        const { svc, emitter, notices } = make();
         const s = await addSeller(ds, { userId: 'owner-1', ...PIN });
         expect(await stored(s.id)).toBe(false);
-        const on = await svc.update(ctxOf(s), { expressDelivery: true });
+        const on = await svc.setExpress(s.id, true);
         expect(on).toMatchObject({ expressDelivery: true });
         expect(await stored(s.id)).toBe(true);
         expect(emitter.sent.some((e) => e.to === 'user:owner-1' && e.event === 'seller:updated' && e.payload.expressDelivery === true)).toBe(true);
+        expect(emitter.sent.some((e) => e.event === 'seller:updated' && !e.to.startsWith('user:'))).toBe(true);
         expect(emitter.sent.some((e) => e.event === 'store:vacation')).toBe(false); // not a vacation change: shoppers are not pinged
-        expect(await svc.update(ctxOf(on as never as Seller & { id: string }), { expressDelivery: false })).toMatchObject({ expressDelivery: false });
+        expect(notices).toEqual([{ to: 'owner-1', title: 'Express delivery turned on' }]);
+        expect(await svc.setExpress(s.id, false)).toMatchObject({ expressDelivery: false });
         expect(await stored(s.id)).toBe(false);
+        expect(notices.at(-1)).toEqual({ to: 'owner-1', title: 'Express delivery turned off' });
+        // setting it to what it already is says nothing
+        notices.length = 0;
+        await svc.setExpress(s.id, false);
+        expect(notices).toEqual([]);
       });
 
       it('is refused without a pinned pickup location, with the pin message, and saves nothing', async () => {
         const { svc } = make();
-        const s = await addSeller(ds, { handlingDays: 1 });
-        await expect(svc.update(ctxOf(s), { expressDelivery: true, handlingDays: 3 })).rejects.toThrow(EXPRESS_NEEDS_PIN);
-        expect(EXPRESS_NEEDS_PIN).toBe('Pin your pickup location on the map (Store settings) before offering express delivery.');
+        const s = await addSeller(ds);
+        await expect(svc.setExpress(s.id, true)).rejects.toThrow(EXPRESS_NEEDS_PIN);
+        expect(EXPRESS_NEEDS_PIN).toBe('This store has no pinned pickup location. Ask the seller to pin it in Store settings before turning on express delivery.');
         expect(await stored(s.id)).toBe(false);
-        expect((await ds.getRepository(Seller).findOneByOrFail({ id: s.id })).handlingDays).toBe(1);
         // half a pin is no pin
         const half = await addSeller(ds, { pickupLat: -4.3 });
-        await expect(svc.update(ctxOf(half), { expressDelivery: true })).rejects.toThrow(EXPRESS_NEEDS_PIN);
+        await expect(svc.setExpress(half.id, true)).rejects.toThrow(EXPRESS_NEEDS_PIN);
       });
 
-      it('a request that pins the location and switches express on together is judged by the pin it sends (and one that clears the pin is refused)', async () => {
-        const { svc } = make();
-        const s = await addSeller(ds);
-        await expect(svc.update(ctxOf(s), { expressDelivery: true, pickupLat: null, pickupLng: null } as never)).rejects.toThrow(EXPRESS_NEEDS_PIN);
-        await svc.update(ctxOf(s), { expressDelivery: true, ...PIN } as never);
-        expect(await stored(s.id)).toBe(true);
-        const pinned = await addSeller(ds, PIN);
-        await expect(svc.update(ctxOf(pinned), { expressDelivery: true, pickupLat: null, pickupLng: null } as never)).rejects.toThrow(EXPRESS_NEEDS_PIN);
-      });
-
-      it('must be true or false', async () => {
+      it('must be true or false, for a store that exists', async () => {
         const { svc } = make();
         const s = await addSeller(ds, PIN);
-        for (const bad of ['true', 1, 0, null, 'yes', {}]) await expect(svc.update(ctxOf(s), { expressDelivery: bad })).rejects.toThrow(EXPRESS_NOT_BOOLEAN);
+        for (const bad of ['true', 1, 0, null, 'yes', {}, undefined]) await expect(svc.setExpress(s.id, bad)).rejects.toThrow(EXPRESS_NOT_BOOLEAN);
         expect(EXPRESS_NOT_BOOLEAN).toBe('Express delivery must be true or false.');
+        expect(await stored(s.id)).toBe(false);
+        await expect(svc.setExpress('nope', true)).rejects.toThrow('Store not found.');
+      });
+
+      it('switching off needs no pin', async () => {
+        const { svc } = make();
+        const s = await addSeller(ds, { expressDelivery: true });
+        await svc.setExpress(s.id, false);
         expect(await stored(s.id)).toBe(false);
       });
 
-      it('switching off needs no pin, and an untouched switch stays as it was', async () => {
+      it('a seller\'s update no longer touches it: an old client that still sends expressDelivery is ignored, without an error', async () => {
         const { svc } = make();
-        const s = await addSeller(ds, { expressDelivery: true });
-        await svc.update(ctxOf(s), { handlingDays: 2 });
-        expect(await stored(s.id)).toBe(true);
-        await svc.update(ctxOf(s), { expressDelivery: false });
-        expect(await stored(s.id)).toBe(false);
+        const on = await addSeller(ds, { expressDelivery: true, ...PIN });
+        const off = await addSeller(ds, PIN);
+        expect(touchesStorefront({ expressDelivery: true })).toBe(false);
+        await svc.update(ctxOf(on), { expressDelivery: false, handlingDays: 2 } as never);
+        await svc.update(ctxOf(off), { expressDelivery: true, handlingDays: 2 } as never);
+        expect(await stored(on.id)).toBe(true);
+        expect(await stored(off.id)).toBe(false);
+        expect((await ds.getRepository(Seller).findOneByOrFail({ id: off.id })).handlingDays).toBe(2);
       });
 
       it('is part of the seller view (sellers:mine, seller:updated, the admin lists and the public storefront all spread it)', async () => {
@@ -293,17 +303,18 @@ describe('storefront with a database', () => {
       expect((await ds.getRepository(Seller).findOneByOrFail({ id: s.id })).handlingDays).toBe(1);
     });
 
-    it('policies are authored in either language and the other is queued for translation', async () => {
-      const { svc, translations } = make();
+    it('a seller\'s policies do not go live: they become a pending revision and the live text stays', async () => {
+      const { svc } = make();
       const s = await addSeller(ds);
-      await svc.update(ctxOf(s), { returnsPolicy: 'Returns are accepted within 14 days.', shippingPolicyFr: 'Expédition sous deux jours ouvrés.' });
+      await ds.getRepository(Seller).update({ id: s.id }, { returnsPolicy: 'Live: returns within 7 days.' });
+      const out = await svc.update(ctxOf(s), { returnsPolicy: 'Returns are accepted within 14 days.', shippingPolicyFr: 'Expédition sous deux jours ouvrés.' });
+      expect(out.policyRevision).toMatchObject({ status: 'pending', returnsPolicy: 'Returns are accepted within 14 days.', shippingPolicyFr: 'Expédition sous deux jours ouvrés.', shippingPolicy: null, returnsPolicyFr: null });
       const row = await ds.getRepository(Seller).findOneByOrFail({ id: s.id });
-      expect(row.returnsPolicy).toBe('Returns are accepted within 14 days.');
-      const rows = (await translations.rowsFor('seller', [s.id])).get(s.id) ?? [];
-      expect(rows.find((r) => r.field === 'shippingPolicy' && r.locale === 'fr')).toMatchObject({ origin: 'author', value: 'Expédition sous deux jours ouvrés.' });
+      expect(row.returnsPolicy).toBe('Live: returns within 7 days.');
+      expect(row.shippingPolicy).toBeNull();
       await expect(svc.update(ctxOf(s), { returnsPolicy: 'short' })).rejects.toThrow(/Returns policy/);
-      const cleared = await svc.update(ctxOf(s), { returnsPolicy: null });
-      expect(cleared.returnsPolicy).toBeNull();
+      // a body without policies makes no revision
+      expect((await svc.update(ctxOf(s), { handlingDays: 3 })).policyRevision).toBeNull();
     });
 
     it('the sweep reopens stores whose date passed and tells the owner', async () => {
@@ -343,7 +354,7 @@ describe('storefront with a database', () => {
   it('touchesStorefront recognises the storefront fields of a sellers:update body', () => {
     expect(touchesStorefront({ vacationUntil: null })).toBe(true);
     expect(touchesStorefront({ handlingDays: 0 })).toBe(true);
-    expect(touchesStorefront({ expressDelivery: false })).toBe(true);
+    expect(touchesStorefront({ expressDelivery: false })).toBe(false); // admin switches express now
     expect(touchesStorefront({ returnsPolicyFr: 'x' })).toBe(true);
     expect(touchesStorefront({ name: 'x', description: 'y' })).toBe(false);
     expect(touchesStorefront(undefined)).toBe(false);

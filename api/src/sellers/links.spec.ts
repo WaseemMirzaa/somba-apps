@@ -1,11 +1,11 @@
 import { linkFor } from '../notifications/links';
 
 describe('where seller-platform notices open', () => {
-  it('chat opens the conversation, for the shopper and for the store', () => {
-    expect(linkFor('customer', 'chat', 'c1')).toBe('/shop/messages/c1');
-    expect(linkFor('customer', 'chat', null)).toBe('/shop/messages');
-    expect(linkFor('seller', 'chat', 'c1')).toBe('/seller/messages/c1');
-    expect(linkFor('seller', 'chat', null)).toBe('/seller/messages');
+  it('an old chat notice opens the notifications page (chat is closed)', () => {
+    expect(linkFor('customer', 'chat', 'c1')).toBe('/shop/notifications');
+    expect(linkFor('customer', 'chat', null)).toBe('/shop/notifications');
+    expect(linkFor('seller', 'chat', 'c1')).toBe('/seller/notifications');
+    expect(linkFor('seller', 'chat', null)).toBe('/seller/notifications');
   });
   it('team and security notices open the team and settings pages', () => {
     expect(linkFor('seller', 'team', 'm1')).toBe('/seller/team');

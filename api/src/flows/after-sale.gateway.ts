@@ -1,6 +1,5 @@
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
 import { oneOf } from '../common/validate';
-import { sellerContext } from '../sellers/seller-context';
 import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
 import { StaffTierService } from '../logistics/staff-tier.service';
@@ -15,9 +14,9 @@ const REPLACEMENT_STATUSES = ['requested', 'approved', 'received', 'allocated', 
 const EXCHANGE_STATUSES = ['requested', 'approved', 'received', 'ready', 'dispatched', 'delivered', 'rejected'] as const;
 
 /**
- * Replacements and exchanges on the shared Socket.IO server: the customer asks, the seller approves or rejects (stock
- * is taken from their product, logistics is asked to deliver), the warehouse follows the delivery task.
- * See docs/contracts/after-sale.md.
+ * Replacements and exchanges on the shared Socket.IO server: the customer asks, KOMORIKO support approves or rejects (stock
+ * is taken from the seller's product, logistics is asked to deliver), the warehouse follows the delivery task. Sellers take
+ * no part (docs/contracts/admin-controls.md). See docs/contracts/after-sale.md.
  */
 @WebSocketGateway({ cors: { origin: true, credentials: true } })
 export class AfterSaleGateway {
@@ -30,7 +29,7 @@ export class AfterSaleGateway {
 
   /**
    * Every staff action on an exchange is audited (A-03), with the wallet credit it causes: a cheaper item is refunded to
-   * the customer's wallet when the exchange is delivered. The customer's and the seller's own actions are not.
+   * the customer's wallet when the exchange is delivered. The customer's own actions are not.
    */
   private async auditExchange(user: SocketUser, action: string, ex: ExchangeView): Promise<void> {
     if (user.role === 'customer' || user.role === 'seller' || ex.customerId === user.id) return;
@@ -60,15 +59,9 @@ export class AfterSaleGateway {
     return user.role.startsWith('admin') && !inRoleGroup(user.role, 'exchangeDecide') ? 'Not allowed.' : null;
   }
 
-  /** A seller account acts as its store (a team member with the orders permission too); everyone else as themselves. */
-  private async viewer(user: SocketUser, write: boolean) {
-    if (user.role !== 'seller') return user;
-    try {
-      return (await sellerContext(user, 'orders', { write })).actor;
-    } catch (e) {
-      if (write) throw e;
-      return user; // a seller without a store still sees what they bought
-    }
+  /** Everyone acts as themselves: a seller who shops sees only what they bought (sellers take no part in after-sale). */
+  private viewer(user: SocketUser) {
+    return user;
   }
 
   // ---- Replacements -------------------------------------------------------
@@ -79,7 +72,7 @@ export class AfterSaleGateway {
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.replacements.list(await this.viewer(user, false), body ?? {}));
+      return ok(await this.replacements.list(this.viewer(user), body ?? {}));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -102,7 +95,7 @@ export class AfterSaleGateway {
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.replacements.get(await this.viewer(user, false), String(body?.id ?? '')));
+      return ok(await this.replacements.get(this.viewer(user), String(body?.id ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -121,14 +114,14 @@ export class AfterSaleGateway {
     }
   }
 
-  /** The seller approves or rejects (support may on their behalf). */
+  /** Support approves or rejects (the first decision on every replacement). */
   @SubscribeMessage('replacements:respond')
   async replacementsRespond(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; approve: boolean; reason?: string }) {
     try {
       const user = requireUser(client);
-      // The seller, or support / operations on their behalf (group `exchangeDecide`); no other admin department.
-      if (user.role !== 'seller' && !inRoleGroup(user.role, 'exchangeDecide')) return fail('Not allowed.');
-      return ok(await this.replacements.respond(await this.viewer(user, true), String(body?.id ?? ''), body?.approve === true, body?.reason));
+      // Support / operations / the super admin (group `exchangeDecide`); sellers and the other admin departments are refused.
+      if (!inRoleGroup(user.role, 'exchangeDecide')) return fail('Not allowed.');
+      return ok(await this.replacements.respond(this.viewer(user), String(body?.id ?? ''), body?.approve === true, body?.reason));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -156,7 +149,7 @@ export class AfterSaleGateway {
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.exchanges.list(await this.viewer(user, false), body ?? {}));
+      return ok(await this.exchanges.list(this.viewer(user), body ?? {}));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -178,7 +171,7 @@ export class AfterSaleGateway {
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.exchanges.get(await this.viewer(user, false), String(body?.id ?? '')));
+      return ok(await this.exchanges.get(this.viewer(user), String(body?.id ?? '')));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -204,9 +197,9 @@ export class AfterSaleGateway {
   async exchangesRespond(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string; approve: boolean; reason?: string }) {
     try {
       const user = requireUser(client);
-      // A-03/A-07: the seller, or the desk / support on their behalf; no other admin department.
-      if (user.role !== 'seller' && !inRoleGroup(user.role, 'exchangeDecide')) return fail('Not allowed.');
-      const ex = await this.exchanges.respond(await this.viewer(user, true), String(body?.id ?? ''), body?.approve === true, body?.reason);
+      // A-03/A-07: support, operations or the super admin decide (group `exchangeDecide`), whatever the price difference; sellers and the other admin departments are refused.
+      if (!inRoleGroup(user.role, 'exchangeDecide')) return fail('Not allowed.');
+      const ex = await this.exchanges.respond(this.viewer(user), String(body?.id ?? ''), body?.approve === true, body?.reason);
       await this.auditExchange(user, ex.status === 'rejected' ? 'exchange.rejected' : 'exchange.approved', ex);
       return ok(ex);
     } catch (e) {

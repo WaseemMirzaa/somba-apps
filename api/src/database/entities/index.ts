@@ -97,6 +97,8 @@ export { SellerTeamMember, TEAM_STAFF_ROLES } from './seller-team.entity';
 export type { TeamRole, TeamStatus } from './seller-team.entity';
 export { Conversation } from './conversation.entity';
 export { ConversationMessage } from './conversation-message.entity';
+export { SellerPolicyRevision } from './seller-policy-revision.entity';
+export type { PolicyRevisionStatus } from './seller-policy-revision.entity';
 export type { ChatSide } from './conversation-message.entity';
 export { PrivateFile } from './private-file.entity';
 export { DeliveryProof } from './delivery-proof.entity';
@@ -177,6 +179,7 @@ import { RiderDocument } from './rider-document.entity';
 import { SellerTeamMember } from './seller-team.entity';
 import { Conversation } from './conversation.entity';
 import { ConversationMessage } from './conversation-message.entity';
+import { SellerPolicyRevision } from './seller-policy-revision.entity';
 import { PrivateFile } from './private-file.entity';
 import { DeliveryProof } from './delivery-proof.entity';
 import { HubOpsSettings } from './hub-ops-settings.entity';
@@ -251,6 +254,7 @@ export const ENTITIES = [
   SellerTeamMember,
   Conversation,
   ConversationMessage,
+  SellerPolicyRevision,
   PrivateFile,
   DeliveryProof,
   RefreshToken,

@@ -27,6 +27,7 @@ import { GeoService } from '../geo/geo.service';
 import { LanesService } from '../logistics/lanes.service';
 import { HubOpsSettingsService } from '../logistics/hub-ops-settings.service';
 import { PrivateFilesService } from '../sellers/private-files.service';
+import { SellerPolicyService } from '../sellers/policy.service';
 import { StorefrontService } from '../sellers/storefront.service';
 import { sellerContext } from '../sellers/seller-context';
 import { newRecoveryCodes, hashRecovery, newTotpSecret } from '../auth/totp';
@@ -77,6 +78,9 @@ const RETURNS_POLICY =
   'Returns are accepted within 7 days of delivery for unused items in their original packaging. Food and beauty products can only be returned unopened.';
 const SHIPPING_POLICY =
   'We pack every order within one working day and hand it to the KOMORIKO warehouse in Gombe.';
+/** Store B's proposal: it waits in the admin queue (a seller's policy goes live only when KOMORIKO admin approves it). */
+const PROPOSED_RETURNS_POLICY =
+  'Returns within 7 days if the item is unused and in its box. Start a return from your order: KOMORIKO support decides and a rider collects the goods.';
 
 async function preflight(
   ds: DataSource,
@@ -535,6 +539,7 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
   const sellerRepo = ds.getRepository(Seller);
   const wallet = ctx.app.get(WalletService);
   const storefront = ctx.app.get(StorefrontService);
+  const policies = ctx.app.get(SellerPolicyService);
   for (const s of DEMO_STORES as DemoStore[]) {
     const owner = ctx.users.get(`seller.${s.key.toLowerCase()}`)!;
     let seller = await sellerRepo.findOne({ where: { userId: owner.id } });
@@ -627,13 +632,19 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
   };
   const A = await ctxOf('A');
   if (!A.seller.returnsPolicy) {
-    await storefront.update(A, {
-      handlingDays: 1,
-      returnsPolicy: RETURNS_POLICY,
-      returnsPolicyFr: frOf(RETURNS_POLICY),
-      shippingPolicy: SHIPPING_POLICY,
-      shippingPolicyFr: frOf(SHIPPING_POLICY),
-    } as never);
+    await storefront.update(A, { handlingDays: 1 } as never);
+    // Store A's policies are live and approved (the way an admin publishes them); nobody is notified for demo data.
+    await policies.publish(
+      { id: ctx.users.get('admin.super')!.id, name: 'Demo Super Admin' },
+      {
+        sellerId: A.seller.id,
+        returnsPolicy: RETURNS_POLICY,
+        returnsPolicyFr: frOf(RETURNS_POLICY),
+        shippingPolicy: SHIPPING_POLICY,
+        shippingPolicyFr: frOf(SHIPPING_POLICY),
+      },
+      { silent: true },
+    );
     await storefront.setGoals(A, { revenueUsd: 2000, orders: 60, rating: 4.5 });
     await storefront.setPayoutAccount(A, {
       method: 'mobile_money',
@@ -651,9 +662,17 @@ async function seedStores(ctx: DemoCtx): Promise<void> {
   }
   // Store C offers express delivery (its pickup pin is in Kasa-Vubu, where a demo customer has a pinned address). Harmless while the
   // platform setting is off; the store is a demo store, so the removal takes the toggle away with it.
+  // Express is KOMORIKO's switch (`sellers:setExpress`), not the seller's.
   const C = await ctxOf('C');
   if (!C.seller.expressDelivery && C.seller.pickupLat != null)
-    await storefront.update(C, { expressDelivery: true } as never);
+    await storefront.setExpress(C.seller.id, true);
+  // Store B proposes a returns policy: it waits in the admin queue (pending), the live text is untouched.
+  const B = await ctxOf('B');
+  if (!(await ds.query('SELECT 1 AS x FROM seller_policy_revisions WHERE sellerId = ? LIMIT 1', [B.seller.id])).length)
+    await policies.propose(B, {
+      returnsPolicy: PROPOSED_RETURNS_POLICY,
+      returnsPolicyFr: frOf(PROPOSED_RETURNS_POLICY),
+    });
   const G = await ctxOf('G');
   const wantBack = new Date(Date.now() + 45 * 86_400_000)
     .toISOString()

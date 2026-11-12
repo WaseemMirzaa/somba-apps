@@ -101,10 +101,10 @@ export const DEMO_TEXTS: DemoText[] = [
   t('case', 'en', 'Screen cracked, not resellable.', 'Écran fissuré, invendable.'),
   t('case', 'en', 'The shirt is too large and I would like my money back.', 'La chemise est trop grande et je souhaite être remboursé.'),
   t('case', 'fr', 'The shirt has a stain near the collar.', 'La chemise a une tache près du col.'),
-  t('case', 'en', 'The shirt left our warehouse clean. The stain is not from us, so we cannot accept this return.', 'La chemise est sortie propre de notre entrepôt. La tache ne vient pas de nous, nous ne pouvons donc pas accepter ce retour.'),
-  t('case', 'fr', 'I do not agree: the stain was already there when the parcel was opened. See the photo.', 'Je ne suis pas d’accord : la tache était déjà là à l’ouverture du colis. Voir la photo.'),
+  t('case', 'en', 'Thank you for the photo. We are checking the stain with the seller and will decide within two days.', 'Merci pour la photo. Nous vérifions la tache avec le vendeur et déciderons sous deux jours.'),
+  t('case', 'fr', 'The stain was already there when the parcel was opened, as the photo shows.', 'La tache était déjà là à l’ouverture du colis, comme le montre la photo.'),
   t('case', 'en', 'The box arrived crushed and two cushion covers were missing from the set.', 'La boîte est arrivée écrasée et deux housses de coussin manquaient dans le lot.'),
-  t('case', 'en', 'We are sorry about this. We packed four covers and the box looked fine in our photo. Could you send a picture of the covers you received?', 'Nous en sommes désolés. Nous avons emballé quatre housses et la boîte était intacte sur notre photo. Pourriez-vous envoyer une photo des housses reçues ?'),
+  t('case', 'en', 'We are sorry about this. Could you send a picture of the box and of the covers you received, so that we can check with the seller?', 'Nous en sommes désolés. Pourriez-vous envoyer une photo de la boîte et des housses reçues, afin que nous vérifions avec le vendeur ?'),
   t('case', 'en', 'The size is too small, I need a 42.', 'La taille est trop petite, il me faut du 42.'),
   t('case', 'fr', 'Too small, I would like size 41.', 'Trop petites, je voudrais la pointure 41.'),
   t('case', 'en', 'The lantern does not charge from the solar panel.', 'La lanterne ne se recharge pas avec le panneau solaire.'),
@@ -129,6 +129,7 @@ export const DEMO_TEXTS: DemoText[] = [
   t('note', 'en', 'Leaking bottles removed', 'Bouteilles qui fuient retirées'),
 
   // ── Store policies of Maison Kinshasa ─────────────────────────────────────────────────────────
+  t('store_policy', 'en', 'Returns within 7 days if the item is unused and in its box. Start a return from your order: KOMORIKO support decides and a rider collects the goods.', 'Retours dans les 7 jours si l’article est inutilisé et dans son emballage. Lancez le retour depuis votre commande : le support KOMORIKO décide et un livreur récupère les articles.'),
   t('store_policy', 'en', 'Returns are accepted within 7 days of delivery for unused items in their original packaging. Food and beauty products can only be returned unopened.', 'Les retours sont acceptés dans les 7 jours suivant la livraison pour les articles non utilisés dans leur emballage d’origine. Les produits alimentaires et de beauté doivent être non ouverts.'),
   t('store_policy', 'en', 'We pack every order within one working day and hand it to the KOMORIKO warehouse in Gombe.', 'Nous emballons chaque commande en un jour ouvré et la remettons à l’entrepôt KOMORIKO de la Gombe.'),
 

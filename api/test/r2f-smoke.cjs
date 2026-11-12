@@ -235,7 +235,7 @@ const hasNotice = async (u, pred, ms) => !!(await until(async () => (await notic
   await req(admin.sock, 'settings:set', { key: 'returnWindowDays', value: '7' });
 
   // ═════════════════════════════════════════════════════════════════════════
-  section('Response time: returns, disputes, replacements and exchanges are not left hanging');
+  section('Support response time: returns, disputes, replacements and exchanges are not left hanging');
   await req(admin.sock, 'settings:set', { key: 'sellerResponseHours', value: '0.001' });
   const oR = await delivered(cust, [{ productId: pC.id, qty: 3 }]);
   const oD = await delivered(cust2, [{ productId: pC.id, qty: 1 }]);
@@ -245,28 +245,31 @@ const hasNotice = async (u, pred, ms) => !!(await until(async () => (await notic
   const rep = (await req(cust.sock, 'replacements:create', { orderId: oR.id, sku: pC.id, productName: pC.name, reason: 'One cable is cracked', qty: 1 })).data;
   const exc = (await req(cust.sock, 'exchanges:create', { orderId: oX.id, fromSku: pB.id, fromName: pB.name, toSku: pC.id, toName: pC.name, reason: 'Too small' }));
   await req(admin.sock, 'settings:set', { key: 'sellerResponseHours', value: '48' });
-  ok(!!ret && !!dsp && !!rep, 'a return, a dispute and a replacement are opened with a 3.6 s response time', JSON.stringify({ r: !!ret, d: !!dsp, p: !!rep, e: exc.error }));
-  const lapsed = await until(async () => { const d = (await req(cust.sock, 'disputes:get', { id: ret.id })).data; return d.stage === 'seller_timeout' ? d : null; }, 15000);
-  ok(!!lapsed && lapsed.canEscalate, 'return: after the response time it moves to seller_timeout and can be escalated');
-  ok(await hasNotice(cust, (n) => n.entityId === ret.id && n.title === 'Seller did not respond'), 'return: the customer is told');
-  ok(await hasNotice(owner, (n) => n.entityId === ret.id && n.title === 'Seller did not respond'), 'return: the seller is told');
-  a = await req(owner.sock, 'returns:respond', { id: ret.id, accept: true });
-  ok(!a.ok && /response time has passed/.test(a.error ?? ''), 'return: the seller can no longer answer', a.error);
-  ok(await hasNotice(cust2, (n) => n.entityId === dsp.id && n.title === 'Seller did not respond' && n.type === 'dispute', 15000), 'dispute: the customer is told when the seller does not reply');
-  ok(await hasNotice(owner, (n) => n.entityId === dsp.id && n.title === 'Seller did not respond'), 'dispute: the seller is told');
-  ok((await req(agent.sock, 'notifications:list')).data.some((n) => n.entityId === dsp.id && n.title === 'Seller did not respond'), 'dispute: support is told');
-  ok(await hasNotice(cust, (n) => n.entityId === rep.id && n.title === 'Seller did not respond' && n.type === 'replacement', 15000), 'replacement: the customer is told');
-  ok(await hasNotice(owner, (n) => n.entityId === rep.id && n.title === 'Seller did not respond'), 'replacement: the seller is told');
-  if (exc.ok) ok(await hasNotice(cust, (n) => n.entityId === exc.data.id && n.title === 'Seller did not respond' && n.type === 'exchange', 15000), 'exchange: the customer is told');
-  await sleep(4500); // several more sweeps: each notice must have been sent exactly once
-  const noticeCount = async (u, id) => (await noticesOf(u)).filter((n) => n.entityId === id && n.title === 'Seller did not respond').length;
-  ok((await noticeCount(cust, ret.id)) === 1 && (await noticeCount(cust2, dsp.id)) === 1 && (await noticeCount(cust, rep.id)) === 1, 'every notice was sent exactly once, however many sweeps ran');
+  ok(!!ret && !!dsp && !!rep, 'a return, a dispute and a replacement are opened with a 3.6 s support response time', JSON.stringify({ r: !!ret, d: !!dsp, p: !!rep, e: exc.error }));
+  ok(ret?.stage === 'awaiting_support' && dsp?.stage === 'awaiting_support', 'the return and the dispute start with support');
+  const supportTold = async (id, title) => hasNotice(agent, (n) => n.entityId === id && n.title === title, 15000);
+  ok(await supportTold(ret.id, 'Return waiting for support'), 'return: support is alerted when it waits past the response time');
+  ok(await supportTold(dsp.id, 'Dispute waiting for support'), 'dispute: support is alerted');
+  ok(await supportTold(rep.id, 'Replacement waiting for support'), 'replacement: support is alerted');
+  if (exc.ok) ok(await supportTold(exc.data.id, 'Exchange waiting for support'), 'exchange: support is alerted');
+  const stillWaiting = (await req(cust.sock, 'disputes:get', { id: ret.id })).data;
+  ok(stillWaiting.stage === 'awaiting_support' && stillWaiting.canEscalate === false, 'return: nothing moves, there is no escalation');
+  await sleep(4500); // several more sweeps: each alert must have been sent exactly once
+  const alertCount = async (id) => (await noticesOf(agent)).filter((n) => n.entityId === id && /waiting for support$/.test(n.title)).length;
+  ok((await alertCount(ret.id)) === 1 && (await alertCount(dsp.id)) === 1 && (await alertCount(rep.id)) === 1, 'every alert was sent exactly once, however many sweeps ran');
+  const told = async (u) => (await noticesOf(u)).filter((n) => [ret.id, dsp.id, rep.id].includes(n.entityId) && /did not respond|waiting for support/i.test(n.title)).length;
+  ok((await told(cust)) === 0 && (await told(cust2)) === 0 && (await told(owner)) === 0, 'neither the customers nor the seller are told about it');
+  ok(!(await noticesOf(owner)).some((n) => [ret.id, dsp.id, rep.id].includes(n.entityId)), 'the seller gets no notice about any of them');
   const lapseRows = await sql('SELECT sellerLapsedAt, stage, status FROM disputes WHERE id = ?', [dsp.id]);
-  ok(lapseRows[0]?.sellerLapsedAt && lapseRows[0].stage === 'awaiting_seller' && lapseRows[0].status === 'open', 'the dispute keeps its stage (support was already on it) and records the lapse');
-  a = await req(agent.sock, 'replacements:respond', { id: rep.id, approve: true });
-  ok(a.ok && a.data.status === 'approved', 'support can still approve the replacement on the seller\'s behalf after the lapse', a.error);
+  ok(lapseRows[0]?.sellerLapsedAt && lapseRows[0].stage === 'awaiting_support' && lapseRows[0].status === 'open', 'the dispute keeps its stage and records the alert');
+  a = await req(owner.sock, 'returns:respond', { id: ret.id, accept: true });
+  ok(!a.ok, 'the seller cannot answer the return (retired)', a.error);
   a = await req(owner.sock, 'disputes:reply', { id: dsp.id, text: 'Shipped Monday, here is the label' });
-  ok(a.ok, 'and the seller may still reply to the dispute late', a.error);
+  ok(!a.ok, 'and cannot reply to the dispute', a.error);
+  a = await req(agent.sock, 'replacements:respond', { id: rep.id, approve: true });
+  ok(a.ok && a.data.status === 'approved', 'support approves the replacement after the alert', a.error);
+  a = await req(agent.sock, 'returns:decide', { id: ret.id, approve: true });
+  ok(a.ok && ['approved', 'pickup'].includes(a.data.stage), 'and the return', a.error);
 
   // ═════════════════════════════════════════════════════════════════════════
   section('Vacation mode: an open product page follows live, and the sweep reopens the store');
@@ -304,7 +307,9 @@ const hasNotice = async (u, pred, ms) => !!(await until(async () => (await notic
   ok(await can(sup, 'reviews:seller'), 'support reads the reviews');
   ok(await can(sup, 'questions:seller', {}), 'support reads the product questions');
   ok(await can(sup, 'questions:unanswered'), 'support reads the unanswered count');
-  ok(await can(sup, 'chat:list'), 'support reads the customer chat');
+  ok(await can(sup, 'chat:list'), 'support reads the chat list (empty: chat is closed)');
+  ok(((await req(sup.sock, 'chat:list')).data ?? []).length === 0, 'and it holds nothing: customers contact KOMORIKO support now');
+  ok(!(await can(sup, 'chat:start', { sellerId: store.id, text: 'hello' })), 'a store member cannot start a chat');
   ok(await can(sup, 'support:list'), 'support reads the platform support tickets');
   ok(await can(sup, 'products:list', {}), 'support may read product names (catalog_read)');
   ok(await can(sup, 'notifications:list'), 'support has a notification list');
@@ -319,7 +324,7 @@ const hasNotice = async (u, pred, ms) => !!(await until(async () => (await notic
   // the lists behind the Orders pages answer a team member without the right with nothing (never the store's cases)
   const seen = async (u, ev, body = {}) => { const r = await req(u.sock, ev, body); return r.ok ? (Array.isArray(r.data) ? r.data.length : 1) : 0; };
   for (const ev of ['disputes:list', 'returns:list', 'replacements:list', 'exchanges:list']) ok((await seen(sup, ev)) === 0, `support gets nothing from ${ev}`);
-  ok((await seen(staff.orders, 'disputes:list')) > 0 && (await seen(staff.orders, 'replacements:list')) > 0, 'orders: the same lists show the store\'s cases');
+  ok((await seen(staff.orders, 'disputes:list')) === 0 && (await seen(staff.orders, 'replacements:list')) === 0, 'orders: nor do they show the store\'s cases (support decides them)');
   ok((await seen(sup, 'reviews:seller')) > 0 && (await seen(staff.orders, 'reviews:seller')) === 0 && (await seen(staff.finance, 'reviews:seller')) === 0, 'reviews: support sees them, orders and finance get nothing');
   // the other roles keep their own pages and are refused the rest
   ok(await can(staff.finance, 'finance:earnings', {}) && !(await can(staff.finance, 'products:update', { id: pA.id, patch: { price: 98 } })), 'finance: earnings yes, editing products no');

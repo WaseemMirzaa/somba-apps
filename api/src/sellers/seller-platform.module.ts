@@ -13,6 +13,7 @@ import {
   Payout,
   PrivateFile,
   Product,
+  SellerPolicyRevision,
   Review,
   Seller,
   SellerTeamMember,
@@ -23,6 +24,8 @@ import { OpsModule } from '../ops/ops.module';
 import { PayoutsModule } from '../payouts/payouts.module';
 import { UsersModule } from '../users/users.module';
 import { PlanGateService } from './plan-gate';
+import { AdminControlsGateway } from './admin-controls.gateway';
+import { SellerPolicyService } from './policy.service';
 import { PlatformGateway } from './platform.gateway';
 import { PrivateFilesService } from './private-files.service';
 import { PrivateUploadsController } from './private-uploads.controller';
@@ -44,7 +47,7 @@ import { TeamService } from './team.service';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Seller, SellerTeamMember, User, Conversation, ConversationMessage, PrivateFile, Order, OrderItem, Product, Review, Payout]),
+    TypeOrmModule.forFeature([Seller, SellerTeamMember, User, Conversation, ConversationMessage, PrivateFile, Order, OrderItem, Product, Review, Payout, SellerPolicyRevision]),
     TeamDirectoryModule,
     AuthModule,
     UsersModule,
@@ -60,6 +63,7 @@ import { TeamService } from './team.service';
     TeamService,
     ChatService,
     StorefrontService,
+    SellerPolicyService,
     PrivateFilesService,
     SellerScoringService,
     SellerAccountService,
@@ -68,7 +72,8 @@ import { TeamService } from './team.service';
     TwoFaGateway,
     ChatGateway,
     PlatformGateway,
+    AdminControlsGateway,
   ],
-  exports: [SellerContextService, PlanGateService, TeamService, ChatService, StorefrontService, PrivateFilesService, SellerAccountService, SellerScoringService, SellerPlatformKit],
+  exports: [SellerContextService, PlanGateService, TeamService, ChatService, StorefrontService, SellerPolicyService, PrivateFilesService, SellerAccountService, SellerScoringService, SellerPlatformKit],
 })
 export class SellerPlatformModule {}

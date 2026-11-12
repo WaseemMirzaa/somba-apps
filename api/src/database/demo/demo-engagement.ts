@@ -263,37 +263,21 @@ async function chats(ctx: DemoCtx): Promise<void> {
       })
     )
       return;
-    let convId = '';
-    for (const m of opts.script) {
-      const photos = m.photo ? [ctx.images.url(m.photo)] : [];
-      let messageId: string;
-      if (!convId) {
-        const res = await chat.start(buyer, {
-          sellerId: store.id,
-          ...(opts.product ? { productId: pid(ctx, opts.product) } : {}),
-          ...(opts.orderId ? { orderId: opts.orderId } : {}),
-          text: m.text,
-          attachments: photos,
-        });
-        convId = (res.conversation as { id: string }).id;
-        messageId = (res.message as { id: string }).id;
-      } else {
-        const sent = (await chat.send(
-          m.by === 'buyer' ? buyer : caller(ctx, m.by),
-          { conversationId: convId, text: m.text, attachments: photos },
-        )) as { id?: string; message?: { id: string } };
-        messageId = sent.message?.id ?? (sent.id as string);
-      }
-      await ctx.ds.query(
-        'UPDATE conversation_messages SET createdAt = ? WHERE id = ?',
-        [new Date(Date.now() - m.agoH * H), messageId],
-      );
-    }
-    const last = opts.script[opts.script.length - 1];
-    await ctx.ds.query(
-      'UPDATE conversations SET lastMessageAt = ? WHERE id = ?',
-      [new Date(Date.now() - last.agoH * H), convId],
-    );
+    // Chat is closed (customers contact support), so the demo's conversations are written as history: support and the
+    // super admin read them read-only, and the customer sees their own old threads.
+    await chat.importHistory({
+      buyer,
+      sellerId: store.id,
+      productId: opts.product ? pid(ctx, opts.product) : null,
+      orderId: opts.orderId ?? null,
+      messages: opts.script.map((m) => ({
+        side: m.by === 'buyer' ? ('buyer' as const) : ('seller' as const),
+        sender: m.by === 'buyer' ? buyer : caller(ctx, m.by),
+        text: m.text,
+        attachments: m.photo ? [ctx.images.url(m.photo)] : [],
+        at: new Date(Date.now() - m.agoH * H),
+      })),
+    });
   };
   // With photos: Grace asks about the dress in another colour; the support member of store A answers with a size photo.
   await talk({

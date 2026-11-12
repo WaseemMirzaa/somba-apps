@@ -1,5 +1,10 @@
 # Seller platform — contract
 
+> **Update (admin controls, `docs/contracts/admin-controls.md`)**: customer <-> seller chat is closed (`chat:start` / `chat:send` refuse; admin and support read old
+> chats with `chat:adminList` / `chat:adminMessages`; the store side of `chat:*` is empty), express delivery is switched by admin (`sellers:setExpress`; `sellers:update`
+> ignores `expressDelivery`), and store policies go live only after admin approval (`sellers:update` creates a pending revision; `sellers:policy:*` events). Read §3 (chat),
+> the express rows and the policy rows below with that in mind. `orders` no longer covers returns/disputes/replacements/exchanges.
+
 Builder: seller platform (team accounts, 2FA, customer ↔ seller chat, storefront, seller account & settings).
 Plan: `docs/WAREHOUSE-SELLER-FLOWS-PLAN.md` §2 S16–S20 and §6 answer 14. Migration: `1792980000001-SellerPlatform`.
 Everything below is on the one Socket.IO connection (JWT in the handshake) unless it says REST. Replies are

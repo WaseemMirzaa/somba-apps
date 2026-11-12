@@ -70,13 +70,14 @@ const SELLER_PIN = { lat: -4.3031, lng: 15.3033 }; // the Gombe commune centroid
 const GOMBE = { commune: 'Gombe', pin: { lat: -4.3086, lng: 15.3171 } };
 const KALAMU = { commune: 'Kalamu', pin: { lat: -4.3366, lng: 15.3175 } };
 const addr = (p) => JSON.stringify({ line1: '1 Test Street', city: 'Kinshasa', ...(p.commune ? { commune: p.commune } : {}), ...(p.pin ? { geo: p.pin } : {}) });
-const NEEDS_PIN = 'Pin your pickup location on the map (Store settings) before offering express delivery.';
+const NEEDS_PIN = 'This store has no pinned pickup location. Ask the seller to pin it in Store settings before turning on express delivery.';
 const NO_RETURN = 'An express parcel is still with the seller. Cancel the order instead.';
 
 (async () => {
   const admin = await login('admin@somba.app', process.env.ADMIN_PW ?? PW);
   scanOpts.admin = admin; // desk admin: marks a run's boxes in by hand when a run is received
   const finance = await login('finance@somba.app');
+  const ops = await login('ops@somba.app');
   const demoRider = await login('rider@somba.app');
   const get = async (key) => (await req(admin.sock, 'settings:get')).data?.[key];
   const KEYS = ['productModeration', 'requireDeliveryCode', 'requireVerifiedForCheckout', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm'];
@@ -109,20 +110,39 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   };
 
   // ── 1. The toggle, the quote, the order ─────────────────────────────────────────────────────────────────────────
-  section('The store toggle needs a pinned pickup location');
+  section('Express is KOMORIKO\'s switch (sellers:setExpress); it needs a pinned pickup location');
+  // a support agent and a moderator (fresh accounts, promoted, then signed in again: a role change ends the old session)
+  const promote = async (label, role) => {
+    const u = await register(label);
+    const r = await req(admin.sock, 'roles:setRole', { id: u.user.id, role });
+    if (!r.ok) throw new Error(`setRole ${role}: ${r.error}`);
+    u.sock.close();
+    return login(`${label}${tag}@express.test`, 'Express-Pass-2026');
+  };
+  const support = await promote('exsupport', 'admin_support');
+  const moderator = await promote('exmod', 'admin_moderation');
   const nopin = await makeSeller('exnopin', false);
   let a = await req(nopin.sock, 'sellers:update', { expressDelivery: true });
-  ok(!a.ok && a.error === NEEDS_PIN, 'a store with no pin cannot switch express on, with the pin message', a.error ?? 'was allowed');
-  a = await req(nopin.sock, 'sellers:update', { expressDelivery: 'yes' });
+  ok(a.ok, 'a seller sending expressDelivery (an old client) is ignored without an error', a.error ?? '');
+  ok((await req(nopin.sock, 'sellers:mine')).data?.expressDelivery === false, 'and express stays off: it is not the seller\'s to switch');
+  ok(!(await req(nopin.sock, 'sellers:setExpress', { sellerId: nopin.store.id, enabled: true })).ok, 'a seller cannot call sellers:setExpress');
+  for (const [who, role] of [[support, 'support'], [finance, 'finance'], [moderator, 'moderation']]) ok(!(await req(who.sock, 'sellers:setExpress', { sellerId: nopin.store.id, enabled: true })).ok, `${role} cannot switch express`);
+  a = await req(admin.sock, 'sellers:setExpress', { sellerId: nopin.store.id, enabled: true });
+  ok(!a.ok && a.error === NEEDS_PIN, 'admin cannot switch it on for a store with no pin, with the pin message', a.error ?? 'was allowed');
+  a = await req(admin.sock, 'sellers:setExpress', { sellerId: nopin.store.id, enabled: 'yes' });
   ok(!a.ok && a.error === 'Express delivery must be true or false.', 'a non-boolean is refused', a.error ?? 'was allowed');
-  a = await req(nopin.sock, 'sellers:update', { expressDelivery: true, pickupLat: SELLER_PIN.lat, pickupLng: SELLER_PIN.lng });
-  ok(a.ok && a.data.expressDelivery === true, 'pinning the location and switching express on in one request works', a.error ?? '');
+  a = await req(admin.sock, 'sellers:setExpress', { sellerId: 'nope', enabled: true });
+  ok(!a.ok && /Store not found/.test(a.error ?? ''), 'an unknown store is refused', a.error ?? '');
+  await req(nopin.sock, 'sellers:update', { pickupLat: SELLER_PIN.lat, pickupLng: SELLER_PIN.lng });
+  a = await req(ops.sock, 'sellers:setExpress', { sellerId: nopin.store.id, enabled: true });
+  ok(a.ok && a.data.expressDelivery === true, 'once the seller pins the location, operations switches express on', a.error ?? '');
+  ok(await until(async () => (await req(nopin.sock, 'notifications:list')).data?.some((n) => n.title === 'Express delivery turned on')), 'the seller is told');
   a = await req(nopin.sock, 'sellers:update', { pickupLat: null, pickupLng: null });
   ok(a.ok && a.data.expressDelivery === false, 'clearing the pin switches express off', a.error ?? JSON.stringify(a.data?.expressDelivery));
 
   const shop = await makeSeller('exshop');
-  a = await req(shop.sock, 'sellers:update', { expressDelivery: true });
-  ok(a.ok && a.data.expressDelivery === true, 'a pinned store switches express on', a.error ?? '');
+  a = await req(admin.sock, 'sellers:setExpress', { sellerId: shop.store.id, enabled: true });
+  ok(a.ok && a.data.expressDelivery === true, 'admin switches express on for a pinned store', a.error ?? '');
   const mine = (await req(shop.sock, 'sellers:mine')).data;
   ok(mine?.expressDelivery === true, 'sellers:mine carries expressDelivery');
   const prod = (await req(shop.sock, 'products:create', { name: `Express kettle ${tag}`, price: 30, category: 'Electronics', stock: 50 })).data;
@@ -204,13 +224,13 @@ const NO_RETURN = 'An express parcel is still with the seller. Cancel the order 
   await standard('the setting is off', GOMBE, [line(prod)]);
   await set('expressDeliveryEnabled', 'true');
   const shop2 = await makeSeller('exshop2');
-  await req(shop2.sock, 'sellers:update', { expressDelivery: true });
+  await req(admin.sock, 'sellers:setExpress', { sellerId: shop2.store.id, enabled: true });
   const prod2 = (await req(shop2.sock, 'products:create', { name: `Express lamp ${tag}`, price: 20, category: 'Electronics', stock: 50 })).data;
   await standard('two sellers (both with express on)', GOMBE, [line(prod), line(prod2)]);
-  await req(shop.sock, 'sellers:update', { expressDelivery: false });
+  await req(admin.sock, 'sellers:setExpress', { sellerId: shop.store.id, enabled: false });
   const off = await standard('the seller has express off', GOMBE, [line(prod)]);
   ok(off && off.transfer === false && off.estimateDays === 3 && off.routeDays === 1, 'a standard quote keeps the local days (prep 2 + 1) and no transfer', JSON.stringify([off?.estimateDays, off?.routeDays]));
-  await req(shop.sock, 'sellers:update', { expressDelivery: true });
+  await req(admin.sock, 'sellers:setExpress', { sellerId: shop.store.id, enabled: true });
   const far = await standard('a different commune (Kalamu, same warehouse)', KALAMU, [line(prod)]);
   ok(far && far.destinationHubId === kin.id, 'the other commune is still served by the same warehouse', far?.destinationHubName);
   await standard('the customer has no pin', { commune: 'Gombe' }, [line(prod)]);

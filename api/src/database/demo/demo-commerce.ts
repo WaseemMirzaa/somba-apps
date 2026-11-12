@@ -569,8 +569,9 @@ export function orderSpecs(): OrderSpec[] {
           'damaged',
           'issue-1.jpg',
         );
-        if (d.stage === 'awaiting_seller')
-          await disputes.sellerRespond(sellerViewer(c, 'A'), d.id, true, '');
+        // Support approves the return (sellers take no part): a rider collects the goods, the warehouse grades them.
+        if (d.stage === 'awaiting_support')
+          await disputes.adminDecideReturn(viewerOf(c, 'admin.support'), d.id, true, '');
         const fresh = (await c.ctx.ds
           .getRepository(Dispute)
           .findOne({ where: { id: d.id } }))!;
@@ -653,7 +654,7 @@ export function orderSpecs(): OrderSpec[] {
           await c.ctx.app
             .get(ReplacementsService)
             .respond(
-              { id: sellerViewer(c, 'A').id, role: 'seller' },
+              viewerOf(c, 'admin.support'),
               rep.id,
               true,
               '',
@@ -691,11 +692,12 @@ export function orderSpecs(): OrderSpec[] {
           );
           d = (await repo.findOne({ where: { id: view.id } }))!;
         }
-        if (d.stage === 'awaiting_seller')
+        // Support answers first: sellers take no part in disputes.
+        if (d.stage === 'awaiting_support')
           await disputes.reply(
-            { ...sellerViewer(c, 'A'), name: 'Maison Kinshasa' },
+            viewerOf(c, 'admin.support'),
             d.id,
-            'We are sorry about this. We packed four covers and the box looked fine in our photo. Could you send a picture of the covers you received?',
+            'We are sorry about this. Could you send a picture of the box and of the covers you received, so that we can check with the seller?',
           );
       },
     },
@@ -709,7 +711,7 @@ export function orderSpecs(): OrderSpec[] {
       deliveredAgoH: 3 * 24,
       caseAgoH: 20,
       after: async (c) => {
-        // The request is 20 hours old (caseAgoH): the seller still has 28 hours to answer, so the timer is running.
+        // The request is 20 hours old (caseAgoH): support still has 28 hours to decide, so the timer is running.
         await openReturn(
           c,
           'MK-SHR',
@@ -856,22 +858,19 @@ export function orderSpecs(): OrderSpec[] {
           'issue-2.jpg',
         );
         const disputes = c.ctx.app.get(DisputesService);
-        if (d.stage === 'awaiting_seller')
-          await disputes.sellerRespond(
-            sellerViewer(c, 'A'),
+        // Support reviews the photo and answers; the customer replies in French. The return stays with support.
+        if (d.stage === 'awaiting_support') {
+          await disputes.reply(
+            viewerOf(c, 'admin.support'),
             d.id,
-            false,
-            'The shirt left our warehouse clean. The stain is not from us, so we cannot accept this return.',
+            'Thank you for the photo. We are checking the stain with the seller and will decide within two days.',
           );
-        const fresh = (await c.ctx.ds
-          .getRepository(Dispute)
-          .findOne({ where: { id: d.id } }))!;
-        if (fresh.stage === 'seller_rejected')
-          await disputes.escalate(
-            { id: c.user.id, role: 'customer', name: c.user.name, hubId: null },
+          await disputes.reply(
+            { id: c.user.id, role: 'customer', name: c.user.name },
             d.id,
-            'Je ne suis pas d’accord : la tache était déjà là à l’ouverture du colis. Voir la photo.',
+            'La tache était déjà là à l’ouverture du colis, comme le montre la photo.',
           );
+        }
       },
     },
     {
@@ -905,7 +904,7 @@ export function orderSpecs(): OrderSpec[] {
           await c.ctx.app
             .get(ExchangesService)
             .respond(
-              { id: sellerViewer(c, 'A').id, role: 'seller' },
+              viewerOf(c, 'admin.support'),
               ex.id,
               true,
               '',

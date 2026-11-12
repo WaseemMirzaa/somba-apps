@@ -13,12 +13,16 @@ export type DisputeStatus = 'open' | 'resolved' | 'rejected';
 
 /**
  * Where a request stands.
- *  - return:  awaiting_seller → approved → pickup → received → (refunded: status resolved)
- *             awaiting_seller → seller_rejected | seller_timeout → escalated → approved | (rejected: status rejected)
- *  - dispute: awaiting_seller → seller_replied → (decided: status resolved | rejected)
- * A request closed by an admin keeps its last stage and carries `status` resolved / rejected.
+ *  - return:  awaiting_support → approved → pickup → received → (refunded: status resolved)
+ *             awaiting_support → (refused: status rejected)
+ *  - dispute: awaiting_support → (decided: status resolved | rejected)
+ * Every request starts with KOMORIKO support (sellers take no part: docs/contracts/admin-controls.md). A request closed by
+ * an admin keeps its last stage and carries `status` resolved / rejected.
+ * The seller stages below are LEGACY: nothing writes them any more and a migration moved their rows to `awaiting_support`;
+ * they stay in the type so an old client or an old export that names one still parses.
  */
 export type DisputeStage =
+  | 'awaiting_support'
   | 'awaiting_seller'
   | 'seller_replied'
   | 'seller_rejected'
@@ -74,7 +78,7 @@ export class Dispute {
   status: DisputeStatus;
 
   @Index()
-  @Column({ type: 'varchar', length: 20, default: 'awaiting_seller' })
+  @Column({ type: 'varchar', length: 20, default: 'awaiting_support' })
   stage: DisputeStage;
 
   /** Customer photos (upload URLs) as a JSON array. */
@@ -86,18 +90,18 @@ export class Dispute {
   @Column({ type: 'varchar', nullable: true })
   sellerId: string | null;
 
-  /** The seller must answer by then (returns). Past it the request moves to `seller_timeout`. */
+  /** Support should answer by then (`sellerResponseHours` after opening; the column keeps its old name). Past it support is alerted once. */
   @Column({ type: 'datetime', nullable: true })
   sellerDueAt: Date | null;
 
-  /** When the response time ran out with no answer (support was told once; null = not lapsed). */
+  /** When the support response time ran out with no decision (support was alerted once; null = not lapsed). */
   @Column({ type: 'datetime', nullable: true })
   sellerLapsedAt: Date | null;
 
   @Column({ type: 'datetime', nullable: true })
   sellerRespondedAt: Date | null;
 
-  /** The seller's reason when they accept or reject. */
+  /** LEGACY: the seller's reason from before sellers left the after-sale flow; nothing writes it any more. */
   @Column({ type: 'text', nullable: true })
   sellerReason: string | null;
 

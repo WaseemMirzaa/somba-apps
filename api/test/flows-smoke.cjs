@@ -253,7 +253,7 @@ const register = async (label, role = 'customer') => {
   const ret = a.data;
   ok((await req(warehouse.sock, 'disputes:list')).data.some((d) => d.id === ret.id), 'warehouse staff can see the return to receive');
   ok(!(await req(other.sock, 'disputes:list')).data.some((d) => d.id === ret.id), "another customer cannot see it");
-  ok((await req(sellerU.sock, 'disputes:list')).data.some((d) => d.id === ret.id), 'the seller of the returned goods can see the request');
+  ok(!(await req(sellerU.sock, 'disputes:list')).data.some((d) => d.id === ret.id), 'the seller of the returned goods does not see the request (support decides returns)');
   ok(!(await req(seller2.sock, 'disputes:list')).data.some((d) => d.id === ret.id), 'an unrelated seller cannot');
   a = await req(admin.sock, 'disputes:resolve', { disputeId: ret.id, refund: true });
   ok(!a.ok && /received/i.test(a.error ?? ''), 'a refund is refused until the goods are received', a.error ?? '');
@@ -266,17 +266,12 @@ const register = async (label, role = 'customer') => {
   a = await req(admin.sock, 'disputes:resolve', { disputeId: ret.id, refund: true });
   ok(a.ok && a.data.status === 'resolved', 'with the goods received, finance resolves with a refund');
 
-  // ---- sellers are told about returns, replacements and exchanges on their items ----------
-  section('Sellers hear about after-sale requests on their items');
+  // ---- sellers take no part in returns, replacements and exchanges on their items ----------
+  section('Sellers hear nothing about after-sale requests on their items');
   const noticesOf = async (u) => (await req(u.sock, 'notifications:list')).data ?? [];
-  let sellerNotes = await until(async () => {
-    const n = await noticesOf(sellerU);
-    return n.some((x) => x.entityId === ret.id && x.title === 'Return resolved') ? n : null;
-  });
-  ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.type === 'return' && x.title === 'Return requested on your order'), 'the seller was told when the return was opened');
-  ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.title === 'Returned goods received'), 'the seller was told when the warehouse received the goods');
-  ok(!!sellerNotes?.some((x) => x.entityId === ret.id && x.title === 'Return resolved'), 'the seller was told how the return ended');
-  ok(!(await noticesOf(seller2)).some((x) => x.entityId === ret.id), 'an unrelated seller hears nothing');
+  let sellerNotes = await noticesOf(sellerU);
+  ok(!sellerNotes.some((x) => x.entityId === ret.id), 'the seller was not told about the return: not opened, not received, not resolved');
+  ok(!(await noticesOf(seller2)).some((x) => x.entityId === ret.id), 'an unrelated seller hears nothing either');
   ok((await noticesOf(rider)).some((x) => x.type === 'task' && x.title === 'New task assigned to you'), 'the rider was told when a task was assigned to them');
 
   // A fresh delivered order (the returned one above is closed).
@@ -287,25 +282,23 @@ const register = async (label, role = 'customer') => {
   a = await req(cust.sock, 'replacements:create', { orderId: o4.id, sku: prod.id, productName: prod.name, reason: 'Second unit arrived cracked' });
   ok(a.ok, 'the customer asks for a replacement of the item', a.error ?? '');
   const rep = a.data;
-  ok((await req(sellerU.sock, 'replacements:list')).data.some((r) => r.id === rep.id), "the replacement shows in the item's seller's list");
-  ok(!(await req(seller2.sock, 'replacements:list')).data.some((r) => r.id === rep.id), 'not in an unrelated seller list');
+  ok(!(await req(sellerU.sock, 'replacements:list')).data.some((r) => r.id === rep.id), "the replacement does not show in the item's seller's list");
+  ok(!(await req(seller2.sock, 'replacements:list')).data.some((r) => r.id === rep.id), 'nor in an unrelated seller list');
   a = await req(warehouse.sock, 'replacements:setStatus', { id: rep.id, status: 'dispatched' });
   ok(!a.ok && /can't move from requested to dispatched/i.test(a.error ?? ''), 'a replacement cannot skip steps', a.error ?? '');
   a = await req(warehouse.sock, 'replacements:setStatus', { id: rep.id, status: 'approved' });
   ok(a.ok && a.data.status === 'approved', 'the warehouse approves the replacement');
-  sellerNotes = await until(async () => {
-    const n = await noticesOf(sellerU);
-    return n.some((x) => x.entityId === rep.id && x.title === 'Replacement approved') ? n : null;
-  });
-  ok(!!sellerNotes?.some((x) => x.entityId === rep.id && x.title === 'Replacement requested on your item'), 'the seller was told about the replacement request');
-  ok(!!sellerNotes, 'and about its approval');
+  await new Promise((r) => setTimeout(r, 500));
+  sellerNotes = await noticesOf(sellerU);
+  ok(!sellerNotes.some((x) => x.entityId === rep.id), 'the seller was told nothing about the replacement request or its approval');
 
   a = await req(cust.sock, 'exchanges:create', { orderId: o4.id, fromSku: prod.id, fromName: prod.name, toSku: prod.id, toName: `${prod.name} (other size)`, reason: 'Too small for me' });
   ok(a.ok, 'the customer asks to exchange the item', a.error ?? '');
   const exc = a.data;
-  ok((await req(sellerU.sock, 'exchanges:list')).data.some((x) => x.id === exc.id), "the exchange shows in the item's seller's list");
-  ok(!(await req(seller2.sock, 'exchanges:list')).data.some((x) => x.id === exc.id), 'not in an unrelated seller list');
-  ok(!!(await until(async () => (await noticesOf(sellerU)).some((x) => x.entityId === exc.id))), 'the seller was told about the exchange request');
+  ok(!(await req(sellerU.sock, 'exchanges:list')).data.some((x) => x.id === exc.id), "the exchange does not show in the item's seller's list");
+  ok(!(await req(seller2.sock, 'exchanges:list')).data.some((x) => x.id === exc.id), 'nor in an unrelated seller list');
+  await new Promise((r) => setTimeout(r, 500));
+  ok(!(await noticesOf(sellerU)).some((x) => x.entityId === exc.id), 'the seller was told nothing about the exchange request');
 
   // ---- manual payment confirmation -----------------------------------------------------
   section('Finance confirms mobile-money payments by hand');

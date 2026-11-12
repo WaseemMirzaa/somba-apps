@@ -59,9 +59,10 @@ describe('what staff hear', () => {
   it('maps live events to the permission that handles them', () => {
     expect(permissionForEvent('order:created')).toBe('orders');
     expect(permissionForEvent('order:updated')).toBe('orders');
-    expect(permissionForEvent('exchange:updated')).toBe('orders');
-    expect(permissionForEvent('replacement:updated')).toBe('orders');
-    expect(permissionForEvent('dispute:updated')).toBe('orders');
+    // Sellers take no part in returns, disputes, exchanges and replacements: those events are the owner's own shopping.
+    expect(permissionForEvent('exchange:updated')).toBeNull();
+    expect(permissionForEvent('replacement:updated')).toBeNull();
+    expect(permissionForEvent('dispute:updated')).toBeNull();
     expect(permissionForEvent('product:created')).toBe('catalog_read');
     expect(permissionForEvent('campaign:updated')).toBe('catalog');
     expect(permissionForEvent('payout:created')).toBe('finance');
@@ -78,12 +79,13 @@ describe('what staff hear', () => {
 
   it('maps notices by type, and keeps security and team notices with the owner', () => {
     expect(permissionForNotice('order')).toBe('orders');
-    expect(permissionForNotice('return')).toBe('orders');
+    // after-sale and chat notices are about the owner's own shopping: owner only
+    for (const t of ['return', 'dispute', 'exchange', 'replacement', 'chat']) expect(permissionForNotice(t)).toBe('team');
+    expect(permissionForNotice('policy')).toBe('storefront');
     expect(permissionForNotice('payout')).toBe('finance');
     expect(permissionForNotice('moderation')).toBe('catalog');
     expect(permissionForNotice('stock')).toBe('catalog');
     expect(permissionForNotice('review')).toBe('support');
-    expect(permissionForNotice('chat')).toBe('support');
     expect(permissionForNotice('team')).toBe('team');
     expect(permissionForNotice('security')).toBe('team');
     expect(permissionForNotice('seller')).toBe('storefront');
@@ -92,7 +94,7 @@ describe('what staff hear', () => {
 
   it('a finance member never receives an order notice; a manager receives every kind except owner-only ones', () => {
     expect(roleAllows('finance', permissionForNotice('order'))).toBe(false);
-    for (const t of ['order', 'payout', 'moderation', 'review', 'chat', 'seller', 'system']) expect(roleAllows('manager', permissionForNotice(t))).toBe(true);
-    for (const t of ['team', 'security']) expect(roleAllows('manager', permissionForNotice(t))).toBe(false);
+    for (const t of ['order', 'payout', 'moderation', 'review', 'policy', 'seller', 'system']) expect(roleAllows('manager', permissionForNotice(t))).toBe(true);
+    for (const t of ['team', 'security', 'return', 'dispute', 'exchange', 'replacement', 'chat']) expect(roleAllows('manager', permissionForNotice(t))).toBe(false);
   });
 });

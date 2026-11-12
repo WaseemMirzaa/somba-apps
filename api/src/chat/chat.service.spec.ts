@@ -1,15 +1,11 @@
-import { DataSource, DeepPartial } from 'typeorm';
-import { Conversation, ConversationMessage, Order, OrderItem, Product, Seller, SellerTeamMember, User } from '../database/entities';
-import type { TeamRole } from '../database/entities';
-import { SellerContextService } from '../sellers/seller-context';
-import { TeamDirectory } from '../sellers/team-directory';
+import { DataSource } from 'typeorm';
+import { Conversation, ConversationMessage, Order, Product, Seller, SellerTeamMember, User } from '../database/entities';
 import { addProduct, recordingEmitter, testDb } from '../testing/test-db';
-import { ChatService, MAX_TEXT, SENDS_PER_MINUTE, STARTS_PER_HOUR, canChat, cleanChatText } from './chat.service';
+import { CHAT_CLOSED, ChatService } from './chat.service';
 
 let ds: DataSource;
 let chat: ChatService;
 let emitter: ReturnType<typeof recordingEmitter>;
-let notices: { to: string; title: string; body: string; type?: string }[];
 let translate: jest.Mock;
 /** What the translation service answers for a product's name: [English, French] by product id (none: the stored name in both). */
 let productNames: Record<string, [string, string]>;
@@ -20,41 +16,37 @@ async function user(name: string, role: User['role'] = 'customer'): Promise<User
 }
 const caller = (u: User) => ({ id: u.id, role: u.role, name: u.name });
 
-async function shop(status: Seller['status'] = 'approved') {
-  const owner = await user('owner', 'seller');
+async function shop(name = 'Shop') {
+  const owner = await user(`owner-${name}`, 'seller');
   const repo = ds.getRepository(Seller);
-  const seller = await repo.save(repo.create({ name: 'Shop', userId: owner.id, status }));
+  const seller = await repo.save(repo.create({ name, userId: owner.id, status: 'approved' }));
   const product = await addProduct(ds, { sellerId: seller.id, name: 'Phone' });
   return { owner, seller, product };
 }
-async function staff(seller: Seller, name: string, role: TeamRole) {
-  const u = await user(name, 'seller');
-  const repo = ds.getRepository(SellerTeamMember);
-  await repo.save(repo.create({ sellerId: seller.id, userId: u.id, emailHash: `h-${name}`, email: `${name}@x.test`, role, status: 'active', invitedBy: seller.userId! }));
-  return u;
+const at = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000);
+
+/** A past conversation, as the demo seed writes one (nothing else can create a chat now). */
+async function history(buyer: User, seller: Seller, owner: User, productId: string | null = null, texts = ['Is it new?', 'Yes, brand new', 'Great, thanks']) {
+  return chat.importHistory({
+    buyer: caller(buyer),
+    sellerId: seller.id,
+    productId,
+    messages: texts.map((text, i) => ({ side: i % 2 === 0 ? ('buyer' as const) : ('seller' as const), sender: caller(i % 2 === 0 ? buyer : owner), text, at: at(100 - i * 10) })),
+  });
 }
-const heard = (to: string, event: string) => emitter.sent.filter((e) => e.to === `user:${to}` && e.event === event);
 
 beforeEach(async () => {
   ds = await testDb();
   emitter = recordingEmitter();
-  notices = [];
   translate = jest.fn(async () => ({ text: '[fr] hello', sourceLang: 'en', same: false }));
   productNames = {};
-  const dir = new TeamDirectory(ds.getRepository(SellerTeamMember), ds.getRepository(Seller));
-  const ctx = new SellerContextService(ds.getRepository(Seller), ds.getRepository(SellerTeamMember), ds.getRepository(User), { get: async () => null } as never);
   chat = new ChatService(
     ds.getRepository(Conversation),
     ds.getRepository(ConversationMessage),
     ds.getRepository(Seller),
     ds.getRepository(Product),
     ds.getRepository(Order),
-    ds.getRepository(OrderItem),
-    ds.getRepository(User),
-    { toUser: async (to: string, n: { title: string; body: string; type?: string }) => void notices.push({ to, ...n }) } as never,
     emitter as never,
-    dir,
-    ctx,
     {
       translateStored: translate,
       translateForSave: async () => null,
@@ -67,286 +59,181 @@ beforeEach(async () => {
 });
 afterEach(() => ds.destroy());
 
-describe('chat: starting a conversation', () => {
-  it('opens a thread from a product with the first message, and counts it unread for the store', async () => {
-    const { seller, product } = await shop();
+describe('chat is closed: nobody starts or sends', () => {
+  it('chat:start and chat:send refuse for every role with the same sentence, and write nothing', async () => {
+    const { seller, product, owner } = await shop();
     const buyer = await user('buyer');
-    const r = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: '  Is it new?  ' });
-    expect(r.message).toMatchObject({ text: 'Is it new?', senderSide: 'buyer', senderName: 'buyer' });
-    expect(r.conversation).toMatchObject({ side: 'buyer', productId: product.id, productName: 'Phone', storeName: 'Shop', lastMessagePreview: 'Is it new?', unread: 0 });
-    const row = await ds.getRepository(Conversation).findOneByOrFail({ id: r.conversation.id });
-    expect(row).toMatchObject({ buyerUnread: 0, sellerUnread: 1, contextKey: `p:${product.id}` });
+    const admin = await user('admin', 'admin');
+    expect(CHAT_CLOSED).toBe('Messaging sellers is closed. Contact support from your account.');
+    for (const who of [buyer, owner, admin]) {
+      await expect(chat.start(caller(who), { sellerId: seller.id, productId: product.id, text: 'Is it new?' })).rejects.toThrow(CHAT_CLOSED);
+    }
+    const conv = await history(buyer, seller, owner);
+    for (const who of [buyer, owner, admin]) {
+      await expect(chat.send(caller(who), { conversationId: conv.id, text: 'hello' })).rejects.toThrow(CHAT_CLOSED);
+    }
+    expect(await ds.getRepository(ConversationMessage).count()).toBe(3); // only the history
+    expect(await ds.getRepository(Conversation).count()).toBe(1);
+    expect(emitter.sent).toHaveLength(0); // nothing is pushed
   });
+});
 
-  it('names the product in both languages, so the French header chip is French (bug 5)', async () => {
-    const { seller, product } = await shop();
+describe('chat: the customer reads their own history', () => {
+  it('lists and reads their own conversations, with the product named in both languages', async () => {
+    const { seller, product, owner } = await shop();
     productNames[product.id] = ['Phone', 'Téléphone'];
     const buyer = await user('buyer');
-    const r = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: 'Bonjour' });
-    expect(r.conversation).toMatchObject({ productName: 'Phone', productNameFr: 'Téléphone' });
-    const listed = await chat.list(caller(await ds.getRepository(User).findOneByOrFail({ id: seller.userId! })), { as: 'seller' });
-    expect(listed[0]).toMatchObject({ productName: 'Phone', productNameFr: 'Téléphone' });
+    const conv = await history(buyer, seller, owner, product.id);
+    const listed = await chat.list(caller(buyer), {});
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ id: conv.id, side: 'buyer', storeName: 'Shop', productName: 'Phone', productNameFr: 'Téléphone', lastMessagePreview: 'Great, thanks', unread: 0 });
+    const read = await chat.messages(caller(buyer), { conversationId: conv.id });
+    expect(read.messages.map((m) => [m.senderSide, m.text])).toEqual([
+      ['buyer', 'Is it new?'],
+      ['seller', 'Yes, brand new'],
+      ['buyer', 'Great, thanks'],
+    ]);
   });
 
   it('a product with no French name is named by its stored name in both fields; no product, no names', async () => {
-    const { seller, product } = await shop();
+    const { seller, product, owner } = await shop();
     const buyer = await user('buyer');
-    const withProduct = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: 'hi' });
-    expect(withProduct.conversation).toMatchObject({ productName: 'Phone', productNameFr: 'Phone' });
-    const general = await chat.start(caller(buyer), { sellerId: seller.id, text: 'a general question' });
-    expect(general.conversation).toMatchObject({ productId: null, productName: null, productNameFr: null });
+    await history(buyer, seller, owner, product.id);
+    await chat.importHistory({ buyer: caller(buyer), sellerId: seller.id, messages: [{ side: 'buyer', sender: caller(buyer), text: 'a general question', at: at(5) }] });
+    const listed = await chat.list(caller(buyer), {});
+    expect(listed.find((c) => c.productId)).toMatchObject({ productName: 'Phone', productNameFr: 'Phone' });
+    expect(listed.find((c) => !c.productId)).toMatchObject({ productId: null, productName: null, productNameFr: null });
   });
 
-  it('reuses the thread for the same context and opens another for a different one', async () => {
-    const { seller, product } = await shop();
+  it('the store side is gone: the owner and staff list nothing, read nothing, and see no unread', async () => {
+    const { seller, owner } = await shop();
     const buyer = await user('buyer');
-    const a = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: 'one' });
-    const b = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: 'two' });
-    const c = await chat.start(caller(buyer), { sellerId: seller.id, text: 'general' });
-    expect(b.conversation.id).toBe(a.conversation.id);
-    expect(c.conversation.id).not.toBe(a.conversation.id);
-    expect(await ds.getRepository(ConversationMessage).count({ where: { conversationId: a.conversation.id } })).toBe(2);
-  });
-
-  it('a conversation about an order needs the shopper\'s own order with something from the store', async () => {
-    const { seller, product } = await shop();
-    const buyer = await user('buyer');
+    const conv = await history(buyer, seller, owner);
+    const staff = await user('staff', 'seller');
+    await ds.getRepository(SellerTeamMember).save(ds.getRepository(SellerTeamMember).create({ sellerId: seller.id, userId: staff.id, emailHash: 'h', email: 's@x.test', role: 'support', status: 'active', invitedBy: owner.id }));
+    for (const who of [owner, staff]) {
+      expect(await chat.list(caller(who), { as: 'seller' })).toEqual([]);
+      expect(await chat.list(caller(who), {})).toEqual([]);
+      await expect(chat.messages(caller(who), { conversationId: conv.id })).rejects.toThrow('Conversation not found.');
+      await expect(chat.markRead(caller(who), { conversationId: conv.id })).rejects.toThrow('Conversation not found.');
+      expect(await chat.unread(caller(who))).toEqual({ total: 0, buyer: 0, seller: 0 });
+    }
+    // another customer cannot read it either: the same answer as for a missing chat
     const other = await user('other');
-    const orders = ds.getRepository(Order);
-    const order = await orders.save(orders.create({ reference: 'SOM-1', customerId: buyer.id, customerName: 'buyer', status: 'confirmed', paymentMethod: 'wallet', subtotalUsd: 10, totalUsd: 10 } as DeepPartial<Order>));
-    const items = ds.getRepository(OrderItem);
-    await items.save(items.create({ orderId: order.id, productId: product.id, productName: 'Phone', qty: 1, priceUsd: 10, sellerId: seller.id } as DeepPartial<OrderItem>));
-    const r = await chat.start(caller(buyer), { sellerId: seller.id, orderId: order.id, text: 'Where is it?' });
-    expect(r.conversation).toMatchObject({ orderId: order.id, orderReference: 'SOM-1' });
-    await expect(chat.start(caller(other), { sellerId: seller.id, orderId: order.id, text: 'x' })).rejects.toThrow('Order not found.');
-    const { seller: s2 } = await (async () => {
-      const o = await user('o2', 'seller');
-      const repo = ds.getRepository(Seller);
-      return { seller: await repo.save(repo.create({ name: 'Other', userId: o.id, status: 'approved' })) };
-    })();
-    await expect(chat.start(caller(buyer), { sellerId: s2.id, orderId: order.id, text: 'x' })).rejects.toThrow('That order has nothing from this store.');
+    await expect(chat.messages(caller(other), { conversationId: conv.id })).rejects.toThrow('Conversation not found.');
   });
 
-  it('refuses: a missing / unapproved store, a foreign product, empty or huge text, staff, and non-shoppers', async () => {
-    const { seller, product } = await shop();
+  it('counts the customer\'s unread and clears it on mark-read', async () => {
+    const { seller, owner } = await shop();
     const buyer = await user('buyer');
-    await expect(chat.start(caller(buyer), { sellerId: 'nope', text: 'x' })).rejects.toThrow('Store not found.');
-    const pend = await shop('pending').catch(() => null);
-    void pend;
-    await expect(chat.start(caller(buyer), { sellerId: seller.id, productId: 'nope', text: 'x' })).rejects.toThrow('That product does not belong to this store.');
-    await expect(chat.start(caller(buyer), { sellerId: seller.id, text: '   ' })).rejects.toThrow('Write a message first.');
-    await expect(chat.start(caller(buyer), { sellerId: seller.id, text: 'x'.repeat(MAX_TEXT + 1) })).rejects.toThrow(/2000/);
-    const fin = await staff(seller, 'fin', 'finance');
-    await expect(chat.start(caller(fin), { sellerId: seller.id, text: 'hi' })).rejects.toThrow('You cannot message your own store.');
-    const admin = await user('adm', 'admin');
-    await expect(chat.start(caller(admin), { sellerId: seller.id, text: 'hi' })).rejects.toThrow('Only shoppers can message a store.');
-    void product;
-  });
-
-  it('does not accept a suspended or pending store', async () => {
-    const { seller } = await shop('suspended');
-    const buyer = await user('buyer');
-    await expect(chat.start(caller(buyer), { sellerId: seller.id, text: 'hi' })).rejects.toThrow('Store not found.');
-  });
-
-  it('a first message refused by the per-minute limit leaves no empty conversation behind', async () => {
-    const { seller } = await shop();
-    const buyer = await user('buyer');
-    const { conversation } = await chat.start(caller(buyer), { sellerId: seller.id, text: 'first' });
-    for (let i = 1; i < SENDS_PER_MINUTE; i++) await chat.send(caller(buyer), { conversationId: conversation.id, text: `m${i}` });
-    const before = await ds.getRepository(Conversation).count();
-    const p = await addProduct(ds, { sellerId: seller.id, name: 'New topic' });
-    await expect(chat.start(caller(buyer), { sellerId: seller.id, productId: p.id, text: 'a new question' })).rejects.toThrow(/too fast/);
-    expect(await ds.getRepository(Conversation).count()).toBe(before);
-    expect(await ds.getRepository(ConversationMessage).count({ where: { text: 'a new question' } })).toBe(0);
-  });
-
-  it('limits how many conversations one account opens per hour', async () => {
-    const { seller } = await shop();
-    const buyer = await user('buyer');
-    for (let i = 0; i < STARTS_PER_HOUR; i++) {
-      const p = await addProduct(ds, { sellerId: seller.id, name: `P${i}` });
-      await chat.start(caller(buyer), { sellerId: seller.id, productId: p.id, text: `q${i}` });
-    }
-    const extra = await addProduct(ds, { sellerId: seller.id, name: 'Extra' });
-    await expect(chat.start(caller(buyer), { sellerId: seller.id, productId: extra.id, text: 'more' })).rejects.toThrow(/too many conversations/);
-  });
-});
-
-describe('chat: who sees what', () => {
-  async function setup() {
-    const { owner, seller, product } = await shop();
-    const buyer = await user('buyer');
-    const support = await staff(seller, 'support', 'support');
-    const manager = await staff(seller, 'manager', 'manager');
-    const orders = await staff(seller, 'orders', 'orders');
-    const finance = await staff(seller, 'finance', 'finance');
-    const catalog = await staff(seller, 'catalog', 'catalog');
-    const { conversation } = await chat.start(caller(buyer), { sellerId: seller.id, productId: product.id, text: 'Hello store' });
-    return { owner, seller, product, buyer, support, manager, orders, finance, catalog, conv: conversation };
-  }
-
-  it('the roles that answer customers are owner, manager, support and orders', () => {
-    expect(['owner', 'manager', 'support', 'orders', 'finance', 'catalog'].filter((r) => canChat(r as TeamRole))).toEqual(['owner', 'manager', 'support', 'orders']);
-  });
-
-  it('pushes chat:message to the shopper and to every account on the seller side, never to finance or catalog', async () => {
-    const t = await setup();
-    for (const who of [t.buyer, t.owner, t.support, t.manager, t.orders]) expect(heard(who.id, 'chat:message')).toHaveLength(1);
-    for (const who of [t.finance, t.catalog]) expect(heard(who.id, 'chat:message')).toHaveLength(0);
-    const toOwner = heard(t.owner.id, 'chat:message')[0].payload;
-    expect(toOwner.conversation).toMatchObject({ side: 'seller', unread: 1 });
-    expect(heard(t.buyer.id, 'chat:message')[0].payload.conversation).toMatchObject({ side: 'buyer', unread: 0 });
-  });
-
-  it('lists the seller-side thread for owner and chat roles only', async () => {
-    const t = await setup();
-    for (const who of [t.owner, t.support, t.manager, t.orders]) expect((await chat.list(caller(who))).map((c) => c.id)).toEqual([t.conv.id]);
-    for (const who of [t.finance, t.catalog]) expect(await chat.list(caller(who))).toEqual([]);
-    expect((await chat.list(caller(t.buyer))).map((c) => c.id)).toEqual([t.conv.id]);
-    expect(await chat.list(caller(t.buyer), { as: 'seller' })).toEqual([]);
-  });
-
-  it('only the two sides can read, write, mark read or translate; others get "not found"', async () => {
-    const t = await setup();
-    const stranger = await user('stranger');
-    for (const who of [stranger, t.finance, t.catalog]) {
-      await expect(chat.messages(caller(who), { conversationId: t.conv.id })).rejects.toThrow('Conversation not found.');
-      await expect(chat.send(caller(who), { conversationId: t.conv.id, text: 'hi' })).rejects.toThrow('Conversation not found.');
-      await expect(chat.markRead(caller(who), { conversationId: t.conv.id })).rejects.toThrow('Conversation not found.');
-    }
-    const msg = (await chat.messages(caller(t.buyer), { conversationId: t.conv.id })).messages[0];
-    await expect(chat.translate(caller(stranger), msg.id, 'fr')).rejects.toThrow('Nothing to translate.');
-    await expect(chat.translate(caller(t.finance), msg.id, 'fr')).rejects.toThrow('Nothing to translate.');
-    await expect(chat.translate(caller(t.buyer), 'not-a-uuid', 'fr')).rejects.toThrow('Nothing to translate.');
-    expect(translate).not.toHaveBeenCalled();
-    await expect(chat.translate(caller(t.buyer), msg.id, 'fr')).resolves.toMatchObject({ text: '[fr] hello' });
-    await expect(chat.translate(caller(t.support), msg.id, 'fr')).resolves.toBeDefined();
-    expect(translate).toHaveBeenCalledWith('chat_message', msg.id, 'fr', { private: true });
-  });
-
-  it('counts unread per side: sending bumps the other side, reading clears only your own side', async () => {
-    const t = await setup();
-    expect(await chat.unread(caller(t.owner))).toEqual({ total: 1, buyer: 0, seller: 1 });
-    expect(await chat.unread(caller(t.buyer))).toEqual({ total: 0, buyer: 0, seller: 0 });
-    await chat.send(caller(t.support), { conversationId: t.conv.id, text: 'Yes' });
-    await chat.send(caller(t.owner), { conversationId: t.conv.id, text: 'In stock' });
-    expect(await chat.unread(caller(t.buyer))).toEqual({ total: 2, buyer: 2, seller: 0 });
-    await chat.markRead(caller(t.buyer), { conversationId: t.conv.id });
-    expect((await chat.unread(caller(t.buyer))).total).toBe(0);
-    expect((await chat.unread(caller(t.owner))).seller).toBe(1);
-    // any teammate reading clears it for the whole seller side
-    await chat.markRead(caller(t.orders), { conversationId: t.conv.id });
-    expect((await chat.unread(caller(t.owner))).seller).toBe(0);
-    expect((await chat.unread(caller(t.support))).seller).toBe(0);
-    expect(heard(t.buyer.id, 'chat:read').length).toBeGreaterThan(0);
-    expect(heard(t.owner.id, 'chat:read')[0].payload).toMatchObject({ conversationId: t.conv.id });
-  });
-
-  it('a staff reply shows the staff member\'s own name on the seller side', async () => {
-    const t = await setup();
-    const r = await chat.send(caller(t.support), { conversationId: t.conv.id, text: 'Hi, support here' });
-    expect(r.message).toMatchObject({ senderSide: 'seller', senderName: 'support', senderId: t.support.id });
-    expect(heard(t.buyer.id, 'chat:message').at(-1)!.payload.conversation.unread).toBe(1);
+    const conv = await history(buyer, seller, owner);
+    await ds.getRepository(Conversation).update({ id: conv.id }, { buyerUnread: 2 });
+    expect(await chat.unread(caller(buyer))).toEqual({ total: 2, buyer: 2, seller: 0 });
+    await chat.markRead(caller(buyer), { conversationId: conv.id });
+    expect(await chat.unread(caller(buyer))).toEqual({ total: 0, buyer: 0, seller: 0 });
+    expect(emitter.sent.filter((e) => e.event === 'chat:read')).toHaveLength(1);
   });
 
   it('pages history with `before` and flags when there is more', async () => {
-    const t = await setup();
-    for (let i = 0; i < 4; i++) await chat.send(caller(t.owner), { conversationId: t.conv.id, text: `m${i}` });
-    const page1 = await chat.messages(caller(t.buyer), { conversationId: t.conv.id, limit: 2 });
-    expect(page1.messages.map((m) => m.text)).toEqual(['m2', 'm3']);
-    expect(page1.hasMore).toBe(true);
-    const page2 = await chat.messages(caller(t.buyer), { conversationId: t.conv.id, limit: 10, before: page1.messages[0].id });
-    expect(page2.messages.map((m) => m.text)).toEqual(['Hello store', 'm0', 'm1']);
-    expect(page2.hasMore).toBe(false);
-    await expect(chat.messages(caller(t.buyer), { conversationId: t.conv.id, before: 'nope' })).rejects.toThrow('Message not found.');
-  });
-
-  it('notifies a side once per burst (when it had nothing unread), not for every message', async () => {
-    const t = await setup();
-    expect(notices.filter((n) => n.title === 'New customer message').map((n) => n.to)).toContain(t.owner.id);
-    // orders staff are told directly (the owner's notice only fans out to roles with the support permission)
-    expect(notices.filter((n) => n.to === t.orders.id)).toHaveLength(1);
-    const before = notices.length;
-    await chat.send(caller(t.buyer), { conversationId: t.conv.id, text: 'Another' });
-    expect(notices).toHaveLength(before);
-    await chat.send(caller(t.owner), { conversationId: t.conv.id, text: 'Reply' });
-    expect(notices.at(-1)).toMatchObject({ to: t.buyer.id, title: 'New message from the seller', type: 'chat' });
-    await chat.send(caller(t.owner), { conversationId: t.conv.id, text: 'Reply 2' });
-    expect(notices.filter((n) => n.to === t.buyer.id)).toHaveLength(1);
-  });
-
-  it('a suspended store can be read but not answered from', async () => {
-    const t = await setup();
-    await ds.getRepository(Seller).update({ id: t.seller.id }, { status: 'suspended' });
-    await expect(chat.send(caller(t.owner), { conversationId: t.conv.id, text: 'hi' })).rejects.toThrow(/suspended/);
-    await expect(chat.messages(caller(t.owner), { conversationId: t.conv.id })).resolves.toBeDefined();
-    // the shopper can still write; the store reads it later
-    await expect(chat.send(caller(t.buyer), { conversationId: t.conv.id, text: 'still there?' })).resolves.toBeDefined();
-  });
-
-  it('a removed team member loses the thread at once', async () => {
-    const t = await setup();
-    await ds.getRepository(SellerTeamMember).update({ userId: t.support.id }, { status: 'removed' });
-    await expect(chat.messages(caller(t.support), { conversationId: t.conv.id })).rejects.toThrow('Conversation not found.');
-    expect(await chat.list(caller(t.support))).toEqual([]);
+    const { seller, owner } = await shop();
+    const buyer = await user('buyer');
+    const conv = await history(buyer, seller, owner, null, ['m1', 'm2', 'm3', 'm4', 'm5']);
+    const newest = await chat.messages(caller(buyer), { conversationId: conv.id, limit: 2 });
+    expect(newest.messages.map((m) => m.text)).toEqual(['m4', 'm5']);
+    expect(newest.hasMore).toBe(true);
+    const older = await chat.messages(caller(buyer), { conversationId: conv.id, limit: 2, before: newest.messages[0].id });
+    expect(older.messages.map((m) => m.text)).toEqual(['m2', 'm3']);
+    const oldest = await chat.messages(caller(buyer), { conversationId: conv.id, limit: 2, before: older.messages[0].id });
+    expect(oldest.messages.map((m) => m.text)).toEqual(['m1']);
+    expect(oldest.hasMore).toBe(false);
   });
 });
 
-describe('chat: abuse control and content', () => {
-  it('limits messages per minute per account', async () => {
-    const { seller } = await shop();
-    const buyer = await user('buyer');
-    const { conversation } = await chat.start(caller(buyer), { sellerId: seller.id, text: 'first' });
-    let ok = 1;
-    let blocked = false;
-    for (let i = 0; i < SENDS_PER_MINUTE + 5; i++) {
-      try {
-        await chat.send(caller(buyer), { conversationId: conversation.id, text: `spam ${i}` });
-        ok++;
-      } catch (e) {
-        expect((e as Error).message).toMatch(/too fast/);
-        blocked = true;
-        break;
-      }
+describe('chat: support reads every conversation, read-only', () => {
+  it('admin and support list every conversation with its length; filters narrow it', async () => {
+    const a = await shop('Alpha');
+    const b = await shop('Beta');
+    const grace = await user('Grace');
+    const jean = await user('Jean');
+    const c1 = await history(grace, a.seller, a.owner, a.product.id);
+    const c2 = await history(jean, b.seller, b.owner, null, ['Bonjour']);
+    for (const role of ['admin', 'admin_support'] as const) {
+      const who = await user(`staff-${role}`, role);
+      const all = await chat.adminList(caller(who), {});
+      expect(all.map((c) => c.id).sort()).toEqual([c1.id, c2.id].sort());
+      expect(all.find((c) => c.id === c1.id)).toMatchObject({ messageCount: 3, buyerName: 'Grace', storeName: 'Alpha' });
+      expect('side' in all[0]).toBe(false);
+      expect('unread' in all[0]).toBe(false);
+      expect((await chat.adminList(caller(who), { sellerId: b.seller.id })).map((c) => c.id)).toEqual([c2.id]);
+      expect((await chat.adminList(caller(who), { buyerId: grace.id })).map((c) => c.id)).toEqual([c1.id]);
+      expect((await chat.adminList(caller(who), { q: 'jea' })).map((c) => c.id)).toEqual([c2.id]);
+      expect((await chat.adminList(caller(who), { q: 'alph' })).map((c) => c.id)).toEqual([c1.id]);
+      expect(await chat.adminList(caller(who), { limit: 1 })).toHaveLength(1);
     }
-    expect(blocked).toBe(true);
-    expect(ok).toBe(SENDS_PER_MINUTE);
   });
 
-  it('attachments must be platform uploads (max 4), and a photo alone is a message', async () => {
-    const { seller } = await shop();
+  it('reads any conversation\'s messages, paged, and changes nothing', async () => {
+    const a = await shop();
+    const grace = await user('Grace');
+    const conv = await history(grace, a.seller, a.owner, null, ['m1', 'm2', 'm3']);
+    await ds.getRepository(Conversation).update({ id: conv.id }, { buyerUnread: 1, sellerUnread: 1 });
+    const admin = await user('support', 'admin_support');
+    const page = await chat.adminMessages(caller(admin), { conversationId: conv.id, limit: 2 });
+    expect(page.messages.map((m) => m.text)).toEqual(['m2', 'm3']);
+    expect(page.hasMore).toBe(true);
+    expect(page.conversation).toMatchObject({ id: conv.id, messageCount: 3, buyerName: 'Grace' });
+    const older = await chat.adminMessages(caller(admin), { conversationId: conv.id, before: page.messages[0].id });
+    expect(older.messages.map((m) => m.text)).toEqual(['m1']);
+    // read-only: no unread counter moved, nothing was pushed
+    expect(await ds.getRepository(Conversation).findOneByOrFail({ id: conv.id })).toMatchObject({ buyerUnread: 1, sellerUnread: 1 });
+    expect(emitter.sent).toHaveLength(0);
+    await expect(chat.adminMessages(caller(admin), { conversationId: 'nope' })).rejects.toThrow('Conversation not found.');
+  });
+
+  it('every other role is refused: customers, sellers, finance, marketing, moderation, operations, warehouse', async () => {
+    const a = await shop();
+    const grace = await user('Grace');
+    const conv = await history(grace, a.seller, a.owner);
+    for (const role of ['customer', 'seller', 'admin_finance', 'admin_marketing', 'admin_moderation', 'admin_operations', 'warehouse_staff', 'rider'] as const) {
+      const who = await user(`who-${role}`, role);
+      await expect(chat.adminList(caller(who), {})).rejects.toThrow('Not allowed.');
+      await expect(chat.adminMessages(caller(who), { conversationId: conv.id })).rejects.toThrow('Not allowed.');
+    }
+  });
+
+  it('support may translate a message of any conversation; strangers may not', async () => {
+    const a = await shop();
+    const grace = await user('Grace');
+    const conv = await history(grace, a.seller, a.owner);
+    const msg = await ds.getRepository(ConversationMessage).findOneByOrFail({ conversationId: conv.id, text: 'Is it new?' });
+    const support = await user('support', 'admin_support');
+    await expect(chat.translate(caller(support), msg.id, 'fr')).resolves.toBeDefined();
+    await expect(chat.translate(caller(grace), msg.id, 'fr')).resolves.toBeDefined();
+    const stranger = await user('stranger');
+    await expect(chat.translate(caller(stranger), msg.id, 'fr')).rejects.toThrow('Nothing to translate.');
+    await expect(chat.translate(caller(a.owner), msg.id, 'fr')).rejects.toThrow('Nothing to translate.');
+  });
+});
+
+describe('chat: stored history', () => {
+  it('importHistory reuses the thread for the same context and keeps the last message as the preview', async () => {
+    const { seller, owner } = await shop();
     const buyer = await user('buyer');
-    const good = 'http://localhost:3024/uploads/11111111-2222-3333-4444-555555555555.png';
-    const r = await chat.start(caller(buyer), { sellerId: seller.id, text: '', attachments: [good] });
-    expect(r.message.attachments).toEqual([good]);
-    expect(r.conversation.lastMessagePreview).toBe('📷');
-    const id = r.conversation.id;
-    await expect(chat.send(caller(buyer), { conversationId: id, text: 'x', attachments: ['https://evil.example/a.png'] })).rejects.toThrow(/uploaded through the platform/);
-    await expect(chat.send(caller(buyer), { conversationId: id, text: 'x', attachments: Array(5).fill(good) })).rejects.toThrow(/up to 4/);
-    // Whatever the uploads endpoint can write is accepted: png, jpg, jpeg, webp and heic.
-    const base = 'http://localhost:3024/uploads/11111111-2222-3333-4444-5555555555';
-    const formats = ['png', 'jpg', 'jpeg', 'webp', 'heic'].map((ext, i) => `${base}${String(10 + i)}.${ext}`);
-    const sent = await chat.send(caller(buyer), { conversationId: id, text: '', attachments: formats.slice(0, 4) });
-    expect(sent.message.attachments).toEqual(formats.slice(0, 4));
-    expect((await chat.send(caller(buyer), { conversationId: id, text: '', attachments: formats.slice(4) })).message.attachments).toEqual(formats.slice(4));
-    await expect(chat.send(caller(buyer), { conversationId: id, text: 'x', attachments: [`${base}10.gif`] })).rejects.toThrow(/uploaded through the platform/);
-    await expect(chat.send(caller(buyer), { conversationId: id, text: 'x', attachments: [`${base}10.svg`] })).rejects.toThrow(/uploaded through the platform/);
-    await expect(chat.send(caller(buyer), { conversationId: id, text: 'x', attachments: [42 as never] })).rejects.toThrow(/not a valid image/);
-    await expect(chat.send(caller(buyer), { conversationId: id, text: '' })).rejects.toThrow('Write a message first.');
-  });
-
-  it('normalises whitespace in the (no-op) contact filter hook', () => {
-    expect(cleanChatText('  hi \r\nthere  ')).toBe('hi\nthere');
-    expect(cleanChatText(null)).toBe('');
+    const a = await history(buyer, seller, owner);
+    const b = await chat.importHistory({ buyer: caller(buyer), sellerId: seller.id, messages: [{ side: 'seller', sender: caller(owner), text: 'One more thing', at: at(1) }] });
+    expect(b.id).toBe(a.id);
+    expect(await ds.getRepository(ConversationMessage).count({ where: { conversationId: a.id } })).toBe(4);
+    expect((await ds.getRepository(Conversation).findOneByOrFail({ id: a.id })).lastMessagePreview).toBe('One more thing');
   });
 
   it('erases a deleted shopper\'s chats', async () => {
-    const { seller } = await shop();
+    const { seller, owner } = await shop();
     const buyer = await user('buyer');
-    const { conversation } = await chat.start(caller(buyer), { sellerId: seller.id, text: 'bye' });
+    const other = await user('other');
+    await history(buyer, seller, owner);
+    await history(other, seller, owner);
     await chat.forgetBuyer(buyer.id);
-    expect(await ds.getRepository(Conversation).count()).toBe(0);
-    expect(await ds.getRepository(ConversationMessage).count({ where: { conversationId: conversation.id } })).toBe(0);
+    expect(await ds.getRepository(Conversation).count()).toBe(1);
+    expect(await ds.getRepository(ConversationMessage).count()).toBe(3);
   });
 });

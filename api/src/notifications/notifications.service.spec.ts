@@ -50,7 +50,7 @@ describe('NotificationsService', () => {
     await svc.toUser('u1', { title: 'T', body: 'B', type: 'exchange', entityId: 'x1' });
     await svc.toRole('admin_support', { title: 'T', body: 'B', type: 'support', entityId: 't1' });
     // the super admin hears an admin role's notice too
-    expect(payloads.map((p) => p.link)).toEqual(['/seller/exchanges/x1', '/admin/support/t1', '/admin/support/t1']);
+    expect(payloads.map((p) => p.link)).toEqual(['/seller/notifications', '/admin/support/t1', '/admin/support/t1']);
     rows.push({ id: 'a', type: 'order', entityId: 'o1' }, { id: 'b', type: 'marketing', entityId: null });
     expect((await svc.listForUser('u1', 'seller')).map((n) => n.link)).toEqual(['/seller/orders/o1', '/seller/notifications']);
   });
@@ -63,7 +63,7 @@ describe('NotificationsService', () => {
     expect(push.sendToUser).toHaveBeenCalledWith('u1', {
       title: 'T',
       body: 'B',
-      link: '/seller/returns/d1',
+      link: '/seller/notifications',
       data: { type: 'return', entityId: 'd1', notificationId: 'n1', view: 'x' },
     });
   });

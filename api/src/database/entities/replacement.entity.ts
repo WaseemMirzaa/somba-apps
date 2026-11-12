@@ -78,11 +78,11 @@ export class Replacement {
   @Column({ type: 'text', nullable: true })
   attachments: string | null;
 
-  /** The seller must answer by then. */
+  /** Support should decide by then (`sellerResponseHours` after the request; the column keeps its old name). */
   @Column({ type: 'datetime', nullable: true })
   sellerDueAt: Date | null;
 
-  /** When the response time ran out with no answer (support was told once; null = not lapsed). */
+  /** When the support response time ran out with no decision (support was alerted once; null = not lapsed). */
   @Column({ type: 'datetime', nullable: true })
   sellerLapsedAt: Date | null;
 

@@ -119,7 +119,7 @@ export const FIELD_FR: Record<string, string> = {
   SKU: 'Le SKU',
   'Saved for later': 'Les articles gardés pour plus tard',
   Search: 'La recherche',
-  'Seller response time': 'Le délai de réponse du vendeur',
+  'Support response time': 'Le délai de réponse du support',
   Severity: 'La gravité',
   'Shipping policy': 'La politique d’expédition',
   'Shipping policy (French)': 'La politique d’expédition (français)',

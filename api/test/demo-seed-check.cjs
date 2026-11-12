@@ -137,11 +137,14 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     const notes = list(await req(s, 'notifications:list'));
     ok(notes.some((n) => n.read) && notes.some((n) => !n.read), `notices read and unread (${notes.length})`);
     const ds = list(await req(s, 'disputes:list', { limit: 50 }));
-    ok(ds.some((d) => d.type === 'return' && d.stage === 'closed') && ds.some((d) => d.type === 'return' && d.stage === 'awaiting_seller') && ds.some((d) => d.type === 'dispute'), 'returns (refunded, awaiting the seller) and a dispute');
+    ok(ds.some((d) => d.type === 'return' && d.stage === 'closed') && ds.some((d) => d.type === 'return' && d.stage === 'awaiting_support') && ds.some((d) => d.type === 'dispute'), 'returns (refunded, awaiting support) and a dispute');
+    ok(!ds.some((d) => ['awaiting_seller', 'seller_rejected', 'seller_timeout'].includes(d.stage)), 'no request waits on a seller any more');
     ok(list(await req(s, 'exchanges:mine')).length >= 1, 'an exchange');
     ok(list(await req(s, 'replacements:mine')).length >= 1, 'a replacement');
     const chats = data(await req(s, 'chat:list', {}));
-    ok((chats?.items ?? chats ?? []).length >= 2, 'chats with a seller');
+    ok((chats?.items ?? chats ?? []).length >= 2, 'old chats with a seller are still there (history)');
+    const closed = await req(s, 'chat:start', { sellerId: 'x', text: 'Hello there' });
+    ok(closed?.ok === false && /Messaging sellers is closed/.test(closed.error ?? ''), 'chat:start is closed (contact support)', JSON.stringify(closed).slice(0, 120));
     const tickets = list(await req(s, 'support:list'));
     ok(tickets.some((t) => t.status === 'closed') && tickets.some((t) => t.status === 'open'), 'support tickets, open and closed');
   }
@@ -222,8 +225,22 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(po.some((p) => p.status === 'paid') && po.some((p) => p.status === 'requested'), 'payouts: one paid (no real transfer), one requested');
     ok(!!data(await req(s, 'finance:earnings', {})), 'earnings');
     ok(!!data(await req(s, 'finance:statements', {})), 'statements');
-    const returns = list(await req(s, 'returns:list', {}));
-    ok(returns.some((r) => r.stage === 'awaiting_seller' && r.sellerDueAt), 'a return to answer with a timer running', `${returns.length}`);
+    // Returns, disputes, exchanges and replacements are support's: the store sees none of them and cannot answer.
+    ok(list(await req(s, 'returns:list', {})).length === 0, 'store A sees no returns (support decides them)');
+    ok(list(await req(s, 'disputes:list', {})).length === 0, 'store A sees no disputes');
+    ok(list(await req(s, 'exchanges:list', {})).length === 0 && list(await req(s, 'replacements:list', {})).length === 0, 'store A sees no exchanges or replacements');
+    const answered = await req(s, 'returns:respond', { id: 'x', accept: true });
+    ok(answered?.ok === false, 'returns:respond is refused for a seller', JSON.stringify(answered).slice(0, 100));
+    ok(list(await req(s, 'chat:list', { as: 'seller' })).length === 0, 'store A has no chats to answer');
+    const express = await req(s, 'sellers:update', { expressDelivery: true });
+    ok(express?.ok === true, 'an old client sending expressDelivery is ignored without an error');
+    const mineNow = data(await req(s, 'sellers:mine'));
+    ok(mineNow?.expressDelivery === false, 'store A: express stays off (the admin switches it)', JSON.stringify(mineNow?.expressDelivery));
+    const tpl = data(await req(s, 'sellers:policy:template'));
+    ok(tpl?.returnsPolicy?.en?.length > 50 && tpl?.returnsPolicy?.fr?.length > 50, 'returns-policy template in English and French');
+    ok(/Returns are accepted/.test(mineNow?.returnsPolicy ?? ''), 'store A: the approved policy is live');
+    const prop = data(await req(s, 'sellers:policy:mine'));
+    ok(prop?.pending === null && prop?.lastDecided?.status === 'approved', 'store A: no pending proposal, an approved one on record', JSON.stringify(prop).slice(0, 120));
     const sa = data(await req(s, 'analytics:seller', {}));
     ok(!!sa, 'seller analytics');
   }
@@ -264,7 +281,10 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(r?.ok === false, 'finance member is refused the orders', JSON.stringify(r).slice(0, 100));
   }
   if (S['team.orders']) ok(list(await req(S['team.orders'].sock, 'orders:sellerList', { limit: 5 })).length > 0, 'orders member sees the orders');
-  if (S['team.support']) ok(!!(data(await req(S['team.support'].sock, 'chat:list', { as: 'seller' })) ?? null), 'support member sees the chats');
+  if (S['team.support']) {
+    const r = await req(S['team.support'].sock, 'chat:list', { as: 'seller' });
+    ok(list(r).length === 0, 'support member of the store sees no chats (chat is closed)');
+  }
   if (S['team.manager']) ok(list(await req(S['team.manager'].sock, 'orders:sellerList', { limit: 5 })).length > 0, 'manager sees the orders');
 
   section('Admin');
@@ -280,12 +300,27 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(cust.some((c) => c.active === false), 'customers list shows the suspended one');
     ok(list(await req(s, 'disputes:list', { limit: 50 })).length >= 4, 'disputes and returns');
     ok(list(await req(s, 'payouts:list')).length >= 2, 'payouts');
+    const convs = list(await req(s, 'chat:adminList', { limit: 50 }));
+    ok(convs.length >= 3, `the old chats are readable by admin (${convs.length})`);
+    const thread = convs[0] ? data(await req(s, 'chat:adminMessages', { conversationId: convs[0].id })) : null;
+    ok((thread?.messages ?? []).length >= 1, 'an old chat opens read-only for admin');
+    const express = await req(s, 'sellers:list', { limit: 50 });
+    const storeC = list(express).find((x) => /Ndolo/.test(x.name));
+    ok(storeC?.expressDelivery === true, 'store C offers express (set by admin)', JSON.stringify(storeC?.expressDelivery));
+    const toggled = await req(s, 'sellers:setExpress', { sellerId: storeC?.id, enabled: false });
+    ok(toggled?.ok === true && data(toggled).expressDelivery === false, 'admin switches express off for a store');
+    const back = await req(s, 'sellers:setExpress', { sellerId: storeC?.id, enabled: true });
+    ok(back?.ok === true && data(back).expressDelivery === true, 'and on again (the pickup pin is there)');
+    const queue = list(await req(s, 'sellers:policy:list', {}));
+    ok(queue.length >= 1 && queue.every((r) => r.status === 'pending'), `store policies waiting for approval (${queue.length})`);
+    ok(queue.some((r) => /Returns within 7 days/.test(r.returnsPolicy ?? '')), 'store B\'s proposed returns policy is in the queue');
   }
   if (S['admin.moderation']) {
     const s = S['admin.moderation'].sock;
     const pend = list(await req(s, 'products:list', { status: 'pending', limit: 50 }));
     ok(pend.length >= 2, `product moderation queue (${pend.length})`);
     ok(list(await req(s, 'reviews:admin', { reported: true })).length >= 1, 'reported reviews');
+    ok(list(await req(s, 'sellers:policy:list', {})).length >= 1, 'moderation sees the policy queue');
   }
   if (S['admin.operations']) ok(list(await req(S['admin.operations'].sock, 'hubs:list')).some((h) => /Maluku/.test(h.name)), 'operations sees the demo warehouse');
   if (S['admin.finance']) ok(list(await req(S['admin.finance'].sock, 'payments:list', { limit: 20 })).length > 0, 'finance sees payments');
@@ -299,6 +334,13 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
   if (S['admin.support']) {
     const t = list(await req(S['admin.support'].sock, 'support:list', { limit: 50 }));
     ok(t.length >= 3 && t.some((x) => x.status === 'open'), `support tickets (${t.length})`);
+    const q = list(await req(S['admin.support'].sock, 'returns:list', { limit: 50 }));
+    ok(q.some((r) => r.stage === 'awaiting_support'), 'support sees the returns waiting for its decision');
+    ok(list(await req(S['admin.support'].sock, 'chat:adminList', { limit: 50 })).length >= 3, 'support reads the old chats');
+    const refused = await req(S['admin.support'].sock, 'sellers:policy:list', {});
+    ok(refused?.ok === false, 'support does not decide store policies (moderation does)');
+    const noExpress = await req(S['admin.support'].sock, 'sellers:setExpress', { sellerId: 'x', enabled: true });
+    ok(noExpress?.ok === false, 'support cannot switch express');
   }
 
   section('Warehouse and rider');

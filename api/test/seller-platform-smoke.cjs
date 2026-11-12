@@ -1,4 +1,4 @@
-/* End-to-end test of the seller platform: team accounts and roles, 2FA, customer <-> seller chat, storefront
+/* End-to-end test of the seller platform: team accounts and roles, 2FA, chat (closed: customers contact support), storefront
  * (vacation, handling time, policies, goals), seller settings (notification switches, password, deleting an account),
  * private KYC documents, plan gating, and a suspended store. Runs against a RUNNING dev API seeded with `npm run seed`
  * (non-production: invitations return their `devToken`, TRANSLATE_PROVIDER=fake).
@@ -394,80 +394,32 @@ const upload = async (path, token, buf = PNG, name = 'doc.png') => {
   // from now on the owner's login needs a code: keep an authenticated socket (owner.sock) for the rest of the run
 
   // ═════════════════════════════════════════════════════════════════════════
-  section('Chat: customer <-> seller');
-  const ownerPush = nextEvent(owner.sock, 'chat:message', 4000);
-  const supportPush = nextEvent(staff.support.sock, 'chat:message', 4000);
-  const managerPush = nextEvent(staff.manager.sock, 'chat:message', 4000);
-  const financePush = nextEvent(staff.finance.sock, 'chat:message', 2500);
-  const custPush = nextEvent(cust.sock, 'chat:message', 4000);
-  const ownerNote = nextEvent(owner.sock, 'notification:new', 4000, (n) => n.title === 'New customer message');
+  section('Chat is closed: customers contact support; admin reads old chats read-only');
+  const CLOSED = 'Messaging sellers is closed. Contact support from your account.';
   a = await req(cust.sock, 'chat:start', { sellerId: store.id, productId: prod.id, text: 'Is this still available?' });
-  ok(a.ok && a.data.conversation.productId === prod.id && a.data.message.senderSide === 'buyer', 'a customer starts a chat from a product', a.error);
-  const conv = a.data.conversation;
-  ok((await ownerPush)?.message.text === 'Is this still available?', 'the owner gets chat:message live');
-  ok((await supportPush)?.conversation.unread === 1, 'a support member gets it, with their unread count');
-  ok((await managerPush) !== null, 'a manager gets it');
-  ok((await financePush) === null, 'finance does not');
-  ok((await custPush)?.conversation.side === 'buyer', 'the customer\'s other screens get it too');
-  const on = await ownerNote;
-  ok(on && on.titleFr === 'Nouveau message client', 'the store gets a notice, with French', JSON.stringify(on));
-  a = await req(cust.sock, 'chat:start', { sellerId: store.id, productId: prod.id, text: 'And in blue?' });
-  ok(a.ok && a.data.conversation.id === conv.id, 'the same product reuses the same conversation');
-  a = await req(cust.sock, 'chat:start', { sellerId: store.id, text: 'A general question' });
-  ok(a.ok && a.data.conversation.id !== conv.id, 'a different context opens another conversation');
-  a = await req(cust.sock, 'chat:start', { sellerId: store.id, productId: 'nope', text: 'x' });
-  ok(!a.ok, 'a product of another store is refused');
-  ok(!(await req(cust.sock, 'chat:start', { sellerId: store.id, text: '   ' })).ok, 'an empty message is refused');
-  ok(!(await req(cust.sock, 'chat:start', { sellerId: store.id, text: 'x'.repeat(2001) })).ok, 'a very long message is refused');
-  ok(!(await req(staff.finance.sock, 'chat:start', { sellerId: store.id, text: 'hi' })).ok, 'staff cannot message their own store');
-  a = await req(owner.sock, 'chat:unread');
-  ok(a.ok && a.data.seller >= 1 && a.data.total === a.data.seller, 'the owner has unread messages', JSON.stringify(a.data));
-  a = await req(owner.sock, 'chat:list');
-  const mine = a.data.find((c) => c.id === conv.id);
-  ok(a.ok && mine && mine.unread === 2 && mine.side === 'seller' && mine.productName, 'chat:list shows the thread, its product and 2 unread', JSON.stringify(mine));
-  ok((await req(staff.finance.sock, 'chat:list')).data.length === 0, 'finance sees no chats');
-  a = await req(cust2.sock, 'chat:messages', { conversationId: conv.id });
-  ok(!a.ok && /not found/.test(a.error), 'another customer cannot read the thread');
-  ok(!(await req(staff.finance.sock, 'chat:messages', { conversationId: conv.id })).ok, 'nor can finance staff');
-  ok(!(await req(cust2.sock, 'chat:send', { conversationId: conv.id, text: 'hi' })).ok, 'or write in it');
-  a = await req(staff.support.sock, 'chat:messages', { conversationId: conv.id });
-  ok(a.ok && a.data.messages.length === 2 && a.data.messages[0].text === 'Is this still available?' && a.data.hasMore === false, 'a support member reads the thread (oldest first)');
-  a = await req(staff.support.sock, 'chat:messages', { conversationId: conv.id, before: a.data.messages[1].id, limit: 1 });
-  ok(a.ok && a.data.messages.length === 1 && a.data.messages[0].text === 'Is this still available?', 'history pages back with `before`');
-  const readPush = nextEvent(cust.sock, 'chat:read', 3000, (p) => p.conversationId === conv.id);
-  const readOwner = nextEvent(owner.sock, 'chat:read', 3000, (p) => p.conversationId === conv.id);
-  a = await req(staff.support.sock, 'chat:markRead', { conversationId: conv.id });
-  ok(a.ok && a.data.unread === 0, 'a support member marks it read');
-  ok((await readPush)?.side === 'seller' && (await readOwner) !== null, 'the customer and the owner\'s screens hear it');
-  ok((await req(owner.sock, 'chat:list')).data.find((c) => c.id === conv.id).unread === 0, 'the unread count is shared by the seller side');
-  const replyPush = nextEvent(cust.sock, 'chat:message', 4000);
-  const custNote = nextEvent(cust.sock, 'notification:new', 4000, (n) => n.title === 'New message from the seller');
-  a = await req(staff.support.sock, 'chat:send', { conversationId: conv.id, text: 'Yes, in stock!' });
-  ok(a.ok && a.data.message.senderSide === 'seller' && a.data.message.senderName === 'stsupport user', 'a team member answers under their own name', a.error);
-  const rp = await replyPush;
-  ok(rp?.message.text === 'Yes, in stock!' && rp.conversation.unread === 1, 'the customer gets it live with 1 unread');
-  const cn = await custNote;
-  ok(cn && cn.titleFr === 'Nouveau message du vendeur', 'and a notice with French', JSON.stringify(cn));
-  ok((await req(cust.sock, 'chat:unread')).data.buyer === 1, 'the customer\'s badge counts it');
-  a = await req(cust.sock, 'chat:markRead', { conversationId: conv.id });
-  ok(a.ok && (await req(cust.sock, 'chat:unread')).data.total === 0, 'reading clears it');
-  a = await req(cust.sock, 'chat:send', { conversationId: conv.id, text: 'Photo', attachments: ['https://evil.example/x.png'] });
-  ok(!a.ok, 'attachments must be platform uploads');
-  // translate on demand
-  const mid = (await req(cust.sock, 'chat:messages', { conversationId: conv.id })).data.messages[2].id;
-  a = await req(cust.sock, 'translate:text', { kind: 'chat_message', id: mid, target: 'fr' });
-  ok(a.ok && /Yes, in stock!/.test(a.data.text) && a.data.sourceLang, 'a participant translates a chat message on demand', a.error ?? JSON.stringify(a.data));
-  ok(!(await req(cust2.sock, 'translate:text', { kind: 'chat_message', id: mid, target: 'fr' })).ok, 'an outsider cannot');
-  ok(!(await req(staff.finance.sock, 'translate:text', { kind: 'chat_message', id: mid, target: 'fr' })).ok, 'neither can finance staff');
-  ok(!(await req(cust.sock, 'translate:text', { kind: 'chat_message', id: 'not-an-id', target: 'fr' })).ok, 'only stored ids can be translated');
-  ok(!(await req(cust.sock, 'translate:text', { kind: 'chat_message', id: mid, target: 'xx' })).ok, 'only English or French');
-  // rate limit
-  let sent = 0; let limited = false;
-  for (let i = 0; i < 26; i++) {
-    const r = await req(cust.sock, 'chat:send', { conversationId: conv.id, text: `spam ${i}` });
-    if (r.ok) sent++; else if (/too fast/.test(r.error)) { limited = true; break; }
+  ok(!a.ok && a.error === CLOSED, 'a customer cannot start a chat: "Messaging sellers is closed"', a.error);
+  ok(typeof a.errorFr === 'string' && /fermée/.test(a.errorFr), 'with the French message', a.errorFr);
+  for (const [who, sock] of [['a store member', staff.support.sock], ['the owner', owner.sock], ['another customer', cust2.sock], ['finance staff', staff.finance.sock]]) {
+    a = await req(sock, 'chat:start', { sellerId: store.id, text: 'hi' });
+    ok(!a.ok && a.error === CLOSED, `${who} cannot start one either`, a.error);
   }
-  ok(limited && sent < 26, `sending is rate-limited (${sent} accepted)`);
+  a = await req(cust.sock, 'chat:send', { conversationId: 'anything', text: 'hello' });
+  ok(!a.ok && a.error === CLOSED, 'chat:send is closed too', a.error);
+  a = await req(staff.support.sock, 'chat:send', { conversationId: 'anything', text: 'hello?' });
+  ok(!a.ok && a.error === CLOSED, 'including for the store\'s support member');
+  for (const [who, sock] of [['the owner', owner.sock], ['a support member', staff.support.sock], ['a manager', staff.manager.sock]]) {
+    a = await req(sock, 'chat:list');
+    ok(a.ok && a.data.length === 0, `${who} has no chats to read (the store side is gone)`);
+    a = await req(sock, 'chat:unread');
+    ok(a.ok && a.data.total === 0 && a.data.seller === 0, `${who} has no unread count`);
+  }
+  a = await req(cust.sock, 'chat:list');
+  ok(a.ok && Array.isArray(a.data), 'a customer can still list their (old) chats');
+  ok(!(await req(owner.sock, 'chat:adminList')).ok && !(await req(cust.sock, 'chat:adminList')).ok && !(await req(staff.finance.sock, 'chat:adminMessages', { conversationId: 'x' })).ok, 'only admin and support read every conversation (stores and customers are refused)');
+  a = await req(admin.sock, 'chat:adminList', { limit: 20 });
+  ok(a.ok && Array.isArray(a.data), 'admin reads the conversation list (read-only)', a.error);
+  a = await req(admin.sock, 'chat:adminMessages', { conversationId: 'unknown' });
+  ok(!a.ok && /not found/i.test(a.error), 'and an unknown conversation is "not found"', a.error);
 
   // ═════════════════════════════════════════════════════════════════════════
   section('Storefront: vacation, handling time, policies, goals');
@@ -518,20 +470,73 @@ const upload = async (path, token, buf = PNG, name = 'doc.png') => {
   if (a.ok) ok(true, 'the order was placed');
   await req(cust.sock, 'cart:set', { lines: [] });
 
-  const policyPush = nextEvent(owner.sock, 'seller:updated', 8000, (s) => /^\[fr\]/.test(s.returnsPolicyFr ?? '') && /^\[fr\]/.test(s.shippingPolicyFr ?? ''));
-  a = await req(owner.sock, 'sellers:update', { returnsPolicy: `Returns are accepted within 14 days of delivery (${tag}).`, shippingPolicy: `We ship within two working days (${tag}).` });
-  ok(a.ok && a.data.returnsPolicy.startsWith('Returns are accepted'), 'the owner writes returns and shipping policies', a.error);
-  const pp = await policyPush;
-  ok(!!pp && pp.id === store.id, 'when the translation job finishes the owner gets a seller:updated push with the French policies', JSON.stringify(pp && { fr: pp.returnsPolicyFr }));
+  section('Store policies need approval: pending, approve, reject, edit and publish');
+  const POLICY_EN = `Returns are accepted within 14 days of delivery (${tag}).`;
+  const SHIP_EN = `We ship within two working days (${tag}).`;
+  a = await req(owner.sock, 'sellers:policy:template');
+  ok(a.ok && a.data.returnsPolicy.en.length > 50 && a.data.returnsPolicy.fr.length > 50 && a.data.returnWindowDays > 0, 'the returns-policy template comes in English and French', a.error);
+  ok((await req(staff.manager.sock, 'sellers:policy:template')).ok, 'a manager reads it too');
+  ok(!(await req(staff.finance.sock, 'sellers:policy:template')).ok && !(await req(staff.finance.sock, 'sellers:policy:mine')).ok, 'finance does not (no storefront permission)');
+  const before = (await req(cust.sock, 'sellers:storefront', { id: store.id })).data.seller;
+  const pendingPush = nextEvent(admin.sock, 'policy:pending', 4000, (r) => r.sellerId === store.id);
+  a = await req(owner.sock, 'sellers:update', { returnsPolicy: POLICY_EN, shippingPolicy: SHIP_EN });
+  ok(a.ok && a.data.policyRevision?.status === 'pending' && a.data.policyRevision.returnsPolicy === POLICY_EN, 'the owner\'s policy becomes a pending revision', a.error ?? JSON.stringify(a.data?.policyRevision));
+  ok(a.ok && !(a.data.returnsPolicy ?? '').startsWith('Returns are accepted'), 'and the live text is not touched', JSON.stringify(a.data?.returnsPolicy));
+  const polRev1 = a.data.policyRevision;
+  ok((await pendingPush)?.id === polRev1.id, 'admin gets policy:pending live');
+  const live0 = (await req(cust.sock, 'sellers:storefront', { id: store.id })).data.seller;
+  ok((live0.returnsPolicy ?? null) === (before.returnsPolicy ?? null), 'shoppers still see the old policy (or none)');
   ok(!(await req(owner.sock, 'sellers:update', { returnsPolicy: 'short' })).ok, 'a too-short policy is refused');
-  const sf = await until(async () => {
+  a = await req(owner.sock, 'sellers:update', { expressDelivery: true, handlingDays: 3 });
+  ok(a.ok && a.data.expressDelivery === false, 'a seller cannot switch express polOk (ignored, no error)', a.error);
+  a = await req(owner.sock, 'sellers:policy:mine');
+  ok(a.ok && a.data.pending?.id === polRev1.id, 'sellers:policy:mine shows the pending proposal', a.error);
+  for (const [who, sock] of [['the owner', owner.sock], ['a manager', staff.manager.sock], ['a customer', cust.sock], ['support staff', staff.support.sock]]) {
+    ok(!(await req(sock, 'sellers:policy:list')).ok, `${who} cannot read the approval queue`);
+    ok(!(await req(sock, 'sellers:policy:approve', { id: polRev1.id })).ok, `${who} cannot approve`);
+  }
+  a = await req(admin.sock, 'sellers:policy:list', {});
+  const queued = a.ok && a.data.find((r) => r.id === polRev1.id);
+  ok(!!queued && queued.status === 'pending' && queued.storeName && queued.live && 'returnsPolicyFr' in queued.live, 'admin sees it in the queue with the live text beside it', a.error);
+  a = await req(admin.sock, 'sellers:policy:reject', { id: polRev1.id, note: '' });
+  ok(!a.ok && /why the policy was not approved/.test(a.error ?? ''), 'rejecting needs a note', a.error);
+  const rejNote = nextEvent(owner.sock, 'notification:new', 4000, (n) => n.title === 'Store policy rejected');
+  a = await req(admin.sock, 'sellers:policy:reject', { id: polRev1.id, note: 'Please list what cannot be returned.' });
+  ok(a.ok && a.data.status === 'rejected' && a.data.note === 'Please list what cannot be returned.', 'admin rejects with a note', a.error);
+  const polRej = await rejNote;
+  ok(polRej && polRej.titleFr === 'Politique de boutique refusée' && /Please list/.test(polRej.body) && /n’a pas été approuvée/.test(polRej.bodyFr ?? ''), 'the seller is told, in English and French', JSON.stringify(polRej && [polRej.title, polRej.titleFr, polRej.bodyFr]));
+  ok((await req(admin.sock, 'sellers:policy:approve', { id: polRev1.id })).ok === false, 'a decided change cannot be decided again');
+  a = await req(owner.sock, 'sellers:policy:mine');
+  ok(a.ok && a.data.pending === null && a.data.lastDecided?.status === 'rejected', 'the seller sees the rejection and the note');
+  // propose again and approve: the text goes live and the pipeline fills in the other language
+  const policyPush = nextEvent(owner.sock, 'seller:updated', 8000, (st) => /^\[fr\]/.test(st.returnsPolicyFr ?? '') && /^\[fr\]/.test(st.shippingPolicyFr ?? ''));
+  a = await req(owner.sock, 'sellers:update', { returnsPolicy: POLICY_EN, shippingPolicy: SHIP_EN });
+  const polRev2 = a.data.policyRevision;
+  const okNote = nextEvent(owner.sock, 'notification:new', 4000, (n) => n.title === 'Store policy approved');
+  a = await req(admin.sock, 'sellers:policy:approve', { id: polRev2.id, note: 'Thank you.' });
+  ok(a.ok && a.data.status === 'approved' && a.data.decidedBy, 'admin approves', a.error);
+  const polPush = await policyPush;
+  ok(!!polPush && polPush.id === store.id && polPush.returnsPolicy.startsWith('Returns are accepted'), 'when the translation job finishes the owner gets a seller:updated push with the French policies', JSON.stringify(polPush && { fr: polPush.returnsPolicyFr }));
+  const polOk = await okNote;
+  ok(polOk && polOk.titleFr === 'Politique de boutique approuvée', 'the seller is told it is live, with French', JSON.stringify(polOk && [polOk.title, polOk.titleFr]));
+  const polSf = await until(async () => {
     const r = await req(cust.sock, 'sellers:storefront', { id: store.id });
     return r.ok && /^\[fr\]/.test(r.data.seller.returnsPolicyFr ?? '') ? r.data.seller : null;
   }, 8000);
-  ok(!!sf && sf.returnsPolicy.startsWith('Returns are accepted') && /^\[fr\]/.test(sf.shippingPolicyFr), 'the other language is filled in by the translation pipeline', JSON.stringify(sf));
+  ok(!!polSf && polSf.returnsPolicy.startsWith('Returns are accepted') && /^\[fr\]/.test(polSf.shippingPolicyFr), 'shoppers now see it, the other language filled in by the translation pipeline', JSON.stringify(polSf));
   a = await req(owner.sock, 'sellers:update', { returnsPolicyFr: 'Les retours sont acceptés sous 14 jours.' });
+  a = await req(admin.sock, 'sellers:policy:approve', { id: a.data.policyRevision.id });
+  ok(a.ok, 'a hand-written French policy waits for approval too', a.error);
   a = await req(cust.sock, 'sellers:storefront', { id: store.id });
-  ok(a.data.seller.returnsPolicyFr === 'Les retours sont acceptés sous 14 jours.' && a.data.seller.returnsPolicy.startsWith('Returns are accepted'), 'a hand-written French policy is kept next to the English one');
+  ok(a.data.seller.returnsPolicyFr === 'Les retours sont acceptés sous 14 jours.' && a.data.seller.returnsPolicy.startsWith('Returns are accepted'), 'once approved it is kept next to the English one');
+  // admin edits and publishes any store's policy directly
+  a = await req(admin.sock, 'sellers:policy:publish', { sellerId: store.id, returnsPolicy: `Returns within 7 days, unused items only (${tag}).`, note: 'Aligned with the platform rules.' });
+  ok(a.ok && a.data.status === 'approved' && a.data.returnsPolicy.startsWith('Returns within 7 days'), 'admin edits and publishes the store\'s policy directly', a.error);
+  a = await req(cust.sock, 'sellers:storefront', { id: store.id });
+  ok(a.data.seller.returnsPolicy.startsWith('Returns within 7 days'), 'it is live at once');
+  ok(!(await req(admin.sock, 'sellers:policy:publish', { sellerId: store.id })).ok, 'publishing nothing is refused');
+  a = await req(admin.sock, 'sellers:policy:list', { status: 'all', sellerId: store.id });
+  ok(a.ok && a.data.length >= 4 && ['pending', 'approved', 'rejected'].every((st) => a.data.some((r) => r.status === st) || st === 'pending'), 'the history lists every decision', a.error);
 
   // ═════════════════════════════════════════════════════════════════════════
   section('Seller settings: notification switches, password, deleting accounts');
@@ -660,10 +665,7 @@ const upload = async (path, token, buf = PNG, name = 'doc.png') => {
   ok(!a.ok, 'a suspended store cannot buy a plan', a.error);
   a = await req(owner.sock, 'sellers:resubmit', kyc(`Late KYC ${tag}`));
   ok(!a.ok && /suspended store cannot resubmit/.test(a.error), 'nor resubmit its application (the service says why)', a.error);
-  a = await req(staff.support.sock, 'chat:send', { conversationId: conv.id, text: 'hello?' });
-  ok(!a.ok && /suspended/.test(a.error), 'chat replies are paused, reading is not');
-  ok((await req(staff.support.sock, 'chat:messages', { conversationId: conv.id })).ok, 'the thread can still be read');
-  ok(!(await req(cust2.sock, 'chat:start', { sellerId: store.id, text: 'hi' })).ok, 'and shoppers cannot start new chats with a suspended store');
+  ok(!(await req(cust2.sock, 'chat:start', { sellerId: store.id, text: 'hi' })).ok, 'and shoppers cannot start chats with a suspended store (chat is closed for everyone)');
   await req(admin.sock, 'sellers:setStatus', { id: store.id, status: 'approved' });
   ok((await req(staff.manager.sock, 'products:update', { id: sprod.id, patch: { price: 6 } })).ok, 'when reinstated, writes work again');
 

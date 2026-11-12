@@ -245,6 +245,18 @@ const TITLES: Record<string, string> = {
   'Dispute closed': 'Litige clôturé',
   'Exchange requested': 'Échange demandé',
   'Replacement requested': 'Remplacement demandé',
+  // Support's response time ran out (the support staff are alerted once)
+  'Return waiting for support': 'Retour en attente du support',
+  'Dispute waiting for support': 'Litige en attente du support',
+  'Exchange waiting for support': 'Échange en attente du support',
+  'Replacement waiting for support': 'Remplacement en attente du support',
+  // Store policies need approval; express is switched by KOMORIKO
+  'Store policy awaiting approval': 'Politique de boutique à approuver',
+  'Store policy approved': 'Politique de boutique approuvée',
+  'Store policy rejected': 'Politique de boutique refusée',
+  'Store policy updated': 'Politique de boutique mise à jour',
+  'Express delivery turned on': 'Livraison express activée',
+  'Express delivery turned off': 'Livraison express désactivée',
   // Orders and deliveries
   'New order': 'Nouvelle commande',
   'New delivery available': 'Nouvelle livraison disponible',
@@ -385,6 +397,15 @@ const BODIES: Rule[] = [
   [/^Two-factor authentication was turned off on your account\.$/, () => 'L’authentification à deux facteurs a été désactivée sur votre compte.'],
   [/^A super admin reset two-factor authentication on your account\. Sign in again and set it up again\.$/, () => 'Un super admin a réinitialisé l’authentification à deux facteurs de votre compte. Reconnectez-vous et configurez-la de nouveau.'],
   [/^Your store is open again and takes new orders\.$/, () => 'Votre boutique est de nouveau ouverte et accepte les nouvelles commandes.'],
+  [/^(.+): new returns or shipping policy to review\.$/, (m) => `${m[1]} : nouvelle politique de retour ou d’expédition à examiner.`],
+  [/^Your returns and shipping policy is now live on your store\.$/, () => 'Votre politique de retour et d’expédition est maintenant en ligne sur votre boutique.'],
+  [/^Your returns and shipping policy is now live on your store: ([\s\S]+)$/, (m) => `Votre politique de retour et d’expédition est maintenant en ligne sur votre boutique : ${m[1]}`],
+  [/^KOMORIKO updated the policy shown on your store\.$/, () => 'KOMORIKO a mis à jour la politique affichée sur votre boutique.'],
+  [/^KOMORIKO updated the policy shown on your store: ([\s\S]+)$/, (m) => `KOMORIKO a mis à jour la politique affichée sur votre boutique : ${m[1]}`],
+  [/^Your policy change was not approved\.$/, () => 'Votre modification de politique n’a pas été approuvée.'],
+  [/^Your policy change was not approved: ([\s\S]+)$/, (m) => `Votre modification de politique n’a pas été approuvée : ${m[1]}`],
+  [/^KOMORIKO turned express delivery on for your store\.$/, () => 'KOMORIKO a activé la livraison express pour votre boutique.'],
+  [/^KOMORIKO turned express delivery off for your store\.$/, () => 'KOMORIKO a désactivé la livraison express pour votre boutique.'],
   [/^Your store badge is now (\w+) \(was (\w+)\)\.$/, (m) => `Le badge de votre boutique est maintenant ${pick(BADGES, m[1])} (avant : ${pick(BADGES, m[2])}).`],
   // The journey: tasks for the warehouse desk and the riders, notices for sellers, routing alerts for admins
   [/^(\S+): ([a-z ]+) now carries more parcels\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » mise à jour, d’autres colis s’y ajoutent.`],
@@ -394,7 +415,7 @@ const BODIES: Rule[] = [
   [/^(\S+): ([a-z ]+) has been open for (\d+) hours\.$/, (m) => `${m[1]} : tâche « ${legFr(m[2])} » ouverte depuis ${m[3]} heures.`],
   [/^(\S+): the customer parcel is going back to the seller\. Review the order\.$/, (m) => `${m[1]} : le colis du client retourne chez le vendeur. Vérifiez la commande.`],
   [/^(\S+) could not be delivered and is going back to the seller\. Our team will contact you about your order\.$/, (m) => `${m[1]} n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.`],
-  [/^(\S+): a rider will collect your package\.$/, (m) => `${m[1]} : un livreur viendra récupérer votre colis.`],
+  [/^(\S+(?: · \S+)?): a rider will collect your package\.$/, (m) => `${m[1]} : un livreur viendra récupérer votre colis.`],
   [/^(\S+): your package reached the warehouse\.$/, (m) => `${m[1]} : votre colis est arrivé à l’entrepôt.`],
   [/^(\S+): the rider collected your package and is taking it to the customer\.$/, (m) => `${m[1]} : le livreur a récupéré votre colis et l’emmène chez le client.`],
   [

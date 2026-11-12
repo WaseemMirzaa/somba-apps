@@ -1544,6 +1544,17 @@ export class LogisticsService {
     return legs;
   }
 
+  /** The reference of the replacement or exchange a task serves (null for an ordinary order leg). */
+  private async afterSaleReference(task: Pick<DeliveryTask, 'replacementId' | 'exchangeId'>): Promise<string | null> {
+    try {
+      if (task.replacementId) return (await this.tasks.manager.findOne(Replacement, { where: { id: task.replacementId }, select: { id: true, reference: true } }))?.reference ?? null;
+      if (task.exchangeId) return (await this.tasks.manager.findOne(Exchange, { where: { id: task.exchangeId }, select: { id: true, reference: true } }))?.reference ?? null;
+    } catch {
+      /* a label: the notice goes out without it */
+    }
+    return null;
+  }
+
   private async afterAssigned(task: DeliveryTask, rider: Pick<User, 'id' | 'name'>): Promise<void> {
     const orderFlow = isOrderFlow(task);
     if (orderFlow && (task.kind === 'pickup' || task.kind === 'express')) await this.advanceOrder(task.orderId, 'processing');
@@ -1559,7 +1570,11 @@ export class LogisticsService {
     }
     if ((task.kind === 'pickup' || task.kind === 'express') && task.sellerId) {
       const user = await this.sellerUser(task.sellerId);
-      if (user) await this.notifications.toUser(user, { title: 'Pickup scheduled', body: `${task.orderReference}: a rider will collect your package.`, type: 'delivery', entityId: task.orderId }).catch(() => undefined);
+      if (user) {
+        // The hand-over of a replacement or an exchange names its reference too (sellers get no other after-sale notice).
+        const ref = await this.afterSaleReference(task);
+        await this.notifications.toUser(user, { title: 'Pickup scheduled', body: `${[task.orderReference, ref].filter(Boolean).join(' · ')}: a rider will collect your package.`, type: 'delivery', entityId: task.orderId }).catch(() => undefined);
+      }
     }
     await this.notifications
       .toUser(rider.id, {

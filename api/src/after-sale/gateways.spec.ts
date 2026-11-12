@@ -5,7 +5,7 @@ import { SupportGateway } from '../content/support.gateway';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { StaffTierService } from '../logistics/staff-tier.service';
 
-// The team-aware "my store" resolver: a seller account is the store; a 'customer' never gets here.
+// The team-aware "my store" resolver: a seller account is the store (the after-sale gateways no longer use it: sellers take no part).
 jest.mock('../sellers/seller-context', () => ({
   sellerContext: jest.fn(async (user: { id: string; name: string }) => ({
     actor: { id: `owner-of-${user.id}`, name: user.name, role: 'seller' },
@@ -25,8 +25,8 @@ const echo = () => jest.fn(async (...a: unknown[]) => ({ args: a }));
 
 function disputes() {
   const svc = {
-    list: echo(), get: echo(), eligibility: echo(), open: echo(), reply: echo(), escalate: echo(), cancel: echo(),
-    sellerRespond: echo(), adminDecideReturn: echo(), decide: echo(), resolve: echo(), markReceived: echo(), grade: echo(), reject: echo(),
+    list: echo(), get: echo(), eligibility: echo(), open: echo(), reply: echo(), cancel: echo(),
+    adminDecideReturn: echo(), decide: echo(), resolve: echo(), markReceived: echo(), grade: echo(), reject: echo(),
   };
   const audit = { record: jest.fn(async () => undefined) };
   return { svc, audit, gw: new DisputesGateway(svc as never, audit as never, tiers()) };
@@ -35,16 +35,15 @@ function disputes() {
 describe('DisputesGateway', () => {
   it('refuses guests everywhere', async () => {
     const { gw } = disputes();
-    for (const call of [gw.list(guest), gw.get(guest, { id: 'x' }), gw.open(guest, {} as never), gw.respond(guest, { accept: true })]) {
+    for (const call of [gw.list(guest), gw.get(guest, { id: 'x' }), gw.open(guest, {} as never), gw.respond(guest)]) {
       expect(await call).toEqual({ ok: false, error: 'Sign in to continue.' });
     }
   });
 
-  it('opening, escalating, cancelling and asking about the window are for customers', async () => {
+  it('opening, cancelling and asking about the window are for customers', async () => {
     const { gw, svc } = disputes();
     for (const role of ['seller', 'admin', 'rider', 'warehouse_staff']) {
       expect(await gw.open(client(role), { orderId: 'o', type: 'return', reason: 'Broken on arrival' })).toEqual({ ok: false, error: 'Customers only.' });
-      expect(await gw.escalate(client(role), { id: 'd' })).toEqual({ ok: false, error: 'Customers only.' });
       expect(await gw.cancel(client(role), { id: 'd' })).toEqual({ ok: false, error: 'Customers only.' });
       expect(await gw.eligibility(client(role), { orderId: 'o' })).toEqual({ ok: false, error: 'Customers only.' });
     }
@@ -54,14 +53,22 @@ describe('DisputesGateway', () => {
     expect(svc.open).toHaveBeenCalledWith({ id: 'u1', name: 'User One' }, expect.objectContaining({ orderId: 'o', items: [{ itemId: 'i', qty: 2 }], attachments: ['u'], refundTo: 'phone' }));
   });
 
-  it('answering a return is for sellers, acting as the store', async () => {
+  it('the seller\'s part is gone: returns:respond and disputes:escalate answer with a message for every role and call nothing', async () => {
     const { gw, svc } = disputes();
-    expect(await gw.respond(client('customer'), { id: 'd', accept: true })).toEqual({ ok: false, error: 'Sellers only.' });
-    expect(await gw.respond(client('admin'), { id: 'd', accept: true })).toEqual({ ok: false, error: 'Sellers only.' });
-    await gw.respond(client('seller', 'staff-1', 'Staff Member'), { disputeId: 'd', accept: true, reason: 'ok' });
-    expect(svc.sellerRespond).toHaveBeenCalledWith(expect.objectContaining({ id: 'owner-of-staff-1', role: 'seller' }), 'd', true, 'ok');
-    await gw.respond(client('seller'), { id: 'd', accept: 'yes' as never });
-    expect(svc.sellerRespond).toHaveBeenLastCalledWith(expect.anything(), 'd', false, undefined); // only a real true accepts
+    for (const role of ['customer', 'seller', 'admin', 'admin_support']) {
+      expect(await gw.respond(client(role))).toEqual({ ok: false, error: 'Returns are decided by KOMORIKO support.' });
+      expect(await gw.escalate(client(role))).toEqual({ ok: false, error: 'Your request is already with KOMORIKO support.' });
+    }
+    expect(svc.adminDecideReturn).not.toHaveBeenCalled();
+    expect(await gw.respond(guest)).toEqual({ ok: false, error: 'Sign in to continue.' });
+  });
+
+  it('a seller reads and writes nothing of a store\'s cases: they act as themselves (a seller who shops sees their own purchases)', async () => {
+    const { gw, svc } = disputes();
+    await gw.list(client('seller', 's1'), {});
+    expect(svc.list).toHaveBeenLastCalledWith(expect.objectContaining({ id: 's1', role: 'seller' }), {});
+    await gw.reply(client('seller', 's1'), { id: 'd', message: 'hi' });
+    expect(svc.reply).toHaveBeenLastCalledWith(expect.objectContaining({ id: 's1', role: 'seller' }), 'd', 'hi', undefined);
   });
 
   it('deciding: admin, support, operations and finance; nobody else. Refunds only for admin and finance', async () => {
@@ -212,9 +219,9 @@ describe('AfterSaleGateway', () => {
     expect(exc.setStatus).toHaveBeenLastCalledWith('e', 'delivered', expect.objectContaining({ role: 'warehouse_staff', id: 'sup-1' }));
   });
 
-  it('A-03: respond on the seller’s behalf is for the desk and support only; marketing, moderation and finance are refused', async () => {
+  it('A-03: an exchange is decided by the desk and support only; sellers, marketing, moderation and finance are refused', async () => {
     const { gw, exc } = make();
-    for (const role of ['admin_marketing', 'admin_moderation', 'admin_finance']) {
+    for (const role of ['seller', 'admin_marketing', 'admin_moderation', 'admin_finance']) {
       expect(await gw.exchangesRespond(client(role), { id: 'e', approve: true })).toEqual({ ok: false, error: 'Not allowed.' });
     }
     expect(exc.respond).not.toHaveBeenCalled();
@@ -272,14 +279,15 @@ describe('AfterSaleGateway', () => {
     expect((await gw.exchangesSetStatus(client('warehouse_staff', 'sup-1'), { id: 'e', status: 'approved' })).ok).toBe(true);
   });
 
-  it('respond: sellers (as their store) and admins; customers, riders and the warehouse cannot', async () => {
+  it('respond: support, operations and the super admin; sellers, customers, riders and the warehouse cannot', async () => {
     const { gw, rep, exc } = make();
-    for (const role of ['customer', 'rider', 'warehouse_staff']) {
+    for (const role of ['seller', 'customer', 'rider', 'warehouse_staff']) {
       expect(await gw.replacementsRespond(client(role), { id: 'r', approve: true })).toEqual({ ok: false, error: 'Not allowed.' });
       expect(await gw.exchangesRespond(client(role), { id: 'e', approve: true })).toEqual({ ok: false, error: 'Not allowed.' });
     }
-    await gw.replacementsRespond(client('seller', 's9'), { id: 'r', approve: true, reason: 'x' });
-    expect(rep.respond).toHaveBeenCalledWith(expect.objectContaining({ id: 'owner-of-s9' }), 'r', true, 'x');
+    expect(rep.respond).not.toHaveBeenCalled();
+    await gw.replacementsRespond(client('admin_support', 's9'), { id: 'r', approve: true, reason: 'x' });
+    expect(rep.respond).toHaveBeenCalledWith(expect.objectContaining({ id: 's9', role: 'admin_support' }), 'r', true, 'x');
     await gw.exchangesRespond(client('admin_support'), { id: 'e', approve: false, reason: 'no thanks' });
     expect(exc.respond).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin_support' }), 'e', false, 'no thanks');
   });
@@ -311,9 +319,9 @@ describe('AfterSaleGateway', () => {
     expect(rep.setStatus).toHaveBeenCalledTimes(2);
   });
 
-  it('a replacement is approved on the seller’s behalf by the desk and support only; marketing, moderation and finance are refused', async () => {
+  it('a replacement is decided by the desk and support only; sellers, marketing, moderation and finance are refused', async () => {
     const { gw, rep } = make();
-    for (const role of ['admin_marketing', 'admin_moderation', 'admin_finance']) {
+    for (const role of ['seller', 'admin_marketing', 'admin_moderation', 'admin_finance']) {
       expect(await gw.replacementsRespond(client(role), { id: 'r', approve: true })).toEqual({ ok: false, error: 'Not allowed.' });
     }
     expect(rep.respond).not.toHaveBeenCalled();

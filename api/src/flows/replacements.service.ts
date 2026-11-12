@@ -8,9 +8,9 @@ import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
 import { SettingsService } from '../content/settings.service';
-import { cleanAttachments, parseAttachments, redactForSeller, storeAttachments } from '../common/attachments';
+import { cleanAttachments, parseAttachments, storeAttachments } from '../common/attachments';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
-import { REPLACEMENT_NEXT, assertStep, sellerForItem, sellerKeys } from './after-sale';
+import { REPLACEMENT_NEXT, assertStep, sellerForItem } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
 import { quotedNotice } from '../notifications/quote';
 import { TranslationService } from '../translation/translation.service';
@@ -93,22 +93,9 @@ export class ReplacementsService {
     const take = Math.min(1000, Math.max(1, Math.floor(Number(paging?.limit) || (readsAll(user.role) ? 200 : 500))));
     const skip = Math.max(0, Math.floor(Number(paging?.offset) || 0));
     const status = paging?.status ? ({ status: paging.status as ReplacementStatus } as const) : {};
-    // The deciding admin roles and the warehouse see all; a seller sees requests about their items (and any they filed);
-    // everyone else only their own.
+    // The deciding admin roles and the warehouse see all; everyone else (a seller included) only what they asked for themselves.
     if (readsAll(user.role)) {
       return this.serve(await this.replacements.find({ where: status, order: { createdAt: 'DESC' }, take, skip }));
-    }
-    if (user.role === 'seller') {
-      const keys = await sellerKeys(user.id, this.sellers);
-      const rows = await this.serve(
-        await this.replacements.find({
-          where: [{ sellerId: In(keys), ...status }, { customerId: user.id, ...status }],
-          order: { createdAt: 'DESC' },
-          take,
-          skip,
-        }),
-      );
-      return rows.map((r) => redactForSeller(r, user.id));
     }
     return this.serve(await this.replacements.find({ where: { customerId: user.id, ...status }, order: { createdAt: 'DESC' }, take, skip }));
   }
@@ -121,29 +108,17 @@ export class ReplacementsService {
     return this.serve(await this.replacements.find({ where: { customerId: userId, ...status }, order: { createdAt: 'DESC' }, take, skip }));
   }
 
-  /** One replacement, for the customer who asked, the seller whose item it is, or staff. */
+  /** One replacement, for the customer who asked or staff (a seller sees none: support decides). */
   async get(user: { id: string; role: string }, id: string): Promise<ReplacementView> {
     const rep = await this.replacements.findOne({ where: { id: String(id ?? '') } });
-    const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
-    const allowed = !!rep && (readsAll(user.role) || rep.customerId === user.id || (!!rep.sellerId && keys.includes(rep.sellerId)));
-    if (!rep || !allowed) throw new NotFoundException('Replacement not found.');
-    const [view] = await this.serve([rep]);
-    return user.role === 'seller' ? redactForSeller(view, user.id) : view;
+    if (!rep || !(readsAll(user.role) || rep.customerId === user.id)) throw new NotFoundException('Replacement not found.');
+    return (await this.serve([rep]))[0];
   }
 
-  /** The seller account behind a replacement (null when the item's seller is unknown). */
-  private async sellerUserOf(rep: Pick<Replacement, 'sellerId'>): Promise<string | null> {
-    if (!rep.sellerId) return null;
-    const store = await this.sellers.findOne({ where: { id: rep.sellerId } });
-    return store?.userId ?? rep.sellerId;
-  }
-
-  /** Tell everyone who follows a replacement that it changed. */
+  /** Tell everyone who follows a replacement that it changed: the deciding desk, the warehouse and the customer (never the seller). */
   private async publish(rep: ReplacementView): Promise<void> {
     this.emitter.toRoles(OPS_ROLES, 'replacement:updated', rep);
     if (rep.customerId) this.emitter.toUser(rep.customerId, 'replacement:updated', rep);
-    const sellerUser = await this.sellerUserOf(rep);
-    if (sellerUser) this.emitter.toUser(sellerUser, 'replacement:updated', redactForSeller(rep));
   }
 
   async create(
@@ -186,6 +161,7 @@ export class ReplacementsService {
     if (open) throw new BadRequestException('You already asked for a replacement of this item.');
     const photos = cleanAttachments(input.attachments);
     const seller = await sellerForItem(order, sku, this.products, this.sellers);
+    // Support's response time (the setting keeps its old key).
     const hours = Number(await this.settings.get('sellerResponseHours'));
     // Translate first, then store: the reason is saved in both languages together.
     const reasonText = input.reason ? String(input.reason).slice(0, 1000) : '';
@@ -213,37 +189,33 @@ export class ReplacementsService {
     await this.keep('replacement_reason', saved.id, reasonTr);
     const [rep] = await this.serve([saved]);
     await this.publish(rep);
-    if (seller) {
-      await this.notifications.toUser(
-        seller.userId,
-        quotedNotice({
-          title: 'Replacement requested on your item',
-          body: (q) => `${rep.reference} · ${order.reference} · ${rep.productName}${rep.reason ? `: ${q}` : ''}`,
-          text: rep.reason ?? '',
-          i18n: reasonTr,
-          max: 120,
-          type: 'replacement',
-          entityId: rep.id,
-        }),
-      );
-    }
+    await this.notifications.toRole(
+      'admin_support',
+      quotedNotice({
+        title: 'Replacement requested',
+        body: (q) => `${rep.reference} · ${order.reference} · ${rep.productName}${rep.reason ? `: ${q}` : ''}`,
+        text: rep.reason ?? '',
+        i18n: reasonTr,
+        max: 120,
+        type: 'replacement',
+        entityId: rep.id,
+      }),
+    );
     return rep;
   }
 
-  /** The seller (or support, on their behalf) approves or rejects a replacement. */
+  /** Support (the `exchangeDecide` group) approves or rejects a replacement; sellers take no part. */
   async respond(actor: { id: string; role: string }, id: string, approve: boolean, rawReason: unknown): Promise<ReplacementView> {
     const rep = await this.replacements.findOne({ where: { id: String(id ?? '') } });
-    const keys = actor.role === 'seller' ? await sellerKeys(actor.id, this.sellers) : [];
-    const mine = !!rep && actor.role === 'seller' && !!rep.sellerId && keys.includes(rep.sellerId);
-    if (!rep || !(mine || inRoleGroup(actor.role, 'exchangeDecide'))) throw new NotFoundException('Replacement not found.');
+    if (!rep || !inRoleGroup(actor.role, 'exchangeDecide')) throw new NotFoundException('Replacement not found.');
     if (rep.status !== 'requested') throw new BadRequestException('This request was already handled.');
     const reason = String(rawReason ?? '').trim().slice(0, 1000);
     if (!approve && reason.length < 5) throw new BadRequestException('Tell the customer why you are rejecting this replacement.');
-    // Translate first, then store: the seller's reason is saved in both languages together.
+    // Translate first, then store: the decision note is saved in both languages together (in `sellerReason`, as before).
     return this.move(rep, approve ? 'approved' : 'rejected', reason, await this.translateFor(reason, actor.id));
   }
 
-  /** Warehouse / admin steps (the desk buttons). Approving and rejecting go through the same path as the seller's. */
+  /** Warehouse / admin steps (the desk buttons). Approving and rejecting go through the same path as support's decision. */
   async setStatus(id: string, status: ReplacementStatus): Promise<ReplacementView> {
     const rep = await this.replacements.findOne({ where: { id } });
     if (!rep) throw new NotFoundException('Replacement not found.');
@@ -276,7 +248,7 @@ export class ReplacementsService {
     if (status === 'approved') {
       const ready = await this.takeStockAndSend(rep);
       if (ready !== true) {
-        // Out of stock: put the request back so the seller can restock or reject.
+        // Out of stock: put the request back so support can ask the seller to restock, or reject.
         await this.replacements.update({ id: rep.id }, { status: 'requested', dispatchStatus: 'pending', sellerRespondedAt: null, sellerReason: null });
         throw new BadRequestException(ready);
       }
@@ -297,7 +269,7 @@ export class ReplacementsService {
   private async takeStockAndSend(rep: Replacement): Promise<true | string> {
     if (!rep.sku.startsWith('ext:') && (await this.products.getRaw(rep.sku))) {
       if (!(await this.products.reserve(rep.sku, rep.qty, { variant: rep.variant, orderId: rep.orderId, reason: 'replacement' }))) {
-        return 'Not enough stock to send a replacement. Restock the item or reject the request.';
+        return 'Not enough stock to send a replacement. Ask the seller to restock the item, or reject the request.';
       }
       await this.replacements.update({ id: rep.id }, { stockTaken: rep.qty });
     }
@@ -307,15 +279,7 @@ export class ReplacementsService {
   }
 
   private async tell(rep: ReplacementView, status: ReplacementStatus, reason: string, reasonTr: SaveTranslation | null = null): Promise<void> {
-    const sellerUser = await this.sellerUserOf(rep);
-    if (sellerUser) {
-      await this.notifications.toUser(sellerUser, {
-        title: `Replacement ${status}`,
-        body: `${rep.reference} · ${rep.orderReference} · ${rep.productName}`,
-        type: 'replacement',
-        entityId: rep.id,
-      });
-    }
+    // The seller is told nothing here: the hand-over of the new unit reaches them as "Pickup scheduled" (logistics).
     if (rep.customerId) {
       await this.notifications.toUser(
         rep.customerId,
@@ -421,7 +385,7 @@ export class ReplacementsService {
 
   /**
    * `translate:text` for `replacement_reason` / `replacement_reply` (id = the replacement). PRIVATE: only people who may
-   * read the replacement (`get`: the desk and warehouse, its customer, the seller whose item it is) may translate its
+   * read the replacement (`get`: the desk and warehouse, its customer) may translate its
    * notes. Anyone else, and a made-up id, gets "Nothing to translate.".
    */
   async translate(user: { id: string; role: string }, kind: unknown, id: unknown, target: unknown) {
@@ -429,8 +393,7 @@ export class ReplacementsService {
     const nothing = 'Nothing to translate.';
     if ((kind !== 'replacement_reason' && kind !== 'replacement_reply') || typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error(nothing);
     const rep = await this.replacements.findOne({ where: { id } });
-    const keys = user.role === 'seller' ? await sellerKeys(user.id, this.sellers) : [];
-    if (!rep || !(readsAll(user.role) || rep.customerId === user.id || (!!rep.sellerId && keys.includes(rep.sellerId)))) throw new Error(nothing);
+    if (!rep || !(readsAll(user.role) || rep.customerId === user.id)) throw new Error(nothing);
     return this.translations.translateStored(kind, id, target, { private: true });
   }
 }
