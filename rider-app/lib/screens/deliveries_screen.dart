@@ -166,26 +166,56 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
     return ok == true && mounted;
   }
 
-  Future<void> _askCode(DeliveryTaskDto t, ) async {
-    // The dialog keeps itself open and shows the server's error until the code is right.
+  /// Asks the customer's 4-digit code ONCE for the whole stop and sends it with each leg (sibling deliveries share one handover
+  /// code). The dialog keeps itself open and shows the server's error until the code is right: that is the first leg's answer,
+  /// before any other leg spent an attempt. Once the first leg went through, the others follow and the outcome of every leg is
+  /// told in a snackbar.
+  Future<void> _askCode(LegStop stop) async {
+    var failures = const <LegFailure>[];
     final done = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => DeliveryCodeDialog(onSubmit: (code) => store.advance(t.id, 'delivered', code: code)),
+      builder: (ctx) => DeliveryCodeDialog(
+        legCount: stop.legs.length,
+        onSubmit: (code) async => failures = await store.advanceLegs(stop.legs, 'delivered', code: code),
+      ),
     );
-    if (done == true && mounted) showSnack(context, Strings.of(context).doneDelivered);
+    if (done == true && mounted) _tellOutcome(stop, failures, Strings.of(context).doneDelivered);
+  }
+
+  /// Says what happened to the legs of [stop]: [done] when every leg went through (with the number of orders for a stop of
+  /// several), else which orders were done and which were refused, and why.
+  void _tellOutcome(LegStop stop, List<LegFailure> failures, String done) {
+    final s = Strings.of(context);
+    if (failures.isEmpty) {
+      showSnack(context, stop.isGroup ? s.stopAllOk(done, stop.legs.length) : done);
+      return;
+    }
+    final failed = failures.map((f) => '${f.orderReference}${s.isFr ? ' :' : ':'} ${Strings.current.errorText(f.error)}').join('; ');
+    showSnack(context, s.stopPartial(stop.legs.length - failures.length, stop.legs.length, failed));
   }
 
   /// The scanner for one leg's boxes. Whatever it reports is in the store, which the cards listen to.
-  Future<void> _scanLeg(DeliveryTaskDto t, ParcelStage stage) async {
+  /// A stop's legs share their boxes: one scan on any of them ticks all (the server records it on every sibling), and the
+  /// checklist counts a shared box once.
+  Future<void> _scanLeg(LegStop stop, ParcelStage stage) async {
+    final t = stop.first;
+    // The stop as the store knows it now (the scans update its legs in place).
+    LegStop current() {
+      final now = store.myTasks.where((x) => stop.legs.any((l) => l.id == x.id)).toList();
+      return now.isEmpty ? stop : LegStop(now);
+    }
     await Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => ParcelScanScreen(
-        title: t.orderReference,
+        title: stop.references.join(' · '),
         stage: stage,
         scanner: widget.scanner,
         refresh: store,
-        parcels: () => store.myTasks.where((x) => x.id == t.id).fold<List<ParcelDto>>(t.parcels, (_, x) => x.parcels),
+        showOrders: stop.isGroup,
+        parcels: () => current().parcels,
+        contents: () => current().contents,
         onScan: (code, manual) => store.scanParcel(t, code, stage, manual: manual),
+        onResolve: store.resolveParcel,
       ),
     ));
     if (mounted) unawaited(store.legParcels(t));
@@ -207,7 +237,14 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
   }
 
   /// The boxes of a card and the button that opens the scanner (secondary: the card's one filled button stays its main action).
-  List<Widget> _scanBlock(Strings s, {required Object id, required List<ParcelDto> parcels, required ParcelStage stage, required bool offer, required VoidCallback open}) {
+  List<Widget> _scanBlock(Strings s,
+      {required Object id,
+      required List<ParcelDto> parcels,
+      required ParcelStage stage,
+      required bool offer,
+      required VoidCallback open,
+      List<ParcelContent> contents = const [],
+      bool showOrders = false}) {
     if (parcels.isEmpty) return const [];
     final n = scanCount(parcels, stage);
     return [
@@ -215,7 +252,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
         key: ValueKey('parcels-$id'),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14)),
-        child: ParcelChecklist(parcels: parcels, stage: stage, idPrefix: '$id-'),
+        child: ParcelChecklist(parcels: parcels, stage: stage, idPrefix: '$id-', contents: contents, showOrders: showOrders),
       )),
       if (offer)
         Padding(
@@ -228,7 +265,10 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
     ];
   }
 
-  Future<void> _advance(DeliveryTaskDto t, String to) async {
+  /// Moves every leg of [stop] one step: the first leg first (a refusal there changes nothing), then its siblings; each leg's
+  /// outcome is told in a snackbar.
+  Future<void> _advance(LegStop stop, String to) async {
+    final t = stop.first;
     final s = Strings.of(context);
     if (to == 'in_transit') await _explainBackgroundLocation();
     if (!mounted) return;
@@ -240,13 +280,14 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
         builder: (ctx) => const FailReasonSheet(),
       );
       if (reason == null || !mounted) return;
-      await _run(() => store.advance(t.id, 'failed', reason: reason), done: s.doneFailed);
+      await _runStop(stop, 'failed', s.doneFailed, reason: reason);
       return;
     }
     if (to == 'delivered') {
       if (t.collectOld && !await _confirm(s.collectOldTitle, s.collectOldBody(t.customerName ?? s.theCustomer))) return;
       // Optional proof at the door: a photo and the customer's signature, saved on the server before the leg is completed.
       // The code below is checked exactly as before; the sheet only adds the proof.
+      // One proof for the stop (the photo and signature are taken once, saved on the first leg).
       if (t.takesProof && mounted) {
         final go = await showModalBottomSheet<bool>(
           context: context,
@@ -257,16 +298,16 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
         if (go != true || !mounted) return;
       }
       // The customer's code is asked on the customer delivery only (never on a hub-bound leg, a return or a replacement).
-      if (t.needsCode && store.requireDeliveryCode) return _askCode(t);
+      if (t.needsCode && store.requireDeliveryCode) return _askCode(stop);
       try {
         setState(() => _busy = true);
-        await store.advance(t.id, 'delivered');
-        if (mounted) showSnack(context, s.doneDelivered);
+        final failures = await store.advanceLegs(stop.legs, 'delivered');
+        if (mounted) _tellOutcome(stop, failures, s.doneDelivered);
       } catch (e) {
         // The setting was not known yet but the server wants the code: ask for it.
         if (e is ApiException && e.message.startsWith('Wrong delivery code') && mounted) {
           setState(() => _busy = false);
-          return _askCode(t);
+          return _askCode(stop);
         }
         if (mounted) showSnack(context, Strings.current.errorText(e));
       } finally {
@@ -274,7 +315,20 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
       }
       return;
     }
-    await _run(() => store.advance(t.id, to), done: to == 'picked_up' ? s.donePickedUp : s.doneInTransit);
+    await _runStop(stop, to, to == 'picked_up' ? s.donePickedUp : s.doneInTransit);
+  }
+
+  /// [_run] for a stop: its legs go to [status] and the outcome of each is told.
+  Future<void> _runStop(LegStop stop, String status, String done, {String? reason}) async {
+    setState(() => _busy = true);
+    try {
+      final failures = await store.advanceLegs(stop.legs, status, reason: reason);
+      if (mounted) _tellOutcome(stop, failures, done);
+    } catch (e) {
+      if (mounted) showSnack(context, Strings.current.errorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -297,7 +351,9 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
             : filtering
                 ? filterFinishedRuns(store.finishedRuns, store.tasksOfRun, query: _search.text, from: _range?.start, to: _range?.end)
                 : store.finishedRuns;
-        final total = runs.length + rows.length;
+        // Legs of one box set met at one address are one stop (open legs only; a finished leg stands alone).
+        final stops = groupStops(rows);
+        final total = runs.length + stops.length;
         final top = MediaQuery.of(context).padding.top;
         return Column(children: [
           Container(
@@ -310,7 +366,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
               ]),
               const SizedBox(height: 14),
               Row(children: [
-                _seg(s.tabActive, 0, store.active.length + store.activeRuns.length),
+                _seg(s.tabActive, 0, groupStops(store.active).length + store.activeRuns.length),
                 const SizedBox(width: 8),
                 _seg(s.tabDone, 1, store.finished.length + store.finishedRuns.length),
               ]),
@@ -328,7 +384,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
                           itemCount: total,
                           separatorBuilder: (_, __) => const SizedBox(height: 12),
-                          itemBuilder: (_, i) => i < runs.length ? _runCard(s, runs[i], alone: total == 1) : _taskCard(s, rows[i - runs.length], alone: total == 1),
+                          itemBuilder: (_, i) => i < runs.length ? _runCard(s, runs[i], alone: total == 1) : _taskCard(s, stops[i - runs.length], alone: total == 1),
                         ),
             ),
           ),
@@ -396,22 +452,24 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
     return s.has('task_${t.status}') ? s.t('task_${t.status}') : t.status.replaceAll('_', ' ');
   }
 
-  Widget _taskCard(Strings s, DeliveryTaskDto t, {required bool alone}) {
+  Widget _taskCard(Strings s, LegStop stop, {required bool alone}) {
+    final t = stop.first;
     final next = nextStatusFor(t);
     final nav = navTargetFor(t);
     final hubName = (t.toHubName ?? s.theWarehouse);
     // The status change waits for the boxes of its stage (the server refuses it too): collecting needs the pickup scans,
     // handing over the drop-off scans (also before the customer's code).
     final ParcelStage? blocked = switch (next?.$1) {
-      'picked_up' => t.scanBlocks(ParcelStage.pickup) ? ParcelStage.pickup : null,
-      'delivered' => t.scanBlocks(ParcelStage.dropoff) ? ParcelStage.dropoff : null,
+      'picked_up' => stop.scanBlocks(ParcelStage.pickup) ? ParcelStage.pickup : null,
+      'delivered' => stop.scanBlocks(ParcelStage.dropoff) ? ParcelStage.dropoff : null,
       _ => null,
     };
     return SurfaceCard(
       key: ValueKey('task-${t.id}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text(t.orderReference, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+          Expanded(child: Text(stop.references.join(' · '), key: ValueKey('refs-${t.id}'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, height: 1.25))),
+          const SizedBox(width: 8),
           Pill(_statusLabel(s, t), color: _statusColor(t.status).withValues(alpha: 0.14), textColor: _statusColor(t.status)),
         ]),
         const SizedBox(height: 8),
@@ -419,6 +477,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
           padding: const EdgeInsets.only(bottom: 8),
           child: Wrap(spacing: 6, runSpacing: 6, children: [
             Pill(_kindLabel(s, t), key: ValueKey('kind-${t.id}'), color: AppColors.violet.withValues(alpha: 0.12), textColor: AppColors.violet),
+            if (stop.isGroup) Pill(s.stopOrdersPill(stop.legs.length), key: ValueKey('stop-${t.id}'), color: AppColors.primary.withValues(alpha: 0.12), textColor: AppColors.primary),
             if (t.attempts > 1) _attemptPill(s, t),
             if (t.readyAt != null && t.kind == LegKind.pickup) Pill(s.sellerReady, color: AppColors.success.withValues(alpha: 0.14), textColor: AppColors.success),
             if (t.isExpress) Pill(s.kindExpress, key: ValueKey('express-${t.id}'), color: AppColors.accent.withValues(alpha: 0.18), textColor: const Color(0xFF92610A)),
@@ -440,7 +499,12 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
               Expanded(child: Text(s.failedWithReason(s.isFr ? translateReason(t.failureReason!) : t.failureReason), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w700, fontSize: 13))),
             ]),
           ),
-        if (t.items.isNotEmpty) _line(Icons.shopping_bag_outlined, _itemsText(s, t)),
+        if (stop.isGroup) _line(Icons.receipt_long_rounded, s.stopOrdersLine(stop.references.join(', '))),
+        // Boxes in hand: their checklist below lists what is in them. Otherwise (no labels, older server, a finished leg) each
+        // leg's own lines, with their options.
+        if (!(t.isActive && stop.hasParcels && stop.contents.isNotEmpty))
+          for (final leg in stop.legs)
+            if (leg.items.isNotEmpty) _line(Icons.shopping_bag_outlined, stop.isGroup ? '${leg.orderReference}: ${_itemsText(s, leg)}' : _itemsText(s, leg)),
         if (t.deliverByText != null && t.isCustomerLeg) _line(Icons.event_available_rounded, s.deliverBy(t.deliverByText)),
         if (t.isActive && nav?.kind == NavKind.customer && nav?.pin != null && t.status != 'assigned') _line(Icons.push_pin_rounded, s.pinExact),
         if (t.isActive && nav != null)
@@ -502,21 +566,25 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
             ]),
           ),
         if (t.isActive && t.needsCode && store.requireDeliveryCode && t.status != 'assigned')
-          Padding(padding: const EdgeInsets.only(top: 8), child: Text(s.codeHint, key: ValueKey('code-hint-${t.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
+          Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(stop.isGroup ? '${s.codeHint} ${s.stopOneCode(stop.legs.length)}' : s.codeHint, key: ValueKey('code-hint-${t.id}'), style: const TextStyle(color: AppColors.muted, fontSize: 12.5))),
         if (t.status == 'in_transit') _gpsRow(s, toCustomer: t.isCustomerLeg || t.kind == LegKind.replacementDelivery),
         if (t.isActive)
           ..._scanBlock(s,
               id: t.id,
-              parcels: t.parcels,
+              parcels: stop.parcels,
+              contents: stop.contents,
+              showOrders: stop.isGroup,
               stage: t.scanStage ?? ParcelStage.pickup,
-              offer: t.offersScan,
-              open: () => _scanLeg(t, t.scanStage!)),
+              offer: stop.offersScan,
+              open: () => _scanLeg(stop, t.scanStage!)),
         if (next != null) ...[
           const SizedBox(height: 12),
           _cardAction(
             key: ValueKey('next-${t.id}'),
             alone: alone,
-            onPressed: _busy || blocked != null ? null : () => _advance(t, next.$1),
+            onPressed: _busy || blocked != null ? null : () => _advance(stop, next.$1),
             label: s.t(next.$2),
           ),
           if (blocked != null)
@@ -531,9 +599,10 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> with WidgetsBinding
             alignment: Alignment.centerRight,
             child: TextButton(
               key: ValueKey('fail-${t.id}'),
-              onPressed: _busy ? null : () => _advance(t, 'failed'),
+              onPressed: _busy ? null : () => _advance(stop, 'failed'),
               style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-              child: Text(s.couldNotDeliver),
+              // One line even at the largest text on the narrowest phone: the label shrinks rather than wraps.
+              child: FittedBox(fit: BoxFit.scaleDown, child: Text(s.couldNotDeliver)),
             ),
           ),
       ]),
@@ -1016,7 +1085,10 @@ class _FailReasonSheetState extends State<FailReasonSheet> {
 /// server's message ("Wrong delivery code…") until the code is accepted.
 class DeliveryCodeDialog extends StatefulWidget {
   final Future<void> Function(String code) onSubmit;
-  const DeliveryCodeDialog({super.key, required this.onSubmit});
+
+  /// The orders of the stop this code is for (more than one: the same code is sent with each, so it is asked once).
+  final int legCount;
+  const DeliveryCodeDialog({super.key, required this.onSubmit, this.legCount = 1});
   @override
   State<DeliveryCodeDialog> createState() => _DeliveryCodeDialogState();
 }
@@ -1060,8 +1132,10 @@ class _DeliveryCodeDialogState extends State<DeliveryCodeDialog> {
     final s = Strings.of(context);
     return AlertDialog(
       title: Text(s.codeTitle),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Scrolls: at the largest text on the narrowest phone the body, the code and the buttons do not fit one screen.
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(s.codeBody),
+        if (widget.legCount > 1) Padding(padding: const EdgeInsets.only(top: 6), child: Text(s.stopOneCode(widget.legCount), key: const ValueKey('delivery-code-shared'), style: const TextStyle(fontWeight: FontWeight.w700))),
         const SizedBox(height: 12),
         TextField(
           key: const ValueKey('delivery-code-field'),
@@ -1076,7 +1150,7 @@ class _DeliveryCodeDialogState extends State<DeliveryCodeDialog> {
           onSubmitted: (_) => _submit(),
         ),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, key: const ValueKey('delivery-code-error'), style: const TextStyle(color: AppColors.danger, fontWeight: FontWeight.w600))),
-      ]),
+      ])),
       actions: [
         TextButton(onPressed: _busy ? null : () => Navigator.pop(context, false), child: Text(s.cancel)),
         FilledButton(key: const ValueKey('delivery-code-submit'), onPressed: _busy ? null : _submit, child: ButtonLabel(_busy ? s.codeChecking : s.codeConfirm)),

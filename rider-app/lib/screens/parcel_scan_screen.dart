@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../l10n/parcel_strings.dart';
@@ -7,13 +9,18 @@ import '../services/parcels.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 import 'parcel_checklist.dart';
+import 'parcel_resolution_card.dart';
 
 /// Sends one scan to the server; throws what it refuses with.
 typedef ScanParcel = Future<ParcelScan> Function(String code, bool manual);
 
+/// Asks the server what a box is (`parcels:resolve`); throws what it refuses with ("Parcel not found.").
+typedef ResolveParcel = Future<ParcelResolution> Function(String code);
+
 /// The scanner: stays open while the rider scans box after box. Every scan ticks the checklist off ("2 of 3 scanned"), with a
 /// buzz and a snackbar; the server's refusals are shown as they come. Without the camera (no permission, no camera) the code can be
-/// typed, and that scan is sent as `manual`. The camera itself is a [ParcelScanner], so tests drive the screen without one.
+/// typed, and that scan is sent as `manual`. After each scan (accepted or refused) the box is looked up ([onResolve]) and what it is
+/// is shown under the checklist: its contents, orders and legs, and the street, phone and recipient when the server sends them. The camera itself is a [ParcelScanner], so tests drive the screen without one.
 class ParcelScanScreen extends StatefulWidget {
   const ParcelScanScreen({
     super.key,
@@ -22,6 +29,9 @@ class ParcelScanScreen extends StatefulWidget {
     required this.parcels,
     required this.onScan,
     required this.refresh,
+    this.onResolve,
+    this.contents,
+    this.showOrders = false,
     this.scanner = const CameraParcelScanner(),
     this.debounce = const Duration(seconds: 3),
   });
@@ -33,6 +43,15 @@ class ParcelScanScreen extends StatefulWidget {
   /// The boxes as they stand now (read on every [refresh] notification).
   final List<ParcelDto> Function() parcels;
   final ScanParcel onScan;
+
+  /// Looks a box up after each scan; null (tests, an older server) shows only the scan's own answer.
+  final ResolveParcel? onResolve;
+
+  /// What is in the boxes being scanned (the leg's or stop's box set); read on every [refresh] notification.
+  final List<ParcelContent> Function()? contents;
+
+  /// Each contents line names its order (a stop of several orders).
+  final bool showOrders;
 
   /// Rebuilds the screen when the boxes change (the store).
   final Listenable refresh;
@@ -52,6 +71,12 @@ class _ParcelScanScreenState extends State<ParcelScanScreen> {
   String? _lastCode;
   DateTime? _lastAt;
   ({String text, bool error})? _note;
+
+  /// The last box looked up: its code, the answer (or the refusal) and whether the lookup is still running. [_resolveToken] drops
+  /// the answer of a lookup that a newer scan overtook.
+  ({String code, ParcelResolution? data, String? error, bool loading})? _resolved;
+  List<ParcelContent> _scanContents = const [];
+  int _resolveToken = 0;
 
   @override
   void dispose() {
@@ -84,6 +109,8 @@ class _ParcelScanScreenState extends State<ParcelScanScreen> {
     try {
       final scan = await widget.onScan(code, manual);
       if (!mounted) return;
+      _scanContents = scan.contents;
+      unawaited(_resolve(code));
       final complete = stageComplete(widget.parcels(), widget.stage);
       final text = scan.already ? s.parcelAlready(code) : complete ? s.parcelCompleteMsg : s.parcelScannedOk(code, scan.scanned, scan.total);
       _feedback(heavy: false);
@@ -93,11 +120,31 @@ class _ParcelScanScreenState extends State<ParcelScanScreen> {
     } catch (e) {
       if (!mounted) return;
       final text = s.errorText(e);
+      _scanContents = const [];
+      unawaited(_resolve(code, scanError: text));
       _feedback(heavy: true);
       setState(() => _note = (text: text, error: true));
       showSnack(context, text);
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Looks the box up and shows what it is. A refusal is shown in the card ("Parcel not found." in the rider's language) unless it
+  /// only repeats the scan's own refusal; any other failure is quiet (the scan itself already said what happened).
+  Future<void> _resolve(String code, {String? scanError}) async {
+    final resolve = widget.onResolve;
+    if (resolve == null) return;
+    final token = ++_resolveToken;
+    if (mounted) setState(() => _resolved = (code: code, data: null, error: null, loading: true));
+    try {
+      final data = await resolve(code);
+      if (!mounted || token != _resolveToken) return;
+      setState(() => _resolved = (code: code, data: data, error: null, loading: false));
+    } catch (e) {
+      if (!mounted || token != _resolveToken) return;
+      final text = Strings.current.errorText(e);
+      setState(() => _resolved = text == scanError ? null : (code: code, data: null, error: text, loading: false));
     }
   }
 
@@ -143,13 +190,33 @@ class _ParcelScanScreenState extends State<ParcelScanScreen> {
                 ),
               ),
             const SizedBox(height: 14),
-            SurfaceCard(child: ParcelChecklist(parcels: parcels, stage: widget.stage)),
+            SurfaceCard(child: ParcelChecklist(parcels: parcels, stage: widget.stage, contents: widget.contents?.call() ?? const [], showOrders: widget.showOrders)),
+            if (_resolved != null) ...[const SizedBox(height: 14), _resolvedBlock(s, _resolved!)],
             const SizedBox(height: 14),
             _typedFallback(s),
           ]);
         },
       ),
     );
+  }
+
+  Widget _resolvedBlock(Strings s, ({String code, ParcelResolution? data, String? error, bool loading}) r) {
+    final data = r.data;
+    if (data != null) return ParcelResolutionCard(resolution: data);
+    if (r.error != null) {
+      return Text(r.error!, key: const ValueKey('parcel-resolve-error'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, height: 1.3, color: AppColors.danger));
+    }
+    // Still looking: what the scan itself said is in the box (older server: nothing to show until the lookup answers).
+    if (_scanContents.isNotEmpty) {
+      return Container(
+        key: const ValueKey('parcel-resolving'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14)),
+        child: ParcelContentsList(contents: _scanContents, showOrders: widget.showOrders, idPrefix: 'scan-'),
+      );
+    }
+    return Text(s.parcelResLoading, key: const ValueKey('parcel-resolving'), style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.3));
   }
 
   Widget _camera(Strings s) {

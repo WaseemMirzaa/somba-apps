@@ -20,6 +20,8 @@ final i18nAllowlist = <Pattern>[
   RegExp(r'^(Aline Kabila Mwamba|.*Kasa-Vubu.*|.*avenue du Commerce.*)$'),
   // The seeded account e-mail.
   RegExp(r'^[\w.+-]+@[\w.-]+$'),
+  // Parcel codes and order references (identifiers, e.g. "PKG-7KQ2M9XA", "SOM-1042 · SOM-1043").
+  RegExp(r'^(PKG|SOM)-[A-Z0-9]+( · (PKG|SOM)-[A-Z0-9]+)*$'),
   // Brands and payment-method names.
   RegExp(r'^(KOMORIKO|Airtel Money|Orange Money|Vodacom M-Pesa|M-Pesa|Mobile Money|Google Maps)\b'),
   // Text people typed (support tickets and replies) is theirs, not the app's.

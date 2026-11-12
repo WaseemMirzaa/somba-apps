@@ -25,6 +25,10 @@ final layoutConfigs = [
       for (final scale in const [1.0, 1.3]) LayoutConfig(size, lang, scale),
 ];
 
+/// The narrowest phone and the largest text a rider can set (320 pt, 200%), both languages: the screens that show product lists
+/// and grouped stops are also run here.
+final stressConfigs = [for (final lang in const ['en', 'fr']) LayoutConfig(const Size(320, 640), lang, 2.0)];
+
 /// A MaterialApp `builder` that applies [config]'s text scale.
 TransitionBuilder scaleText(LayoutConfig config) =>
     (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(config.scale)), child: child!);

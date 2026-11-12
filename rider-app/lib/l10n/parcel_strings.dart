@@ -33,4 +33,18 @@ extension ParcelStrings on Strings {
   String get parcelOpenSettings => t('parcel_open_settings');
   String get parcelTorch => t('parcel_torch');
   String get parcelSettingsFailed => t('parcel_settings_failed');
+
+  String get parcelContentsTitle => t('parcel_contents_title');
+  String stopOrdersPill(int n) => t('stop_orders_pill', {'n': n});
+  String stopOrdersLine(String refs) => t('stop_orders_line', {'refs': refs});
+  String get stopOneScan => t('stop_one_scan');
+  String stopOneCode(int n) => t('stop_one_code', {'n': n});
+  String stopAllOk(String text, int n) => t('stop_all_ok', {'text': text, 'n': n});
+  String stopPartial(int ok, int total, String failed) => t('stop_partial', {'ok': ok, 'total': total, 'failed': failed});
+  String get parcelResLoading => t('parcel_res_loading');
+  String parcelResStore(String name) => t('parcel_res_store', {'name': name});
+  String parcelResArea(String area) => t('parcel_res_area', {'area': area});
+  String get parcelResVoided => t('parcel_res_voided');
+  String get parcelResOrders => t('parcel_res_orders');
+  String get parcelResLegs => t('parcel_res_legs');
 }
