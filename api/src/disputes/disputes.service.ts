@@ -641,6 +641,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const payload = { disputeId: d.id, message: msg };
     this.emitter.toUser(d.customerId, 'dispute:message', payload);
     this.emitter.toRoles([...ROLE_GROUPS.disputeDesk], 'dispute:message', payload);
+    // A store that admin shares this conversation with hears it too, read-only (never the stripped fields: see `pushCustomerMessage`).
+    await this.sellerView?.pushCustomerMessage(fresh, msg as unknown as Record<string, unknown>);
     // And a notice to the others: the words are quoted in each recipient's language (a photo-only message has nothing to translate).
     const what = d.type === 'return' ? 'Return' : 'Dispute';
     const quote = { text: body || '📷', i18n: body ? bodyTr : null, max: 140 };

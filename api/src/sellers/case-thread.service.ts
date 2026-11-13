@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CaseSellerMessage, Dispute, Exchange, Replacement, Seller } from '../database/entities';
+import { CaseSellerMessage, Dispute, DisputeMessage, Exchange, Replacement, Seller } from '../database/entities';
 import type { CaseKind } from '../database/entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
@@ -9,6 +9,10 @@ import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { TranslationService } from '../translation/translation.service';
 import type { TextI18n } from '../translation/translation.service';
 import { SellerAfterSaleViewService } from './seller-after-sale.service';
+import { NOT_SHARED } from './after-sale-access';
+import { customerMessageView } from './seller-case-view';
+import type { CustomerConversationMessage } from './seller-case-view';
+import { parseAttachments } from '../common/attachments';
 import { TeamDirectory } from './team-directory';
 
 export const CASE_KINDS: readonly CaseKind[] = ['return', 'exchange', 'replacement'];
@@ -55,6 +59,7 @@ export class CaseThreadService {
     @InjectRepository(Exchange) private readonly exchanges: Repository<Exchange>,
     @InjectRepository(Replacement) private readonly replacements: Repository<Replacement>,
     @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
+    @InjectRepository(DisputeMessage) private readonly customerMsgs: Repository<DisputeMessage>,
     private readonly view: SellerAfterSaleViewService,
     private readonly emitter: RealtimeEmitter,
     private readonly team: TeamDirectory,
@@ -112,6 +117,27 @@ export class CaseThreadService {
       readBySellerAt: m.readBySellerAt,
       readBySupportAt: m.readBySupportAt,
     }));
+  }
+
+  /**
+   * `caseThread:customer { kind, caseId }`: the customer <-> support conversation of one of the store's cases, READ-ONLY, only while
+   * admin shares it with the store (`afterSaleAccess.customerThread`) and the section is on. A return has such a conversation; an
+   * exchange or a replacement has none (answered as an empty list). The store never writes here: its only thread is the private one.
+   */
+  async customerConversation(user: Caller, body: { kind?: unknown; caseId?: unknown } | undefined): Promise<CustomerConversationMessage[]> {
+    if (user.role !== 'seller') throw new Error('Not allowed.');
+    const kind = CaseThreadService.kindOf(body?.kind);
+    const c = await this.caseOf(kind, body?.caseId);
+    const ctx = await this.view.threadSide(user, kind, false);
+    if (ctx.seller.id !== c.sellerId) throw new Error(NOT_FOUND);
+    const access = await this.view.accessOf(ctx.seller);
+    if (!access.customerThread) throw new Error(NOT_SHARED);
+    if (kind !== 'return') return [];
+    const rows = await this.customerMsgs.find({ where: { disputeId: c.id }, order: { createdAt: 'ASC' }, take: 500 });
+    const i18n = await this.translations?.i18nFor('dispute_message', rows.map((m) => ({ id: m.id, text: m.text })));
+    return rows
+      .map((m) => customerMessageView({ ...m, attachments: parseAttachments(m.attachments), ...(i18n?.has(m.id) ? { textI18n: i18n.get(m.id) } : {}) }, access.reasons))
+      .filter((m): m is CustomerConversationMessage => !!m);
   }
 
   /** `caseThread:list { kind, caseId }`: the thread, oldest first. */

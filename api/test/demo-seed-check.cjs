@@ -312,11 +312,11 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     for (const [k, sock] of [['A', A], ['B', B], ['C', C]]) ids[k] = (data(await req(sock, 'sellers:mine')) ?? {}).id;
     const accessOf = async (sock) => (data(await req(sock, 'sellers:mine')) ?? {}).afterSaleAccess ?? {};
     const defaults = data(await req(SUP, 'sellerAccess:defaults:get')) ?? {};
-    ok(['returns', 'exchanges', 'replacements', 'express'].every((k) => defaults[k] === false), 'the four platform defaults stay OFF', JSON.stringify(defaults));
+    ok(['returns', 'exchanges', 'replacements', 'express', 'customerThread', 'reasons'].every((k) => defaults[k] === false), 'the six platform defaults stay OFF', JSON.stringify(defaults));
     const aa = await accessOf(A), ab = await accessOf(B), ac = await accessOf(C);
-    ok(aa.returns && aa.exchanges && aa.replacements && aa.express, 'store A: override ON for returns, exchanges, replacements and express', JSON.stringify(aa));
-    ok(!ab.returns && !ab.exchanges && !ab.replacements && !ab.express, 'store B: follows the default (all off)', JSON.stringify(ab));
-    ok(ac.returns === true && !ac.exchanges && !ac.replacements && !ac.express, 'store C: returns only', JSON.stringify(ac));
+    ok(aa.returns && aa.exchanges && aa.replacements && aa.express && aa.customerThread && aa.reasons, 'store A: override ON for the four sections, the customer conversation and the reasons', JSON.stringify(aa));
+    ok(Object.values(ab).length === 6 && Object.values(ab).every((v) => v === false), 'store B: follows the default (all six off)', JSON.stringify(ab));
+    ok(ac.returns === true && ac.reasons === true && !ac.exchanges && !ac.replacements && !ac.express && !ac.customerThread, 'store C: returns and the reasons, not the customer conversation', JSON.stringify(ac));
     const stg = (cs) => new Set(cs.map((c) => c.stage));
     const redacted = (cs) => cs.every((c) => !('customerId' in c) && !('customerName' in c) && !('messages' in c) && c.customerFirstName);
 
@@ -324,6 +324,25 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     const deskReturns = list(await req(SUP, 'returns:list', { limit: 200 }));
     const deskEx = list(await req(SUP, 'exchanges:list', { limit: 200 }));
     const deskRep = list(await req(SUP, 'replacements:list', { limit: 200 }));
+    // (B) and (A) of the visibility switches: store A reads the customers' words, store C the reasons only, store B nothing
+    const raStore = await store(A, 'returns:list');
+    ok(raStore.length >= 3 && raStore.every((c) => c.reasonHidden === false && c.customerThreadShared === true) && raStore.every((c) => !!c.reason), 'store A: every return shows the customer\'s reason (reasons ON) and says the conversation is shared');
+    const a1 = raStore.find((c) => c.stage === 'awaiting_support' && c.reason);
+    let conv = [];
+    for (const c of raStore.filter((x) => x.stage === 'awaiting_support')) {
+      const r = await req(A, 'caseThread:customer', { kind: 'return', caseId: c.id });
+      if (r.ok && r.data.some((m) => /pictures of the bottle/.test(m.text))) { conv = r.data; break; }
+    }
+    ok(conv.some((m) => m.side === 'customer' && /pictures of the bottle/.test(m.text)) && conv.some((m) => m.side === 'support' && /Thank you for the pictures/.test(m.text)), 'store A: reads the customer <-> support conversation of its return (customer first name, support as KOMORIKO)', JSON.stringify(conv).slice(0, 160));
+    ok(conv.every((m) => m.authorName === 'KOMORIKO' || !/\s/.test(m.authorName)) && conv.every((m) => m.textI18n?.en && m.textI18n?.fr), 'store A: the conversation has first names only and both languages');
+    ok((await req(A, 'disputes:reply', { id: a1?.id, message: 'hello' })).ok === false, 'store A cannot write in the customer conversation');
+    const rcStore = await store(C, 'returns:list');
+    ok(rcStore.length >= 3 && rcStore.every((c) => c.reasonHidden === false && !!c.reason && c.customerThreadShared === false), 'store C: sees the reasons');
+    const cConv = await req(C, 'caseThread:customer', { kind: 'return', caseId: rcStore[0]?.id });
+    ok(cConv.ok === false && /not shared/i.test(cConv.error ?? ''), 'store C: the customer conversation is refused (not shared)', JSON.stringify(cConv).slice(0, 100));
+    const bConv = await req(B, 'caseThread:customer', { kind: 'return', caseId: deskReturns.find((d) => d.sellerId === ids.B)?.id });
+    ok(bConv.ok === false, 'store B: no customer conversation (section off)');
+
     for (const k of ['A', 'B', 'C']) {
       const r = deskReturns.filter((d) => d.sellerId === ids[k]), e = deskEx.filter((d) => d.sellerId === ids[k]), p = deskRep.filter((d) => d.sellerId === ids[k]);
       ok(r.length >= 3 && new Set(r.map((d) => d.stage)).size >= 3, `store ${k}: at least 3 returns at 3 different stages (${[...new Set(r.map((d) => d.stage))].join(', ')})`);
@@ -343,7 +362,7 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     let threaded = null, thread = [];
     for (const c of ra.filter((x) => x.stage === 'awaiting_support')) {
       const t = list(await req(A, 'caseThread:list', { kind: 'return', caseId: c.id }));
-      if (t.length >= 3) { threaded = c; thread = t; break; }
+      if (t.length >= 3 && t.some((m) => /Understood\. If it is approved/.test(m.text))) { threaded = c; thread = t; break; }
     }
     ok(!!threaded, 'store A: a return with a seller <-> support back-and-forth');
     ok(thread.some((m) => m.authorSide === 'seller') && thread.some((m) => m.authorSide === 'support'), 'the thread has both sides');

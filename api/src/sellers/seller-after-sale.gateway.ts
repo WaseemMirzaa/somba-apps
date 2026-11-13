@@ -77,6 +77,16 @@ export class SellerAfterSaleGateway {
     }
   }
 
+  /** `{ kind, caseId }`: the customer <-> support conversation of one of the store's cases, read-only, when admin shares it. */
+  @SubscribeMessage('caseThread:customer')
+  async customer(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { kind?: string; caseId?: string }) {
+    try {
+      return ok(await this.threads.customerConversation(requireUser(client), body));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('caseThread:send')
   async send(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { kind?: string; caseId?: string; text?: string }) {
     try {

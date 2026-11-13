@@ -82,3 +82,30 @@ test("the new server sentences have their French in the web error map, and the s
   ]) assert.ok(errors.includes(`"${en}": "${fr}"`), en);
   assert.ok(read("../components/shop/translatable-text.tsx").includes('"case_seller_message"'));
 });
+
+test("the two visibility switches (§13): the customer's words are placeholders until admin shows them, and the conversation is read-only", () => {
+  const lib = read("./seller-aftersale.ts");
+  for (const k of ["customerThread", "reasons"]) assert.ok(lib.includes(`"${k}"`), k);
+  assert.ok(lib.includes('"caseThread:customer"') && lib.includes('"caseThread:customerMessage"'));
+  const section = read("../components/seller/aftersale-section.tsx");
+  assert.ok(section.includes("KOMORIKO support has the reason for this request.") && section.includes("Le support KOMORIKO a le motif de cette demande."));
+  assert.match(section, /c\.reasonHidden \?/);
+  assert.ok(section.includes("Customer & support conversation") && section.includes("Conversation client et support"));
+  assert.match(section, /c\.customerThreadShared && \(/);
+  // the conversation panel has no way to write
+  const panel = section.slice(section.indexOf("function CustomerConversation"));
+  assert.ok(!/<textarea|<input|caseThread:send|disputes:reply/.test(panel), "the customer conversation is read-only");
+});
+
+test("admin: the Seller portal page and the store card carry the two new rows with their help text in English and French", () => {
+  const admin = read("../components/admin/seller-portal-access.tsx");
+  assert.ok(admin.includes('["returns", "exchanges", "replacements", "express", "customerThread", "reasons"]'));
+  for (const text of [
+    "Show the customer's messages with support to this store (read-only).",
+    "Montrer à cette boutique les messages du client avec le support (lecture seule).",
+    "Show the customer's reason and photos to this store.",
+    "Montrer à cette boutique le motif et les photos du client.",
+  ]) assert.ok(admin.includes(text), text);
+  // both the defaults card and the per-store selects are built from the same list, so every switch is in both
+  assert.equal([...admin.matchAll(/SECTION_ORDER\.map/g)].length, 2);
+});

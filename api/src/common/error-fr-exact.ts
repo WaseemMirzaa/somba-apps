@@ -75,6 +75,7 @@ export const ERROR_FR_EXACT: Record<string, string> = {
   'Choose On or Off for each section.': 'Choisissez Activé ou Désactivé pour chaque section.',
   'Choose Follow default, On or Off for each section.': 'Choisissez Suivre le défaut, Activé ou Désactivé pour chaque section.',
   'Request not found.': 'Demande introuvable.',
+  'KOMORIKO support has not shared this conversation with your store.': 'Le support KOMORIKO n’a pas partagé cette conversation avec votre boutique.',
   'Messages are at most 2000 characters.': 'Les messages font 2000 caractères au plus.',
   'Policy change not found.': 'Modification de politique introuvable.',
   'This policy change was already decided.': 'Cette modification de politique a déjà été traitée.',

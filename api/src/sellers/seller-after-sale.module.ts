@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CaseSellerMessage, DeliveryTask, Dispute, Exchange, Replacement, Seller } from '../database/entities';
+import { CaseSellerMessage, DeliveryTask, Dispute, DisputeMessage, Exchange, Replacement, Seller } from '../database/entities';
 import { ContentModule } from '../content/content.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OpsModule } from '../ops/ops.module';
@@ -15,7 +15,7 @@ import { SellerAfterSaleViewService } from './seller-after-sale.service';
  * by the after-sale gateways; it imports none of them. The seller context and the team directory are global.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Seller, DeliveryTask, CaseSellerMessage, Dispute, Exchange, Replacement]), ContentModule, NotificationsModule, OpsModule],
+  imports: [TypeOrmModule.forFeature([Seller, DeliveryTask, CaseSellerMessage, Dispute, DisputeMessage, Exchange, Replacement]), ContentModule, NotificationsModule, OpsModule],
   providers: [AfterSaleAccessService, SellerAfterSaleViewService, CaseThreadService, SellerAfterSaleGateway],
   exports: [AfterSaleAccessService, SellerAfterSaleViewService, CaseThreadService],
 })

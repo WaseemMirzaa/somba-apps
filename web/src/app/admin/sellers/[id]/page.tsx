@@ -35,8 +35,8 @@ const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approv
 const PRODUCT_STATUS_FR: Record<string, string> = { live: "En ligne", pending: "En attente", rejected: "Rejeté", removed: "Bloqué", draft: "Brouillon" };
 
 type SellerFull = Seller & {
-  afterSaleAccessOverride?: Partial<Record<"returns" | "exchanges" | "replacements" | "express", boolean | null>>;
-  afterSaleAccessDefaults?: { returns: boolean; exchanges: boolean; replacements: boolean; express: boolean }; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; expressDelivery?: boolean; plan?: string; planExpiresAt?: string | null };
+  afterSaleAccessOverride?: Partial<Record<"returns" | "exchanges" | "replacements" | "express" | "customerThread" | "reasons", boolean | null>>;
+  afterSaleAccessDefaults?: { returns: boolean; exchanges: boolean; replacements: boolean; express: boolean; customerThread: boolean; reasons: boolean }; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; expressDelivery?: boolean; plan?: string; planExpiresAt?: string | null };
 
 /** Applications filed before KYC existed have none of this. */
 const hasKyc = (s: Seller) => !!(s.kycSubmittedAt || s.termsAcceptedAt || s.legalName || s.idNumber || (s.documentUrls?.length ?? 0) > 0);

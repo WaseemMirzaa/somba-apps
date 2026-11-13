@@ -10,7 +10,7 @@ import { OFF_FOR_STORE, SECTION_OF } from './after-sale-access';
 import { SellerContextService } from './seller-context';
 import type { SellerCaller, SellerContext } from './seller-context';
 import { TeamDirectory } from './team-directory';
-import { caseLine, redactCase } from './seller-case-view';
+import { caseLine, customerMessageView, redactCase, withholdReasons } from './seller-case-view';
 import type { SellerCaseView } from './seller-case-view';
 
 type Any = Record<string, unknown>;
@@ -68,6 +68,11 @@ export class SellerAfterSaleViewService {
     return (await this.access.forSeller(seller))[SECTION_OF[kind]];
   }
 
+  /** What admin shows this store right now (the resolved switches). */
+  accessOf(seller: Pick<Seller, 'afterSaleAccess'>) {
+    return this.access.forSeller(seller);
+  }
+
   /** The store an account works for (no permission or section check), or null. */
   async storeOf(user: SellerCaller): Promise<Seller | null> {
     return (await this.ctx.membership(user.id))?.seller ?? null;
@@ -78,7 +83,13 @@ export class SellerAfterSaleViewService {
   /** Redact served views and add what the store needs beside them: unread support messages and, for returns, the legs. */
   async present(kind: CaseKind, views: Any[], sellerId: string): Promise<SellerCaseView[]> {
     if (!views.length) return [];
-    const out = views.map((v) => redactCase(kind, v));
+    // What admin shows this store (§13): without `reasons` the customer's own words are removed HERE, whatever asked (list, detail, push).
+    const access = await this.access.forSellerId(sellerId);
+    const out = views.map((v) => {
+      const view = redactCase(kind, v);
+      view.customerThreadShared = access?.customerThread === true;
+      return access?.reasons === true ? view : withholdReasons(view);
+    });
     const ids = out.map((v) => v.id);
     const unread = await this.threads
       .createQueryBuilder('m')
@@ -122,6 +133,25 @@ export class SellerAfterSaleViewService {
       if (event === 'opened') await this.notify(seller, kind, view, `${WORD[kind]}${kind === 'return' ? ' opened' : ' requested'} on your item`);
     } catch (e) {
       this.logger.warn(`seller after-sale push skipped: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * A message was added to a return's customer <-> support conversation: tell the store LIVE, read-only, but only while admin shares
+   * that conversation with it (`customerThread`) and the Returns section is on. Photos go along only for a store shown the reasons.
+   */
+  async pushCustomerMessage(dispute: { sellerId?: string | null; type?: string }, message: Any): Promise<void> {
+    try {
+      if (dispute.type !== 'return' || !dispute.sellerId) return;
+      const seller = await this.sellers.findOne({ where: { id: dispute.sellerId } });
+      if (!seller) return;
+      const access = await this.access.forSeller(seller);
+      if (!access.returns || !access.customerThread) return;
+      const view = customerMessageView(message as never, access.reasons);
+      if (!view) return;
+      for (const to of await this.audience(seller)) this.emitter.toUser(to, 'caseThread:customerMessage', view);
+    } catch (e) {
+      this.logger.warn(`customer message push skipped: ${(e as Error).message}`);
     }
   }
 

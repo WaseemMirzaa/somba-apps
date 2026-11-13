@@ -9,9 +9,9 @@ import { useLocale } from "@/context/locale-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useServerList } from "@/lib/admin-live";
 import type { Seller } from "@/lib/realtime/types";
-import type { SectionKey } from "@/lib/seller-aftersale";
+import type { AccessKey } from "@/lib/seller-aftersale";
 
-type Row = Seller & { afterSaleAccessOverride?: Partial<Record<SectionKey, boolean | null>> };
+type Row = Seller & { afterSaleAccessOverride?: Partial<Record<AccessKey, boolean | null>> };
 
 /**
  * Seller portal: after-sale sections (docs/contracts/admin-controls.md §13). The default of each section, then every store with its

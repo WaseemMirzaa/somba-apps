@@ -107,11 +107,17 @@ const signIn = async (local) => {
   const C = S['customer.full'].sock;
   const mine = async (s) => data(await req(s, 'sellers:mine'));
 
+  const sc = async (sock, ev) => arr(await req(sock, ev, { scope: 'store', limit: 100 })).filter((x) => x.sellerView);
   // A clean start: every default off, no override on store A.
   const store = await mine(A);
   const storeA = store.id;
-  await req(sup, 'sellerAccess:defaults:set', { returns: false, exchanges: false, replacements: false, express: false });
-  await req(sup, 'sellers:setAfterSaleAccess', { sellerId: storeA, returns: null, exchanges: null, replacements: null, express: null });
+  // (the demo gives store A its own override: remember it and put it back at the end)
+  const KEYS = ['returns', 'exchanges', 'replacements', 'express', 'customerThread', 'reasons'];
+  const origOverride = (data(await req(sup, 'sellers:get', { id: storeA })) ?? {}).afterSaleAccessOverride ?? {};
+  const allNull = Object.fromEntries(KEYS.map((k) => [k, null]));
+  const allOff = Object.fromEntries(KEYS.map((k) => [k, false]));
+  await req(sup, 'sellerAccess:defaults:set', allOff);
+  await req(sup, 'sellers:setAfterSaleAccess', { sellerId: storeA, ...allNull });
 
   section('Off by default: the seller sees nothing');
   const m0 = await mine(A);
@@ -182,7 +188,8 @@ const signIn = async (local) => {
   const uA = data(await req(A, 'caseThread:unread'));
   ok(uA?.returns >= 1, 'the seller has an unread support message (nav badge)', JSON.stringify(uA));
   await req(A, 'caseThread:markRead', { kind: 'return', caseId: ret.id });
-  ok(data(await req(A, 'caseThread:unread'))?.returns === 0, 'reading it clears the badge');
+  const afterRead = (await sc(A, 'returns:list')).find((x) => x.id === ret.id);
+  ok(afterRead?.unread === 0, 'reading it clears this case\'s unread count (the demo has other unread threads, so the total is not 0)');
   ok(!(await req(B, 'caseThread:list', { kind: 'return', caseId: ret.id })).ok, "another store cannot read this store's thread");
   ok(!(await req(A, 'caseThread:send', { kind: 'return', caseId: ret.id, text: '   ' })).ok, 'an empty message is refused');
   ok(!(await req(A, 'caseThread:send', { kind: 'return', caseId: ret.id, text: 'x'.repeat(2001) })).ok, 'a message over 2000 characters is refused');
@@ -259,11 +266,72 @@ const signIn = async (local) => {
   await req(ops, 'sellers:setAfterSaleAccess', { sellerId: storeA, express: false });
   ok(!!(await expressOnly), 'the Express card can be hidden for one store, live');
 
+  section('Visibility switches: the customer\'s reason (reasons) and the customer <-> support conversation (customerThread)');
+  const defs = data(await req(sup, 'sellerAccess:defaults:get')) ?? {};
+  ok(KEYS.every((k) => k in defs), 'the defaults carry all six keys', JSON.stringify(defs));
+  await req(sup, 'sellerAccess:defaults:set', { returns: true, exchanges: true, replacements: true });
+  await sleep(300);
+  const mv = data(await req(A, 'sellers:mine')) ?? {};
+  ok(mv.afterSaleAccess?.customerThread === false && mv.afterSaleAccess?.reasons === false, 'sellers:mine carries customerThread and reasons (both off)', JSON.stringify(mv.afterSaleAccess));
+  const stripped = await sc(A, 'returns:list');
+  ok(stripped.length >= 1 && stripped.every((c) => c.reasonHidden === true && c.reason === null && (c.attachments ?? []).length === 0 && !('reasonI18n' in c) && c.decisionNote === null && !('decisionNoteI18n' in c)), 'reasons OFF: the reason, photos and decision note are removed from every returns:list case');
+  ok(stripped.every((c) => c.customerFirstName && c.orderReference && Array.isArray(c.items) && c.items.length > 0 && Array.isArray(c.timeline)), 'everything else in the view is unchanged (first name, order, items, timeline)');
+  const strippedOne = data(await req(A, 'disputes:get', { id: ret.id }));
+  ok(strippedOne?.reasonHidden === true && strippedOne.reason === null && !JSON.stringify(strippedOne).includes(String(ret.reason).slice(0, 25)), 'reasons OFF: disputes:get has no reason text anywhere in the payload');
+  ok(!JSON.stringify(await sc(A, 'exchanges:list')).match(/"reason":"[^n]/) && (await sc(A, 'exchanges:list')).every((c) => c.reasonHidden === true), 'reasons OFF: exchanges are stripped too');
+  ok(!JSON.stringify(await sc(A, 'replacements:list')).match(/"reason":"[^n]/) && (await sc(A, 'replacements:list')).every((c) => c.reasonHidden === true), 'reasons OFF: replacements are stripped too');
+  const noConv = await req(A, 'caseThread:customer', { kind: 'return', caseId: ret.id });
+  ok(noConv.ok === false && /not shared/i.test(noConv.error ?? ''), 'customerThread OFF: the conversation is refused', JSON.stringify(noConv).slice(0, 120));
+  ok((await req(B, 'caseThread:customer', { kind: 'return', caseId: ret.id })).ok === false, 'another store cannot read it either');
+
+  // admin turns "reasons" on for store A only: live, and the same payloads now carry the words
+  const liveR = nextEvent(A, 'seller:updated', (p) => p?.id === storeA && p?.afterSaleAccess?.reasons === true);
+  const setR = await req(ops, 'sellers:setAfterSaleAccess', { sellerId: storeA, reasons: true });
+  ok(setR.ok && setR.data.afterSaleAccessOverride?.reasons === true && setR.data.afterSaleAccessDefaults?.reasons === false, 'operations turns reasons ON for store A (override + defaults in the staff view)', JSON.stringify(setR).slice(0, 160));
+  ok(!!(await liveR), 'the seller portal hears it live');
+  const shown = await sc(A, 'returns:list');
+  ok(shown.length >= 1 && shown.every((c) => c.reasonHidden === false) && shown.some((c) => !!c.reason && c.reasonI18n?.en && c.reasonI18n?.fr), 'reasons ON: the reason (both languages) is back');
+  ok((await sc(B, 'returns:list')).length === 0 || (await sc(B, 'returns:list')).every((c) => c.reasonHidden === true), 'store B is unaffected by store A\'s override');
+
+  // customerThread for store A: read-only, first names, live
+  const liveT = nextEvent(A, 'seller:updated', (p) => p?.id === storeA && p?.afterSaleAccess?.customerThread === true);
+  await req(sup, 'sellers:setAfterSaleAccess', { sellerId: storeA, customerThread: true });
+  ok(!!(await liveT), 'customerThread ON for store A, live');
+  const rc = desk.find((d) => d.status === 'open') ?? ret;
+  // support writes to the customer; the store hears it read-only
+  const supportText = `Support to the customer ${Date.now()}`;
+  const pushedSupport = nextEvent(A, 'caseThread:customerMessage', (p) => p?.caseId === rc.id && p.text === supportText);
+  const sent = await req(sup, 'disputes:reply', { id: rc.id, message: supportText });
+  ok(sent.ok, 'support writes in the customer conversation', JSON.stringify(sent).slice(0, 100));
+  const heardLive = await pushedSupport;
+  ok(!!heardLive && heardLive.side === 'support' && heardLive.authorName === 'KOMORIKO' && Array.isArray(heardLive.attachments), 'the store hears it live, read-only (caseThread:customerMessage)');
+  const conv2 = data(await req(A, 'caseThread:customer', { kind: 'return', caseId: rc.id })) ?? [];
+  ok(conv2.some((m) => m.text === supportText && m.side === 'support') && conv2.every((m) => m.authorName === 'KOMORIKO' || !/\s/.test(m.authorName)), 'the store reads the conversation: support as KOMORIKO, the customer by first name');
+  const deskTexts = (data(await req(sup, 'disputes:get', { id: rc.id })) ?? {}).messages?.filter((m) => m.role !== 'seller').map((m) => m.text) ?? [];
+  ok(deskTexts.length === conv2.length && deskTexts.every((t) => conv2.some((m) => m.text === t)), 'it is exactly the customer <-> support conversation of the desk', JSON.stringify([deskTexts.length, conv2.length]));
+  ok(conv2.every((m) => !supList.some((t) => t.text === m.text)), 'and none of the private seller <-> support thread');
+  ok((await req(A, 'disputes:reply', { id: rc.id, message: 'I am the seller' })).ok === false, 'the store still cannot write in it');
+  ok((await req(A, 'caseThread:send', { kind: 'return', caseId: rc.id, text: 'private note to support' })).ok === true, 'its private thread with support is still its writable one');
+  // a live case push never carries stripped words: reasons off again, then a case update
+  await req(sup, 'sellers:setAfterSaleAccess', { sellerId: storeA, reasons: false });
+  const caseLive = nextEvent(A, 'dispute:updated', (p) => p?.id === rc.id && p.sellerView === true);
+  await req(sup, 'disputes:reply', { id: rc.id, message: `Another line ${Date.now()}` });
+  const lp = await caseLive;
+  ok(!!lp && lp.reasonHidden === true && lp.reason === null && (lp.attachments ?? []).length === 0, 'a live dispute:updated push carries no reason when reasons are off');
+  // roles and values
+  ok((await req(fin, 'sellers:setAfterSaleAccess', { sellerId: storeA, reasons: true })).ok === false, 'finance cannot change the new switches');
+  const badV = await req(sup, 'sellerAccess:defaults:set', { reasons: 'yes' });
+  ok(!badV.ok && /Choose On or Off/.test(badV.error ?? ''), 'a non-boolean default for the new keys is refused');
+  const sv = data(await req(sup, 'sellers:get', { id: storeA })) ?? {};
+  ok(sv.afterSaleAccessOverride?.customerThread === true && sv.afterSaleAccessOverride?.reasons === false && sv.afterSaleAccessDefaults && 'customerThread' in sv.afterSaleAccessDefaults, 'the staff store view carries the raw override and the defaults for both keys');
+  await req(sup, 'sellers:setAfterSaleAccess', { sellerId: storeA, ...allNull });
+
   section('Restore');
-  await req(sup, 'sellers:setAfterSaleAccess', { sellerId: storeA, returns: null, exchanges: null, replacements: null, express: null });
-  const reset = await req(sup, 'sellerAccess:defaults:set', { returns: false, exchanges: false, replacements: false, express: false });
-  ok(reset.ok && Object.values(reset.data).every((v) => v === false), 'all four defaults are off again');
-  ok(Object.values((await mine(A)).afterSaleAccess).every((v) => v === false), 'the store sees nothing again');
+  const reset = await req(sup, 'sellerAccess:defaults:set', allOff);
+  ok(reset.ok && KEYS.every((k) => reset.data[k] === false), 'all six defaults are off again');
+  await req(sup, 'sellers:setAfterSaleAccess', { sellerId: storeA, ...allNull, ...origOverride });
+  const restored = (data(await req(sup, 'sellers:get', { id: storeA })) ?? {}).afterSaleAccessOverride ?? {};
+  ok(JSON.stringify(restored) === JSON.stringify(origOverride), 'store A\'s own override is back as it was', JSON.stringify([restored, origOverride]));
 
   for (const s of Object.values(S)) s.sock.close();
   console.log(`\n${pass} passed, ${fails.length} failed`);

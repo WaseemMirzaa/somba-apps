@@ -15,8 +15,12 @@ import type { TextI18n } from "@/lib/text-i18n";
  */
 export type CaseKind = "return" | "exchange" | "replacement";
 export type SectionKey = "returns" | "exchanges" | "replacements" | "express";
-export type AfterSaleAccess = Record<SectionKey, boolean>;
-export const NO_ACCESS: AfterSaleAccess = { returns: false, exchanges: false, replacements: false, express: false };
+/** The two visibility switches (§13): what a store that has a section on may also read of the customer's words. */
+export type VisibilityKey = "customerThread" | "reasons";
+/** Every switch admin sets, per platform default and per store. */
+export type AccessKey = SectionKey | VisibilityKey;
+export type AfterSaleAccess = Record<AccessKey, boolean>;
+export const NO_ACCESS: AfterSaleAccess = { returns: false, exchanges: false, replacements: false, express: false, customerThread: false, reasons: false };
 
 export interface SectionMeta {
   kind: CaseKind;
@@ -111,6 +115,22 @@ export interface SellerCase {
   createdAt: string;
   updatedAt: string;
   unread: number;
+  /** The customer's reason, category, photos and support's decision note were removed by the server (admin has not shown them to this store). */
+  reasonHidden?: boolean;
+  /** Admin shares the customer <-> support conversation of cases with this store (read-only). */
+  customerThreadShared?: boolean;
+}
+
+/** One line of the customer <-> support conversation as a store that was shown it reads it. */
+export interface CustomerConversationMessage {
+  id: string;
+  caseId: string;
+  side: "customer" | "support";
+  authorName: string;
+  text: string;
+  textI18n?: TextI18n;
+  attachments: string[];
+  createdAt: string;
 }
 
 export interface ThreadMessage {
@@ -142,13 +162,21 @@ export function useCasePage(kind: CaseKind, page: number, status: string): LiveQ
   return useLiveQuery<SellerCase[]>(
     meta.listEvent,
     { scope: "store", limit: PAGE_SIZE + 1, offset: page * PAGE_SIZE, ...(status ? { status } : {}) },
-    { pushes: [meta.push, "caseThread:message"], pick: (p) => !!(p as { sellerView?: boolean })?.sellerView || (p as { caseKind?: string })?.caseKind === kind },
+    { pushes: [meta.push, "caseThread:message", "seller:updated"], pick: (p, name) => name === "seller:updated" || !!(p as { sellerView?: boolean })?.sellerView || (p as { caseKind?: string })?.caseKind === kind },
   );
 }
 
 export function useCaseDetail(kind: CaseKind, id: string): LiveQuery<SellerCase> {
   const meta = SECTIONS[kind];
-  return useLiveQuery<SellerCase>(meta.getEvent, { id }, { pushes: [meta.push], pick: (p) => (p as { id?: string })?.id === id });
+  return useLiveQuery<SellerCase>(meta.getEvent, { id }, { pushes: [meta.push, "seller:updated"], pick: (p, name) => name === "seller:updated" || (p as { id?: string })?.id === id });
+}
+
+/** The customer <-> support conversation of a case, read-only (only while admin shares it: the server refuses otherwise). Live. */
+export function useCustomerConversation(kind: CaseKind, caseId: string, shared: boolean): LiveQuery<CustomerConversationMessage[]> {
+  return useLiveQuery<CustomerConversationMessage[]>("caseThread:customer", shared ? { kind, caseId } : null, {
+    pushes: ["caseThread:customerMessage"],
+    pick: (p) => (p as { caseId?: string })?.caseId === caseId,
+  });
 }
 
 /** Unread support messages per section (the nav badges), live. */
