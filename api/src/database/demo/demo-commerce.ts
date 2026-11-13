@@ -33,6 +33,7 @@ import {
   stampTask,
 } from './demo-flow';
 import { orderTypeSpecs } from './demo-orders';
+import { afterSaleSpecs, seedStoreSwitches, topUpForAfterSale } from './demo-aftersale';
 import type { Stage } from './demo-flow';
 
 const H = 3_600_000;
@@ -273,7 +274,8 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
 
   // ── orders, oldest first so the wallet history reads in order ──────────────────
   const driver = new Driver(ctx);
-  const all = [...orderSpecs(), ...orderTypeSpecs()];
+  await topUpForAfterSale(ctx);
+  const all = [...orderSpecs(), ...orderTypeSpecs(), ...afterSaleSpecs()];
   const skippedExpress = all.filter((s) => s.express && !ctx.expressOn);
   const specs = all
     .filter((s) => !s.express || ctx.expressOn)
@@ -360,6 +362,8 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
       `! ${skippedExpress.length} express-delivery order(s) NOT made: express delivery is off on this server. To get them, run the seed with --with-express (seed-demo.sh --with-express, or DEMO_WITH_EXPRESS=1); that switches expressDeliveryEnabled on. Switch it on only once the rider app that knows express is installed.`,
     );
   await payoutsAndFinance(ctx);
+  // The seller portal's after-sale sections: the stores' own switches (the platform defaults are not touched).
+  await seedStoreSwitches(ctx);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────

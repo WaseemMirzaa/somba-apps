@@ -2,11 +2,16 @@ import { Like } from 'typeorm';
 import {
   Campaign,
   CmsBlock,
+  CaseSellerMessage,
   ConversationMessage,
+  Dispute,
+  DisputeMessage,
+  Exchange,
   FlashSale,
   Notification,
   Product,
   ProductQuestion,
+  Replacement,
   Review,
   Seller,
   Translation,
@@ -136,6 +141,13 @@ export async function seedBilingual(ctx: DemoCtx): Promise<void> {
     await twinRow('answer', q.id, 'text', q.answer);
   }
   for (const m of await ctx.ds.getRepository(ConversationMessage).find()) await twinRow('chat_message', m.id, 'text', m.text);
+  // What customers wrote on a return, an exchange or a replacement, the messages beside them and the private seller <-> support
+  // thread (docs/contracts/admin-controls.md §13): the other language as an author row, so both panes read in either language.
+  for (const d of await ctx.ds.getRepository(Dispute).find()) await twinRow('dispute_reason', d.id, 'reason', d.reason);
+  for (const e of await ctx.ds.getRepository(Exchange).find()) await twinRow('exchange_reason', e.id, 'reason', e.reason);
+  for (const r of await ctx.ds.getRepository(Replacement).find()) await twinRow('replacement_reason', r.id, 'reason', r.reason);
+  for (const m of await ctx.ds.getRepository(DisputeMessage).find()) await twinRow('dispute_message', m.id, 'text', m.text);
+  for (const m of await ctx.ds.getRepository(CaseSellerMessage).find()) await twinRow('case_seller_message', m.id, 'text', m.text);
 
   // ── Notices that quote a person's words or name a product: the French body with those in French ──
   const notices = await ctx.ds.getRepository(Notification).find();
@@ -213,6 +225,9 @@ async function untwinned(ctx: DemoCtx): Promise<string[]> {
   }
   for (const m of await ctx.ds.getRepository(ConversationMessage).find()) {
     if (m.senderId && demoIds.has(m.senderId)) miss('chat message', m.text);
+  }
+  for (const m of await ctx.ds.getRepository(CaseSellerMessage).find()) {
+    if (m.authorId && demoIds.has(m.authorId)) miss('seller thread message', m.text);
   }
   return out;
 }

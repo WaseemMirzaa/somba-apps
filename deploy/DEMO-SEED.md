@@ -150,6 +150,36 @@ It sets **only** `expressDeliveryEnabled=true`, says so loudly, and from then on
 
 **Auto-assignment on "Entrepôt Kinshasa".** The warehouse the express order and the other demo orders use is the launch warehouse that `bootstrap:prod` creates, not a demo record: the demo removal does not delete it, and the seed does not change its settings (auto-assignment stays **off**, the platform default). To let the express order go to a rider the moment the seller presses Package Ready, turn it on yourself, and turn it off again after the demo if you wish: sign in as the warehouse manager (`warehouse.manager`) or an admin, open **Warehouse > Settings > How the warehouse runs** (an admin picks the warehouse in the scope bar first), tick **Auto-assignment** and save. It then hands new pickup and express legs to the least busy available rider while the warehouse is open.
 
+### Seller portal: read-only Returns, Exchanges, Replacements and Express card
+
+KOMORIKO support decides every return, exchange and replacement; a store only **reads** them (the customer's first name only, never the customer conversation) and talks to support in a **private thread per case** that the customer never sees. Each section shows in a store's portal only when admin switches it on (contract: `docs/contracts/admin-controls.md` section 13).
+
+**What the demo adds (all of it removed by `seed-demo.sh remove --yes`).** On each of the three active stores, `A` Maison Kinshasa, `B` Limete Grossiste and `C` Ndolo Électro: 3 returns, 2 exchanges and 2 replacements, each on its own delivered demo order (21 extra orders for `reviewer.1` to `reviewer.4` and `customer.fr`, who also get a little extra wallet credit so the orders go through; the full customer `customer.full` is not touched).
+
+| Per store | Where it stands |
+|---|---|
+| Return 1 | **Waiting for support** (support has not decided) |
+| Return 2 | **Approved, the rider has the goods** and is on the road to the warehouse |
+| Return 3 | **Received and refunded**; the leg that brings the goods back to the store is open (`return_to_seller`, waiting for a rider) |
+| Exchange 1 | **Pending** |
+| Exchange 2 | **Approved, with a price difference** (the customer pays or is credited the difference on delivery) |
+| Replacement 1 | **Pending** |
+| Replacement 2 | **Approved** (the pickup and the delivery legs exist) |
+
+**Private threads (seller <-> support)** are written on several of those cases, as history (no push, no notice), with a seller question and a support answer, some **unread by the store** (support wrote last) and some **unread by support** (the store wrote last). Both languages are stored with every message. On store A's first return (waiting for support) there is also a **customer <-> support** conversation (a message from `reviewer.1` and support's answer), so the two separate threads can be seen side by side: the desk shows both on the return page (**Seller thread** pane next to the customer conversation), the store sees only its own.
+
+**The switches: three states, so each can be shown.** The seed never changes the four platform defaults (they stay **off**) and never touches a live setting. It sets an override on the stores only:
+
+| Store | Switches | What its owner sees |
+|---|---|---|
+| **A** Maison Kinshasa (`seller.a`) | override **On** for Returns, Exchanges, Replacements and Express | **Returns**, **Exchanges** and **Replacements** in the menu at once (with an unread badge), and the read-only **Express delivery** card in **Storefront** |
+| **B** Limete Grossiste (`seller.b`) | none: follows the default (**off**) | none of them; `/seller/returns` sends the store back to the dashboard |
+| **C** Ndolo Électro (`seller.c`) | override **On** for Returns only | **Returns** only |
+
+**To turn a section on for everybody (every store that has no override of its own):** sign in as `admin.super`, `admin.operations` or `admin.support` and open **Admin > Seller portal** (`/admin/seller-portal`; the Super Admin also finds the four default switches in **Settings > Seller portal: after-sale sections**). Switch **Returns**, **Exchanges**, **Replacements** and/or **Express delivery card** on. Store B then shows them live, without signing in again. The same page has, per store, **Follow default (On/Off) / On / Off**: set store A or C to **Follow default** to see them follow the platform setting. Turn the defaults off again afterwards if you wish: the demo removal does not change them (they are settings, not demo rows).
+
+**Try this.** `seller.a`: open **Returns**, open the first return, write to support in **Talk to support**. `admin.support`: **Returns**, the same case, **Seller thread**: the message is there; reply. `seller.a`: the reply arrives live. `reviewer.1`: the return shows the customer conversation only. `seller.b`: nothing shows until you switch the defaults on.
+
 ### Parcel labels and scanning
 
 Every demo package that is ready or further has KOMORIKO labels (`PKG-` and 8 characters), and the scans agree with each leg's state: legs already collected have their pickup scans, finished legs have both. About every third package is in **2 boxes**. The setting **Admin > Settings > Delivery model > Require parcel scanning** is on, so a rider cannot collect or hand over a parcel until every box was scanned.
@@ -192,7 +222,7 @@ Sign in at the web portal (`/login`) for stores, admins, warehouse and riders, a
 
 | Account | What it is for | Try this |
 |---|---|---|
-| `seller.a` (Maison Kinshasa) | Approved, **Pro** plan, two-factor on. The full store | **Products**: live, waiting for moderation (2), rejected, blocked, draft, out of stock, low stock, options (size, colour), an 8-photo gallery, a price drop and a flash price. **Orders**: every state, mark one ready. **Returns**: answer the one with the running timer (accept or reject). **Exchanges / Replacements**: approve. **Questions**: answer the open one. **Reviews**: reply, report. **Messages**: the chats. **Promotions**, **Coupons**, **Flash sales**: one running, one waiting for marketing. **Finance**: earnings, statements, transactions, tax, two payouts (one paid with a made-up receipt, one requested; no real money moves). **Analytics**: 30 days of views and sales. **Team**: five members and one open invitation. **Storefront**: profile, logo, banner, French text, policies, goals. |
+| `seller.a` (Maison Kinshasa) | Approved, **Pro** plan, two-factor on. The full store | **Products**: live, waiting for moderation (2), rejected, blocked, draft, out of stock, low stock, options (size, colour), an 8-photo gallery, a price drop and a flash price. **Orders**: every state, mark one ready. **Returns / Exchanges / Replacements**: read-only (support decides): 7 cases with private threads, see "Seller portal: read-only Returns...". **Questions**: answer the open one. **Reviews**: reply, report. **Messages**: the chats. **Promotions**, **Coupons**, **Flash sales**: one running, one waiting for marketing. **Finance**: earnings, statements, transactions, tax, two payouts (one paid with a made-up receipt, one requested; no real money moves). **Analytics**: 30 days of views and sales. **Team**: five members and one open invitation. **Storefront**: profile, logo, banner, French text, policies, goals. |
 | `seller.b` (Limete Grossiste) | Approved, **Free** plan, another commune | Second seller in the two-seller basket. Try **Coupons** or **Flash sales** or invite a second team member: the plan refuses and offers an upgrade. Subscribe to Pro with the wallet. |
 | `seller.c` (Ndolo Électro) | Approved, **no two-factor** | With Admin > Settings "Require two-factor for sellers" switched **on**, sign-in forces enrolment before anything else. Switch the setting back when you are done. |
 | `seller.d` (Bandal Textiles) | KYC submitted | As an admin (moderation, operations or super) open **Sellers**, read the documents, approve or reject. |

@@ -86,12 +86,13 @@ describe('demo text table (demo-texts.ts)', () => {
 });
 
 /** Files whose human-readable literals are shown to people (reviews, questions, chat, returns, notes, banners...). */
-const SEEDED_TEXT_FILES = ['demo-engagement.ts', 'demo-commerce.ts', 'demo-orders.ts', 'demo-admin.ts'];
+const SEEDED_TEXT_FILES = ['demo-engagement.ts', 'demo-commerce.ts', 'demo-orders.ts', 'demo-admin.ts', 'demo-aftersale-texts.ts', 'demo-aftersale.ts'];
 
 /** Longer literals in those files that are not seeded person text. */
 const NOT_SEEDED_TEXT: RegExp[] = [
   /^(SELECT|UPDATE|INSERT|DELETE)\b/, // SQL
   /^Welcome credit from KOMORIKO \(demo\)$/, // a wallet line: localizeWalletDescription
+  /^Demo starter credit \(not real money\)$/, // a wallet line: localizeWalletDescription
   /^Demo: cold shelf$/, // a bin code
   /^Demo (Warehouse|Support|Rider)/, // account names
   /address is pinned in the store/, // a code comment inside a template, not data

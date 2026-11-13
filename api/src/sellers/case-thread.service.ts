@@ -215,6 +215,40 @@ export class CaseThreadService {
     return { count: rows.length, cases };
   }
 
+  /**
+   * Write a past thread as history (the demo seed's only way in: no event reaches this, nobody is notified, nothing is pushed).
+   * Messages are oldest first, each with its own time and read marks; a message already stored with the same text on the case is
+   * skipped, so a second run adds nothing. The other language of each text is added by the demo's own twin table (author rows).
+   */
+  async importHistory(input: {
+    kind: CaseKind;
+    caseId: string;
+    messages: { side: 'seller' | 'support'; author: { id: string; name: string }; text: string; at: Date; readBySeller: boolean; readBySupport: boolean }[];
+  }): Promise<number> {
+    const c = await this.caseOf(input.kind, input.caseId);
+    const have = new Set((await this.msgs.find({ where: { caseKind: input.kind, caseId: c.id } })).map((m) => m.text));
+    let added = 0;
+    for (const m of input.messages) {
+      if (have.has(m.text)) continue;
+      await this.msgs.save(
+        this.msgs.create({
+          caseKind: input.kind,
+          caseId: c.id,
+          sellerId: c.sellerId,
+          authorId: m.author.id,
+          authorName: m.author.name.slice(0, 120),
+          authorSide: m.side,
+          text: m.text,
+          createdAt: m.at,
+          readBySellerAt: m.readBySeller ? m.at : null,
+          readBySupportAt: m.readBySupport ? m.at : null,
+        }),
+      );
+      added++;
+    }
+    return added;
+  }
+
   /** `translate:text` for `case_seller_message`: only people who may read the thread. */
   async translate(user: Caller, id: unknown, target: unknown) {
     if (!this.translations) throw new Error('Translation is not available right now. Try again later.');

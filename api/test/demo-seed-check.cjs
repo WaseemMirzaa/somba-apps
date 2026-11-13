@@ -244,10 +244,8 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(po.some((p) => p.status === 'paid') && po.some((p) => p.status === 'requested'), 'payouts: one paid (no real transfer), one requested');
     ok(!!data(await req(s, 'finance:earnings', {})), 'earnings');
     ok(!!data(await req(s, 'finance:statements', {})), 'statements');
-    // Returns, disputes, exchanges and replacements are support's: the store sees none of them and cannot answer.
-    ok(list(await req(s, 'returns:list', {})).length === 0, 'store A sees no returns (support decides them)');
-    ok(list(await req(s, 'disputes:list', {})).length === 0, 'store A sees no disputes');
-    ok(list(await req(s, 'exchanges:list', {})).length === 0 && list(await req(s, 'replacements:list', {})).length === 0, 'store A sees no exchanges or replacements');
+    // After-sale is support's: store A's override shows the read-only sections (checked in full below), but it can never answer or decide.
+    ok(list(await req(s, 'disputes:list', { scope: 'store' })).every((d) => d.sellerView && d.kind === 'return'), 'store A sees returns only, never a dispute');
     const answered = await req(s, 'returns:respond', { id: 'x', accept: true });
     ok(answered?.ok === false, 'returns:respond is refused for a seller', JSON.stringify(answered).slice(0, 100));
     ok(list(await req(s, 'chat:list', { as: 'seller' })).length === 0, 'store A has no chats to answer');
@@ -305,6 +303,97 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
     ok(list(r).length === 0, 'support member of the store sees no chats (chat is closed)');
   }
   if (S['team.manager']) ok(list(await req(S['team.manager'].sock, 'orders:sellerList', { limit: 5 })).length > 0, 'manager sees the orders');
+
+  section('Seller portal: after-sale view (demo cases, switches, private threads)');
+  if (S['seller.a'] && S['seller.b'] && S['seller.c'] && S['admin.support']) {
+    const A = S['seller.a'].sock, B = S['seller.b'].sock, C = S['seller.c'].sock, SUP = S['admin.support'].sock;
+    const store = async (sock, ev, extra = {}) => list(await req(sock, ev, { scope: 'store', limit: 100, ...extra })).filter((x) => x.sellerView);
+    const ids = {};
+    for (const [k, sock] of [['A', A], ['B', B], ['C', C]]) ids[k] = (data(await req(sock, 'sellers:mine')) ?? {}).id;
+    const accessOf = async (sock) => (data(await req(sock, 'sellers:mine')) ?? {}).afterSaleAccess ?? {};
+    const defaults = data(await req(SUP, 'sellerAccess:defaults:get')) ?? {};
+    ok(['returns', 'exchanges', 'replacements', 'express'].every((k) => defaults[k] === false), 'the four platform defaults stay OFF', JSON.stringify(defaults));
+    const aa = await accessOf(A), ab = await accessOf(B), ac = await accessOf(C);
+    ok(aa.returns && aa.exchanges && aa.replacements && aa.express, 'store A: override ON for returns, exchanges, replacements and express', JSON.stringify(aa));
+    ok(!ab.returns && !ab.exchanges && !ab.replacements && !ab.express, 'store B: follows the default (all off)', JSON.stringify(ab));
+    ok(ac.returns === true && !ac.exchanges && !ac.replacements && !ac.express, 'store C: returns only', JSON.stringify(ac));
+    const stg = (cs) => new Set(cs.map((c) => c.stage));
+    const redacted = (cs) => cs.every((c) => !('customerId' in c) && !('customerName' in c) && !('messages' in c) && c.customerFirstName);
+
+    // what the desk holds per store (the cases the stores' sections show)
+    const deskReturns = list(await req(SUP, 'returns:list', { limit: 200 }));
+    const deskEx = list(await req(SUP, 'exchanges:list', { limit: 200 }));
+    const deskRep = list(await req(SUP, 'replacements:list', { limit: 200 }));
+    for (const k of ['A', 'B', 'C']) {
+      const r = deskReturns.filter((d) => d.sellerId === ids[k]), e = deskEx.filter((d) => d.sellerId === ids[k]), p = deskRep.filter((d) => d.sellerId === ids[k]);
+      ok(r.length >= 3 && new Set(r.map((d) => d.stage)).size >= 3, `store ${k}: at least 3 returns at 3 different stages (${[...new Set(r.map((d) => d.stage))].join(', ')})`);
+      ok(e.length >= 2 && e.some((x) => x.status === 'requested') && e.some((x) => x.status === 'approved' && Number(x.priceDiffUsd) !== 0), `store ${k}: an exchange pending and one approved with a price difference`);
+      ok(p.length >= 2 && p.some((x) => x.status === 'requested') && p.some((x) => x.status === 'approved'), `store ${k}: a replacement pending and one approved`);
+    }
+
+    // store A: everything on
+    const ra = await store(A, 'returns:list'), ea = await store(A, 'exchanges:list'), pa = await store(A, 'replacements:list');
+    ok(ra.length >= 3 && stg(ra).has('awaiting_support') && stg(ra).has('pickup') && stg(ra).has('closed'), 'store A: returns at three stages', JSON.stringify([...stg(ra)]));
+    ok(ra.some((c) => c.legs && c.legs.returnToSeller), 'store A: a return with its leg back to the store');
+    ok(ea.length >= 2 && ea.some((c) => c.status === 'requested') && ea.some((c) => c.status === 'approved' && c.priceDiffUsd), 'store A: exchanges, one with a price difference');
+    ok(pa.length >= 2 && pa.some((c) => c.status === 'requested') && pa.some((c) => c.status === 'approved'), 'store A: replacements, pending and approved');
+    ok(redacted([...ra, ...ea, ...pa]), 'store A: every case is redacted (customer first name only, no thread)');
+    ok(ra.some((c) => c.reasonI18n?.en && c.reasonI18n?.fr), 'store A: the customers\' reasons come in English and French');
+    // the private thread on store A's waiting return
+    let threaded = null, thread = [];
+    for (const c of ra.filter((x) => x.stage === 'awaiting_support')) {
+      const t = list(await req(A, 'caseThread:list', { kind: 'return', caseId: c.id }));
+      if (t.length >= 3) { threaded = c; thread = t; break; }
+    }
+    ok(!!threaded, 'store A: a return with a seller <-> support back-and-forth');
+    ok(thread.some((m) => m.authorSide === 'seller') && thread.some((m) => m.authorSide === 'support'), 'the thread has both sides');
+    ok(thread.every((m) => m.textI18n?.en && m.textI18n?.fr), 'every thread message is in English and French');
+    const unreadA = data(await req(A, 'caseThread:unread')) ?? {};
+    ok(unreadA.total >= 3 && unreadA.returns >= 1 && unreadA.exchanges >= 1 && unreadA.replacements >= 1, 'store A: unread messages from support (nav badges)', JSON.stringify(unreadA));
+    const unreadStaff = data(await req(SUP, 'caseThread:unread')) ?? {};
+    ok(unreadStaff.count >= 3, 'support: cases with unread seller messages', JSON.stringify(unreadStaff).slice(0, 100));
+    const one = data(await req(A, 'disputes:get', { id: threaded?.id }));
+    ok(one?.sellerView === true && !('messages' in one), 'store A: the case detail has no customer conversation');
+    const aDispute = deskReturns.length ? list(await req(SUP, 'disputes:list', { type: 'dispute', limit: 100 })).find((d) => d.sellerId === ids.A) : null;
+    if (aDispute) ok(!(await req(A, 'disputes:get', { id: aDispute.id })).ok, 'store A: a dispute (not a return) stays hidden');
+    for (const [ev, body] of [['returns:decide', { id: threaded?.id, approve: true }], ['exchanges:respond', { id: 'x', approve: true }], ['replacements:respond', { id: 'x', approve: true }], ['disputes:reply', { id: threaded?.id, message: 'hello' }]]) {
+      ok((await req(A, ev, body)).ok === false, `store A cannot ${ev}`);
+    }
+
+    // store B: follows the default, so nothing
+    ok((await store(B, 'returns:list')).length === 0 && (await store(B, 'exchanges:list')).length === 0 && (await store(B, 'replacements:list')).length === 0, 'store B sees no after-sale case (default off)');
+    const bCase = deskReturns.find((d) => d.sellerId === ids.B);
+    const bThread = await req(B, 'caseThread:list', { kind: 'return', caseId: bCase?.id });
+    ok(bThread.ok === false && /turned off/i.test(bThread.error ?? ''), 'store B: its thread is refused ("turned off for your store")', JSON.stringify(bThread).slice(0, 100));
+    ok(((await req(B, 'disputes:get', { id: bCase?.id })).ok) === false, 'store B cannot open its own return');
+    ok(!list(await req(B, 'returns:list', {})).some((x) => x.sellerView), 'store B: returns:list holds no store case either');
+
+    // store C: returns only
+    const rc = await store(C, 'returns:list');
+    ok(rc.length >= 3 && redacted(rc), 'store C: its returns, redacted');
+    ok((await store(C, 'exchanges:list')).length === 0 && (await store(C, 'replacements:list')).length === 0, 'store C: no exchanges or replacements (off)');
+    const cEx = deskEx.find((d) => d.sellerId === ids.C);
+    const cThread = await req(C, 'caseThread:list', { kind: 'exchange', caseId: cEx?.id });
+    ok(cThread.ok === false && /turned off/i.test(cThread.error ?? ''), 'store C: the exchange thread is refused (section off)');
+    ok(rc.some((c) => c.unread > 0) || list(await req(C, 'caseThread:list', { kind: 'return', caseId: rc[0]?.id })).length >= 0, 'store C: its return threads open');
+
+    // the two threads stay apart: the customer sees only the customer <-> support one, never the seller's
+    if (S['reviewer.1'] && threaded) {
+      const R1 = S['reviewer.1'].sock;
+      const mine = data(await req(R1, 'disputes:get', { id: threaded.id })) ?? {};
+      const texts = (mine.messages ?? []).map((m) => m.text);
+      ok(texts.some((t) => /pictures of the bottle/.test(t)) && texts.some((t) => /Thank you for the pictures/.test(t)), 'the customer <-> support conversation of that return is there (two messages)');
+      ok(!(mine.messages ?? []).some((m) => thread.some((t) => t.text === m.text)), 'the customer never gets a seller <-> support message');
+      ok((await req(R1, 'caseThread:list', { kind: 'return', caseId: threaded.id })).ok === false, 'the customer cannot open the seller thread');
+      ok(!JSON.stringify(mine).includes(thread[0]?.text ?? '\u0000'), 'nothing of the seller thread is in the customer\'s view of the case');
+    }
+    // the desk reads both: the customer's messages on the case and the private thread
+    if (threaded) {
+      const deskCase = data(await req(SUP, 'disputes:get', { id: threaded.id })) ?? {};
+      ok((deskCase.messages ?? []).length >= 2, 'support sees the customer conversation of the case');
+      ok(list(await req(SUP, 'caseThread:list', { kind: 'return', caseId: threaded.id })).length >= 3, 'support sees the Seller thread as a second conversation');
+    }
+  } else console.log('  (store owners or support not signed in: after-sale checks skipped)');
 
   section('Admin');
   if (S['admin.super']) {

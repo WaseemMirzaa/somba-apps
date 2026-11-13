@@ -10,6 +10,8 @@
  * `demo-bilingual.spec.ts` fails (it scans the demo sources for human text that has no entry).
  */
 
+import { AFTER_SALE_TEXTS } from './demo-aftersale-texts';
+
 export type DemoLang = 'en' | 'fr';
 
 export type DemoTextKind =
@@ -150,6 +152,8 @@ export const DEMO_TEXTS: DemoText[] = [
   t('promo', 'en', 'Maison Kinshasa: $5 off orders over $30', 'Maison Kinshasa : 5 $ de réduction dès 30 $ d’achat'),
   t('promo', 'en', 'Demo: $3 off orders over $15', 'Démo : 3 $ de réduction dès 15 $ d’achat'),
   t('promo', 'en', 'Demo: a paused code (switch it on to test)', 'Démo : un code en pause (activez-le pour le tester)'),
+  // ── The seller portal's after-sale demo: customer reasons and the private seller <-> support threads ──
+  ...AFTER_SALE_TEXTS,
 ];
 
 const norm = (s: string) => s.trim();
