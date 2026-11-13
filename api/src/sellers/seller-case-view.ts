@@ -55,6 +55,13 @@ export interface SellerCaseView {
   updatedAt: Date | string;
   /** Messages from support the store has not read yet (filled by the service). */
   unread: number;
+  /**
+   * True when the customer's reason, category, photos and support's decision note were REMOVED from this view because admin has not
+   * shown them to this store (`afterSaleAccess.reasons`, §13): the web then shows "KOMORIKO support has the reason for this request".
+   */
+  reasonHidden: boolean;
+  /** True when admin shares the customer <-> support conversation of a case with this store (`afterSaleAccess.customerThread`). */
+  customerThreadShared: boolean;
 }
 
 type Any = Record<string, unknown>;
@@ -113,6 +120,8 @@ const base = (kind: CaseKind, v: Any) => ({
   createdAt: v.createdAt as Date | string,
   updatedAt: v.updatedAt as Date | string,
   unread: 0,
+  reasonHidden: false,
+  customerThreadShared: false,
 });
 
 /** A return as the store sees it. `legs` is filled by the service (delivery tasks). */
@@ -184,3 +193,52 @@ export const redactCase = (kind: CaseKind, v: Any): SellerCaseView => (kind === 
 
 /** The reference-led line every notice about a case carries: `RET-… · SOM-…`. */
 export const caseLine = (v: { reference?: string | null; orderReference?: string | null }) => `${v.reference ?? ''} · ${v.orderReference ?? ''}`;
+
+/**
+ * Take the customer's own words off a redacted view: the reason, its category / condition, its translations, the photos and
+ * support's decision note. Everything else (first name, order, items, stage, money, legs, timeline) stays. The server calls this
+ * for every view of a store that has not been shown the reasons, so nothing leaks through a list, a detail or a live push.
+ */
+export function withholdReasons<T extends SellerCaseView>(v: T): T {
+  const out = { ...v, reason: null, category: null, attachments: [] as string[], decisionNote: null, decisionNoteFr: null, reasonHidden: true } as T & { reasonI18n?: unknown; decisionNoteI18n?: unknown };
+  delete out.reasonI18n;
+  delete out.decisionNoteI18n;
+  return out;
+}
+
+/** One message of the customer <-> support conversation of a return, as a store that was shown it reads it (read-only). */
+export interface CustomerConversationMessage {
+  id: string;
+  caseId: string;
+  /** Who wrote it: the customer (first name only) or KOMORIKO support. */
+  side: 'customer' | 'support';
+  authorName: string;
+  text: string;
+  textI18n?: TextI18n;
+  /** Photos in the message: only for a store that is also shown the reasons. */
+  attachments: string[];
+  createdAt: Date | string;
+}
+
+/**
+ * The store's view of a `dispute_messages` row, or null when the message is not part of that conversation (an old message written
+ * by a seller before sellers left the flow). The customer is named by first name only, support as KOMORIKO.
+ */
+export function customerMessageView(
+  m: { id: string; disputeId: string; role?: string | null; authorName?: string | null; text: string; textI18n?: TextI18n; attachments?: string[] | null; createdAt: Date | string },
+  showPhotos: boolean,
+): CustomerConversationMessage | null {
+  const role = String(m.role ?? '');
+  if (role === 'seller') return null;
+  const customer = role === 'customer';
+  return {
+    id: m.id,
+    caseId: m.disputeId,
+    side: customer ? 'customer' : 'support',
+    authorName: customer ? firstName(m.authorName) : 'KOMORIKO',
+    text: m.text,
+    ...(m.textI18n ? { textI18n: m.textI18n } : {}),
+    attachments: showPhotos && Array.isArray(m.attachments) ? m.attachments : [],
+    createdAt: m.createdAt,
+  };
+}

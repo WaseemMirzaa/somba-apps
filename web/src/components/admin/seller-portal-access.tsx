@@ -8,15 +8,15 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import { errMessage } from "@/lib/seller-labels";
 import { canManageSellerPortal } from "@/lib/admin-controls";
 import { useRole } from "@/lib/admin-live";
-import { NO_ACCESS, type AfterSaleAccess, type SectionKey } from "@/lib/seller-aftersale";
+import { NO_ACCESS, type AfterSaleAccess, type AccessKey } from "@/lib/seller-aftersale";
 
 /**
  * Admin side of the seller portal's read-only after-sale sections (docs/contracts/admin-controls.md §13): the default per section
  * and, per store, Follow default / On / Off. Roles `admin`, `admin_operations`, `admin_support`; the server refuses everyone else.
  */
-export const SECTION_ORDER: SectionKey[] = ["returns", "exchanges", "replacements", "express"];
+export const SECTION_ORDER: AccessKey[] = ["returns", "exchanges", "replacements", "express", "customerThread", "reasons"];
 
-export const SECTION_LABEL: Record<SectionKey, { en: string; fr: string; hintEn: string; hintFr: string }> = {
+export const SECTION_LABEL: Record<AccessKey, { en: string; fr: string; hintEn: string; hintFr: string }> = {
   returns: {
     en: "Returns",
     fr: "Retours",
@@ -34,6 +34,18 @@ export const SECTION_LABEL: Record<SectionKey, { en: string; fr: string; hintEn:
     fr: "Remplacements",
     hintEn: "The store sees the replacements requested on its items, read-only, and can message support.",
     hintFr: "La boutique voit les remplacements demandés sur ses articles, en lecture seule, et peut écrire au support.",
+  },
+  customerThread: {
+    en: "Customer & support messages",
+    fr: "Messages client et support",
+    hintEn: "Show the customer's messages with support to this store (read-only).",
+    hintFr: "Montrer à cette boutique les messages du client avec le support (lecture seule).",
+  },
+  reasons: {
+    en: "Customer's reason and photos",
+    fr: "Motif et photos du client",
+    hintEn: "Show the customer's reason and photos to this store.",
+    hintFr: "Montrer à cette boutique le motif et les photos du client.",
   },
   express: {
     en: "Express delivery card",
@@ -88,9 +100,9 @@ export function SellerPortalDefaults() {
   const fr = locale === "fr";
   const { toast } = useToast();
   const { defaults, setDefaults, loaded, error, allowed } = useAfterSaleDefaults();
-  const [busy, setBusy] = useState<SectionKey | null>(null);
+  const [busy, setBusy] = useState<AccessKey | null>(null);
 
-  async function flip(key: SectionKey) {
+  async function flip(key: AccessKey) {
     setBusy(key);
     try {
       const next = await socketClient.request<AfterSaleAccess>("sellerAccess:defaults:set", { [key]: !defaults[key] });
@@ -168,7 +180,7 @@ export function SellerPortalAccessSelects({
   onChanged,
 }: {
   sellerId: string;
-  override: Partial<Record<SectionKey, boolean | null>> | null | undefined;
+  override: Partial<Record<AccessKey, boolean | null>> | null | undefined;
   defaults: AfterSaleAccess | null | undefined;
   onChanged?: (store: Record<string, unknown>) => void;
 }) {
@@ -177,10 +189,10 @@ export function SellerPortalAccessSelects({
   const { toast } = useToast();
   const role = useRole();
   const allowed = canManageSellerPortal(role);
-  const [busy, setBusy] = useState<SectionKey | null>(null);
+  const [busy, setBusy] = useState<AccessKey | null>(null);
   const d = defaults ?? NO_ACCESS;
 
-  async function change(key: SectionKey, choice: Choice) {
+  async function change(key: AccessKey, choice: Choice) {
     setBusy(key);
     try {
       const store = await socketClient.request<Record<string, unknown>>("sellers:setAfterSaleAccess", { sellerId, [key]: choice === "follow" ? null : choice === "on" });

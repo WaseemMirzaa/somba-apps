@@ -18,8 +18,9 @@ import type { OrderSpec, Scenario } from './demo-commerce';
  * a few days ago), so `seed:demo:remove` takes it out with the rest. Private seller <-> support threads are written as history
  * (no push, no notice), some unread for each side, and one case has a customer <-> support exchange beside them.
  *
- * The switches: the four platform defaults are NEVER touched (they stay off). Store A carries an override with all four sections
- * ON, store C returns only, store B none (it follows the default: off), so the three states can be tried at once.
+ * The switches: the six platform defaults (four sections, customer conversation, reasons) are NEVER touched (they stay off). Store A
+ * carries an override with all four sections, the conversation and the reasons ON; store C returns and reasons only; store B none (it
+ * follows the default: off), so the three states can be tried at once.
  */
 
 const H = 3_600_000;
@@ -31,10 +32,13 @@ const WALLET_BONUS = 260;
 const BONUS_NOTE = 'Demo starter credit (not real money)';
 export const AFTER_SALE_CUSTOMERS = ['reviewer.1', 'reviewer.2', 'reviewer.3', 'reviewer.4', 'customer.fr'] as const;
 
-/** Store A: every section on. Store C: returns only. Store B: none (follows the default). */
+/**
+ * Store A: every section on, and it also sees the customer <-> support conversation and the customers' reasons and photos.
+ * Store C: returns only, with the reasons but not the conversation. Store B: none (follows the default, all off).
+ */
 export const STORE_OVERRIDES: Record<string, Record<string, boolean>> = {
-  A: { returns: true, exchanges: true, replacements: true, express: true },
-  C: { returns: true },
+  A: { returns: true, exchanges: true, replacements: true, express: true, customerThread: true, reasons: true },
+  C: { returns: true, reasons: true },
 };
 
 const ADDRESS: Record<string, Address> = {
@@ -239,5 +243,5 @@ export async function seedStoreSwitches(ctx: DemoCtx): Promise<void> {
     const row = await repo.findOne({ where: { id: store.id } });
     if (row && row.afterSaleAccess !== want) await repo.update({ id: store.id }, { afterSaleAccess: want });
   }
-  log('✓ seller portal switches: store A shows all four after-sale sections, store C returns only, store B follows the default (off)');
+  log('✓ seller portal switches: store A shows all four sections + the customer conversation + the reasons, store C returns + reasons, store B follows the default (off)');
 }

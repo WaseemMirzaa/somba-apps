@@ -149,6 +149,8 @@ export class SettingsService {
       case 'sellerViewExchanges':
       case 'sellerViewReplacements':
       case 'sellerViewExpress':
+      case 'sellerViewCustomerThread':
+      case 'sellerViewReasons':
         return oneOf(String(value), ['true', 'false'] as const, 'Seller portal section flag');
       case 'requirePinnedAddress':
       case 'requireSellerPickupPin':

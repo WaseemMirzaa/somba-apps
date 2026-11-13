@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { CaseSellerMessage, Dispute, Exchange, Replacement, Seller, SellerTeamMember, Setting, DeliveryTask } from '../database/entities';
+import { CaseSellerMessage, Dispute, DisputeMessage, Exchange, Replacement, Seller, SellerTeamMember, Setting, DeliveryTask } from '../database/entities';
 import { addSeller, recordingEmitter, testDb, testTranslations } from '../testing/test-db';
 import { SettingsService } from '../content/settings.service';
 import { AfterSaleAccessService } from './after-sale-access.service';
@@ -8,12 +8,12 @@ import { CaseThreadService } from './case-thread.service';
 import { SellerContextService } from './seller-context';
 import { TeamDirectory } from './team-directory';
 import { accessFields, defaultsFrom, overrideColumn, parseOverride, resolveAccess } from './after-sale-access';
-import { redactExchange, redactReplacement, redactReturn } from './seller-case-view';
+import { customerMessageView, redactExchange, redactReplacement, redactReturn, withholdReasons } from './seller-case-view';
 import { ROLE_GROUPS } from '../common/role-groups';
 import { errorFr } from '../common/error-fr';
 
 describe('after-sale access: pure rules', () => {
-  const off = { returns: false, exchanges: false, replacements: false, express: false };
+  const off = { returns: false, exchanges: false, replacements: false, express: false, customerThread: false, reasons: false };
   it('every section defaults to off, and only "true" turns a default on', () => {
     expect(defaultsFrom({})).toEqual(off);
     expect(defaultsFrom({ sellerViewReturns: 'true', sellerViewExpress: 'false', sellerViewExchanges: 'yes' })).toEqual({ ...off, returns: true });
@@ -21,7 +21,7 @@ describe('after-sale access: pure rules', () => {
   it('a store override wins over the default; null / missing follows it', () => {
     const on = { ...off, returns: true, exchanges: true };
     expect(resolveAccess({}, on)).toEqual(on);
-    expect(resolveAccess({ returns: false, replacements: true }, on)).toEqual({ returns: false, exchanges: true, replacements: true, express: false });
+    expect(resolveAccess({ returns: false, replacements: true }, on)).toEqual({ ...off, returns: false, exchanges: true, replacements: true });
   });
   it('parses the stored JSON defensively and writes only the forced keys', () => {
     expect(parseOverride('{"returns":false,"express":true,"x":1,"exchanges":"yes"}')).toEqual({ returns: false, express: true });
@@ -107,14 +107,14 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
       toRole: async (role: string, n: { title: string; type?: string }) => void roleNotices.push({ role, ...n }),
     };
     view = new SellerAfterSaleViewService(access, ctx, ds.getRepository(Seller), ds.getRepository(DeliveryTask), ds.getRepository(CaseSellerMessage), emitter as never, team, notifications as never);
-    threads = new CaseThreadService(ds.getRepository(CaseSellerMessage), ds.getRepository(Dispute), ds.getRepository(Exchange), ds.getRepository(Replacement), ds.getRepository(Seller), view, emitter as never, team, notifications as never, translations);
+    threads = new CaseThreadService(ds.getRepository(CaseSellerMessage), ds.getRepository(Dispute), ds.getRepository(Exchange), ds.getRepository(Replacement), ds.getRepository(Seller), ds.getRepository(DisputeMessage), view, emitter as never, team, notifications as never, translations);
     storeA = await addSeller(ds, { name: 'Store A', userId: 'owner-a' });
     storeB = await addSeller(ds, { name: 'Store B', userId: 'owner-b' });
   });
   afterEach(() => ds.destroy());
 
   it('defaults: all off; a store sees nothing until admin switches the default on, and its override beats the default', async () => {
-    expect(await access.defaults()).toEqual({ returns: false, exchanges: false, replacements: false, express: false });
+    expect(await access.defaults()).toEqual({ returns: false, exchanges: false, replacements: false, express: false, customerThread: false, reasons: false });
     expect(await view.readerOf(sellerCaller('owner-a'), 'return')).toBeNull();
     await access.setDefaults({ returns: true });
     expect((await view.readerOf(sellerCaller('owner-a'), 'return'))?.seller.id).toBe(storeA.id);
@@ -176,6 +176,94 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
     emitter.sent.length = 0;
     await view.push('return', { ...full, sellerId: storeB.id }, 'updated');
     expect(emitter.sent.filter((e) => e.to === 'user:owner-a')).toEqual([]);
+  });
+
+  describe('what a store may read of the customer\'s words (§13: customerThread and reasons switches)', () => {
+    const asCase = (d: Dispute) => ({ ...d, items: [], attachments: ['/uploads/photo.jpg'], reasonI18n: { sourceLang: 'en', en: 'broken', fr: 'cassé' } }) as unknown as Record<string, unknown>;
+
+    it('without `reasons` the reason, category, translations, photos and decision note are removed server-side; the rest stays', async () => {
+      const d = await addReturn({ category: 'damaged', resolution: 'Approved: the parcel was crushed.' });
+      await access.setDefaults({ returns: true });
+      const [v] = (await view.present('return', [asCase(d)], storeA.id)) as unknown as Record<string, unknown>[];
+      expect(v).toMatchObject({ reasonHidden: true, reason: null, category: null, attachments: [], decisionNote: null, decisionNoteFr: null, customerFirstName: 'Awa', reference: d.reference });
+      expect(v).not.toHaveProperty('reasonI18n');
+      expect(v).not.toHaveProperty('decisionNoteI18n');
+      expect(JSON.stringify(v)).not.toMatch(/broken|crushed|photo\.jpg|cassé/);
+      // a live push carries the same stripped view
+      emitter.sent.length = 0;
+      await view.push('return', asCase(d), 'updated');
+      const pushed = emitter.sent.find((e) => e.event === 'dispute:updated' && e.to === 'user:owner-a')?.payload;
+      expect(pushed).toMatchObject({ reasonHidden: true, reason: null, attachments: [] });
+      expect(JSON.stringify(pushed)).not.toMatch(/broken|crushed|photo\.jpg/);
+    });
+
+    it('with `reasons` on (default or this store\'s override) the reason, photos and decision note come back', async () => {
+      const d = await addReturn({ category: 'damaged', resolution: 'Approved: the parcel was crushed.' });
+      await access.setDefaults({ returns: true, reasons: true });
+      const [v] = (await view.present('return', [asCase(d)], storeA.id)) as unknown as Record<string, unknown>[];
+      expect(v).toMatchObject({ reasonHidden: false, reason: 'broken', category: 'damaged', attachments: ['/uploads/photo.jpg'], decisionNote: 'Approved: the parcel was crushed.' });
+      expect(v.reasonI18n).toBeTruthy();
+      // an override Off on this store strips them again, live
+      await access.setStoreAccess({ sellerId: storeA.id, reasons: false });
+      const [w] = (await view.present('return', [asCase(d)], storeA.id)) as unknown as Record<string, unknown>[];
+      expect(w).toMatchObject({ reasonHidden: true, reason: null });
+      const [other] = (await view.present('return', [{ ...asCase(d), sellerId: storeB.id }], storeB.id)) as unknown as Record<string, unknown>[];
+      expect(other.reasonHidden).toBe(false);
+    });
+
+    it('the redaction helper keeps first name, items, stage, money and legs', () => {
+      const v = withholdReasons(redactReturn({ id: 'r', reference: 'RET-1', orderId: 'o', orderReference: 'SOM-1', customerName: 'Awa Diallo', status: 'open', stage: 'approved', reason: 'x', category: 'damaged', attachments: ['/a.jpg'], refundUsd: 5, items: [{ productName: 'Kettle', qty: 1 }], createdAt: new Date(), updatedAt: new Date() }));
+      expect(v).toMatchObject({ customerFirstName: 'Awa', stage: 'approved', refundUsd: 5, reasonHidden: true });
+      expect(v.items).toHaveLength(1);
+    });
+
+    describe('the customer <-> support conversation', () => {
+      let ret: Dispute;
+      const say = async (role: string, authorName: string, text: string, attachments: string | null = null) =>
+        ds.getRepository(DisputeMessage).save(ds.getRepository(DisputeMessage).create({ disputeId: ret.id, authorId: role === 'customer' ? 'cust-1' : 'adm', authorName, role, text, attachments }));
+      beforeEach(async () => {
+        ret = await addReturn();
+        await say('customer', 'Awa Diallo', 'Where is my refund?', JSON.stringify(['/uploads/c.jpg']));
+        await say('admin_support', 'Demo Support', 'We are checking.');
+        await say('seller', 'Old Seller', 'legacy seller reply');
+        await access.setDefaults({ returns: true });
+      });
+
+      it('is refused until admin shares it (default off, then On for the store), then read-only with first names and no legacy seller lines', async () => {
+        await expect(threads.customerConversation(sellerCaller('owner-a'), { kind: 'return', caseId: ret.id })).rejects.toThrow('KOMORIKO support has not shared this conversation with your store.');
+        await access.setStoreAccess({ sellerId: storeA.id, customerThread: true });
+        const msgs = await threads.customerConversation(sellerCaller('owner-a'), { kind: 'return', caseId: ret.id });
+        expect(msgs.map((m) => [m.side, m.authorName, m.text])).toEqual([['customer', 'Awa', 'Where is my refund?'], ['support', 'KOMORIKO', 'We are checking.']]);
+        // photos only while the reasons are shown too
+        expect(msgs[0].attachments).toEqual([]);
+        await access.setStoreAccess({ sellerId: storeA.id, reasons: true });
+        expect((await threads.customerConversation(sellerCaller('owner-a'), { kind: 'return', caseId: ret.id }))[0].attachments).toEqual(['/uploads/c.jpg']);
+        expect(JSON.stringify(msgs)).not.toMatch(/Diallo|legacy seller reply/);
+      });
+
+      it('another store, a customer, the section off, and an exchange (no conversation) are answered as such', async () => {
+        await access.setDefaults({ customerThread: true });
+        await expect(threads.customerConversation(sellerCaller('owner-b'), { kind: 'return', caseId: ret.id })).rejects.toThrow('Request not found.');
+        await expect(threads.customerConversation({ id: 'cust-1', role: 'customer', name: 'c' }, { kind: 'return', caseId: ret.id })).rejects.toThrow('Not allowed.');
+        await expect(threads.customerConversation(staff('admin_support'), { kind: 'return', caseId: ret.id })).rejects.toThrow('Not allowed.');
+        await access.setStoreAccess({ sellerId: storeA.id, returns: false });
+        await expect(threads.customerConversation(sellerCaller('owner-a'), { kind: 'return', caseId: ret.id })).rejects.toThrow('This section is turned off for your store.');
+        await access.setStoreAccess({ sellerId: storeA.id, returns: null, exchanges: true });
+        const ex = await ds.getRepository(Exchange).save(ds.getRepository(Exchange).create({ reference: 'EXC-9', orderId: 'o', orderReference: 'SOM-9', customerId: 'c', customerName: 'x', sellerId: storeA.id, fromSku: 'a', fromName: 'A', toSku: 'b', toName: 'B' }));
+        expect(await threads.customerConversation(sellerCaller('owner-a'), { kind: 'exchange', caseId: ex.id })).toEqual([]);
+      });
+
+      it('a new message is pushed to the store live only while the conversation is shared; stripped like the read', async () => {
+        const msg = (await say('customer', 'Awa Diallo', 'Hello again', JSON.stringify(['/uploads/d.jpg']))) as unknown as Record<string, unknown>;
+        await view.pushCustomerMessage(ret, msg);
+        expect(emitter.sent.filter((e) => e.event === 'caseThread:customerMessage')).toEqual([]);
+        await access.setDefaults({ customerThread: true });
+        await view.pushCustomerMessage(ret, msg);
+        const pushed = emitter.sent.find((e) => e.event === 'caseThread:customerMessage' && e.to === 'user:owner-a')?.payload;
+        expect(pushed).toMatchObject({ side: 'customer', authorName: 'Awa', text: 'Hello again', attachments: [] });
+        expect(customerMessageView({ id: 'm', disputeId: 'd', role: 'seller', text: 't', createdAt: new Date() }, true)).toBeNull();
+      });
+    });
   });
 
   describe('the private thread', () => {

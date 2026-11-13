@@ -32,6 +32,7 @@ import {
   useAfterSaleAccess,
   useCaseDetail,
   useCasePage,
+  useCustomerConversation,
   type CaseKind,
   type SellerCase,
 } from "@/lib/seller-aftersale";
@@ -228,11 +229,17 @@ export function AftersaleSectionDetail({ kind, id }: { kind: CaseKind; id: strin
       <Banner />
       {q.error && <LoadError message={q.error} onRetry={q.reload} />}
 
-      {c.reason && (
-        <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
-          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">{fr ? "Motif" : "Reason"}</p>
-          <TranslatableText kind={KIND_TRANSLATE[kind]} id={c.id} auto text={c.reason} i18n={c.reasonI18n} className="mt-1 whitespace-pre-wrap text-lg font-bold text-slate-900" />
+      {c.reasonHidden ? (
+        <div role="note" data-testid="reason-hidden" className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+          {fr ? "Le support KOMORIKO a le motif de cette demande." : "KOMORIKO support has the reason for this request."}
         </div>
+      ) : (
+        c.reason && (
+          <div data-testid="reason-block" className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-amber-700">{fr ? "Motif" : "Reason"}</p>
+            <TranslatableText kind={KIND_TRANSLATE[kind]} id={c.id} auto text={c.reason} i18n={c.reasonI18n} className="mt-1 whitespace-pre-wrap text-lg font-bold text-slate-900" />
+          </div>
+        )
       )}
 
       <DetailGrid>
@@ -251,7 +258,9 @@ export function AftersaleSectionDetail({ kind, id }: { kind: CaseKind; id: strin
         </DetailGridSection>
 
         <DetailGridSection title={fr ? "Décision du support" : "Support decision"}>
-          {c.decisionNote ? (
+          {c.reasonHidden ? (
+            <p className="text-sm text-slate-500">{fr ? "Le support KOMORIKO a le détail de sa décision." : "KOMORIKO support has the details of its decision."}</p>
+          ) : c.decisionNote ? (
             <TranslatableText kind={NOTE_TRANSLATE[kind]} id={c.id} auto text={c.decisionNote} i18n={c.decisionNoteI18n} className="whitespace-pre-wrap text-sm text-slate-800" />
           ) : (
             <p className="text-sm text-slate-500">{c.status === "open" || c.status === "requested" ? (fr ? "Le support n'a pas encore décidé." : "Support has not decided yet.") : fr ? "Aucune note." : "No note."}</p>
@@ -313,10 +322,59 @@ export function AftersaleSectionDetail({ kind, id }: { kind: CaseKind; id: strin
           </DetailGridSection>
         )}
 
+        {c.customerThreadShared && (
+          <DetailGridSection title={fr ? "Conversation client et support" : "Customer & support conversation"} span={3}>
+            <CustomerConversation kind={kind} caseId={c.id} />
+          </DetailGridSection>
+        )}
+
         <DetailGridSection title={fr ? "Parler au support" : "Talk to support"} span={3}>
           <CaseThreadPanel kind={kind} caseId={c.id} side="seller" />
         </DetailGridSection>
       </DetailGrid>
+    </div>
+  );
+}
+
+/**
+ * The conversation between the customer and KOMORIKO support about this request, READ-ONLY (admin shares it with the store: the
+ * server refuses it otherwise). The store cannot write here; "Talk to support" below is its own private thread.
+ */
+function CustomerConversation({ kind, caseId }: { kind: CaseKind; caseId: string }) {
+  const { locale } = useLocale();
+  const fr = locale === "fr";
+  const q = useCustomerConversation(kind, caseId, true);
+  const messages = q.data ?? [];
+  return (
+    <div className="space-y-3" data-testid="customer-conversation">
+      <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+        {fr
+          ? "Lecture seule : les échanges du client avec le support KOMORIKO. Pour écrire au support, utilisez « Parler au support »."
+          : "Read-only: the customer's messages with KOMORIKO support. To write to support, use “Talk to support”."}
+      </p>
+      {q.error && <LoadError message={q.error} onRetry={q.reload} />}
+      {q.loading && <p className="text-sm text-slate-400">{fr ? "Chargement…" : "Loading…"}</p>}
+      {!q.loading && !q.error && messages.length === 0 && <p className="text-sm text-slate-400">{fr ? "Aucun message pour l'instant." : "No messages yet."}</p>}
+      <div className="max-h-96 space-y-2 overflow-y-auto">
+        {messages.map((m) => (
+          <div key={m.id} className={`rounded-xl p-3 text-sm ${m.side === "customer" ? "bg-slate-50" : "bg-blue-50"}`}>
+            <p className="text-xs font-semibold text-slate-700">
+              {m.side === "customer" ? m.authorName || (fr ? "Client" : "Customer") : "KOMORIKO"}
+              <span className="ml-1 font-normal text-slate-500">· {m.side === "customer" ? (fr ? "Client" : "Customer") : "Support"} · {localDateTime(m.createdAt)}</span>
+            </p>
+            <TranslatableText kind="dispute_message" id={m.id} text={m.text} i18n={m.textI18n} className="mt-1 whitespace-pre-line text-slate-800" />
+            {m.attachments.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {m.attachments.map((u) => (
+                  <a key={u} href={assetUrl(u)} target="_blank" rel="noreferrer" className="block h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                    <img src={assetUrl(u)} alt={fr ? "Pièce jointe" : "Attachment"} className="h-full w-full object-cover" loading="lazy" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
