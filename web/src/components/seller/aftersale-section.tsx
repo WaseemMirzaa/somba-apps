@@ -45,12 +45,31 @@ const NOTE_TRANSLATE = { return: "dispute_resolution", exchange: "exchange_reply
  */
 export function SectionGate({ kind, children }: { kind: CaseKind; children: React.ReactNode }) {
   const router = useRouter();
+  const { locale } = useLocale();
   const { loaded, access } = useAfterSaleAccess();
   const on = access[SECTIONS[kind].key];
   useEffect(() => {
-    if (loaded && !on) router.replace("/seller");
-  }, [loaded, on, router]);
-  if (!loaded || !on) return null;
+    if (!loaded || on) return;
+    router.replace("/seller");
+    // A client navigation can stall while this page's live reads are still settling: if the page is still here a moment
+    // later, load the dashboard the plain way.
+    const t = setTimeout(() => {
+      if (window.location.pathname.startsWith(SECTIONS[kind].href)) window.location.replace("/seller");
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [loaded, on, router, kind]);
+  if (!loaded) return null;
+  if (!on) {
+    // The redirect above runs at once; this is what shows for the instant before it lands (and if it is slow).
+    return (
+      <div role="status" className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        {locale === "fr" ? "Cette section est désactivée pour votre boutique." : "This section is turned off for your store."}{" "}
+        <Link href="/seller" className="font-medium text-[var(--primary)] hover:underline">
+          {locale === "fr" ? "Retour au tableau de bord" : "Back to the dashboard"}
+        </Link>
+      </div>
+    );
+  }
   return <>{children}</>;
 }
 
