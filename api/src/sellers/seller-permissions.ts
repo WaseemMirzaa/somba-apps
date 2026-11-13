@@ -8,7 +8,7 @@ import type { TeamRole } from '../database/entities/seller-team.entity';
  *   insight         dashboards: sellers:stats, analytics:seller, goals
  *   catalog_read    products, categories, inventory (read)
  *   catalog         products, inventory, promotions / campaigns, flash-sale nominations, coupons, bulk import
- *   orders          orders, shipping (returns, disputes, replacements and exchanges are decided by KOMORIKO support: a store sees none)
+ *   orders          orders, shipping, and the read-only after-sale view while admin turns it on (returns, exchanges and replacements are decided by KOMORIKO support)
  *   finance         payouts, statements, earnings, tax documents
  *   support         support tickets, product Q&A, review replies (customer chat is closed: customers contact KOMORIKO support)
  *   storefront      store profile, vacation mode, handling time, policy proposals (a policy goes live when KOMORIKO admin approves it; express delivery is admin-managed)
@@ -84,6 +84,9 @@ export function permissionForEvent(event: string): SellerPermission | null {
       return 'support';
     case 'seller':
       return 'any';
+    // The private seller <-> support thread of a return / exchange / replacement (§13). The `dispute|exchange|replacement` heads stay owner-only: they also carry the owner's own purchases.
+    case 'caseThread':
+      return 'orders';
     default:
       return null;
   }
@@ -94,6 +97,10 @@ export function permissionForNotice(type: string | null | undefined): SellerPerm
   switch (type) {
     case 'order':
     case 'delivery':
+    // The read-only after-sale view (§13): a store's own cases, for the people who handle its orders.
+    case 'seller_return':
+    case 'seller_exchange':
+    case 'seller_replacement':
       return 'orders';
     case 'payout':
     case 'finance':

@@ -10,6 +10,7 @@ import { useMarket } from "@/context/market-context";
 import { useToast } from "@/context/toast-context";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { PlansEditor } from "@/components/admin/plans-editor";
+import { SellerPortalDefaults } from "@/components/admin/seller-portal-access";
 import { TranslationsStatusPanel } from "@/components/admin/translations-status-panel";
 import { errMsg } from "@/lib/admin-live";
 import { socketClient } from "@/lib/realtime/socket-client";
@@ -303,6 +304,11 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           ))}
+
+          <div className="card-premium space-y-3 p-6">
+            <h3 className="font-semibold">{fr ? "Portail vendeur : sections après-vente" : "Seller portal: after-sale sections"}</h3>
+            <SellerPortalDefaults />
+          </div>
 
           <div className="card-premium space-y-3 p-6">
             <h3 className="font-semibold">{fr ? "Formules d'abonnement vendeur" : "Seller subscription plans"}</h3>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { StoreProfileForm } from "@/components/seller/store-profile-form";
 import { StoreBrandingForm } from "@/components/seller/store-branding-form";
+import { ExpressCard } from "@/components/seller/express-card";
 import { HandlingForm, PoliciesForm, VacationForm } from "@/components/seller/account-storefront-forms";
 import { useLocale } from "@/context/locale-context";
 
@@ -26,6 +27,7 @@ export default function SellerStorefrontPage() {
         <h2 className="mb-4 font-semibold">{fr ? "Informations de la boutique" : "Store details"}</h2>
         <StoreProfileForm />
       </div>
+      <ExpressCard />
       <div className="card-premium p-6">
         <h2 className="mb-4 font-semibold">{fr ? "Mode vacances" : "Vacation mode"}</h2>
         <VacationForm />

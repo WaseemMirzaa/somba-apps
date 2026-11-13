@@ -32,7 +32,8 @@ export type TranslationEntityType =
   | 'exchange_reason'
   | 'exchange_reply'
   | 'replacement_reason'
-  | 'replacement_reply';
+  | 'replacement_reply'
+  | 'case_seller_message';
 
 /** author = typed by a person (a machine never overwrites it) · machine = Google · snapshot = copied at order time. */
 export type TranslationOrigin = 'author' | 'machine' | 'snapshot';

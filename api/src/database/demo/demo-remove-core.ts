@@ -46,6 +46,7 @@ import {
   Seller,
   Setting,
   SellerPolicyRevision,
+  CaseSellerMessage,
   SellerTeamMember,
   StockMovement,
   StoreFollow,
@@ -270,6 +271,13 @@ async function collect(ds: DataSource): Promise<Ids> {
   ids.messages = uniq([
     ...(await col(ConversationMessage, 'id', [['conversationId', ids.convs]])),
     ...(await col(SupportMessage, 'id', [['ticketId', ids.tickets]])),
+    // The customer <-> support messages of the demo's returns and disputes (their translations are keyed by the message id too).
+    ...(await col(DisputeMessage, 'id', [['disputeId', ids.disputes]])),
+    // The private seller <-> support threads of the demo's cases (their translations are keyed by the message id).
+    ...(await col(CaseSellerMessage, 'id', [
+      ['caseId', uniq([...ids.disputes, ...ids.exchanges, ...ids.replacements])],
+      ['sellerId', ids.owners],
+    ])),
   ]);
   ids.reviews = await col(Review, 'id', [
     ['productId', ids.products],
@@ -453,6 +461,14 @@ function steps(i: Ids): Step[] {
     { label: 'campaigns', entity: Campaign, terms: [['id', i.campaigns]] },
     { label: 'promos', entity: Promo, terms: [['id', i.promos]] },
     { label: 'cms_blocks', entity: CmsBlock, terms: [['id', i.cms]] },
+    {
+      label: 'case_seller_messages',
+      entity: CaseSellerMessage,
+      terms: [
+        ['caseId', uniq([...i.disputes, ...i.exchanges, ...i.replacements])],
+        ['sellerId', i.owners],
+      ],
+    },
     {
       label: 'dispute_messages',
       entity: DisputeMessage,

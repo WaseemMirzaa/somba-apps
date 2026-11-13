@@ -23,13 +23,18 @@ const SUP = 'Only supervisors and managers can do this.';
 
 const echo = () => jest.fn(async (...a: unknown[]) => ({ args: a }));
 
+/** The seller view with nothing switched on: a store account reads only its own purchases (§13 covers the switched-on case). */
+function noStoreView() {
+  return { readerOf: jest.fn(async () => null) } as never;
+}
+
 function disputes() {
   const svc = {
     list: echo(), get: echo(), eligibility: echo(), open: echo(), reply: echo(), cancel: echo(),
     adminDecideReturn: echo(), decide: echo(), resolve: echo(), markReceived: echo(), grade: echo(), reject: echo(),
   };
   const audit = { record: jest.fn(async () => undefined) };
-  return { svc, audit, gw: new DisputesGateway(svc as never, audit as never, tiers()) };
+  return { svc, audit, gw: new DisputesGateway(svc as never, audit as never, tiers(), noStoreView()) };
 }
 
 describe('DisputesGateway', () => {
@@ -203,7 +208,7 @@ describe('AfterSaleGateway', () => {
     const rep = { list: echo(), get: echo(), mine: echo(), create: echo(), respond: echo(), setStatus: echo() };
     const exc = { list: echo(), get: echo(), mine: echo(), create: echo(), respond: echo(), setStatus: echo() };
     const audit = { record: jest.fn(async (_entry: { action: string; role: string; entity: string; entityId?: string; detail?: string }) => undefined) };
-    return { rep, exc, audit, gw: new AfterSaleGateway(rep as never, exc as never, tiers(), audit as never) };
+    return { rep, exc, audit, gw: new AfterSaleGateway(rep as never, exc as never, tiers(), audit as never, noStoreView()) };
   }
 
   it('A-03: an exchange is moved (and so credited on delivery) by the exchange desk and warehouse supervisors only', async () => {

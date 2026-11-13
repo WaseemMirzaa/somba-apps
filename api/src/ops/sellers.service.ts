@@ -21,6 +21,7 @@ import type { SellerStatus, SellerView } from '../database/entities/seller.entit
 import { normalizePhone } from '../common/phone/phone-hash';
 import { onVacation, vacationNotice } from '../sellers/storefront';
 import { privateIdOf } from '../sellers/private-url';
+import { accessFields, defaultsFrom } from '../sellers/after-sale-access';
 import { KYC_REVIEWERS } from '../common/staff-access';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import {
@@ -144,7 +145,14 @@ const PRIVATE_SELLER_KEYS = [
   'payoutMethod',
   'payoutAccount',
   'payoutAccountMasked',
+  // The raw per-store override and the platform defaults of the after-sale sections: staff views keep them (see `forStaff`).
+  'afterSaleAccess',
+  'afterSaleAccessOverride',
+  'afterSaleAccessDefaults',
 ] as const;
+
+/** What every staff view of a store keeps although it is not public: the after-sale section switches (docs/contracts/admin-controls.md §13). */
+const STAFF_KEEPS: readonly string[] = ['userId', 'afterSaleAccess', 'afterSaleAccessOverride', 'afterSaleAccessDefaults'];
 
 @Injectable()
 export class SellersService {
@@ -240,7 +248,7 @@ export class SellersService {
     if (KYC_REVIEWERS.includes(role)) return view;
     const out = { ...view } as Record<string, unknown>;
     // `userId` is an internal id, not KYC data: payouts and other admin pages are keyed by it, so every admin role keeps it.
-    for (const k of PRIVATE_SELLER_KEYS) if (k !== 'userId') delete out[k];
+    for (const k of PRIVATE_SELLER_KEYS) if (!STAFF_KEEPS.includes(k)) delete out[k];
     return out as T;
   }
 
@@ -296,7 +304,9 @@ export class SellersService {
 
   /** The seller as the apps see it: plus the plan that is actually in force right now. */
   async withPlanState(seller: Seller) {
-    return { ...(await this.adminView(seller)), activePlan: activePlanId(seller) };
+    // The resolved after-sale sections (`afterSaleAccess`), plus the raw override and the defaults for staff pages (§13).
+    const defaults = defaultsFrom(await Promise.resolve().then(() => this.settings.all()).catch(() => ({})));
+    return { ...(await this.adminView(seller)), ...accessFields(seller.afterSaleAccess, defaults), activePlan: activePlanId(seller) };
   }
 
   /**

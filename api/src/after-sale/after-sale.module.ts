@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SellerAfterSaleModule } from '../sellers/seller-after-sale.module';
 import { ContentModule } from '../content/content.module';
 import { EngagementGateway } from '../content/engagement.gateway';
 import { SupportGateway } from '../content/support.gateway';
@@ -18,7 +19,7 @@ import { AfterSaleLogisticsListener } from './logistics-listener';
  * Contract: docs/contracts/after-sale.md.
  */
 @Module({
-  imports: [DisputesModule, FlowsModule, ContentModule, NotificationsModule, OpsModule, LogisticsModule],
+  imports: [DisputesModule, FlowsModule, SellerAfterSaleModule, ContentModule, NotificationsModule, OpsModule, LogisticsModule],
   providers: [DisputesGateway, AfterSaleGateway, EngagementGateway, SupportGateway, NotificationsGateway, AfterSaleLogisticsListener],
 })
 export class AfterSaleModule {}

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SellerAfterSaleModule } from '../sellers/seller-after-sale.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DeliveryTask, Dispute, DisputeItem, DisputeMessage, Order, OrderItem, Payment, Seller } from '../database/entities';
 import { ContentModule } from '../content/content.module';
@@ -19,6 +20,7 @@ import { PartialRefundService } from './partial-refund.service';
     ContentModule,
     WalletModule,
     FlowsModule,
+    SellerAfterSaleModule,
   ],
   providers: [DisputesService, PartialRefundService],
   exports: [DisputesService, PartialRefundService],

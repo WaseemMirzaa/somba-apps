@@ -97,6 +97,7 @@ export const FIELD_FR: Record<string, string> = {
   'Per-customer limit': 'La limite par client',
   Phone: 'Le téléphone',
   'Pickup address': 'L’adresse de collecte',
+  'Seller portal section flag': 'L’indicateur de section du portail vendeur',
   'Pinned address flag': 'L’indicateur d’adresse épinglée',
   'Plan id': 'L’identifiant de l’offre',
   'Plan length (months)': 'La durée de l’offre (mois)',

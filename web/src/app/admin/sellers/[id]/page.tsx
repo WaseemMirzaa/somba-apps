@@ -27,13 +27,16 @@ import { pickText, productNameFor } from "@/lib/i18n-fields";
 import { planLabel, useSellerPlans } from "@/lib/shop-live";
 import { Ban } from "lucide-react";
 import { ExpressToggle } from "@/components/admin/express-toggle";
-import { canReviewPolicies } from "@/lib/admin-controls";
+import { canManageSellerPortal, canReviewPolicies } from "@/lib/admin-controls";
+import { SellerPortalAccessSelects } from "@/components/admin/seller-portal-access";
 import { useRole } from "@/lib/admin-live";
 
 const SELLER_STATUS_FR: Record<string, string> = { pending: "En attente", approved: "Approuvé", suspended: "Suspendu", rejected: "Rejeté" };
 const PRODUCT_STATUS_FR: Record<string, string> = { live: "En ligne", pending: "En attente", rejected: "Rejeté", removed: "Bloqué", draft: "Brouillon" };
 
-type SellerFull = Seller & { pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; expressDelivery?: boolean; plan?: string; planExpiresAt?: string | null };
+type SellerFull = Seller & {
+  afterSaleAccessOverride?: Partial<Record<"returns" | "exchanges" | "replacements" | "express", boolean | null>>;
+  afterSaleAccessDefaults?: { returns: boolean; exchanges: boolean; replacements: boolean; express: boolean }; pickupAddress?: string | null; pickupLat?: number | null; pickupLng?: number | null; expressDelivery?: boolean; plan?: string; planExpiresAt?: string | null };
 
 /** Applications filed before KYC existed have none of this. */
 const hasKyc = (s: Seller) => !!(s.kycSubmittedAt || s.termsAcceptedAt || s.legalName || s.idNumber || (s.documentUrls?.length ?? 0) > 0);
@@ -125,6 +128,17 @@ export default function AdminSellerDetailPage() {
             { label: fr ? "Produits" : "Products", value: sellerProducts.length },
           ]} />
         </DetailGridSection>
+
+        {canManageSellerPortal(role) && (
+          <DetailGridSection title={fr ? "Accès au portail vendeur" : "Seller portal access"} span={2}>
+            <p className="mb-3 text-sm text-slate-500">
+              {fr
+                ? "Quelles sections d'après-vente cette boutique voit en lecture seule (le support décide de tout). « Suivre le défaut » reprend le réglage de la plateforme."
+                : "Which after-sale sections this store sees, read-only (support decides everything). “Follow default” uses the platform setting."}
+            </p>
+            <SellerPortalAccessSelects sellerId={seller.id} override={seller.afterSaleAccessOverride} defaults={seller.afterSaleAccessDefaults} onChanged={() => setRefresh((n) => n + 1)} />
+          </DetailGridSection>
+        )}
 
         <DetailGridSection title={fr ? "Livraison express" : "Express delivery"}>
           <ExpressToggle

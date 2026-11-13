@@ -37,6 +37,7 @@ import {
   ShieldCheck,
   ScrollText,
   MessagesSquare,
+  PanelTop,
 } from "lucide-react";
 
 export type AdminDepartment =
@@ -108,6 +109,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
       // Operations switches express delivery per store (server group `logisticsDesk`): the toggle is on the store page.
       { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
+      // The seller portal's read-only after-sale sections (server group `sellerAfterSaleManage`: Super Admin, Operations, Support).
+      { href: "/admin/seller-portal", label: "sellerPortal", icon: PanelTop, i18n: true },
     ],
   },
   {
@@ -164,6 +167,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/exchanges", label: "exchanges", icon: ArrowLeftRight, i18n: true },
       // Old customer-seller chats, read-only (`chat:adminList` / `chat:adminMessages`: Super Admin and Support).
       { href: "/admin/chats", label: "chatsReadOnly", icon: MessagesSquare, i18n: true },
+      // Which after-sale sections stores see (read-only), and the private seller threads (`sellerAfterSaleManage`).
+      { href: "/admin/seller-portal", label: "sellerPortal", icon: PanelTop, i18n: true },
       { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
       // Support may suspend accounts (`customers:setActive`), so it sees the fraud alerts whose action is a block.
       { href: "/admin/fraud", label: "fraudPayments", icon: AlertTriangle, i18n: true },
@@ -199,7 +204,7 @@ export function getAdminSections(dept: AdminDepartment): AdminNavSection[] {
     // Geography belongs to both Operations and Warehouse Admin; the Super Admin lists it once, next to Warehouses.
     // The Stores page is Moderation's for the Super Admin (Operations reaches it for the express toggle).
     const sections = DEPARTMENT_SECTIONS.map((section) =>
-      section.id === "operations" ? { ...section, items: section.items.filter((i) => i.href !== "/admin/geography" && i.href !== "/admin/sellers") } : section,
+      section.id === "operations" ? { ...section, items: section.items.filter((i) => i.href !== "/admin/geography" && i.href !== "/admin/sellers" && i.href !== "/admin/seller-portal") } : section,
     );
     return [SUPER_SECTION, ...sections];
   }

@@ -1,4 +1,4 @@
-import { AuditLog, Conversation, ConversationMessage, Parcel, ParcelScan, Translation, WarehouseBatch } from '../entities';
+import { AuditLog, CaseSellerMessage, Dispute, DisputeMessage, Conversation, ConversationMessage, Parcel, ParcelScan, Translation, WarehouseBatch } from '../entities';
 import { mkdtempSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -266,6 +266,35 @@ describe('demo removal', () => {
     const res = await removeDemo(ds, { yes: true, uploadDir: dirs.up, privateDir: dirs.priv });
     expect(res.blockers).toEqual([]);
     expect((await rows.find()).map((r) => r.entityId)).toEqual([realMsg.id]);
+  });
+
+  it('removes the private seller <-> support threads of the demo cases (and their other-language rows), the store override with the store, and keeps a real store\'s thread', async () => {
+    const w = await world();
+    const dSeller = await ds.getRepository(Seller).findOneOrFail({ where: { name: 'Demo Store' } });
+    const realSeller = await ds.getRepository(Seller).findOneOrFail({ where: { name: 'Real Store' } });
+    await ds.getRepository(Seller).update({ id: dSeller.id }, { afterSaleAccess: '{"returns":true}' });
+    const ret = (customerId: string, sellerId: string, ref: string, orderId: string) =>
+      ds.getRepository(Dispute).save(ds.getRepository(Dispute).create({ reference: ref, orderId, orderReference: ref, customerId, customerName: 'x', type: 'return', reason: 'because', sellerId }));
+    const dCase = await ret(w.dCust.id, dSeller.id, 'RET-DEMO', w.dOrder.id);
+    const realCase = await ret(w.realCustomer.id, realSeller.id, 'RET-REAL', w.realOrder.id);
+    const msgs = ds.getRepository(CaseSellerMessage);
+    const say = (c: Dispute, sellerId: string, text: string) =>
+      msgs.save(msgs.create({ caseKind: 'return', caseId: c.id, sellerId, authorId: null, authorName: 'n', authorSide: 'seller', text }));
+    const dm = ds.getRepository(DisputeMessage);
+    const customerMsg = await dm.save(dm.create({ disputeId: dCase.id, authorId: w.dCust.id, authorName: 'x', role: 'customer', text: 'Hello support' }));
+    const demoMsg = await say(dCase, dSeller.id, 'Where is it?');
+    const realMsg = await say(realCase, realSeller.id, 'Where is mine?');
+    const rows = ds.getRepository(Translation);
+    await rows.save(rows.create({ entityType: 'dispute_message', entityId: customerMsg.id, field: 'text', locale: 'fr', value: 'Bonjour', origin: 'author', sourceLang: 'en', sourceHash: 'h' }));
+    for (const m of [demoMsg, realMsg]) {
+      await rows.save(rows.create({ entityType: 'case_seller_message', entityId: m.id, field: 'text', locale: 'fr', value: 'Où est-il ?', origin: 'author', sourceLang: 'en', sourceHash: 'h' }));
+    }
+    const res = await removeDemo(ds, { yes: true, uploadDir: dirs.up, privateDir: dirs.priv });
+    expect(res.blockers).toEqual([]);
+    expect((await msgs.find()).map((m) => m.id)).toEqual([realMsg.id]);
+    expect((await rows.find({ where: { entityType: 'case_seller_message' } })).map((r) => r.entityId)).toEqual([realMsg.id]);
+    expect(await rows.count({ where: { entityType: 'dispute_message' } })).toBe(0);
+    expect(await ds.getRepository(Seller).count({ where: { id: dSeller.id } })).toBe(0);
   });
 
   it('refuses while a real order contains a demo product, and deletes nothing', async () => {

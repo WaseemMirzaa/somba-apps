@@ -23,10 +23,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  // Returns, disputes, exchanges, replacements and messages are KOMORIKO support's business now (docs/contracts/admin-controls.md):
-  // a store has no such pages, so an old bookmark or notice link lands on the seller dashboard.
+  // Disputes and messages are KOMORIKO support's business (docs/contracts/admin-controls.md): a store has no such pages, so an
+  // old bookmark or notice link lands on the seller dashboard. Returns, exchanges and replacements are back as READ-ONLY pages
+  // while admin turns them on for the store (§13): each page sends the store back to the dashboard itself when its section is off.
   async redirects() {
-    return ["returns", "disputes", "exchanges", "replacements", "messages"].flatMap((page) => [
+    return ["disputes", "messages"].flatMap((page) => [
       { source: `/seller/${page}`, destination: "/seller", permanent: false },
       { source: `/seller/${page}/:path*`, destination: "/seller", permanent: false },
     ]);

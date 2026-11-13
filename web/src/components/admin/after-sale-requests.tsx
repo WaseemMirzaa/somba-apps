@@ -14,6 +14,7 @@ import { ListFilters, EMPTY_LIST_FILTERS } from "@/components/ui/list-filters";
 import { ErrorNote, Modal } from "@/components/admin/modal";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { Photos } from "@/components/admin/dispute-case";
+import { SellerThreadSection } from "@/components/admin/seller-thread-tabs";
 import { applyListFilters } from "@/lib/list-filter-utils";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -372,6 +373,8 @@ export function AfterSaleDetail({ id, kind }: { id: string; kind: AfterSaleKind 
             <p className="text-sm text-slate-500">{r.status === "rejected" ? (fr ? "Demande rejetée." : "Request rejected.") : fr ? "La suite suit les trajets de livraison ci-dessus." : "What happens next follows the delivery legs above."}</p>
           )}
         </DetailGridSection>
+
+        <SellerThreadSection kind={kind} caseId={r.id} sellerId={r.sellerId} />
       </DetailGrid>
 
       <Modal

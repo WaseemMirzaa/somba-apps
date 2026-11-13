@@ -18,6 +18,13 @@ export const canDecideExchange = (role: string): boolean => role === "admin" || 
 /** `disputeDesk`: decides returns and disputes. */
 export const canDecideReturn = (role: string): boolean => ["admin", "admin_operations", "admin_support", "admin_finance"].includes(role);
 
+/**
+ * `sellerAfterSaleManage` (docs/contracts/admin-controls.md §13): switches the seller portal's read-only after-sale sections (the
+ * defaults and each store's override) and writes in the private seller <-> support threads. Finance only reads the threads.
+ */
+export const canManageSellerPortal = (role: string): boolean => role === "admin" || role === "admin_operations" || role === "admin_support";
+export const canReadSellerThread = (role: string): boolean => canManageSellerPortal(role) || role === "admin_finance";
+
 /** The line under the express switch while the platform-wide express setting is off. */
 export function expressNote(platformOn: boolean, fr: boolean): string {
   if (platformOn) return "";

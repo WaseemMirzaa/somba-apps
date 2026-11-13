@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Dispute, DisputeItem, Order, OrderItem, Replacement, Seller } from '../database/entities';
@@ -12,6 +12,8 @@ import { cleanAttachments, parseAttachments, storeAttachments } from '../common/
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { REPLACEMENT_NEXT, assertStep, sellerForItem } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
+import { SellerAfterSaleViewService } from '../sellers/seller-after-sale.service';
+import type { SellerCaseView } from '../sellers/seller-case-view';
 import { quotedNotice } from '../notifications/quote';
 import { TranslationService } from '../translation/translation.service';
 import type { SaveTranslation, StoredKind, TextI18n } from '../translation/translation.service';
@@ -58,6 +60,8 @@ export class ReplacementsService {
     private readonly settings: SettingsService,
     private readonly logistics: LogisticsBridge,
     private readonly translations?: TranslationService,
+    // The store's read-only view (docs/contracts/admin-controls.md §13): pushes and notices while a section is on.
+    @Optional() private readonly sellerView?: SellerAfterSaleViewService,
   ) {}
 
   /** Translate first, then store (null: stored untranslated, as before). The writer's account language is the hint. */
@@ -100,6 +104,22 @@ export class ReplacementsService {
     return this.serve(await this.replacements.find({ where: { customerId: user.id, ...status }, order: { createdAt: 'DESC' }, take, skip }));
   }
 
+  /** The store's replacements, redacted (docs/contracts/admin-controls.md §13). Callers check that the section is on for the store first. */
+  async listForStore(sellerId: string, paging?: { limit?: number; offset?: number; status?: string }): Promise<SellerCaseView[]> {
+    const take = Math.min(500, Math.max(1, Math.floor(Number(paging?.limit) || 200)));
+    const skip = Math.max(0, Math.floor(Number(paging?.offset) || 0));
+    const status = paging?.status ? ({ status: paging.status as never } as const) : {};
+    const views = await this.serve(await this.replacements.find({ where: { sellerId, ...status }, order: { createdAt: 'DESC' }, take, skip }));
+    return this.sellerView ? this.sellerView.present('replacement', views as unknown as Record<string, unknown>[], sellerId) : [];
+  }
+
+  /** One of the store's replacements, redacted; null when it is not this store's. */
+  async getForStore(sellerId: string, id: string): Promise<SellerCaseView | null> {
+    const row = await this.replacements.findOne({ where: { id: String(id ?? ''), sellerId } });
+    if (!row || !this.sellerView) return null;
+    return (await this.sellerView.present('replacement', (await this.serve([row])) as unknown as Record<string, unknown>[], sellerId))[0] ?? null;
+  }
+
   /** What this person asked for as a customer (a seller who also shops gets their purchases, not their store's requests). */
   async mine(userId: string, paging?: { limit?: number; offset?: number; status?: string }): Promise<ReplacementView[]> {
     const take = Math.min(1000, Math.max(1, Math.floor(Number(paging?.limit) || 500)));
@@ -116,9 +136,11 @@ export class ReplacementsService {
   }
 
   /** Tell everyone who follows a replacement that it changed: the deciding desk, the warehouse and the customer (never the seller). */
-  private async publish(rep: ReplacementView): Promise<void> {
+  private async publish(rep: ReplacementView, opened = false): Promise<void> {
     this.emitter.toRoles(OPS_ROLES, 'replacement:updated', rep);
     if (rep.customerId) this.emitter.toUser(rep.customerId, 'replacement:updated', rep);
+    // The store hears about it too, redacted, while its section is on (never the customer's thread).
+    await this.sellerView?.push('replacement', rep as unknown as Record<string, unknown>, opened ? 'opened' : 'updated');
   }
 
   async create(
@@ -188,7 +210,7 @@ export class ReplacementsService {
     );
     await this.keep('replacement_reason', saved.id, reasonTr);
     const [rep] = await this.serve([saved]);
-    await this.publish(rep);
+    await this.publish(rep, true);
     await this.notifications.toRole(
       'admin_support',
       quotedNotice({
@@ -261,6 +283,7 @@ export class ReplacementsService {
     if (reason && (status === 'approved' || status === 'rejected')) await this.keep('replacement_reply', rep.id, reasonTr);
     const [saved] = await this.serve([(await this.replacements.findOne({ where: { id: rep.id } }))!]);
     await this.publish(saved);
+    if (status === 'approved' || status === 'rejected') await this.sellerView?.decided('replacement', saved as unknown as Record<string, unknown>);
     await this.tell(saved, status, reason, reasonTr);
     return saved;
   }

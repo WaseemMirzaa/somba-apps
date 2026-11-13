@@ -51,6 +51,12 @@ const EXACT: Record<string, string> = {
   "Nothing to publish: write at least one policy.": "Rien à publier : rédigez au moins une politique.",
   "Status must be pending, approved, rejected or all.": "Le statut doit être en attente, approuvé, refusé ou tous.",
   "Support response time must be a number between 0.001 and 720.": "Le délai de réponse du support doit être un nombre entre 0,001 et 720.",
+  // the seller portal's read-only after-sale view and its private thread with support (§13)
+  "This section is turned off for your store.": "Cette section est désactivée pour votre boutique.",
+  "Choose On or Off for each section.": "Choisissez Activé ou Désactivé pour chaque section.",
+  "Choose Follow default, On or Off for each section.": "Choisissez Suivre le défaut, Activé ou Désactivé pour chaque section.",
+  "Request not found.": "Demande introuvable.",
+  "Messages are at most 2000 characters.": "Les messages font 2000 caractères au plus.",
 
   // ── generic / auth ──
   "Request failed.": "La requête a échoué.",

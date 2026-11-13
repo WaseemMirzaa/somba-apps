@@ -74,8 +74,11 @@ test("after-sale and chat notices are owner-only on the server, and the team rol
   assert.doesNotMatch(support, /chat|messages clients/i);
 });
 
-test("no seller dashboard tile or notice link points at the removed pages", () => {
+test("no seller dashboard tile or notice link points at the removed pages (disputes, messages); the read-only sections are reached by their own notice types only", () => {
   assert.doesNotMatch(dashboard, /returnRatePct|disputeRatePct/);
   const links = read("./notice-links.ts");
-  assert.doesNotMatch(links, /\/seller\/(returns|disputes|exchanges|replacements|messages)/);
+  assert.doesNotMatch(links, /\/seller\/(disputes|messages)/);
+  // the old owner's-own-purchase types (`return`, `exchange`, ...) never open a seller page; only the `seller_*` notice types do (§13)
+  const seller = links.slice(links.indexOf('case "seller":'), links.indexOf('case "admin":'));
+  for (const m of seller.matchAll(/t === "(\w+)"\)[^\n]*\/seller\/(returns|exchanges|replacements)/g)) assert.match(m[1], /^seller_/);
 });

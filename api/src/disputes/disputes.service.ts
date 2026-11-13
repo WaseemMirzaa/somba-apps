@@ -5,6 +5,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
@@ -43,6 +44,9 @@ import { CUSTOMER_KINDS } from '../logistics/leg-rules';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { ReplacementsService } from '../flows/replacements.service';
 import { PartialRefundService } from './partial-refund.service';
+import { SellerAfterSaleViewService } from '../sellers/seller-after-sale.service';
+import { CaseThreadService } from '../sellers/case-thread.service';
+import type { SellerCaseView } from '../sellers/seller-case-view';
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -138,6 +142,9 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     private readonly logistics: LogisticsBridge,
     private readonly replacements: ReplacementsService,
     private readonly translations?: TranslationService,
+    // The store's read-only view (docs/contracts/admin-controls.md §13): pushes and notices while a section is on. Optional so specs can leave it out.
+    @Optional() private readonly sellerView?: SellerAfterSaleViewService,
+    @Optional() private readonly caseThreads?: CaseThreadService,
   ) {}
 
   // ── Translate first, then store ────────────────────────────────────────────
@@ -335,6 +342,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     if (dispute.type === 'return') {
       const hub = await this.hubOfReturn(dispute);
       if (hub) this.emitter.toHub(hub, event, view);
+      // The store hears about it too, redacted, while its Returns section is on (never the thread).
+      await this.sellerView?.push('return', view as unknown as Record<string, unknown>, event === 'dispute:created' ? 'opened' : 'updated');
     }
     return view;
   }
@@ -549,6 +558,26 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     return this.present(await qb.getMany());
   }
 
+  /**
+   * The store's returns, redacted (docs/contracts/admin-controls.md §13): only `type = 'return'` cases of that store. Callers check
+   * that the Returns section is on for the store first (`SellerAfterSaleViewService.readerOf`).
+   */
+  async listForStore(sellerId: string, filter: { status?: string; stage?: string; limit?: number; offset?: number } = {}): Promise<SellerCaseView[]> {
+    const { take, skip } = pageOf(filter, { def: 200 });
+    const qb = this.disputes.createQueryBuilder('d').where("d.type = 'return' AND d.sellerId = :sellerId", { sellerId }).orderBy('d.createdAt', 'DESC').take(take).skip(skip);
+    if (filter.status) qb.andWhere('d.status = :status', { status: filter.status });
+    if (filter.stage) qb.andWhere('d.stage = :stage', { stage: filter.stage });
+    const views = await this.present(await qb.getMany());
+    return this.sellerView ? this.sellerView.present('return', views as unknown as Record<string, unknown>[], sellerId) : [];
+  }
+
+  /** One of the store's returns, redacted; null when it is not this store's return. */
+  async getForStore(sellerId: string, id: string): Promise<SellerCaseView | null> {
+    const d = await this.disputes.findOne({ where: { id: String(id ?? ''), type: 'return', sellerId } });
+    if (!d || !this.sellerView) return null;
+    return (await this.sellerView.present('return', (await this.present([d])) as unknown as Record<string, unknown>[], sellerId))[0] ?? null;
+  }
+
   /** One request with its thread (the customer and staff only). */
   async get(user: Viewer, id: string): Promise<DisputeView> {
     const d = await this.loadFor(user, id);
@@ -572,6 +601,12 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const d = disputeId ? await this.disputes.findOne({ where: { id: disputeId } }) : null;
     if (!d || !(await this.canSee(user, d))) throw new Error(nothing);
     return this.translations.translateStored(kind, id, target, { private: true });
+  }
+
+  /** `translate:text` for `case_seller_message` (the private seller <-> support thread): the store's people and the support managers only. */
+  translateSellerThread(user: Viewer & { name?: string }, id: unknown, target: unknown) {
+    if (!this.caseThreads) throw new Error('Nothing to translate.');
+    return this.caseThreads.translate({ id: user.id, role: user.role, name: user.name ?? '' }, id, target);
   }
 
   // ── The thread ─────────────────────────────────────────────────────────────
@@ -666,6 +701,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
     }
     const view = await this.publish(saved, 'dispute:updated');
+    await this.sellerView?.decided('return', view as unknown as Record<string, unknown>);
     const lead = (q: string) => `${saved.reference} · ${saved.orderReference}${note ? `: ${q}` : ''}`;
     await this.notifications.toUser(saved.customerId, quotedNotice({ title: 'Return approved', body: lead, text: note, i18n: noteTr, max: 1000, type: 'return', entityId: saved.id }));
     if (!task) {
@@ -757,6 +793,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const saved = (await this.disputes.findOne({ where: { id: d.id } }))!;
     if (DisputesService.ownWords(saved.resolution)) await this.keep('dispute_resolution', saved.id, resolutionTr);
     const view = await this.publish(saved, 'dispute:updated');
+    if (saved.type === 'return' && !byCustomer) await this.sellerView?.decided('return', view as unknown as Record<string, unknown>);
     const what = saved.type === 'return' ? 'Return' : 'Dispute';
     const words = { text: saved.resolution ?? '', i18n: DisputesService.ownWords(saved.resolution) ? resolutionTr : null, max: 1000, type: saved.type, entityId: saved.id };
     if (!byCustomer) {

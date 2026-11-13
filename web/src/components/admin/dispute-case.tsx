@@ -12,6 +12,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DisputeActions } from "@/components/admin/dispute-actions";
+import { ThreadTabs } from "@/components/admin/seller-thread-tabs";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
@@ -269,7 +270,12 @@ export function DisputeCase({ id, kind }: { id: string; kind: "dispute" | "retur
           <DisputeActions dispute={d} />
         </DetailGridSection>
 
-        <DetailGridSection title={fr ? `Échanges (${messages.length})` : `Conversation (${messages.length})`} span={3}>
+        <ThreadTabs
+          kind="return"
+          caseId={d.id}
+          sellerId={d.type === "return" ? d.sellerId : null}
+          customerTitle={fr ? `Client ⟷ support (${messages.length})` : `Customer ⟷ support (${messages.length})`}
+        >
           <div className="space-y-3">
             {messages.length === 0 && <p className="text-sm text-slate-400">{fr ? "Aucun message pour l'instant." : "No messages yet."}</p>}
             {messages.map((m) => (
@@ -300,7 +306,7 @@ export function DisputeCase({ id, kind }: { id: string; kind: "dispute" | "retur
               </div>
             )}
           </div>
-        </DetailGridSection>
+        </ThreadTabs>
       </DetailGrid>
     </div>
   );

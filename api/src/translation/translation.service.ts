@@ -16,6 +16,7 @@ import {
   Product,
   ProductQuestion,
   Replacement,
+  CaseSellerMessage,
   Review,
   Seller,
   SupportMessage,
@@ -116,6 +117,8 @@ export const STORED_KINDS = {
   /** A replacement's customer reason / seller reason (`ReplacementsService.translate`). */
   replacement_reason: { entity: Replacement, column: 'reason', field: 'reason', private: true },
   replacement_reply: { entity: Replacement, column: 'sellerReason', field: 'reply', private: true },
+  /** A message of the private seller <-> support thread of a return / exchange / replacement (`CaseThreadService.translate`). */
+  case_seller_message: { entity: CaseSellerMessage, column: 'text', field: 'text', private: true },
 } as const;
 export type StoredKind = keyof typeof STORED_KINDS;
 export const isStoredKind = (k: unknown): k is StoredKind => typeof k === 'string' && k in STORED_KINDS;

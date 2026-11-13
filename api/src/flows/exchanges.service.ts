@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Exchange, Order, Seller } from '../database/entities';
@@ -14,6 +14,8 @@ import { cleanAttachments, parseAttachments, storeAttachments } from '../common/
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
 import { EXCHANGE_NEXT, assertStep, sellerForItem } from './after-sale';
 import { AfterSaleNames } from './after-sale-names';
+import { SellerAfterSaleViewService } from '../sellers/seller-after-sale.service';
+import type { SellerCaseView } from '../sellers/seller-case-view';
 import { quotedNotice } from '../notifications/quote';
 import { TranslationService } from '../translation/translation.service';
 import type { SaveTranslation, StoredKind, TextI18n } from '../translation/translation.service';
@@ -61,6 +63,8 @@ export class ExchangesService {
     private readonly settings: SettingsService,
     private readonly logistics: LogisticsBridge,
     private readonly translations?: TranslationService,
+    // The store's read-only view (docs/contracts/admin-controls.md §13): pushes and notices while a section is on.
+    @Optional() private readonly sellerView?: SellerAfterSaleViewService,
   ) {}
 
   /** Translate first, then store (null: stored untranslated, as before). The writer's account language is the hint. */
@@ -108,6 +112,22 @@ export class ExchangesService {
     return this.serve(await this.exchanges.find({ where: { customerId: user.id, ...status }, order: { createdAt: 'DESC' }, take, skip }));
   }
 
+  /** The store's exchanges, redacted (docs/contracts/admin-controls.md §13). Callers check that the section is on for the store first. */
+  async listForStore(sellerId: string, paging?: { limit?: number; offset?: number; status?: string }): Promise<SellerCaseView[]> {
+    const take = Math.min(500, Math.max(1, Math.floor(Number(paging?.limit) || 200)));
+    const skip = Math.max(0, Math.floor(Number(paging?.offset) || 0));
+    const status = paging?.status ? ({ status: paging.status as never } as const) : {};
+    const views = await this.serve(await this.exchanges.find({ where: { sellerId, ...status }, order: { createdAt: 'DESC' }, take, skip }));
+    return this.sellerView ? this.sellerView.present('exchange', views as unknown as Record<string, unknown>[], sellerId) : [];
+  }
+
+  /** One of the store's exchanges, redacted; null when it is not this store's. */
+  async getForStore(sellerId: string, id: string): Promise<SellerCaseView | null> {
+    const row = await this.exchanges.findOne({ where: { id: String(id ?? ''), sellerId } });
+    if (!row || !this.sellerView) return null;
+    return (await this.sellerView.present('exchange', (await this.serve([row])) as unknown as Record<string, unknown>[], sellerId))[0] ?? null;
+  }
+
   /** What this person asked for as a customer. */
   async mine(userId: string, paging?: { limit?: number; offset?: number; status?: string }): Promise<ExchangeView[]> {
     const take = Math.min(1000, Math.max(1, Math.floor(Number(paging?.limit) || 500)));
@@ -124,9 +144,11 @@ export class ExchangesService {
   }
 
   /** The deciding desk, the warehouse and the customer hear about a change; the seller does not. */
-  private async publish(ex: ExchangeView): Promise<void> {
+  private async publish(ex: ExchangeView, opened = false): Promise<void> {
     this.emitter.toRoles(OPS_ROLES, 'exchange:updated', ex);
     if (ex.customerId) this.emitter.toUser(ex.customerId, 'exchange:updated', ex);
+    // The store hears about it too, redacted, while its section is on (never the customer's thread).
+    await this.sellerView?.push('exchange', ex as unknown as Record<string, unknown>, opened ? 'opened' : 'updated');
   }
 
   async create(
@@ -240,7 +262,7 @@ export class ExchangesService {
     });
     await this.keep('exchange_reason', saved.id, reasonTr);
     const [ex] = await this.serve([saved]);
-    await this.publish(ex);
+    await this.publish(ex, true);
     // Support decides now: tell them (a desk-filed exchange is theirs already).
     if (!ops) {
       await this.notifications.toRole('admin_support', {
@@ -306,6 +328,7 @@ export class ExchangesService {
     if (reason && (status === 'approved' || status === 'rejected')) await this.keep('exchange_reply', ex.id, reasonTr);
     const [saved] = await this.serve([(await this.exchanges.findOne({ where: { id: ex.id } }))!]);
     await this.publish(saved);
+    if (status === 'approved' || status === 'rejected') await this.sellerView?.decided('exchange', saved as unknown as Record<string, unknown>);
     await this.tell(saved, status, reason, reasonTr);
     return saved;
   }

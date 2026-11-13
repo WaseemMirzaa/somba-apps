@@ -273,9 +273,11 @@ export class Driver {
   async driveSideLegs(
     where: { disputeId?: string; replacementId?: string; exchangeId?: string },
     upTo: 'assigned' | 'road' | 'done',
+    /** Stop after this many legs have been taken to `upTo` (default: until nothing open is left). */
+    legs = 8,
   ): Promise<void> {
     const repo = this.ds.getRepository(DeliveryTask);
-    for (let guard = 0; guard < 8; guard++) {
+    for (let guard = 0; guard < legs; guard++) {
       const open = (
         await repo.find({ where: where as never, order: { createdAt: 'ASC' } })
       ).filter((t) => OPEN.includes(t.status));

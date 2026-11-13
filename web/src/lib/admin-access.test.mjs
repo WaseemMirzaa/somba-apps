@@ -85,5 +85,14 @@ test("Operations reaches the stores list and a store page, for the express toggl
 
 test("the new menu labels exist in English and French", () => {
   const i18n = readFileSync(new URL("./i18n.ts", import.meta.url), "utf8");
-  for (const key of ["storePolicies", "chatsReadOnly"]) assert.equal([...i18n.matchAll(new RegExp(`\\b${key}: "`, "g"))].length, 2, key);
+  for (const key of ["storePolicies", "chatsReadOnly", "sellerPortal"]) assert.equal([...i18n.matchAll(new RegExp(`\\b${key}: "`, "g"))].length, 2, key);
+});
+
+test("the Seller portal page (after-sale sections) is for the Super Admin, Operations and Support only; listed once for the Super Admin", () => {
+  for (const d of ["super", "operations", "support"]) {
+    assert.equal(canAdminAccess(d, "/admin/seller-portal"), true, d);
+    assert.ok(hrefs(d).includes("/admin/seller-portal"), `${d} menu`);
+  }
+  for (const d of ["finance", "marketing", "moderation", "warehouse"]) assert.equal(canAdminAccess(d, "/admin/seller-portal"), false, d);
+  assert.equal(hrefs("super").filter((h) => h === "/admin/seller-portal").length, 1);
 });
