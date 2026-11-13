@@ -725,6 +725,7 @@ export class RealtimeGateway
       const kind = String(body?.kind ?? '');
       if (kind === 'chat_message') return ok(await this.kit.chat.translate(this.requireUser(client), body.id, body.target));
       if (kind.startsWith('support_')) return ok(await this.support.translate(this.requireUser(client), kind, body.id, body.target));
+      if (kind === 'case_seller_message') return ok(await this.disputes.translateSellerThread(this.requireUser(client), body.id, body.target));
       if (kind.startsWith('dispute_')) return ok(await this.disputes.translate(await this.afterSaleViewer(this.requireUser(client)), kind, body.id, body.target));
       if (kind.startsWith('exchange_')) return ok(await this.exchanges.translate(await this.afterSaleViewer(this.requireUser(client)), kind, body.id, body.target));
       if (kind.startsWith('replacement_')) return ok(await this.replacements.translate(await this.afterSaleViewer(this.requireUser(client)), kind, body.id, body.target));

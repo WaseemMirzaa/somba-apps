@@ -18,6 +18,7 @@ const TITLE_TEMPLATES: Record<string, string[]> = {
   'Exchange {}': ['requested', 'approved', 'received', 'ready', 'dispatched', 'delivered', 'rejected'].map((s) => `Exchange ${s}`),
   'Replacement {}': ['requested', 'approved', 'received', 'allocated', 'dispatched', 'delivered', 'rejected'].map((s) => `Replacement ${s}`),
   '{} reply': ['Dispute reply', 'Return reply'],
+  'Seller message on {}': ['Seller message on RET-1001', 'Seller message on EXC-1001', 'Seller message on REP-1001'],
   'Campaign {}': ['draft', 'pending', 'scheduled', 'active', 'ended', 'rejected'].map((s) => `Campaign ${s}`),
   'Store {}': ['pending', 'approved', 'rejected', 'suspended'].map((s) => `Store ${s}`),
 };

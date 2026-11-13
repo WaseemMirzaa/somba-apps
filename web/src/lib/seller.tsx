@@ -98,6 +98,8 @@ export type SellerStore = Seller & {
   handlingDays?: number | null;
   /** Express delivery: a rider goes straight from this store to a customer in the same commune. Needs a pinned pickup location. */
   expressDelivery?: boolean;
+  /** Which read-only after-sale sections the portal shows (admin switches them; live). Absent on an old server = none. */
+  afterSaleAccess?: { returns: boolean; exchanges: boolean; replacements: boolean; express: boolean };
   returnsPolicy?: string | null;
   returnsPolicyFr?: string | null;
   shippingPolicy?: string | null;

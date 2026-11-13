@@ -25,7 +25,9 @@ export type TranslateKind =
   | "exchange_reason"
   | "exchange_reply"
   | "replacement_reason"
-  | "replacement_reply";
+  | "replacement_reply"
+  // The private seller <-> support thread of a return / exchange / replacement (docs/contracts/admin-controls.md §13)
+  | "case_seller_message";
 
 interface TranslateResult {
   text: string;

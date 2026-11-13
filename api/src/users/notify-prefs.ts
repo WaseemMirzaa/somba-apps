@@ -26,6 +26,9 @@ export function noticeCategory(type: string | null | undefined): NotifyCategory 
     case 'return':
     case 'exchange':
     case 'replacement':
+    case 'seller_return':
+    case 'seller_exchange':
+    case 'seller_replacement':
       return 'order';
     case 'payout':
     case 'finance':

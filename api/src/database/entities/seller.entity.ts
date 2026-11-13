@@ -6,6 +6,8 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { encryptedColumn } from '../../common/crypto/field-crypto';
+import { parseOverride } from '../../sellers/after-sale-access';
+import type { AfterSaleOverride } from '../../sellers/after-sale-access';
 
 export type SellerStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
 
@@ -131,6 +133,13 @@ export class Seller {
   @Column({ type: 'boolean', default: false })
   expressDelivery: boolean;
 
+  /**
+   * JSON `{ returns?, exchanges?, replacements?, express? }`, each true | false | null: whether this store's portal shows that
+   * after-sale section (docs/contracts/admin-controls.md §13). Missing / null = follow the platform default setting.
+   */
+  @Column({ type: 'text', nullable: true })
+  afterSaleAccess: string | null;
+
   /** Returns / shipping policy text as the seller wrote it, in `sourceLang` (the other language is a translation row). */
   @Column({ type: 'text', nullable: true })
   returnsPolicy: string | null;
@@ -180,15 +189,17 @@ export function parseJsonList(raw: string | null | undefined): string[] {
  * The seller as owner / admins see it: `documentUrls` parsed to string[] and the internal
  * `suspendedListingIds` bookkeeping dropped. Never use for public (storefront) output.
  */
-export type SellerView = Omit<Seller, 'documentUrls' | 'suspendedListingIds' | 'payoutAccount'> & {
+export type SellerView = Omit<Seller, 'documentUrls' | 'suspendedListingIds' | 'payoutAccount' | 'afterSaleAccess'> & {
   documentUrls: string[];
+  /** The store's own after-sale switches (true / false = forced, missing = follow the platform default); the stored JSON, parsed. */
+  afterSaleAccessOverride: AfterSaleOverride;
   /** The payout destination, masked ("FR •••• 1234"): the full account is only ever shown to the owner on the payout-account screen. */
   payoutAccountMasked: string | null;
 };
 
 export function sellerView(seller: Seller): SellerView {
-  const { suspendedListingIds: _s, documentUrls, payoutAccount, ...rest } = seller;
+  const { suspendedListingIds: _s, documentUrls, payoutAccount, afterSaleAccess, ...rest } = seller;
   void _s;
   const a = String(payoutAccount ?? '').trim();
-  return { ...rest, documentUrls: parseJsonList(documentUrls), payoutAccountMasked: a ? (a.length <= 6 ? '••••' : `${a.slice(0, 2)} •••• ${a.slice(-4)}`) : null };
+  return { ...rest, afterSaleAccessOverride: parseOverride(afterSaleAccess), documentUrls: parseJsonList(documentUrls), payoutAccountMasked: a ? (a.length <= 6 ? '••••' : `${a.slice(0, 2)} •••• ${a.slice(-4)}`) : null };
 }

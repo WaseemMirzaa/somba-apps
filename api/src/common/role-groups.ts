@@ -31,6 +31,11 @@ export const ROLE_GROUPS = {
    * customer's wallet on the seller's behalf, and move an exchange through its steps (warehouse supervisors move it too).
    */
   exchangeDesk: ['admin', 'admin_operations'],
+  /**
+   * The seller portal's read-only after-sale sections (Returns, Exchanges, Replacements, Express card): change the defaults and each
+   * store's override, and write in the private seller <-> support threads. Finance only reads (`disputeDesk`). docs/contracts/admin-controls.md §13.
+   */
+  sellerAfterSaleManage: ['admin', 'admin_operations', 'admin_support'],
   /** Approve or reject an exchange or replacement on a silent seller's behalf (support is told when a seller lapses). */
   exchangeDecide: ['admin', 'admin_operations', 'admin_support'],
   /**

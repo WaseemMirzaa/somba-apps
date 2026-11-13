@@ -6,6 +6,7 @@ import { StaffTierService } from '../logistics/staff-tier.service';
 import { RETURNS_DESK_ADMINS } from '../common/staff-access';
 import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 import { DisputesService } from './disputes.service';
+import { SellerAfterSaleViewService } from '../sellers/seller-after-sale.service';
 
 /** Admin roles that work the returns and disputes queue and may decide a request; refunding also needs finance or the super admin. */
 const DECIDERS: readonly string[] = ROLE_GROUPS.disputeDesk;
@@ -22,6 +23,7 @@ export class DisputesGateway {
     private readonly disputes: DisputesService,
     private readonly audit: AuditService,
     private readonly tiers: StaffTierService,
+    private readonly sellerView: SellerAfterSaleViewService,
   ) {}
 
   /** An admin role outside the returns and disputes desk (marketing, moderation) is refused; null for everyone else (the service scopes the rest). */
@@ -47,12 +49,17 @@ export class DisputesGateway {
   }
 
   @SubscribeMessage('disputes:list')
-  async list(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; type?: string; stage?: string; limit?: number; offset?: number }) {
+  async list(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; type?: string; stage?: string; limit?: number; offset?: number; scope?: string }) {
     try {
       const user = requireUser(client);
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
-      return ok(await this.disputes.list(await this.viewer(user), body ?? {}));
+      // A store account whose Returns section is on also gets its store's returns (redacted, `sellerView: true`) ahead of its own purchases.
+      const store = body?.type === 'dispute' ? null : await this.sellerView.readerOf(user, 'return');
+      // `scope: 'store'` (the seller portal's pages) asks for the store's cases only, so paging counts nothing else.
+      if (store && body?.scope === 'store') return ok(await this.disputes.listForStore(store.seller.id, body));
+      const own = await this.disputes.list(await this.viewer(user), body ?? {});
+      return ok(store ? [...(await this.disputes.listForStore(store.seller.id, body ?? {})), ...own] : own);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -60,7 +67,7 @@ export class DisputesGateway {
 
   /** Returns only: `returns:list` is `disputes:list` with the type fixed. */
   @SubscribeMessage('returns:list')
-  async returnsList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; stage?: string; limit?: number; offset?: number }) {
+  async returnsList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; stage?: string; limit?: number; offset?: number; scope?: string }) {
     return this.list(client, { ...(body ?? {}), type: 'return' });
   }
 
@@ -70,7 +77,9 @@ export class DisputesGateway {
       const user = requireUser(client);
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
-      return ok(await this.disputes.get(await this.viewer(user), idOf(body)));
+      const store = await this.sellerView.readerOf(user, 'return');
+      const mine = store ? await this.disputes.getForStore(store.seller.id, idOf(body)) : null;
+      return ok(mine ?? (await this.disputes.get(await this.viewer(user), idOf(body))));
     } catch (e) {
       return fail((e as Error).message);
     }

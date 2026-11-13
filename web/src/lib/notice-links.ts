@@ -27,6 +27,10 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
     case "seller":
       if (t === "order") return pick(`/seller/orders/${id}`, "/seller/orders");
       if (t === "delivery") return "/seller/orders";
+      // The read-only after-sale view (§13): a case on the store, or a message from KOMORIKO support about one
+      if (t === "seller_return") return pick(`/seller/returns/${id}`, "/seller/returns");
+      if (t === "seller_exchange") return pick(`/seller/exchanges/${id}`, "/seller/exchanges");
+      if (t === "seller_replacement") return pick(`/seller/replacements/${id}`, "/seller/replacements");
       if (t === "moderation") return pick(`/seller/products/${id}`, "/seller/products");
       if (t === "payout") return "/seller/finance/payouts";
       if (t === "campaign") return pick(`/seller/promotions/${id}`, "/seller/promotions");

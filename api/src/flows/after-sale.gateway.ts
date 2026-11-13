@@ -8,6 +8,7 @@ import type { ExchangeView } from './exchanges.service';
 import { inRoleGroup } from '../common/role-groups';
 import { AuditService } from '../ops/audit.service';
 import { ReplacementsService, canWorkReplacements } from './replacements.service';
+import { SellerAfterSaleViewService } from '../sellers/seller-after-sale.service';
 
 const SUPERVISORS_ONLY = 'Only supervisors and managers can see this.';
 const REPLACEMENT_STATUSES = ['requested', 'approved', 'received', 'allocated', 'dispatched', 'delivered', 'rejected'] as const;
@@ -25,6 +26,7 @@ export class AfterSaleGateway {
     private readonly exchanges: ExchangesService,
     private readonly tiers: StaffTierService,
     private readonly audit: AuditService,
+    private readonly sellerView: SellerAfterSaleViewService,
   ) {}
 
   /**
@@ -66,13 +68,16 @@ export class AfterSaleGateway {
 
   // ---- Replacements -------------------------------------------------------
   @SubscribeMessage('replacements:list')
-  async replacementsList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number }) {
+  async replacementsList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number; scope?: string }) {
     try {
       const user = requireUser(client);
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.replacements.list(this.viewer(user), body ?? {}));
+      const store = await this.sellerView.readerOf(user, 'replacement');
+      if (store && body?.scope === 'store') return ok(await this.replacements.listForStore(store.seller.id, body));
+      const own = await this.replacements.list(this.viewer(user), body ?? {});
+      return ok(store ? [...(await this.replacements.listForStore(store.seller.id, body ?? {})), ...own] : own);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -95,7 +100,9 @@ export class AfterSaleGateway {
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.replacements.get(this.viewer(user), String(body?.id ?? '')));
+      const store = await this.sellerView.readerOf(user, 'replacement');
+      const mine = store ? await this.replacements.getForStore(store.seller.id, String(body?.id ?? '')) : null;
+      return ok(mine ?? (await this.replacements.get(this.viewer(user), String(body?.id ?? ''))));
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -143,13 +150,16 @@ export class AfterSaleGateway {
 
   // ---- Exchanges ----------------------------------------------------------
   @SubscribeMessage('exchanges:list')
-  async exchangesList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number }) {
+  async exchangesList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: { status?: string; limit?: number; offset?: number; scope?: string }) {
     try {
       const user = requireUser(client);
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.exchanges.list(this.viewer(user), body ?? {}));
+      const store = await this.sellerView.readerOf(user, 'exchange');
+      if (store && body?.scope === 'store') return ok(await this.exchanges.listForStore(store.seller.id, body));
+      const own = await this.exchanges.list(this.viewer(user), body ?? {});
+      return ok(store ? [...(await this.exchanges.listForStore(store.seller.id, body ?? {})), ...own] : own);
     } catch (e) {
       return fail((e as Error).message);
     }
@@ -171,7 +181,9 @@ export class AfterSaleGateway {
       const refusal = this.adminRefusal(user);
       if (refusal) return fail(refusal);
       if (await this.staffBelowSupervisor(user)) return fail(SUPERVISORS_ONLY);
-      return ok(await this.exchanges.get(this.viewer(user), String(body?.id ?? '')));
+      const store = await this.sellerView.readerOf(user, 'exchange');
+      const mine = store ? await this.exchanges.getForStore(store.seller.id, String(body?.id ?? '')) : null;
+      return ok(mine ?? (await this.exchanges.get(this.viewer(user), String(body?.id ?? ''))));
     } catch (e) {
       return fail((e as Error).message);
     }

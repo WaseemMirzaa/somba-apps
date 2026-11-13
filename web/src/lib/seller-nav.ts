@@ -18,14 +18,21 @@ import {
   Wallet,
   Zap,
   Bell,
+  ArrowLeftRight,
+  RefreshCw,
+  RotateCcw,
 } from "lucide-react";
 import type { NavItem } from "@/components/layout/dashboard-layout";
 import { useSellerAccess, useSellerTickets } from "@/lib/seller";
 import { useLiveQuery } from "@/lib/seller-api";
 import type { SellerPermission } from "@/lib/seller-access";
+import { useAfterSaleAccess, useThreadUnread } from "@/lib/seller-aftersale";
+import type { SectionKey } from "@/lib/seller-aftersale";
 
 interface Entry extends NavItem {
   perm: SellerPermission;
+  /** Read-only after-sale sections: shown only while admin has switched the section on for the store (`afterSaleAccess`, live). */
+  section?: SectionKey;
 }
 
 /**
@@ -43,6 +50,10 @@ const ENTRIES: Entry[] = [
   { href: "/seller/questions", label: "Questions", labelFr: "Questions", icon: MessageSquareQuote, perm: "support" },
   { href: "/seller/notifications", label: "notifications", icon: Bell, i18n: true, perm: "any" },
   { href: "/seller/shipping", label: "shipping", icon: Truck, i18n: true, perm: "orders" },
+  // Read-only after-sale view (§13): KOMORIKO support decides; the store follows each case and messages support.
+  { href: "/seller/returns", label: "Returns", labelFr: "Retours", icon: RotateCcw, section: "returns", perm: "orders" },
+  { href: "/seller/exchanges", label: "Exchanges", labelFr: "Échanges", icon: ArrowLeftRight, section: "exchanges", perm: "orders" },
+  { href: "/seller/replacements", label: "Replacements", labelFr: "Remplacements", icon: RefreshCw, section: "replacements", perm: "orders" },
   { href: "/seller/promotions", label: "promotions", icon: Megaphone, i18n: true, perm: "catalog" },
   { href: "/seller/coupons", label: "Coupons", labelFr: "Coupons", icon: Ticket, perm: "catalog" },
   { href: "/seller/flash-sales", label: "Flash sales", labelFr: "Ventes flash", icon: Zap, perm: "catalog" },
@@ -65,14 +76,21 @@ export function useSellerNav(): NavItem[] {
   const questions = useLiveQuery<{ count: number }>("questions:unanswered", canSupport ? {} : null, {
     pushes: ["question:created", "question:updated", "notification:new"],
   });
+  const { access: sections } = useAfterSaleAccess();
+  const anySection = sections.returns || sections.exchanges || sections.replacements;
+  const threadUnread = useThreadUnread(anySection && access.can("orders"));
   const ticketUnread = tickets.reduce((n, t) => n + (Number((t as { userUnread?: number }).userUnread) || 0), 0);
 
   const badge: Record<string, number> = {
     "/seller/questions": questions.data?.count ?? 0,
     "/seller/support": ticketUnread,
+    "/seller/returns": threadUnread.returns,
+    "/seller/exchanges": threadUnread.exchanges,
+    "/seller/replacements": threadUnread.replacements,
   };
-  return ENTRIES.filter((e) => access.can(e.perm)).map(({ perm, ...item }) => {
+  return ENTRIES.filter((e) => access.can(e.perm) && (!e.section || sections[e.section])).map(({ perm, section, ...item }) => {
     void perm;
+    void section;
     return badge[item.href] ? { ...item, badge: badge[item.href] } : item;
   });
 }

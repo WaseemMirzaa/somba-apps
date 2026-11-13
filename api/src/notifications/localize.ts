@@ -302,6 +302,12 @@ const TITLES: Record<string, string> = {
   'Return refund failed': 'Échec du remboursement du retour',
   'Exchange requested on your item': 'Échange demandé sur votre article',
   'Replacement requested on your item': 'Remplacement demandé sur votre article',
+  // The seller portal's read-only after-sale view and its private thread with support (docs/contracts/admin-controls.md §13)
+  'Return opened on your item': 'Retour ouvert sur votre article',
+  'Return decided': 'Retour décidé',
+  'Exchange decided': 'Échange décidé',
+  'Replacement decided': 'Remplacement décidé',
+  'Message from KOMORIKO support': 'Message du support KOMORIKO',
   // Payments and payouts
   'Payment amount mismatch': 'Écart de montant du paiement',
   'Phone refund failed': 'Échec du remboursement mobile',
@@ -371,6 +377,8 @@ const TITLES: Record<string, string> = {
 };
 
 function titlePattern(title: string): string | null {
+  const sellerMsg = /^Seller message on (\S+)$/.exec(title);
+  if (sellerMsg) return `Message du vendeur sur ${sellerMsg[1]}`;
   const after = /^(Exchange|Replacement) (\w+)$/.exec(title);
   if (after) return `${after[1] === 'Exchange' ? 'Échange' : 'Remplacement'} ${pick(AFTER_SALE_STEPS, after[2])}`;
   const campaign = /^Campaign (\w+)$/.exec(title);

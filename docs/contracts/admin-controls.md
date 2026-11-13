@@ -261,3 +261,100 @@ Moderation gets "Store policies"; Operations gets the express toggle on the stor
 Jest: `disputes.service.spec`, `disputes-i18n.spec`, `after-sale/gateways.spec`, `flows/*` (replacements-exchanges, exchange-money-roles, seller-lapse, after-sale-notes-i18n), `chat/*`, `sellers/policy.service.spec` (incl. both migrations), `sellers/admin-controls.gateway.spec`, `sellers/storefront.spec`, `sellers/seller-permissions.spec`, notice coverage and links specs.
 Smokes (`api/test`): `after-sale-smoke`, `r2f-smoke`, `seller-platform-smoke`, `delivery-express-smoke`, `authz-smoke`, `flows-smoke`, `i18n-smoke`, `demo-seed-check`.
 Demo seed: the demo support agent approves/answers returns, disputes, exchanges and replacements; store A's policy is published (approved); store B has a **pending** policy proposal; store C's express is set with `sellers:setExpress`; the three demo chats are history.
+
+---
+
+## 13. Seller after-sale view (read-only, switched by admin)
+
+Workstream C1. Brings back, **read-only**, four seller-portal sections that §1-§4 removed: **Returns**, **Exchanges**, **Replacements** and the
+**Express delivery** card in Store settings. They show only **if admin enables them**. Support still decides everything: the seller reads and
+talks to support, nothing more. (This section is numbered 13 because §11 and §12 above already exist; it changes nothing in §1-§12 except
+what a store sees when a section is on.)
+
+### 13.1 Switches
+
+| | |
+|---|---|
+| Defaults | Four staff-only settings, all **off**: `sellerViewReturns`, `sellerViewExchanges`, `sellerViewReplacements`, `sellerViewExpress` (`'true'`/`'false'`). Never in the public settings; `settings:get` for a seller does not carry them |
+| Per-store override | `sellers.afterSaleAccess` (text, JSON `{ returns?, exchanges?, replacements?, express? }`, each `true`/`false`; missing/null = follow the default). Migration `1793530000001-SellerAfterSaleView` (reversible, MySQL + SQLite) |
+| Resolved | `afterSaleAccess: { returns, exchanges, replacements, express }` (booleans) on every store view the owner/team gets (`sellers:mine`, `seller:updated`). Staff store views (`sellers:get`, the admin `seller:updated`) also carry `afterSaleAccessOverride` (raw) and `afterSaleAccessDefaults` |
+| Managers | Role group `sellerAfterSaleManage` = `admin`, `admin_operations`, `admin_support`. Finance (`disputeDesk`) may read the seller threads, never write |
+
+| event | roles | payload -> ack data |
+|---|---|---|
+| `sellerAccess:defaults:get` | managers | -> `{ returns, exchanges, replacements, express }` |
+| `sellerAccess:defaults:set` | managers | `{ returns?, exchanges?, replacements?, express? }` booleans -> the four defaults. Audited (`seller.after_sale_defaults`). `Choose On or Off for each section.` for a non-boolean |
+| `sellers:setAfterSaleAccess` | managers | `{ sellerId, returns?, exchanges?, replacements?, express? }`, each `true`/`false`/`null` (null = follow the default) -> the store as staff see it. Audited (`seller.after_sale_access`). `Choose Follow default, On or Off for each section.` / `Store not found.` |
+
+Both writes are live: the store's owner gets `seller:updated` (the team gets it through the mirror) with the new `afterSaleAccess`, so the portal nav appears
+or disappears without signing in again; a default change reaches every store that follows that default (a store with an override on it is left alone).
+Managers also hear `sellerAccess:defaults` (the four defaults) and admins `seller:updated` with the staff fields. Everyone else gets `Not allowed.`
+
+### 13.2 What a store reads (redacted, only while the section is on for it)
+
+The existing events answer a store account with its **store's cases** (`sellerView: true`) while the section is on; with it off they behave as in §1-§2 (the account's own
+purchases only). Body `scope: 'store'` returns the store's cases only (what the portal pages use, so paging counts nothing else); without it the store's cases come first, then the
+account's own purchases. A team member needs the `orders` permission.
+
+| section | events |
+|---|---|
+| Returns | `returns:list`, `disputes:list` (type `return` only: a dispute (`type = 'dispute'`) stays hidden), `disputes:get` |
+| Exchanges | `exchanges:list`, `exchanges:get` |
+| Replacements | `replacements:list`, `replacements:get` |
+| Express | no event: `sellers:mine` carries `expressDelivery` and `afterSaleAccess.express` |
+
+`SellerCaseView`: `{ sellerView, kind, id, reference, orderId, orderReference, customerFirstName, status, stage, category, reason, reasonI18n?, attachments, items[{ name, nameFr, variant, variantFr, qty }],
+decisionNote, decisionNoteFr, decisionNoteI18n?, refundUsd, priceDiffUsd, dispatchStatus, timeline[{ key, done, at }], legs{ pickup, returnToSeller } (returns), createdAt, updatedAt, unread }`.
+**No** customer id, last name, phone, e-mail or address and **never the customer <-> support thread**. Every write on these cases stays refused for a store (`returns:respond` retired, `*:respond`, `returns:decide`,
+`disputes:reply|decide`, `*:setStatus` = staff only). Live `dispute:updated` / `exchange:updated` / `replacement:updated` reach the store (owner + team with `orders`) in the same redacted shape, **only while that section is on**.
+
+### 13.3 The private seller <-> support thread
+
+One thread per return / exchange / replacement, separate from the customer <-> support thread; the customer never sees it and never gets a notice about it. Table `case_seller_messages`
+(`caseKind` return|exchange|replacement, `caseId`, `sellerId`, `authorId`, `authorName`, `authorSide` seller|support, `text`, `createdAt`, `readBySellerAt`, `readBySupportAt`; index `(caseKind, caseId)`).
+The text is translated before it is stored (stored kind `case_seller_message`, `textI18n` on every message; `translate:text` accepts it for the people who may read the thread).
+
+| event | who | payload -> ack data |
+|---|---|---|
+| `caseThread:list` | the store (section on, its own case), managers, finance | `{ kind, caseId }` -> messages oldest first, each with `textI18n?` |
+| `caseThread:send` | the store, managers | `{ kind, caseId, text }` (1-2000 chars) -> the message. A store writes as `authorSide: 'seller'`, a manager as `'support'` |
+| `caseThread:markRead` | the store, managers | `{ kind, caseId }` -> `{ marked }` (a store marks support's messages, support marks the store's; finance marks nothing) |
+| `caseThread:unread` | the store, managers, finance | store: `{ returns, exchanges, replacements, total }` (sections that are on); staff: `{ count, cases: [{ kind, caseId, unread }] }` |
+
+A store whose section is off gets `This section is turned off for your store.`; another store's case or a made-up id `Request not found.`; empty text `Write a message first.`; over 2000
+characters `Messages are at most 2000 characters.`. Support (managers) can always write; the push and the notice to the store happen only while its section is on.
+Push `caseThread:message` (the message + `reference`, `orderReference`) to the store (owner + team with `orders`, section on) and to the manager roles and finance.
+
+### 13.4 Notices (EN + FR in `notifications/localize.ts`, links in `notifications/links.ts`)
+
+| notice (`title`) | to | body | type -> opens |
+|---|---|---|---|
+| `Message from KOMORIKO support` | the store (owner; the team through the usual notice fan-out), section on | `RET-… \| EXC-… \| REP-… · SOM-…` | `seller_return` / `seller_exchange` / `seller_replacement` -> `/seller/returns/<id>`, `/seller/exchanges/<id>`, `/seller/replacements/<id>` |
+| `Seller message on RET-…` (or `EXC-…`, `REP-…`) | `admin_support` role | `RET-… · SOM-…` | `return` / `exchange` / `replacement` -> the desk page |
+| `Return opened on your item`, `Return decided`, `Exchange requested on your item`, `Exchange decided`, `Replacement requested on your item`, `Replacement decided` | the store, section on (info only) | `RET-… · SOM-…` | `seller_*` as above |
+
+`seller_*` notices follow the `orders` permission for the team (`permissionForNotice`); `caseThread:*` pushes follow it too (`permissionForEvent`). The `dispute|exchange|replacement` heads stay owner-only (they also carry the owner's own purchases).
+
+### 13.5 Web
+
+- Seller portal: nav Returns / Exchanges / Replacements (`lib/seller-nav.ts`) only while `afterSaleAccess.<section>`, with an unread badge; pages `/seller/returns`, `/exchanges`, `/replacements` (list with server paging
+  + detail, read-only, banner "KOMORIKO support handles this request. You can follow it here and message support.", a "Talk to support" panel). A page whose section is off sends the store back to `/seller` itself
+  (the build-level redirect in `next.config.ts` now covers only `disputes` and `messages`). Store settings: read-only **Express delivery** card (On/Off, "Managed by KOMORIKO. Contact support to change it.", the pin hint).
+- Admin: Settings -> "Seller portal: after-sale sections" (four default switches) and a **Seller portal** page (`/admin/seller-portal`: Super Admin, Operations, Support) with the same defaults and every store's four
+  `Follow default (On|Off) / On / Off` selects; the store page (`admin/sellers/[id]`) has a "Seller portal access" card; return, exchange and replacement detail pages get a **Seller thread** pane next to the customer thread
+  (tabs on narrow screens) with an unread badge. Admin, operations and support write; finance reads.
+
+### 13.6 Errors added (English -> French; in `error-fr-exact.ts` and the web `api-errors` map)
+
+| English | French |
+|---|---|
+| This section is turned off for your store. | Cette section est désactivée pour votre boutique. |
+| Choose On or Off for each section. | Choisissez Activé ou Désactivé pour chaque section. |
+| Choose Follow default, On or Off for each section. | Choisissez Suivre le défaut, Activé ou Désactivé pour chaque section. |
+| Request not found. | Demande introuvable. |
+| Messages are at most 2000 characters. | Les messages font 2000 caractères au plus. |
+
+### 13.7 Tests
+
+Jest: `sellers/seller-after-sale.spec` (access resolution, redaction, pushes, thread), `sellers/seller-after-sale.gateway.spec`, `database/seller-after-sale.migration.spec`, `sellers/seller-permissions.spec`, notice coverage / links, error-fr.
+Web: `seller-nav.test`, `seller-aftersale.test`, `admin-access.test`, `seller-roles.test`. Smoke: `api/test/seller-aftersale-view-smoke.cjs`.

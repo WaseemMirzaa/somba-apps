@@ -97,4 +97,15 @@ describe('what staff hear', () => {
     for (const t of ['order', 'payout', 'moderation', 'review', 'policy', 'seller', 'system']) expect(roleAllows('manager', permissionForNotice(t))).toBe(true);
     for (const t of ['team', 'security', 'return', 'dispute', 'exchange', 'replacement', 'chat']) expect(roleAllows('manager', permissionForNotice(t))).toBe(false);
   });
+
+  it('the read-only after-sale view (§13): its notices and thread pushes follow the orders permission; the personal heads stay owner-only', () => {
+    for (const t of ['seller_return', 'seller_exchange', 'seller_replacement']) {
+      expect(permissionForNotice(t)).toBe('orders');
+      expect(roleAllows('orders', permissionForNotice(t))).toBe(true);
+      expect(roleAllows('finance', permissionForNotice(t))).toBe(false);
+    }
+    expect(permissionForEvent('caseThread:message')).toBe('orders');
+    // `dispute:*`, `exchange:*`, `replacement:*` also carry the owner's own purchases: never repeated to the team
+    for (const e of ['dispute:updated', 'exchange:updated', 'replacement:updated']) expect(permissionForEvent(e)).toBeNull();
+  });
 });

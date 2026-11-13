@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SellerAfterSaleModule } from '../sellers/seller-after-sale.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Campaign,
@@ -33,6 +34,7 @@ import { SellerLapseService } from './seller-lapse.service';
     ContentModule,
     WalletModule,
     LogisticsModule,
+    SellerAfterSaleModule,
   ],
   providers: [CampaignsService, ReplacementsService, ExchangesService, AfterSaleNames, LogisticsBridge, SellerLapseService],
   exports: [CampaignsService, ReplacementsService, ExchangesService, LogisticsBridge, SellerLapseService],

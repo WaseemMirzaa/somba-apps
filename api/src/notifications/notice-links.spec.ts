@@ -128,6 +128,9 @@ function adminNotices(): Notice[] {
 
 /** Notices whose recipients are picked at run time, which the scan cannot read. */
 const EXTRA: Notice[] = [
+  { where: 'sellers/case-thread.service.ts (a seller wrote in the private thread of a return)', type: 'return', roles: ['admin_support', 'admin'] },
+  { where: 'sellers/case-thread.service.ts (a seller wrote in the private thread of an exchange)', type: 'exchange', roles: ['admin_support', 'admin'] },
+  { where: 'sellers/case-thread.service.ts (a seller wrote in the private thread of a replacement)', type: 'replacement', roles: ['admin_support', 'admin'] },
   { where: 'disputes/disputes.service.ts (return or dispute)', type: 'return', roles: ['admin_support', 'admin'] },
   { where: 'disputes/disputes.service.ts (return or dispute)', type: 'dispute', roles: ['admin_support', 'admin'] },
   { where: 'flows/seller-lapse.service.ts (replacement or exchange)', type: 'replacement', roles: ['admin_support', 'admin'] },
