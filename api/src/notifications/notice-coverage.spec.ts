@@ -160,9 +160,9 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['Spring sale: 25% off', 'Spring sale : 25\u00A0% de réduction'],
     ['Code WELCOME10: 10% off', 'Code WELCOME10 : 10\u00A0% de réduction'],
   ],
-  '{} · ${} from {}': [['SOM-1001 · $12.50 from Jean Mukendi', 'SOM-1001 · 12,50\u00A0$ de Jean Mukendi']],
-  '{}: {} item(s) to pack — ${}': [['SOM-1001: 2 item(s) to pack — $40.00', 'SOM-1001 : 2 article(s) à préparer — 40,00\u00A0$']],
-  '{} is packed and ready.': [['SOM-1001 is packed and ready.', 'SOM-1001 : colis emballé et prêt.']],
+  '{} · ${} from {}': [['KOM-1001 · $12.50 from Jean Mukendi', 'KOM-1001 · 12,50\u00A0$ de Jean Mukendi']],
+  '{}: {} item(s) to pack — ${}': [['KOM-1001: 2 item(s) to pack — $40.00', 'KOM-1001 : 2 article(s) à préparer — 40,00\u00A0$']],
+  '{} is packed and ready.': [['KOM-1001 is packed and ready.', 'KOM-1001 : colis emballé et prêt.']],
   "{}: one seller's package is ready, waiting for {} more seller{}.": [
     ["KOM-1001: one seller's package is ready, waiting for 2 more sellers.", 'KOM-1001 : le colis d’un vendeur est prêt, en attente de 2 autres vendeurs.'],
     ["KOM-1001: one seller's package is ready, waiting for 1 more seller.", 'KOM-1001 : le colis d’un vendeur est prêt, en attente de 1 autre vendeur.'],

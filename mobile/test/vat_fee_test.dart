@@ -111,7 +111,7 @@ void main() {
   group('receipt', () {
     OrderDto order(Map<String, dynamic> over) => OrderDto.fromJson({
           'id': 'o1',
-          'reference': 'SOM-2042',
+          'reference': 'KOM-2042',
           'customerName': 'Aline',
           'status': 'delivered',
           'paymentMethod': 'wallet',

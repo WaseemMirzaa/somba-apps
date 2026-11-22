@@ -86,4 +86,4 @@ A seller-paid fee is deducted like the commission, line by line (`order_items.se
 
 ## 7. Not in this workstream
 
-Wallet-switch behaviour (W4), SOM->KOM references (W2). `delivery:quote` is not given the cart lines.
+Wallet-switch behaviour (W4), SOM->KOM references (W2, done). `delivery:quote` is not given the cart lines.
