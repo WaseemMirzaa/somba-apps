@@ -52,6 +52,9 @@ String localizeWalletDescription(Strings s, String text, {String? descriptionFr}
   return text;
 }
 
+/// Where a refund went, in French: the wallet, or (the wallet being switched off) the original payment method.
+String _refundDest(String englishNotice) => englishNotice.contains('original payment method') ? 'sur votre moyen de paiement d’origine' : 'sur votre portefeuille';
+
 /// A dollar amount the server wrote in English (`1202.50`) as French money (`1 202,50 $`): comma decimals, grouped
 /// thousands and a no-break space before the symbol, like the server's own French wording and the rider app.
 /// Anything that is not a plain number is kept as received.
@@ -126,16 +129,16 @@ final List<(RegExp, String Function(RegExpMatch))> _bodies = [
   (RegExp(r"^We received (\S+)\. You'll get updates here in real time\.$"), (m) => 'Nous avons reçu ${m[1]}. Vous recevrez les mises à jour ici en temps réel.'),
   (RegExp(r'^(\S+) is now (.+)\.$'), (m) => '${m[1]} est maintenant ${_status(m[2]!)}.'),
   (RegExp(r'^(\S+) was cancelled\. Refund credited to your wallet\.$'), (m) => '${m[1]} a été annulée. Le remboursement a été crédité sur votre portefeuille.'),
-  (RegExp(r'^(\S+) was cancelled\. \$([\d.]+) was refunded to your wallet\.$'), (m) => '${m[1]} a été annulée. ${_usdFr(m[2]!)} ont été remboursés sur votre portefeuille.'),
+  (RegExp(r'^(\S+) was cancelled\. \$([\d.]+) was refunded to your (?:wallet|original payment method)\.$'), (m) => '${m[1]} a été annulée. ${_usdFr(m[2]!)} ont été remboursés ${_refundDest(m[0]!)}.'),
   (RegExp(r'^(\S+) was cancelled\.$'), (m) => '${m[1]} a été annulée.'),
   (RegExp(r'^(\S+) was cancelled: (.+)\.$'), (m) => '${m[1]} a été annulée : ${translateReason(m[2]!)}.'),
   (RegExp(r'^(.+) is handling (\S+)\.$'), (m) => '${m[1]} s’occupe de ${m[2]}.'),
   (RegExp(r'^(\S+): (.+)\. We will try again \(attempt (\d+) of (\d+)\)\. You can also cancel the order\.$'),
       (m) => '${m[1]} : ${m[2]}. Nous allons réessayer (tentative ${m[3]} sur ${m[4]}). Vous pouvez aussi annuler la commande.'),
-  (RegExp(r'^(\S+) could not be delivered after (\d+) attempts \((.+)\)\. \$([\d.]+) was refunded to your wallet\.$'),
-      (m) => '${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${m[3]}). ${_usdFr(m[4]!)} ont été remboursés sur votre portefeuille.'),
-  (RegExp(r'^(\S+) could not be delivered after (\d+) attempts \((.+)\)\.( Your payment was refunded to your wallet\.)?$'),
-      (m) => '${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${m[3]}).${m[4] != null ? ' Votre paiement a été remboursé sur votre portefeuille.' : ''}'),
+  (RegExp(r'^(\S+) could not be delivered after (\d+) attempts \((.+)\)\. \$([\d.]+) was refunded to your (?:wallet|original payment method)\.$'),
+      (m) => '${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${m[3]}). ${_usdFr(m[4]!)} ont été remboursés ${_refundDest(m[0]!)}.'),
+  (RegExp(r'^(\S+) could not be delivered after (\d+) attempts \((.+)\)\.( Your payment was refunded to your (?:wallet|original payment method)\.)?$'),
+      (m) => '${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${m[3]}).${m[4] != null ? ' Votre paiement a été remboursé ${_refundDest(m[0]!)}.' : ''}'),
   (RegExp(r'^\$([\d.]+) added to your wallet\.$'), (m) => '${_usdFr(m[1]!)} ajoutés à votre portefeuille.'),
   (RegExp(r'^Payment for (\S+) confirmed\.$'), (m) => 'Le paiement de ${m[1]} est confirmé.'),
   (RegExp(r'^\$([\d.]+) for (\S+)( → wallet)?\.$'), (m) => '${_usdFr(m[1]!)} pour ${m[2]}${m[3] != null ? ' → portefeuille' : ''}.'),

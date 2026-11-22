@@ -37,6 +37,8 @@ interface ToggleField {
   labelFr: string;
   hint: string;
   hintFr: string;
+  /** What the server does while the setting was never stored: on (the toggle then shows On instead of "Not set"). */
+  defaultOn?: boolean;
 }
 interface ChoiceField {
   key: string;
@@ -50,6 +52,21 @@ interface ChoiceField {
 type Field = TextField | ToggleField | ChoiceField;
 
 const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
+  {
+    title: "Wallet",
+    titleFr: "Portefeuille",
+    fields: [
+      {
+        key: "walletEnabled",
+        kind: "toggle",
+        defaultOn: true,
+        label: "Customer wallet",
+        labelFr: "Portefeuille client",
+        hint: "On: customers can top up, pay with and be refunded to their wallet. Off: the wallet page, top-up, pay-with-wallet and wallet refund choice disappear from the app and the shop, and the server refuses them. Refunds of orders not paid by wallet go back to the original payment method; orders paid by wallet still refund to the wallet. Balances are untouched and come back when you switch it on again.",
+        hintFr: "Activé : les clients peuvent recharger leur portefeuille, payer avec et y être remboursés. Désactivé : la page portefeuille, la recharge, le paiement par portefeuille et le choix de remboursement sur le portefeuille disparaissent de l'application et de la boutique, et le serveur les refuse. Les remboursements des commandes non payées par portefeuille retournent au moyen de paiement d'origine ; les commandes payées par portefeuille sont toujours remboursées sur le portefeuille. Les soldes ne changent pas et reviennent quand vous réactivez la fonction.",
+      },
+    ],
+  },
   {
     title: "Pricing and commission",
     titleFr: "Prix et commission",
@@ -214,6 +231,7 @@ export default function AdminSettingsPage() {
   }, [rt.status]);
 
   const dirty = (key: string) => (draft[key] ?? "") !== (saved[key] ?? "");
+  const eff = (f: ToggleField) => draft[f.key] ?? (f.defaultOn ? "true" : undefined);
 
   async function saveKey(key: string): Promise<boolean> {
     setSavingKey(key);
@@ -311,14 +329,14 @@ export default function AdminSettingsPage() {
                           <button
                             type="button"
                             role="switch"
-                            aria-checked={draft[f.key] === "true"}
-                            onClick={() => setDraft((d) => ({ ...d, [f.key]: d[f.key] === "true" ? "false" : "true" }))}
-                            className={`relative h-6 w-11 rounded-full transition-colors ${draft[f.key] === "true" ? "bg-emerald-500" : "bg-slate-300"}`}
+                            aria-checked={eff(f) === "true"}
+                            onClick={() => setDraft((d) => ({ ...d, [f.key]: (d[f.key] ?? (f.defaultOn ? "true" : undefined)) === "true" ? "false" : "true" }))}
+                            className={`relative h-6 w-11 rounded-full transition-colors ${eff(f) === "true" ? "bg-emerald-500" : "bg-slate-300"}`}
                           >
-                            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${draft[f.key] === "true" ? "left-[22px]" : "left-0.5"}`} />
+                            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${eff(f) === "true" ? "left-[22px]" : "left-0.5"}`} />
                           </button>
                           <span className="text-sm text-slate-600">
-                            {draft[f.key] === "true" ? (fr ? "Activé" : "On") : draft[f.key] === "false" ? (fr ? "Désactivé" : "Off") : fr ? "Non défini (défaut serveur)" : "Not set (server default)"}
+                            {eff(f) === "true" ? (fr ? "Activé" : "On") : eff(f) === "false" ? (fr ? "Désactivé" : "Off") : fr ? "Non défini (défaut serveur)" : "Not set (server default)"}
                           </span>
                           <Button size="sm" variant="secondary" disabled={!dirty(f.key) || busy} onClick={() => saveOne(f.key)}>
                             {busy ? "…" : fr ? "Enregistrer" : "Save"}

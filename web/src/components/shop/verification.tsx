@@ -11,7 +11,7 @@ import { useShop } from "@/context/shop-context";
 import { authApi, type SendOutcome } from "@/lib/realtime/auth-api";
 import { authErrorText } from "@/lib/auth-errors";
 import { socketClient } from "@/lib/realtime/socket-client";
-import { usePublicSettings, useVerificationStatus, type VerificationStatus } from "@/lib/shop-live";
+import { usePublicSettings, useVerificationStatus, useWalletEnabled, type VerificationStatus } from "@/lib/shop-live";
 
 /**
  * Shown on checkout, payment and wallet top-up when the platform requires a
@@ -28,6 +28,7 @@ export function VerificationNotice({
 }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const walletOn = useWalletEnabled();
   return (
     <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
       <div className="flex items-start gap-3">
@@ -38,8 +39,8 @@ export function VerificationNotice({
           </p>
           <p className="mt-1">
             {fr
-              ? "Pour commander ou recharger votre portefeuille, confirmez votre numéro de téléphone ou votre e-mail (Profil > Vérification)."
-              : "To place an order or top up your wallet, confirm your phone number or your email address (Profile > Verification)."}
+              ? `Pour commander${walletOn ? " ou recharger votre portefeuille" : ""}, confirmez votre numéro de téléphone ou votre e-mail (Profil > Vérification).`
+              : `To place an order${walletOn ? " or top up your wallet" : ""}, confirm your phone number or your email address (Profile > Verification).`}
           </p>
           {serverMessage && <p className="mt-1 text-xs text-amber-800">{serverMessage}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -122,6 +123,7 @@ export function VerificationCard() {
   const { toast } = useToast();
   const status = useVerificationStatus();
   const settings = usePublicSettings();
+  const walletOn = settings.walletEnabled;
   // What this server can send (public settings): a channel that is off says so before anyone waits for a code.
   const smsOff = settings.loaded && !settings.smsVerification;
   const mailOff = settings.loaded && !settings.emailVerification;
@@ -209,7 +211,7 @@ export function VerificationCard() {
               : ok
                 ? (fr ? "Votre compte est vérifié." : "Your account is verified.")
                 : status.required
-                  ? (fr ? "Requise pour commander et recharger le portefeuille. Un seul des deux suffit." : "Required to place orders and top up the wallet. Either one is enough.")
+                  ? (walletOn ? (fr ? "Requise pour commander et recharger le portefeuille. Un seul des deux suffit." : "Required to place orders and top up the wallet. Either one is enough.") : fr ? "Requise pour commander. Un seul des deux suffit." : "Required to place orders. Either one is enough.")
                   : (fr ? "Recommandée pour sécuriser votre compte." : "Recommended to secure your account.")}
           </p>
         </div>

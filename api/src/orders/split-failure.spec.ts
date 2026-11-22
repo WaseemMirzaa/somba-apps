@@ -119,6 +119,7 @@ describe('split order: a customer leg that fails', () => {
       registerOrderSettledHandler: () => undefined,
       forOrder: (orderId: string) => ds.getRepository(Payment).findOne({ where: { orderId }, order: { createdAt: 'DESC' } }),
       refundCancelledOrder: async () => 0,
+      automaticOriginal: async () => null, // the wallet switch is on
     };
     orders = new OrdersService(
       ds.getRepository(Order),

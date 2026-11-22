@@ -269,3 +269,10 @@ test("admin-controls contract errors map to French (docs/contracts/admin-control
   // English readers get every sentence untouched.
   assert.equal(localizeApiError("Policy change not found.", "en"), "Policy change not found.");
 });
+
+test("wallet switch: the refusals the server sends while the wallet is off map to French", () => {
+  assert.equal(localizeApiError("The wallet is not available right now.", "fr"), "Le portefeuille n'est pas disponible pour le moment.");
+  assert.match(localizeApiError("The wallet is switched off and this payment cannot be refunded to its original method from here. Switch the wallet back on to refund it.", "fr"), /Réactivez le portefeuille/);
+  assert.match(localizeApiError("This exchange costs more than the original item and the wallet is not available right now. Choose an item of the same price or less.", "fr"), /même prix ou moins cher/);
+  assert.equal(localizeApiError("The wallet is not available right now.", "en"), "The wallet is not available right now.");
+});

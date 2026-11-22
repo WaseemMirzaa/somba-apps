@@ -24,6 +24,7 @@ import {
   isMobileMoneyMethod,
   isVerificationError,
   useVerificationStatus,
+  useWalletEnabled,
 } from "@/lib/shop-live";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
 import { platformFee, platformFeeLabel } from "@/lib/quote-text";
@@ -47,6 +48,8 @@ function PaymentContent() {
   const { promoCode, promoDiscount, promoSellerId, clearCart, addToCart } = useShop();
   const { lines, subtotal, hasUnavailable, savings } = useCartLines();
   const verification = useVerificationStatus();
+  // The wallet switch (live): off = no wallet tile, no top-up link, a wallet choice made earlier falls back to mobile money.
+  const walletOn = useWalletEnabled();
 
   const addressId = params.get("address");
   const openBox = params.get("openBox") === "true";
@@ -82,21 +85,25 @@ function PaymentContent() {
   const submitting = useRef(false);
 
   // Default method: wallet when it covers the total, otherwise Airtel Money.
-  const chosen = method || (walletEnough ? "wallet" : "airtel_money");
+  const chosen = method && (walletOn || method !== "wallet") ? method : walletOn && walletEnough ? "wallet" : "airtel_money";
   const mobile = isMobileMoneyMethod(chosen);
 
   const methods = useMemo(() => {
     const list: { id: string; label: string; hint?: string; disabled?: boolean }[] = [
-      {
-        id: "wallet",
-        label: fr ? "Portefeuille KOMORIKO" : "KOMORIKO wallet",
-        hint: `${fr ? "Solde" : "Balance"}: ${formatCurrency(balance, locale)}${walletEnough ? "" : fr ? " — insuffisant" : " — not enough"}`,
-        disabled: !walletEnough,
-      },
+      ...(walletOn
+        ? [
+            {
+              id: "wallet",
+              label: fr ? "Portefeuille KOMORIKO" : "KOMORIKO wallet",
+              hint: `${fr ? "Solde" : "Balance"}: ${formatCurrency(balance, locale)}${walletEnough ? "" : fr ? " — insuffisant" : " — not enough"}`,
+              disabled: !walletEnough,
+            },
+          ]
+        : []),
       ...MOBILE_MONEY_METHODS.map((m) => ({ id: m.id, label: m.label })),
     ];
     return list;
-  }, [fr, locale, balance, walletEnough]);
+  }, [fr, locale, balance, walletEnough, walletOn]);
 
   const handleConfirmed = useCallback(
     (order: Order) => {
@@ -149,7 +156,7 @@ function PaymentContent() {
       setError(fr ? "Saisissez le numéro Mobile Money qui approuvera le paiement." : "Enter the mobile-money number that will approve the payment.");
       return;
     }
-    if (chosen === "wallet" && !walletEnough) {
+    if (chosen === "wallet" && walletOn && !walletEnough) {
       setError(fr ? "Solde du portefeuille insuffisant." : "Your wallet balance is not enough.");
       return;
     }
@@ -261,7 +268,7 @@ function PaymentContent() {
           ))}
         </div>
 
-        {!walletEnough && (
+        {walletOn && !walletEnough && (
           <p className="mt-2 text-xs text-slate-500">
             <Link href="/shop/account" className="text-[var(--primary)] underline">{fr ? "Recharger le portefeuille" : "Top up your wallet"}</Link>
           </p>

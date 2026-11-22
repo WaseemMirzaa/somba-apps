@@ -11,6 +11,9 @@ String noticeMoney(String raw) {
   return v == null ? '$raw \$' : const Strings('fr').usd(v);
 }
 
+/// Where a refund went, in French: the wallet, or (the wallet being switched off) the original payment method.
+String _refundDest(String englishNotice) => englishNotice.contains('original payment method') ? 'sur votre moyen de paiement d’origine' : 'sur votre portefeuille';
+
 String _pick(Map<String, String> table, String key) => table[key] ?? key;
 
 const Map<String, String> _paymentStatuses = {
@@ -49,6 +52,7 @@ String noticeMethod(String m) {
 
 const Map<String, String> _resolutions = {
   'Refunded to wallet': 'Remboursé sur le portefeuille',
+  'Refunded to original payment method': 'Remboursé sur le moyen de paiement d’origine',
   'Resolved': 'Résolu',
   'Rejected': 'Refusé',
   'Partially refunded': 'Remboursement partiel',
@@ -163,20 +167,20 @@ final List<(RegExp, String Function(RegExpMatch))> kNoticeBodiesFr = [
       (m) => '${m[1]} : le livreur a récupéré votre colis et l’emmène chez le client.'),
   (RegExp(r'^(\S+) could not be delivered and is going back to the seller\. Our team will contact you about your order\.$'),
       (m) => '${m[1]} n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.'),
-  (RegExp(r'^(\S+): (.+) was cancelled \((.+)\)\.( \$([\d.]+) was refunded to your wallet\.)? The rest of your order continues\.$'),
+  (RegExp(r'^(\S+): (.+) was cancelled \((.+)\)\.( \$([\d.]+) was refunded to your (?:wallet|original payment method)\.)? The rest of your order continues\.$'),
       (m) =>
-          '${m[1]} : ${m[2]} a été annulé (${translateReasonText(m[3]!)}).${m[4] != null ? ' ${noticeMoney(m[5]!)} ont été remboursés sur votre portefeuille.' : ''} Le reste de votre commande continue.'),
+          '${m[1]} : ${m[2]} a été annulé (${translateReasonText(m[3]!)}).${m[4] != null ? ' ${noticeMoney(m[5]!)} ont été remboursés ${_refundDest(m[0]!)}.' : ''} Le reste de votre commande continue.'),
   (RegExp(r'^(\S+): part of your order is on its way\. The rest will follow\.$'),
       (m) => '${m[1]} : une partie de votre commande est en route. Le reste suivra.'),
   (RegExp(r'^(\S+): part of your order was delivered\. The rest will follow\.$'),
       (m) => '${m[1]} : une partie de votre commande a été livrée. Le reste suivra.'),
-  (RegExp(r'^(\S+): (.+) could not be delivered \((.+)\)\.( \$([\d.]+) was refunded to your wallet\.)?$'),
-      (m) => '${m[1]} : ${m[2]} n’a pas pu être livré (${translateReasonText(m[3]!)}).${m[5] != null ? ' ${noticeMoney(m[5]!)} ont été remboursés sur votre portefeuille.' : ''}'),
+  (RegExp(r'^(\S+): (.+) could not be delivered \((.+)\)\.( \$([\d.]+) was refunded to your (?:wallet|original payment method)\.)?$'),
+      (m) => '${m[1]} : ${m[2]} n’a pas pu être livré (${translateReasonText(m[3]!)}).${m[5] != null ? ' ${noticeMoney(m[5]!)} ont été remboursés ${_refundDest(m[0]!)}.' : ''}'),
   (RegExp(r'^(\S+): (.+)\. We will try again \(attempt (\d+) of (\d+)\)\.$'),
       (m) => '${m[1]} : ${translateReasonText(m[2]!)}. Nous allons réessayer (tentative ${m[3]} sur ${m[4]}).'),
-  (RegExp(r'^(\S+) was cancelled by KOMORIKO support: (.+?)\.( \$([\d.]+) was refunded to your wallet\.)?$'),
+  (RegExp(r'^(\S+) was cancelled by KOMORIKO support: (.+?)\.( \$([\d.]+) was refunded to your (?:wallet|original payment method)\.)?$'),
       (m) =>
-          '${m[1]} a été annulée par l’assistance KOMORIKO : ${translateReasonText(m[2]!)}.${m[3] != null ? ' ${noticeMoney(m[4]!)} ont été remboursés sur votre portefeuille.' : ''}'),
+          '${m[1]} a été annulée par l’assistance KOMORIKO : ${translateReasonText(m[2]!)}.${m[3] != null ? ' ${noticeMoney(m[4]!)} ont été remboursés ${_refundDest(m[0]!)}.' : ''}'),
   (RegExp(r'^\$([\d.]+) for (\S+) is on its way back to your card\.$'), (m) => '${noticeMoney(m[1]!)} pour ${m[2]} reviennent sur votre carte.'),
   (RegExp(r'^\$([\d.]+) for (\S+) was sent back to your card\.$'), (m) => '${noticeMoney(m[1]!)} pour ${m[2]} ont été renvoyés sur votre carte.'),
   (RegExp(r'^\$([\d.]+) for (\S+) → wallet \(the card refund could not be completed\)\.$'),

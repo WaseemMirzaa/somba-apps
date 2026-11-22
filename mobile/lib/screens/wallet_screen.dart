@@ -35,6 +35,13 @@ class _WalletScreenState extends State<WalletScreen> {
       listenable: RealtimeStore.instance,
       builder: (context, _) {
         final store = RealtimeStore.instance;
+        // Route guard: with the wallet switched off (live) nothing of it is shown, however this screen was reached.
+        if (!store.walletEnabled) {
+          return Scaffold(
+            appBar: backAppBar(context, s.wallet),
+            body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(s.walletOff, key: const ValueKey('wallet-off'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.muted, fontSize: 15)))),
+          );
+        }
         final pending = store.payments.where((p) => p.purpose == 'topup' && p.isPending).toList();
         return Scaffold(
           appBar: backAppBar(context, s.wallet),

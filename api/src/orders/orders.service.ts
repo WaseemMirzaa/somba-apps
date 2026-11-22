@@ -27,7 +27,7 @@ import {
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { recordRefund } from '../payments/refund-ledger';
-import type { RefundKind } from '../database/entities';
+import type { PaymentRefund, RefundKind } from '../database/entities';
 import { WalletService } from '../wallet/wallet.service';
 import { PromosService } from '../content/promos.service';
 import { CouponsService } from '../content/coupons.service';
@@ -1243,7 +1243,7 @@ export class OrdersService {
     const names = targets.map((i) => i.productName).join(', ');
     await this.notifications.toUser(saved.customerId, {
       title: 'Item cancelled by the seller',
-      body: `${saved.reference}: ${names} was cancelled (${reason}).${prepaid && refund > 0 ? ` $${refund.toFixed(2)} was refunded to your wallet.` : ''} The rest of your order continues.`,
+      body: `${saved.reference}: ${names} was cancelled (${reason}).${prepaid && refund > 0 ? ` $${refund.toFixed(2)} was refunded to ${await this.refundedTo(order.id)}.` : ''} The rest of your order continues.`,
       type: 'order',
       entityId: saved.id,
     });
@@ -1254,6 +1254,12 @@ export class OrdersService {
       entityId: saved.id,
     }, 'orderOps');
     return OrdersService.sellerView(saved, (saved.items ?? []).filter((i) => mine.some((t) => t.id === i.id)));
+  }
+
+  /** Where an order's refund went, for the notice: the wallet, or (wallet switched off, order paid by phone / card) the original payment method. */
+  private async refundedTo(orderId: string): Promise<'your wallet' | 'your original payment method'> {
+    const p = await this.payments.forOrder(orderId);
+    return p?.refundTo === 'phone' || p?.refundTo === 'card' ? 'your original payment method' : 'your wallet';
   }
 
   /**
@@ -1277,6 +1283,10 @@ export class OrdersService {
     const refund = Number((goods + targets.reduce((t, i) => t + vatShareUsd(i, i.priceUsd * i.qty), 0)).toFixed(2));
     const payment = await this.payments.forOrder(order.id);
     const prepaid = payment?.status === 'succeeded';
+    // Wallet switched off and the order was not paid with the wallet: the lines' money goes back to the phone / card.
+    const original = prepaid && payment && refund > 0 ? await this.payments.automaticOriginal(payment) : null;
+    const refundRef = original ? this.payments.newRefundRef(original) : null;
+    let recorded: PaymentRefund | null = null;
 
     const done = await this.orders.manager.transaction(async (m) => {
       // Claim the lines atomically: two concurrent cancels refund once.
@@ -1293,12 +1303,19 @@ export class OrdersService {
           await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per + vatShareUsd(i, i.priceUsd * i.qty)).toFixed(2)) });
         }
         // C-refund: recorded and capped like every refund (a payment already refunded cannot be refunded again here).
-        await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: opts.kind, memo: opts.memo });
-        await this.wallet.apply(order.customerId, 'refund', refund, opts.memo, m);
+        ({ entry: recorded } = await recordRefund(m, { payment, amountUsd: refund, to: original ?? 'wallet', kind: opts.kind, memo: opts.memo, refundRef }));
+        if (!original) await this.wallet.apply(order.customerId, 'refund', refund, opts.memo, m);
       }
       return true;
     });
     if (!done) return { done, refund, prepaid };
+    if (original && payment && recorded && !(await this.payments.dispatchOriginalRefund(payment, recorded as PaymentRefund, refund, original))) {
+      // The processor refused: the customer is not left out, the wallet gets it (the lines are already marked refunded).
+      await this.orders.manager.transaction(async (m) => {
+        await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: opts.kind, memo: opts.memo });
+        await this.wallet.apply(order.customerId, 'refund', refund, opts.memo, m);
+      });
+    }
     // A line left the boxes' contents: the seller's label page says "reprint".
     await this.parcelsSvc?.touchContents(order.id).catch(() => undefined);
     if (order.deliveryMode === 'express') await this.logistics.refreshOpenLegCargo(order.id);
@@ -1357,7 +1374,7 @@ export class OrdersService {
       pushOrderToOps(this.emitter, 'order:updated', saved);
       await this.notifications.toUser(saved.customerId, {
         title: 'Order cancelled',
-        body: `${saved.reference} could not be delivered after ${task.attempts} attempts (${reason}).${refunded > 0 ? ` $${refunded.toFixed(2)} was refunded to your wallet.` : ''}`,
+        body: `${saved.reference} could not be delivered after ${task.attempts} attempts (${reason}).${refunded > 0 ? ` $${refunded.toFixed(2)} was refunded to ${await this.refundedTo(saved.id)}.` : ''}`,
         type: 'order',
         entityId: saved.id,
       });
@@ -1396,7 +1413,7 @@ export class OrdersService {
       const names = targets.map((i) => i.productName).join(', ');
       await this.notifications.toUser(order.customerId, {
         title: 'Items could not be delivered',
-        body: `${order.reference}: ${names} could not be delivered (${reason}).${prepaid && refund > 0 ? ` $${refund.toFixed(2)} was refunded to your wallet.` : ''}`,
+        body: `${order.reference}: ${names} could not be delivered (${reason}).${prepaid && refund > 0 ? ` $${refund.toFixed(2)} was refunded to ${await this.refundedTo(order.id)}.` : ''}`,
         type: 'order',
         entityId: order.id,
       });
@@ -1608,7 +1625,7 @@ export class OrdersService {
     pushOrderToOps(this.emitter, 'order:updated', saved);
     await this.notifications.toUser(saved.customerId, {
       title: 'Order cancelled',
-      body: `${saved.reference} was cancelled${opts.reason ? ` by KOMORIKO support: ${opts.reason}` : ''}.${refundedUsd > 0 ? ` $${refundedUsd.toFixed(2)} was refunded to your wallet.` : ''}`,
+      body: `${saved.reference} was cancelled${opts.reason ? ` by KOMORIKO support: ${opts.reason}` : ''}.${refundedUsd > 0 ? ` $${refundedUsd.toFixed(2)} was refunded to ${await this.refundedTo(saved.id)}.` : ''}`,
       type: 'order',
       entityId: saved.id,
     });

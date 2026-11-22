@@ -70,7 +70,7 @@ beforeEach(async () => {
   };
   const notifications = { toUser: record('user:'), toUsers: record('user:'), toRole: record('role:') };
   const payments = {
-    refund: async (orderId: string, toWallet: boolean, source?: unknown) => (fullRefunds.push({ orderId, toWallet, source }), { refund: { amountUsd: outstanding } }),
+    refund: async (orderId: string, toWallet: boolean, source?: unknown) => (fullRefunds.push({ orderId, toWallet, source }), { refund: { amountUsd: outstanding, refundTo: 'wallet' } }),
   };
   const refunds = {
     outstanding: async () => outstanding,

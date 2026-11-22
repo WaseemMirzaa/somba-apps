@@ -14,6 +14,7 @@ import { socketClient } from "@/lib/realtime/socket-client";
 import type { PlanPayment, SellerPlanInfo, SellerStore, SubscribeResult } from "@/lib/seller";
 import { errMessage, paymentMethodLabel } from "@/lib/seller-labels";
 import { cn, formatCurrency } from "@/lib/utils";
+import { useWalletEnabled } from "@/lib/shop-live";
 
 const MOBILE_METHODS = ["airtel_money", "orange_money", "vodacom_mpesa"] as const;
 type Method = "wallet" | (typeof MOBILE_METHODS)[number];
@@ -45,7 +46,9 @@ export function PlanCheckout({ preselect, signInHref = "/login" }: { preselect?:
   const [store, setStore] = useState<Store | undefined>(undefined);
   const [storeError, setStoreError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(preselect ?? null);
-  const [method, setMethod] = useState<Method>("airtel_money");
+  const walletOn = useWalletEnabled(); // the wallet switch (live): off = no wallet option
+  const [pickedMethod, setMethod] = useState<Method>("airtel_money");
+  const method: Method = pickedMethod === "wallet" && !walletOn ? "airtel_money" : pickedMethod;
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -306,6 +309,7 @@ export function PlanCheckout({ preselect, signInHref = "/login" }: { preselect?:
 
           <fieldset className="space-y-2">
             <legend className="mb-1 text-xs font-medium text-slate-600">{fr ? "Moyen de paiement" : "Payment method"}</legend>
+            {walletOn && (
             <label className={cn("flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm", method === "wallet" ? "border-[var(--primary)] bg-blue-50/40" : "border-[var(--border)]")}>
               <input type="radio" name="method" checked={method === "wallet"} onChange={() => setMethod("wallet")} />
               <Wallet className="h-4 w-4 text-[var(--primary)]" />
@@ -316,6 +320,7 @@ export function PlanCheckout({ preselect, signInHref = "/login" }: { preselect?:
                 </span>
               </span>
             </label>
+            )}
             {MOBILE_METHODS.map((m) => (
               <label key={m} className={cn("flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm", method === m ? "border-[var(--primary)] bg-blue-50/40" : "border-[var(--border)]")}>
                 <input type="radio" name="method" checked={method === m} onChange={() => setMethod(m)} />

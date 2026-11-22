@@ -58,6 +58,7 @@ beforeEach(async () => {
   const payments = {
     forOrder: (orderId: string) => ds.getRepository(Payment).findOne({ where: { orderId }, order: { createdAt: 'DESC' } }),
     refundToOriginal: () => (phoneOk ? 'phone' : null),
+    mustAvoidWallet: async () => false, // the wallet switch is on
   };
   const notifications = { toUser: async (to: string, n: { title: string; body: string }) => void notices.push({ to, ...n }) };
   const build = () =>

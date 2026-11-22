@@ -71,3 +71,10 @@ test("where the money went", () => {
   assert.equal(refundDestination({ refundTo: "phone", status: "completed" }, true), "vers le téléphone");
   assert.equal(refundDestination({ refundTo: "wallet", status: "failed" }, false), "wallet (phone refund failed)");
 });
+
+test("wallet switch: a card refund and an exchange difference are named, not shown as the wallet", () => {
+  assert.equal(refundDestination({ refundTo: "card", status: "sending" }, false), "to card · sending");
+  assert.equal(refundDestination({ refundTo: "card", status: "completed" }, true), "vers la carte");
+  assert.equal(refundReason({ kind: "exchange" }, false), "Exchange price difference");
+  assert.match(refundReason({ kind: "late_payment" }, false), /Late payment/);
+});

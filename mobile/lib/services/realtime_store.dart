@@ -81,6 +81,10 @@ class RealtimeStore extends ChangeNotifier {
   /// from them (the order the server places is authoritative). Defaults are today's behaviour: no VAT, the customer pays the
   /// fee, and it is shown as its own line.
   bool vatEnabled = false;
+
+  /// Public setting `walletEnabled` (default on): off = no wallet anywhere (menu, profile stat, wallet screen, checkout tile,
+  /// top-up, wallet refund choice, price-difference payment). Live via `settings:updated`; mirrored in `Strings.walletOff`.
+  bool walletEnabled = true;
   bool feePaidBySeller = false;
   bool showPlatformFee = true;
 
@@ -504,6 +508,10 @@ class RealtimeStore extends ChangeNotifier {
     if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
     if (m.containsKey('requirePinnedAddress')) requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
     if (m.containsKey('vatEnabled')) vatEnabled = '${m['vatEnabled']}' == 'true';
+    if (m.containsKey('walletEnabled')) {
+      walletEnabled = '${m['walletEnabled']}' != 'false';
+      Strings.walletOff = !walletEnabled;
+    }
     if (m.containsKey('deliveryFeePaidBy')) feePaidBySeller = '${m['deliveryFeePaidBy']}' == 'seller';
     if (m.containsKey('showPlatformFee')) showPlatformFee = '${m['showPlatformFee']}' != 'false';
     if (m.containsKey('supportPhone')) supportPhone = '${m['supportPhone'] ?? ''}'.trim();

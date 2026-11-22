@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order, OrderItem, Payment } from '../database/entities';
@@ -10,6 +10,7 @@ import { NOTHING_LEFT_TO_REFUND, recordRefund, refundTooMuch, refundableUsd, rev
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
 import { pushOrderToReaders } from '../logistics/hub-scope';
+import { ExchangesService } from '../flows/exchanges.service';
 
 const FINANCE_ROLES = ['admin', 'admin_finance'];
 const cents = (n: number) => Number(n.toFixed(2));
@@ -19,12 +20,16 @@ export interface PartialRefundInput {
   amountUsd: number;
   /** false: back to the method that paid (the phone through pawaPay, the card through Stripe); falls back to the wallet when the payment cannot go back. */
   toWallet: boolean;
+  /** The money belongs to no order line (an exchange's price difference): only the payment and the refund ledger move. */
+  unattributed?: boolean;
+  /** Pay it into the wallet whatever the wallet switch says (the retry after a phone / card refund was refused: the customer is never left out). */
+  forceWallet?: boolean;
   /** Wallet history line, English (localize.ts has the French). */
   memo: string;
   /** Which order lines the money belongs to (their `refundedUsd` grows). Omitted: spread over what is left on every line. */
   lines?: { orderItemId: string; usd: number }[];
   /** Which request this refund belongs to, for the ledger: a return's refund (`return`) or an admin's dispute decision (`dispute`). */
-  source?: { kind: 'return' | 'dispute'; disputeId: string; disputeReference: string };
+  source?: { kind: 'return' | 'dispute' | 'exchange'; disputeId?: string; disputeReference?: string };
 }
 
 export interface PartialRefundResult {
@@ -44,7 +49,7 @@ export interface PartialRefundResult {
  * can never pay the same money twice and the admin Refunds page and the finance figures count it.
  */
 @Injectable()
-export class PartialRefundService {
+export class PartialRefundService implements OnModuleInit {
   private readonly logger = new Logger(PartialRefundService.name);
 
   constructor(
@@ -56,6 +61,7 @@ export class PartialRefundService {
     private readonly emitter: RealtimeEmitter,
     private readonly notifications: NotificationsService,
     @Optional() @Inject(PAWAPAY_CLIENT) private readonly pawapay: PawapayClient | null = null,
+    @Optional() private readonly exchanges?: ExchangesService,
   ) {}
 
   /** What is still refundable on the order's payment. */
@@ -74,6 +80,28 @@ export class PartialRefundService {
     return cents(Math.max(0, value - (order.discountUsd ?? 0) * share) + vat);
   }
 
+  /**
+   * An exchange's cheaper item arrived: while the wallet is switched off, the price difference of an order that was NOT paid with
+   * the wallet goes back to the phone / card (true). Otherwise false: the exchange pays it into the wallet, as always.
+   */
+  private readonly refundExchangeDifference = async (ex: { orderId: string; reference: string }, amountUsd: number): Promise<boolean> => {
+    const payment = await this.paymentsSvc.forOrder(ex.orderId);
+    if (!payment || payment.status !== 'succeeded' || !(await this.paymentsSvc.mustAvoidWallet(payment))) return false;
+    if (refundableUsd(payment) < amountUsd - 0.009) return false;
+    try {
+      // Paid back to the phone / card, or (the processor refused) into the wallet: either way the customer has it and the exchange is done.
+      await this.refund({ orderId: ex.orderId, amountUsd, toWallet: false, unattributed: true, memo: `Exchange ${ex.reference}: price difference refunded`, source: { kind: 'exchange' } });
+      return true;
+    } catch (e) {
+      this.logger.warn(`Exchange ${ex.reference}: the price difference could not go back to the original method (${(e as Error).message}); crediting the wallet`);
+      return false;
+    }
+  };
+
+  onModuleInit(): void {
+    this.exchanges?.registerDifferenceRefunder(this.refundExchangeDifference);
+  }
+
   async refund(input: PartialRefundInput): Promise<PartialRefundResult> {
     const amount = cents(Number(input.amountUsd));
     if (!(amount > 0)) throw new BadRequestException('The refund amount must be more than zero.');
@@ -90,9 +118,11 @@ export class PartialRefundService {
     if (amount > left + 0.009) throw new BadRequestException(refundTooMuch(left));
     // Back to the original method only while no other phone/card refund of this payment has been sent; otherwise (or when the
     // payment cannot go back where it came from) the money goes to the wallet, explicitly.
-    const original = input.toWallet === false && !payment.refundRef ? this.paymentsSvc.refundToOriginal(payment) : null;
+    // While the wallet is switched off, a payment that was not made with the wallet refunds to where it came from, whatever was asked.
+    const toOriginal = !input.forceWallet && (input.toWallet === false || (await this.paymentsSvc.mustAvoidWallet(payment)));
+    const original = toOriginal && !payment.refundRef ? this.paymentsSvc.refundToOriginal(payment) : null;
     const refundRef = original === 'phone' ? this.pawapay!.newId() : original === 'card' ? PaymentsService.newCardRefundRef() : null;
-    const spread = this.attribute(order, amount, input.lines);
+    const spread = input.unattributed ? new Map<string, number>() : this.attribute(order, amount, input.lines);
 
     // Of two refunds racing for the same money, the payment row serialises them: the second is refused with what is left.
     const entry = await this.payments.manager.transaction(async (m) => {
@@ -122,7 +152,7 @@ export class PartialRefundService {
         // Stripe said no: undo, so the money can go to the wallet instead.
         await this.undoOriginalRefund(entry, spread);
         this.logger.warn(`Stripe refused ${refundRef}: ${e.message}; refunding to the wallet`);
-        return this.refund({ ...input, toWallet: true });
+        return this.refund({ ...input, toWallet: true, forceWallet: true });
       }
     }
     if (original === 'phone') {
@@ -133,7 +163,7 @@ export class PartialRefundService {
           // pawaPay said no: undo, so the money can go to the wallet instead.
           await this.undoOriginalRefund(entry, spread);
           this.logger.warn(`pawaPay refused ${refundRef}: ${(e as Error).message}; refunding to the wallet`);
-          return this.refund({ ...input, toWallet: true });
+          return this.refund({ ...input, toWallet: true, forceWallet: true });
         }
         // No answer: the refund may exist; the status check settles it.
         this.logger.warn(`Refund ${refundRef} for ${payment.reference} unconfirmed: ${e.message}`);

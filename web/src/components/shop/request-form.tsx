@@ -280,7 +280,7 @@ export function RequestForm({ orderId, mode }: { orderId: string; mode: "return"
             {photos.length > 0 && <p className="mt-1">{fr ? `${photos.length} photo(s) jointe(s)` : `${photos.length} photo(s) attached`}</p>}
             {isReturn && <p className="mt-2"><strong>{fr ? "Remboursement estimé" : "Estimated refund"}:</strong> {formatCurrency(refundEstimate, locale)}</p>}
           </div>
-          {isReturn && (
+          {isReturn && settings.walletEnabled && (
             <fieldset className="space-y-2">
               <legend className="mb-1 text-sm font-medium text-slate-700">{fr ? "Rembourser vers" : "Refund to"}</legend>
               {([["wallet", fr ? "Mon portefeuille KOMORIKO (immédiat)" : "My KOMORIKO wallet (instant)"], ["phone", fr ? "Mon téléphone Mobile Money" : "My mobile-money phone"]] as const).map(([v, label]) => (

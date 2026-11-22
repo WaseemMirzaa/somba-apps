@@ -8,6 +8,7 @@ import 'messages_engage.dart';
 import 'messages_logistics.dart';
 import 'messages_r2f.dart';
 import 'messages_verify.dart';
+import 'messages_wallet_off.dart';
 import 'messages_social.dart';
 
 /// key -> (English, French). Placeholders are written {name}.
@@ -664,6 +665,7 @@ const Map<String, (String, String)> kMessages = {
   ...kMessagesAreas,
   ...kMessagesR2f,
   ...kMessagesAccount,
+  ...kMessagesWalletOff,
   ...kMessagesVerify,
   ...kMessagesCartStore,
 };

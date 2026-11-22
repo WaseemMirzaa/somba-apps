@@ -121,6 +121,7 @@ export const FIELD_FR: Record<string, string> = {
   'Saved for later': 'Les articles gardés pour plus tard',
   Search: 'La recherche',
   'Seller commission': 'La commission vendeur',
+  'Wallet switch': 'L’interrupteur du portefeuille',
   'VAT switch': 'L’interrupteur de la TVA',
   VAT: 'La TVA',
   'Delivery fee payer': 'Le payeur des frais de livraison',

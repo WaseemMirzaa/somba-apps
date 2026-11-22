@@ -43,6 +43,9 @@ export function methodFr(m: string): string {
 
 const NBSP = '\u00A0';
 
+/** Where a refund went, in a notice: "to your wallet" (the default) or, with the wallet switched off, "to your original payment method". */
+const refundedTo = (m: RegExpMatchArray): string => (m[0].includes('original payment method') ? 'sur votre moyen de paiement d’origine' : 'sur votre portefeuille');
+
 /**
  * A dollar amount the way French writes money: comma decimals, a non-breaking space between thousands, and one
  * before the sign ("52.00" -> "52,00 $", "1234567.5" -> "1 234 567,5 $"). The server writes English amounts with
@@ -190,6 +193,7 @@ export function translateReason(r: string): string {
 /** The default resolutions an admin gets when no note is typed. */
 const RESOLUTIONS: Record<string, string> = {
   'Refunded to wallet': 'Remboursé sur le portefeuille',
+  'Refunded to original payment method': 'Remboursé sur le moyen de paiement d’origine',
   Resolved: 'Résolu',
   Rejected: 'Refusé',
   'Partially refunded': 'Remboursement partiel',
@@ -504,9 +508,9 @@ const BODIES: Rule[] = [
   [/^(\S+) · \$([\d.]+) from (.+)$/, (m) => `${m[1]} · ${moneyFr(m[2])} de ${m[3]}`],
   [/^(\S+): (\d+) item\(s\) to pack — \$([\d.]+)$/, (m) => `${m[1]} : ${m[2]} article(s) à préparer — ${moneyFr(m[3])}`],
   [
-    /^(\S+): (.+) was cancelled \((.+)\)\.( \$([\d.]+) was refunded to your wallet\.)? The rest of your order continues\.$/,
+    /^(\S+): (.+) was cancelled \((.+)\)\.( \$([\d.]+) was refunded to your (?:wallet|original payment method)\.)? The rest of your order continues\.$/,
     (m) =>
-      `${m[1]} : ${m[2]} a été annulé (${translateReason(m[3])}).${m[4] !== undefined ? ` ${moneyFr(m[5])} ont été remboursés sur votre portefeuille.` : ''} Le reste de votre commande continue.`,
+      `${m[1]} : ${m[2]} a été annulé (${translateReason(m[3])}).${m[4] !== undefined ? ` ${moneyFr(m[5])} ont été remboursés ${refundedTo(m)}.` : ''} Le reste de votre commande continue.`,
   ],
 
   // Quoted names first: the general "X is now Y." rule below would swallow a one-word name
@@ -539,13 +543,13 @@ const BODIES: Rule[] = [
 
   // Cancellations and failed deliveries
   [/^(\S+) was cancelled\. Refund credited to your wallet\.$/, (m) => `${m[1]} a été annulée. Le remboursement a été crédité sur votre portefeuille.`],
-  [/^(\S+) was cancelled\. \$([\d.]+) was refunded to your wallet\.$/, (m) => `${m[1]} a été annulée. ${moneyFr(m[2])} ont été remboursés sur votre portefeuille.`],
+  [/^(\S+) was cancelled\. \$([\d.]+) was refunded to your (?:wallet|original payment method)\.$/, (m) => `${m[1]} a été annulée. ${moneyFr(m[2])} ont été remboursés ${refundedTo(m)}.`],
   [/^(\S+) was cancelled\.$/, (m) => `${m[1]} a été annulée.`],
   [/^(\S+) was cancelled: (.+)\.$/, (m) => `${m[1]} a été annulée : ${translateReason(m[2])}.`],
   [
-    /^(\S+) was cancelled by KOMORIKO support: (.+?)\.( \$([\d.]+) was refunded to your wallet\.)?$/,
+    /^(\S+) was cancelled by KOMORIKO support: (.+?)\.( \$([\d.]+) was refunded to your (?:wallet|original payment method)\.)?$/,
     (m) =>
-      `${m[1]} a été annulée par l’assistance KOMORIKO : ${translateReason(m[2])}.${m[3] !== undefined ? ` ${moneyFr(m[4])} ont été remboursés sur votre portefeuille.` : ''}`,
+      `${m[1]} a été annulée par l’assistance KOMORIKO : ${translateReason(m[2])}.${m[3] !== undefined ? ` ${moneyFr(m[4])} ont été remboursés ${refundedTo(m)}.` : ''}`,
   ],
   [
     /^(\S+) was cancelled( \((.+)\)| by KOMORIKO| by the customer)\. Do not pack it\.$/,
@@ -558,8 +562,8 @@ const BODIES: Rule[] = [
   [/^(\S+): part of your order is on its way\. The rest will follow\.$/, (m) => `${m[1]} : une partie de votre commande est en route. Le reste suivra.`],
   [/^(\S+): part of your order was delivered\. The rest will follow\.$/, (m) => `${m[1]} : une partie de votre commande a été livrée. Le reste suivra.`],
   [
-    /^(\S+): (.+) could not be delivered \((.+)\)\.( \$([\d.]+) was refunded to your wallet\.)?$/,
-    (m) => `${m[1]} : ${m[2]} n’a pas pu être livré (${translateReason(m[3])}).${m[5] !== undefined ? ` ${moneyFr(m[5])} ont été remboursés sur votre portefeuille.` : ''}`,
+    /^(\S+): (.+) could not be delivered \((.+)\)\.( \$([\d.]+) was refunded to your (?:wallet|original payment method)\.)?$/,
+    (m) => `${m[1]} : ${m[2]} n’a pas pu être livré (${translateReason(m[3])}).${m[5] !== undefined ? ` ${moneyFr(m[5])} ont été remboursés ${refundedTo(m)}.` : ''}`,
   ],
   [
     /^(\S+): (.+)\. We will try again \(attempt (\d+) of (\d+)\)\.$/,
@@ -570,11 +574,11 @@ const BODIES: Rule[] = [
     (m) => `${m[1]} : ${translateReason(m[2])}. Nous allons réessayer (tentative ${m[3]} sur ${m[4]}). Vous pouvez aussi annuler la commande.`,
   ],
   [
-    /^(\S+) could not be delivered after (\d+) attempts \((.+)\)\. \$([\d.]+) was refunded to your wallet\.$/,
-    (m) => `${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${translateReason(m[3])}). ${moneyFr(m[4])} ont été remboursés sur votre portefeuille.`,
+    /^(\S+) could not be delivered after (\d+) attempts \((.+)\)\. \$([\d.]+) was refunded to your (?:wallet|original payment method)\.$/,
+    (m) => `${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${translateReason(m[3])}). ${moneyFr(m[4])} ont été remboursés ${refundedTo(m)}.`,
   ],
   [
-    /^(\S+) could not be delivered after (\d+) attempts \((.+)\)\.( Your payment was refunded to your wallet\.)?$/,
+    /^(\S+) could not be delivered after (\d+) attempts \((.+)\)\.( Your payment was refunded to your (?:wallet|original payment method)\.)?$/,
     (m) => `${m[1]} n’a pas pu être livrée après ${m[2]} tentatives (${translateReason(m[3])}).${m[4] !== undefined ? ' Votre paiement a été remboursé sur votre portefeuille.' : ''}`,
   ],
 

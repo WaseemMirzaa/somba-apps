@@ -31,7 +31,7 @@ class NoticeRoute {
 /// The screen for a notification `type` / `entityId` (the same for a push tap and
 /// the in-app list). [hasOrder] tells whether an id is one of the customer's
 /// orders: payment notices carry an order id, or a payment id for wallet top-ups.
-NoticeRoute noticeRoute(String type, String? entityId, {required bool Function(String id) hasOrder}) {
+NoticeRoute noticeRoute(String type, String? entityId, {required bool Function(String id) hasOrder, bool walletEnabled = true}) {
   final id = entityId;
   switch (type) {
     case 'order':
@@ -39,7 +39,7 @@ NoticeRoute noticeRoute(String type, String? entityId, {required bool Function(S
     case 'delivery':
       return id != null && hasOrder(id) ? NoticeRoute(NoticeDest.tracking, id) : const NoticeRoute(NoticeDest.notifications);
     case 'payment':
-      return id != null && hasOrder(id) ? NoticeRoute(NoticeDest.order, id) : const NoticeRoute(NoticeDest.wallet);
+      return id != null && hasOrder(id) ? NoticeRoute(NoticeDest.order, id) : NoticeRoute(walletEnabled ? NoticeDest.wallet : NoticeDest.notifications);
     case 'return':
     case 'dispute':
       return id != null ? NoticeRoute(NoticeDest.returnStatus, id) : const NoticeRoute(NoticeDest.returns);
@@ -81,7 +81,7 @@ Future<void> openNotice(
   if (notificationId != null && store.notifications.any((n) => n.id == notificationId && !n.read)) {
     store.markRead(notificationId).catchError((_) {});
   }
-  final route = noticeRoute(type, entityId, hasOrder: (id) => store.orderById(id) != null);
+  final route = noticeRoute(type, entityId, hasOrder: (id) => store.orderById(id) != null, walletEnabled: store.walletEnabled);
   Widget? screen;
   switch (route.dest) {
     case NoticeDest.product:
