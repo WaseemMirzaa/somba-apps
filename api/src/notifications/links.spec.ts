@@ -42,6 +42,17 @@ describe('linkFor', () => {
     expect(linkFor('warehouse_staff', 'support', 't1')).toBe('/warehouse/support/t1');
   });
 
+  it('a followed store\'s deal opens the deals page and its promotion opens the store', () => {
+    expect(linkFor('customer', 'flash', 'fs1')).toBe('/shop/deals');
+    expect(linkFor('customer', 'campaign', 'st1:cp1')).toBe('/shop/stores/st1');
+    expect(linkFor('customer', 'promo', 'st1:pr1')).toBe('/shop/stores/st1');
+    expect(linkFor('customer', 'promo', null)).toBe('/shop/notifications');
+    expect(linkFor('customer', 'campaign', 'cp1')).toBe('/shop/notifications');
+    // the seller and admin pages for the same types are unchanged
+    expect(linkFor('seller', 'flash', 'fs1')).toBe('/seller/flash-sales');
+    expect(linkFor('seller', 'campaign', 'cp1')).toBe('/seller/promotions/cp1');
+  });
+
   it('falls back to a list or the inbox', () => {
     expect(linkFor('customer', 'order', null)).toBe('/shop/orders');
     expect(linkFor('customer', 'marketing', null)).toBe('/shop/notifications');

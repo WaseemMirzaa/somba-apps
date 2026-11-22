@@ -376,7 +376,20 @@ const TITLES: Record<string, string> = {
   'New from a store you follow': 'Nouveau chez une boutique que vous suivez',
 };
 
+/** "de Boutique X" / "d’Étoile": the French preposition elides before a vowel or a mute h. */
+const deStore = (name: string) => (/^[aeiouyàâäéèêëîïôöùûüh]/i.test(name.trim()) ? `d’${name}` : `de ${name}`);
+
+/** The title of a follower notice in both languages: "New deal from <store>" / "Nouvelle offre de <store>". */
+export function followerTitle(kind: 'deal' | 'promotion', store: string): { en: string; fr: string } {
+  return kind === 'deal'
+    ? { en: `New deal from ${store}`, fr: `Nouvelle offre ${deStore(store)}` }
+    : { en: `New promotion from ${store}`, fr: `Nouvelle promotion ${deStore(store)}` };
+}
+
 function titlePattern(title: string): string | null {
+  // A follower notice stored without its authored French still translates: the store's name is the only variable part.
+  const deal = /^New (deal|promotion) from (.+)$/.exec(title);
+  if (deal) return followerTitle(deal[1] === 'deal' ? 'deal' : 'promotion', deal[2]).fr;
   const sellerMsg = /^Seller message on (\S+)$/.exec(title);
   if (sellerMsg) return `Message du vendeur sur ${sellerMsg[1]}`;
   const after = /^(Exchange|Replacement) (\w+)$/.exec(title);
@@ -393,6 +406,10 @@ function titlePattern(title: string): string | null {
 // ── Bodies (first match wins: keep the specific patterns above the general ones) ──
 
 const BODIES: Rule[] = [
+  // Followers: a store's deal (flash sale) and promotion (campaign, public coupon)
+  [/^(.+): \$([\d.]+) instead of \$([\d.]+)$/, (m) => `${m[1]} : ${moneyFr(m[2])} au lieu de ${moneyFr(m[3])}`],
+  [/^(.+): (\d+)% off$/, (m) => `${m[1]} : ${m[2]}${NBSP}% de réduction`],
+  [/^(.+): \$([\d.]+) off$/, (m) => `${m[1]} : ${moneyFr(m[2])} de réduction`],
   // Commerce notices (stock, flash sales, invoices…): before the general "X is now Y." rule below
   ...COMMERCE_BODIES,
   // Seller platform: team, security, storefront

@@ -161,3 +161,75 @@ describe('a new product from a followed store', () => {
     await expect(svc.tellFollowers(live(await addProduct(ds, { sellerId: store.id })))).resolves.toBe(1);
   });
 });
+
+describe('a deal or promotion from a followed store', () => {
+  const deal = (o: Partial<Parameters<FollowsService['notifyFollowers']>[0]> = {}) => ({
+    storeRef: store.id,
+    kind: 'deal' as const,
+    type: 'flash' as const,
+    sourceId: 'fs1',
+    body: 'Phone: $5.00 instead of $9.00',
+    bodyFr: 'Téléphone : 5,00 $ au lieu de 9,00 $',
+    ...o,
+  });
+
+  it('tells every follower once, in English and French, never the owner or a non-follower', async () => {
+    await svc.toggle(ana, store.id);
+    await svc.toggle(ben, store.id);
+    await svc.toggle({ id: 'c3' }, other.id);
+    expect(await svc.notifyFollowers(deal())).toBe(2);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({
+      type: 'flash',
+      entityId: 'fs1',
+      title: 'New deal from Kinshasa Traders',
+      fr: { title: 'Nouvelle offre de Kinshasa Traders', body: 'Téléphone : 5,00 $ au lieu de 9,00 $' },
+    });
+    expect(sent[0].users.sort()).toEqual(['c1', 'c2']);
+    expect(sent[0].users).not.toContain('su1');
+  });
+
+  it('a promotion opens the store: its entity id is `<store id>:<source id>`; the title is the promotion one', async () => {
+    await svc.toggle(ana, store.id);
+    await svc.notifyFollowers(deal({ kind: 'promotion', type: 'campaign', sourceId: 'cp1' }));
+    expect(sent[0]).toMatchObject({ type: 'campaign', entityId: `${store.id}:cp1`, title: 'New promotion from Kinshasa Traders', fr: { title: 'Nouvelle promotion de Kinshasa Traders' } });
+  });
+
+  it('dedupes per (type, entity, follower): a second call or a sweep re-run sends nothing; a new follower still hears of it', async () => {
+    await svc.toggle(ana, store.id);
+    expect(await svc.notifyFollowers(deal())).toBe(1);
+    expect(await svc.notifyFollowers(deal())).toBe(0);
+    await svc.toggle(ben, store.id);
+    expect(await svc.notifyFollowers(deal())).toBe(1);
+    expect(sent.map((s) => s.users)).toEqual([['c1'], ['c2']]);
+    // another deal, or the same id under another type, is a different notice
+    expect(await svc.notifyFollowers(deal({ sourceId: 'fs2' }))).toBe(2);
+    expect(await svc.notifyFollowers(deal({ type: 'promo', kind: 'promotion' }))).toBe(2);
+  });
+
+  it('an admin copy of the same sale id (type flash, another recipient) does not stop the followers hearing of it', async () => {
+    await svc.toggle(ana, store.id);
+    await ds.getRepository(Notification).save(ds.getRepository(Notification).create({ userId: 'admin1', role: 'admin_marketing', title: 'Flash sale nominated', body: 'x', type: 'flash', entityId: 'fs1' } as never));
+    expect(await svc.notifyFollowers(deal())).toBe(1);
+  });
+
+  it('elides the French "de" before a vowel and tells nobody for an unapproved or unknown store or no followers', async () => {
+    const eto = await ds.getRepository(Seller).save(ds.getRepository(Seller).create({ name: 'Étoile', userId: 'su9', status: 'approved' }));
+    await svc.toggle(ana, eto.id);
+    await svc.notifyFollowers(deal({ storeRef: eto.id }));
+    expect(sent[0].fr?.title).toBe('Nouvelle offre d’Étoile');
+    expect(await svc.notifyFollowers(deal({ storeRef: other.id }))).toBe(0); // no followers
+    expect(await svc.notifyFollowers(deal({ storeRef: null }))).toBe(0);
+    expect(await svc.notifyFollowers(deal({ storeRef: 'nope' }))).toBe(0);
+    await ds.getRepository(Seller).update({ id: eto.id }, { status: 'suspended' });
+    expect(await svc.notifyFollowers(deal({ storeRef: eto.id, sourceId: 'fs9' }))).toBe(0);
+  });
+
+  it('a failing notice is logged, not thrown', async () => {
+    await svc.toggle(ana, store.id);
+    (svc as unknown as { notifications: { toUsers: () => Promise<void> } }).notifications.toUsers = async () => {
+      throw new Error('push is down');
+    };
+    await expect(svc.notifyFollowers(deal())).resolves.toBe(0);
+  });
+});

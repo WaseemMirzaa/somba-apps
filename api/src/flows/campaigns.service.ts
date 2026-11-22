@@ -11,6 +11,7 @@ import { ROLE_GROUPS, inRoleGroup } from '../common/role-groups';
 const CAMPAIGN_ROLES: string[] = [...ROLE_GROUPS.campaignDecisions];
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService } from '../products/products.service';
+import { FollowsService } from '../follows/follows.service';
 import { budgetSpent, campaignRunning, campaignWindow } from '../products/pricing';
 import { approvedStatus, canMoveCampaign } from './campaign-state';
 import { TranslationService } from '../translation/translation.service';
@@ -56,6 +57,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     private readonly emitter: RealtimeEmitter,
     private readonly products: ProductsService,
     private readonly translations: TranslationService,
+    private readonly follows?: FollowsService,
   ) {
     // A machine finished a campaign's other language: tell the admins and the owning seller.
     this.translations.registerRepublisher('campaign', async (id) => {
@@ -230,6 +232,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       moved++;
       const saved = (await this.campaigns.findOne({ where: { id: c.id } }))!;
       const shown = (await this.present([saved]))[0];
+      if (next === 'active') await this.tellFollowers(shown);
       await this.publish(
         saved,
         next === 'ended'
@@ -240,6 +243,24 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
       );
     }
     return moved;
+  }
+
+  /**
+   * A store's campaign went live (approved with its start already reached, or started by the sweep): the store's
+   * followers hear of the promotion once (the follower notice dedupes per campaign). Platform campaigns have no store.
+   */
+  private async tellFollowers(c: ServedCampaign): Promise<void> {
+    if (!this.follows || !c.sellerId || c.status !== 'active') return;
+    await this.follows
+      .notifyFollowers({
+        storeRef: c.sellerId,
+        kind: 'promotion',
+        type: 'campaign',
+        sourceId: c.id,
+        body: `${c.name}: ${c.discount}% off`,
+        bodyFr: `${c.nameFr || c.name} : ${c.discount} % de réduction`,
+      })
+      .catch(() => undefined);
   }
 
   /** Push a campaign change to admins and the owning seller, refresh prices, and optionally notify the seller. */
@@ -469,6 +490,7 @@ export class CampaignsService implements OnModuleInit, OnModuleDestroy {
     if (!claim.affected) throw new BadRequestException('This campaign was just changed. Refresh and try again.');
     const saved = (await this.campaigns.findOne({ where: { id } }))!;
     const shown = (await this.present([saved]))[0];
+    if (status === 'active' && campaign.status !== 'active') await this.tellFollowers(shown);
     await this.publish(
       saved,
       status === campaign.status

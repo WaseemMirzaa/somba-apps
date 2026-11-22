@@ -6,13 +6,14 @@ import 'more/account_more.dart';
 import 'more/aftersale_status.dart';
 import 'more/order_screens.dart';
 import 'more/returns_extra.dart';
+import 'more/shop_extra.dart' show StoreScreen;
 import 'more/support_extra.dart';
 import 'deals_screen.dart';
 import 'product_detail_screen.dart';
 import 'wallet_screen.dart';
 
 /// Where a notification takes the customer.
-enum NoticeDest { product, deals, order, tracking, wallet, returnStatus, replacementStatus, exchangeStatus, returns, ticket, support, notifications }
+enum NoticeDest { product, store, deals, order, tracking, wallet, returnStatus, replacementStatus, exchangeStatus, returns, ticket, support, notifications }
 
 class NoticeRoute {
   const NoticeRoute(this.dest, [this.id]);
@@ -55,6 +56,11 @@ NoticeRoute noticeRoute(String type, String? entityId, {required bool Function(S
       return id != null ? NoticeRoute(NoticeDest.product, id) : const NoticeRoute(NoticeDest.notifications);
     case 'flash':
       return const NoticeRoute(NoticeDest.deals);
+    case 'campaign':
+    case 'promo':
+      // A followed store's promotion (seller campaign or public coupon): the entityId is `<store id>:<campaign or coupon id>`.
+      final store = id == null || !id.contains(':') ? '' : id.split(':').first;
+      return store.isEmpty ? const NoticeRoute(NoticeDest.notifications) : NoticeRoute(NoticeDest.store, store);
     default:
       return const NoticeRoute(NoticeDest.notifications);
   }
@@ -81,6 +87,8 @@ Future<void> openNotice(
     case NoticeDest.product:
       final product = productByUuid(route.id!);
       screen = product != null ? ProductDetailScreen(product: product, locale: locale) : (fromInbox ? null : NotificationsScreen(locale: locale));
+    case NoticeDest.store:
+      screen = StoreScreen(locale: locale, sellerId: route.id);
     case NoticeDest.deals:
       screen = DealsScreen(locale: locale);
     case NoticeDest.order:

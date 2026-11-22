@@ -310,6 +310,15 @@ void main() {
       expect(noticeRoute('store', null, hasOrder: (_) => false), const NoticeRoute(NoticeDest.notifications));
     });
 
+    test('a followed store\'s deal opens the deals page and its promotion opens the store', () {
+      expect(noticeRoute('flash', 'f1', hasOrder: (_) => false), const NoticeRoute(NoticeDest.deals));
+      expect(noticeRoute('campaign', 'st1:c1', hasOrder: (_) => false), const NoticeRoute(NoticeDest.store, 'st1'));
+      expect(noticeRoute('promo', 'st1:pr1', hasOrder: (_) => false), const NoticeRoute(NoticeDest.store, 'st1'));
+      // no store in the id (an older or foreign notice): the list opens, never a dead end
+      expect(noticeRoute('promo', 'pr1', hasOrder: (_) => false), const NoticeRoute(NoticeDest.notifications));
+      expect(noticeRoute('campaign', null, hasOrder: (_) => false), const NoticeRoute(NoticeDest.notifications));
+    });
+
     test('its French text is the server\'s own wording', () {
       final n = NotificationDto.fromJson({
         'id': 'n1',
