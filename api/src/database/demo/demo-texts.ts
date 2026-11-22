@@ -11,6 +11,7 @@
  */
 
 import { AFTER_SALE_TEXTS } from './demo-aftersale-texts';
+import { CUSTOMER_TEXTS } from './demo-customers-texts';
 
 export type DemoLang = 'en' | 'fr';
 
@@ -154,6 +155,8 @@ export const DEMO_TEXTS: DemoText[] = [
   t('promo', 'en', 'Demo: a paused code (switch it on to test)', 'Démo : un code en pause (activez-le pour le tester)'),
   // ── The seller portal's after-sale demo: customer reasons and the private seller <-> support threads ──
   ...AFTER_SALE_TEXTS,
+  // ── The customer demo: reviews, after-sale reasons, cancellation notes and the new customers' tickets ──
+  ...CUSTOMER_TEXTS,
 ];
 
 const norm = (s: string) => s.trim();

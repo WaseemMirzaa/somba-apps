@@ -60,9 +60,9 @@ If you switch on the platform rule "staff two-factor required" while the demo ha
 
 ## What it creates
 
-- **35 accounts**: 10 customers, 6 admins (one per department plus the super admin), warehouse manager, supervisor and operator, a rider, a supervisor and a rider for a second demo warehouse, 8 store owners and 5 team members of store A.
-- **8 stores** and **45 listings** in every state, in 8 categories, with **96 pictures** (about 7 MB, Unsplash and drawn logos, credits in `deploy/demo/images/CREDITS.md`).
-- **38 orders** (42 with express too) in every state, with their legs, riders and warehouse scans, wallet payments, refunds, returns, an exchange, a replacement, a dispute, 16 reviews (8 with photos), questions, chats (with photos), support tickets, a payout, campaigns, a flash sale, promo codes, banners, fraud alerts, warehouse incidents and stock. Twelve of them are the "orders to process" of the next section: work waiting for each active store, a split delivery and a failed attempt.
+- **43 accounts**: 18 customers (ten from before, eight more that look like real people, see "Customer app: what each demo customer can show"), 6 admins (one per department plus the super admin), warehouse manager, supervisor and operator, a rider, a supervisor and a rider for a second demo warehouse, 8 store owners and 5 team members of store A.
+- **8 stores** and **45 listings** in every state, in 8 categories, with **114 pictures** (about 7.4 MB: Unsplash photos, drawn logos and drawn customer avatars, credits in `deploy/demo/images/CREDITS.md`).
+- **About 120 orders** (all of them with express delivery and a mobile-money sandbox on; fewer without, see "Customer app: what each demo customer can show") in every state, with their legs, riders and warehouse scans, wallet payments, refunds, returns, an exchange, a replacement, a dispute, 16 reviews (8 with photos), questions, chats (with photos), support tickets, a payout, campaigns, a flash sale, promo codes, banners, fraud alerts, warehouse incidents and stock. Twelve of them are the "orders to process" of the next section: work waiting for each active store, a split delivery and a failed attempt.
 - A second warehouse, **Entrepôt Maluku (démo)**, that serves only the commune of Maluku, so one order can travel between two warehouses. It is the only change near real routing: a real customer pinned in Maluku would be routed to it while the demo is installed.
 
 ## Both languages (English and French)
@@ -202,7 +202,74 @@ Demo listings carry a preparation time from 0 to 5 days (food and oils 0, clothe
 ### What is not seeded (and how to get it)
 
 - **Mobile-money and card orders** need pawaPay or Stripe keys (`MM_PROVIDER` is `none` in production): put the keys in with `set-secret.sh`, see `LIVE-RUNBOOK.md` sections 6 and 7. Then place an order in the customer app with that method, or ask for the sandbox provider (`https://api.sandbox.pawapay.io`).
-- **Awaiting-payment orders** only exist while a mobile-money or card payment is being confirmed, so they appear once those keys are in and a customer starts a payment. The demo cannot fake that state honestly.
+- **Awaiting-payment orders** need a mobile-money provider the demo may settle by hand (`sandbox` or `manual`): see "Customer app: what each demo customer can show". With no provider they are skipped; with a real aggregator they are never made.
+
+## Customer app: what each demo customer can show
+
+Eighteen customers (all `@demo.komoriko.test`, one shared password in `/etc/somba/demo-credentials.txt`, never in this file). Ten are the original ones; eight look like real people (Congolese and international names, Kinshasa addresses with commune, street, landmark and a map pin, a drawn avatar, French or English, phones in the unassigned `+243 900 000 xxx` range). Orders are spread over about 90 days; a delivered order has a timeline (placed, confirmed, packed, collected, at the warehouse, out for delivery, delivered, hours or days apart) and its notices are spread the same way.
+
+| Login (e-mail) | Language | What it shows |
+|---|---|---|
+| `customer.vip@` Marie-Claire Tshimanga | fr | The VIP: wallet over $1,000 (Orange, Airtel and M-Pesa top-ups, a welcome gift), three pinned addresses, 14 orders over 90 days: ten delivered (some rated with photos, some "rate me", one delivered 4 days ago and still returnable, coupons DEMO10 and MAISON5, a two-store basket, a basket of two boxes), one out for delivery, one on the way to the customer, one being prepared, one just placed; a cart with a saved item, a wishlist, followed stores, a closed support ticket |
+| `customer.regular.fr@` Joël Kabasele | fr | A regular, 11 orders: a **return refused** by support (with the reason), an **exchange delivered**, an **exchange refused**, a 3-star review, one out for delivery, one on the way, one just placed |
+| `customer.regular.en@` Priscilla Nsimba | en | A regular, 12 orders and a case at every after-sale stage: **return approved, waiting for the rider**, **return withdrawn**, **dispute settled with a partial refund**, **replacement delivered**, **replacement refused**, an order **delivered on the second try** (first attempt failed), an order with **one line cancelled by the store** (the rest goes on, that line refunded), a cart, a wishlist, an open ticket |
+| `customer.business@` Olivier Kasongo | fr | A business buyer (Kasongo & Fils): bulk lines (30 to 50 units), a two-store basket, a store coupon, a large wallet, a return waiting for support, a package **ready** for the rider, and an **express** order when express is on (`--with-express`) |
+| `customer.cancelled@` Fabrice Lumbu | en | Only cancelled and returned history, each refunded to the wallet: cancelled **by the customer**, **by the store** (out of stock), **by KOMORIKO support** (reason shown), **undeliverable after three attempts**, and a **returned** order |
+| `customer.expat@` Sarah Whitfield | en | Mobile-money states (see below): **awaiting payment**, **payment declined**, **payment expired**, paid with **Airtel Money** (delivered) and **Orange Money** (out for delivery); always: wallet orders and a **dispute refused** by support |
+| `customer.newfr@` Aimée Mavungu | fr | New, no order: one address, a small wallet, a wishlist, a ticket answered by support |
+| `customer.cart@` Amina Diallo | en | New, ready to buy: a cart worth more than $30, items saved for later, a wishlist, an address, a wallet; apply `DEMOWELCOME` or `MAISON5` at checkout |
+| `customer.full@`, `customer.fr@`, `customer.new@`, `customer.unverified@`, `customer.fraud@`, `reviewer.1@` to `reviewer.4@` | | The original customers (see "The scenarios"); they now have an avatar too |
+
+**Orders per status, per customer** (what the check prints; the seed was run with express and the sandbox mobile-money provider on):
+
+| Customer | pending | confirmed | processing | shipped | out for delivery | delivered | cancelled | returned | total |
+|---|---|---|---|---|---|---|---|---|---|
+| `customer.full` | 0 | 2 | 3 | 2 | 1 | 6 | 1 | 1 | 16 |
+| `customer.fr` | 0 | 1 | 0 | 0 | 1 | 8 | 0 | 0 | 10 |
+| `customer.new` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `customer.unverified` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `customer.fraud` | 0 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 2 |
+| `reviewer.1` | 0 | 4 | 0 | 0 | 1 | 7 | 0 | 0 | 12 |
+| `reviewer.2` | 0 | 2 | 0 | 0 | 0 | 6 | 0 | 0 | 8 |
+| `reviewer.3` | 0 | 2 | 0 | 0 | 0 | 5 | 0 | 0 | 7 |
+| `reviewer.4` | 0 | 3 | 0 | 0 | 0 | 5 | 0 | 0 | 8 |
+| `customer.vip` | 0 | 1 | 1 | 1 | 1 | 10 | 0 | 0 | 14 |
+| `customer.regular.fr` | 0 | 1 | 0 | 1 | 1 | 8 | 0 | 0 | 11 |
+| `customer.regular.en` | 0 | 2 | 1 | 1 | 0 | 8 | 0 | 0 | 12 |
+| `customer.business` | 0 | 2 | 0 | 0 | 1 | 5 | 0 | 0 | 8 |
+| `customer.cancelled` | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 1 | 5 |
+| `customer.expat` | 1 | 1 | 0 | 0 | 1 | 2 | 2 | 0 | 7 |
+| `customer.newfr` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| `customer.cart` | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **all** | **1** | **22** | **5** | **5** | **7** | **71** | **7** | **2** | **120** |
+
+**Where to find each status and screen**
+
+| Status or screen | Where |
+|---|---|
+| Awaiting payment (`pending`) | `customer.expat` (M-Pesa), needs the mobile-money sandbox or manual provider |
+| Payment declined / expired (cancelled) | `customer.expat`, same condition |
+| Confirmed (paid, waiting for the seller) | `customer.vip`, `.regular.fr`, `.regular.en`, `.business` and the store orders |
+| Package ready, waiting for the rider | `customer.business`, `reviewer.3` |
+| Processing (rider assigned) | `customer.vip`, `.regular.en` |
+| Shipped (at the warehouse / on the way to it) | `customer.vip`, `.regular.fr`, `.regular.en` |
+| Out for delivery (4-digit code) | `customer.vip`, `.regular.fr`, `.expat`, `.business` (express) |
+| Delivered (rated, "rate me", returnable) | `customer.vip` (ten) |
+| Delivered after a failed attempt / split in two legs | `customer.regular.en` / `customer.fr` |
+| Cancelled by customer / store / support / undeliverable | `customer.cancelled` |
+| Returned (refunded) | `customer.cancelled`, `customer.full` |
+| Part-cancelled line | `customer.regular.en` |
+| Express | `customer.business` and `reviewer.1` (express on) |
+| Coupon / platform fee line | `customer.vip` (DEMO10, MAISON5); every order with a delivery fee |
+| After-sale: return waiting / approved / on the road / refunded / refused / withdrawn | `customer.business` / `.regular.en` / `reviewer.2` / `customer.cancelled` / `.regular.fr` / `.regular.en` |
+| Exchange pending / approved / delivered / refused | `reviewer.4` / `customer.fr` / `.regular.fr` / `.regular.fr` |
+| Replacement pending / approved / delivered / refused | `reviewer.1` / `customer.full` / `.regular.en` / `.regular.en` |
+| Dispute open / settled / refused | `customer.full` / `.regular.en` / `.expat` |
+| Wallet: top-up, order payment, cancellation refund, return refund, dispute refund | `customer.vip`, `.cancelled`, `.regular.en` |
+| Cart, saved for later, wishlist, coupon to apply | `customer.cart`, `customer.vip` |
+| Notices unread and read, French for French customers | every new customer; French ones: `.vip`, `.regular.fr`, `.business`, `.newfr` |
+
+**Mobile-money orders.** They are made only when the server's mobile-money provider is `sandbox` or `manual` (read from the payment service itself); with no provider (`MM_PROVIDER=none`, the production default) or a real aggregator the seed skips them, says so, and never sends a charge. To get them on a server, set `MM_PROVIDER=manual` (see `LIVE-RUNBOOK.md`) and run the seed again: finance then confirms or declines payments by hand. The awaiting-payment order is closed by the platform's own timeout (24 hours in manual mode, 15 minutes with the sandbox), after which it reads as an expired payment.
 
 ## The scenarios
 
@@ -289,6 +356,9 @@ The demo is dated relative to the day you add it. Two things age:
 
 - The order "delivered 2 days ago" can be returned for 7 days after delivery. After about 5 days the Return button closes.
 - The return waiting for the seller has a 48-hour answer time that started 20 hours before you added the demo. After about 28 hours it times out and the customer can escalate (a valid scenario too).
+
+- The new customers' newest delivered order (`customer.vip`, delivered 4 days ago) can be returned for 7 days after delivery; the oldest orders are about 90 days old, so after a few weeks the history is older than a "recent" list expects.
+- The awaiting-payment order of `customer.expat` closes by the platform's timeout (24 hours in manual mode, 15 minutes with the sandbox, `MM_PENDING_TTL_MIN`) and then reads as an expired payment.
 
 To start the clock again, remove the demo and add it again (a minute).
 

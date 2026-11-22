@@ -1,4 +1,4 @@
-import { AuditLog, CaseSellerMessage, Dispute, DisputeMessage, Conversation, ConversationMessage, Parcel, ParcelScan, Translation, WarehouseBatch } from '../entities';
+import { ParcelGroup, ParcelGroupOrder, AuditLog, CaseSellerMessage, Dispute, DisputeMessage, Conversation, ConversationMessage, Parcel, ParcelScan, Translation, WarehouseBatch } from '../entities';
 import { mkdtempSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -22,6 +22,8 @@ import {
 } from '../entities';
 import { removeDemo, planRemoval } from './demo-remove-core';
 import { DEMO_HUB_NAME } from './demo-common';
+import { DEMO_ACCOUNTS } from './demo-accounts';
+import { loadManifest } from './demo-images';
 
 /** The removal finds the demo through the demo e-mail domain and deletes only what belongs to those users. */
 describe('demo removal', () => {
@@ -242,6 +244,46 @@ describe('demo removal', () => {
       .findOneOrFail({ where: { id: w.realProduct.id } });
     expect([p.rating, p.reviewsCount]).toEqual([0, 0]);
     expect(existsSync(join(dirs.up, 'keep.jpg'))).toBe(true); // not a demo file
+  });
+
+  it('gives every demo customer a drawn avatar of the manifest, and removes those pictures with the account (a real customer\'s own picture stays)', async () => {
+    const manifest = loadManifest();
+    for (const a of DEMO_ACCOUNTS.filter((x) => x.role === 'customer')) {
+      expect(a.avatar).toBeDefined();
+      expect(manifest.some((m) => m.file === a.avatar && m.kind === 'avatar')).toBe(true);
+    }
+    const vip = manifest.find((m) => m.file === 'avatar-customer.vip.jpg')!;
+    const own = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jpg';
+    writeFileSync(join(dirs.up, `${vip.uuid}.jpg`), 'x');
+    writeFileSync(join(dirs.up, own), 'x');
+    const demo = await user('customer.vip@demo.komoriko.test', 'customer', 'Marie-Claire Tshimanga');
+    const real = await user('someone@gmail.com', 'customer', 'Someone');
+    await ds.getRepository(User).update({ id: demo.id }, { avatar: `http://localhost:3041/uploads/${vip.uuid}.jpg` });
+    await ds.getRepository(User).update({ id: real.id }, { avatar: `http://localhost:3041/uploads/${own}` });
+    const res = await removeDemo(ds, { yes: true, uploadDir: dirs.up, privateDir: dirs.priv, manifestNames: manifest.map((m) => `${m.uuid}.jpg`) });
+    expect(res.blockers).toEqual([]);
+    expect(existsSync(join(dirs.up, `${vip.uuid}.jpg`))).toBe(false);
+    expect(existsSync(join(dirs.up, own))).toBe(true);
+    expect(await ds.getRepository(User).count()).toBe(1);
+  });
+
+  it('removes the label sets (parcel groups) of the demo customers and their order memberships, and keeps a real customer\'s', async () => {
+    const w = await world();
+    const groups = ds.getRepository(ParcelGroup);
+    const links = ds.getRepository(ParcelGroupOrder);
+    const make = async (customerId: string, orderId: string, key: string) => {
+      const g = await groups.save(groups.create({ sellerKey: null, customerId, dayKey: '2026-11-01', daySeq: 1, addressKey: key, groupKey: key }));
+      await links.save(links.create({ groupId: g.id, orderId }));
+    };
+    const demoOrder = await ds.getRepository(Order).findOneOrFail({ where: { customerId: w.dCust.id } });
+    const realOrder = await ds.getRepository(Order).findOneOrFail({ where: { customerId: w.realCustomer.id } });
+    await make(w.dCust.id, demoOrder.id, 'demo-key');
+    await make(w.realCustomer.id, realOrder.id, 'real-key');
+    const res = await removeDemo(ds, { yes: true, uploadDir: dirs.up, privateDir: dirs.priv });
+    expect(res.blockers).toEqual([]);
+    expect(await groups.count()).toBe(1);
+    expect(await links.count()).toBe(1);
+    expect((await groups.findOneOrFail({ where: {} })).customerId).toBe(w.realCustomer.id);
   });
 
   it('removes the other-language rows of demo chat messages and reviews (keyed by message and review id), and keeps a real chat\'s', async () => {

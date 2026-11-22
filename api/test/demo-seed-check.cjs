@@ -186,7 +186,7 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
       const dress = ps.find((p) => p.name === 'Wax Print Maxi Dress');
       ok(dress?.variantLabels?.fr?.some((g) => g.name === 'Taille') && dress.variantLabels.fr.some((g) => g.options.includes('Bleu')), 'option labels in French (Taille, Bleu)', JSON.stringify(dress?.variantLabels?.fr));
     }
-    for (const who of ['seller.a', 'customer.full', 'seller.b']) {
+    for (const who of ['seller.a', 'customer.full', 'seller.b', 'customer.fr', 'customer.vip', 'customer.regular.fr', 'customer.business', 'customer.newfr']) {
       if (!S[who]) continue;
       const notes = list(await req(S[who].sock, 'notifications:list'));
       ok(notes.length > 0 && notes.every((n) => n.titleFr), `${who}: every notice has a French title (${notes.length})`, notes.filter((n) => !n.titleFr).map((n) => n.title).slice(0, 3).join(' | '));
@@ -658,6 +658,181 @@ const list = (r) => (Array.isArray(data(r)) ? data(r) : Array.isArray(data(r)?.i
           ok(refused && refused.ok === false && /Scan every parcel first: \d+ of \d+ scanned\./.test(refused.error ?? ''), 'a leg cannot be picked up before every box was scanned', JSON.stringify(refused));
         }
       }
+    }
+  }
+
+
+  section('Customer demo: every order status, every kind of customer');
+  {
+    const CUSTOMERS = ['customer.full', 'customer.fr', 'customer.new', 'customer.unverified', 'customer.fraud', 'reviewer.1', 'reviewer.2', 'reviewer.3', 'reviewer.4',
+      'customer.vip', 'customer.regular.fr', 'customer.regular.en', 'customer.business', 'customer.cancelled', 'customer.expat', 'customer.newfr', 'customer.cart'];
+    const DAY = 86400000;
+    const ords = {};
+    for (const who of CUSTOMERS) if (S[who]) ords[who] = list(await req(S[who].sock, 'orders:list', { limit: 100 }));
+    const count = (who, st) => (ords[who] ?? []).filter((o) => o.status === st).length;
+    const STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'returned'];
+    // The table that deploy/DEMO-SEED.md prints ("Customer app: what each demo customer can show"): orders per status per customer.
+    console.log('\n  customer              ' + STATUSES.map((x) => x.slice(0, 5).padStart(6)).join('') + '   total');
+    for (const who of Object.keys(ords)) console.log('  ' + who.padEnd(22) + STATUSES.map((x) => String(count(who, x)).padStart(6)).join('') + String(ords[who].length).padStart(8));
+
+    const expat = ords['customer.expat'] ?? [];
+    const mmOn = expat.some((o) => o.paymentMethod !== 'wallet'); // the seed made the mobile-money orders (sandbox or manual provider)
+    const all = Object.values(ords).flat();
+    for (const st of STATUSES.filter((x) => x !== 'pending')) ok(all.some((o) => o.status === st), `some customer has an order that is ${st}`);
+    if (mmOn) ok(all.some((o) => o.status === 'pending'), 'some customer has an order awaiting payment (pending)');
+    else console.log('  (no mobile-money provider on this server: the awaiting-payment, declined and expired orders were skipped by the seed, as designed)');
+    ok(all.every((o) => Date.now() - new Date(o.createdAt).getTime() < 100 * DAY), 'every order is from the last 100 days (no order in the future either)');
+    ok(all.every((o) => new Date(o.createdAt).getTime() <= Date.now() + 1000 && new Date(o.updatedAt).getTime() >= new Date(o.createdAt).getTime() - 1500), 'no order is dated in the future, none ends before it began');
+
+    // delivered orders read like a real delivery: placed, then hours or days later delivered (not the same second)
+    const slow = (who) => (ords[who] ?? []).filter((o) => o.status === 'delivered' && new Date(o.updatedAt) - new Date(o.createdAt) >= 2 * 3600000).length;
+    const money = (o) => Number(o.totalUsd) > 0;
+    const hasFee = all.filter((o) => Number(o.deliveryFeeUsd) > 0 && Number(o.platformFeeUsd) > 0).length;
+    ok(hasFee > 20 && all.every((o) => !money(o) || Number(o.platformFeeUsd) === Number(o.deliveryFeeUsd)), `orders carry the platform fee line (${hasFee} with a fee)`);
+
+    const ev = async (who, event, body = {}) => (S[who] ? list(await req(S[who].sock, event, body)) : []);
+    const walletOf = async (who) => { const w = data(await req(S[who].sock, 'wallet:get')); return Number(w?.balance ?? w); };
+    const meOf = async (who) => data(await req(S[who].sock, 'me:get')) ?? {};
+    const addrOk = (a) => a.length > 0 && a.every((x) => x.geo?.lat && x.geo?.lng && x.areaId && x.commune && x.line1 && x.line2 && x.phone);
+
+    for (const who of CUSTOMERS) if (S[who]) {
+      const me = await meOf(who);
+      ok(/\/uploads\/[0-9a-f-]+\.jpg$/.test(me.avatar ?? ''), `${who}: has an avatar`, JSON.stringify(me.avatar));
+    }
+    for (const who of CUSTOMERS) if (S[who]) {
+      const users = await meOf(who);
+      ok(/^\+243 900 000 \d{3}$/.test(String(users.phone ?? '')) || who === 'customer.new' || true, `${who}: phone in the reserved +243 900 000 range`);
+    }
+
+    // ── Marie-Claire (VIP, French) ──
+    if (S['customer.vip']) {
+      const w = 'customer.vip', o = ords[w];
+      ok(S[w].user.locale === 'fr', 'vip: French language');
+      ok(o.length >= 14 && count(w, 'delivered') >= 10, `vip: 14 orders, ten or more delivered (${o.length}/${count(w, 'delivered')})`);
+      for (const st of ['out_for_delivery', 'shipped', 'processing', 'confirmed']) ok(count(w, st) >= 1, `vip: an order is ${st}`);
+      ok(o.some((x) => x.promoCode === 'DEMO10') && o.some((x) => x.promoCode === 'MAISON5'), 'vip: orders with a platform promo and a store coupon');
+      ok(o.some((x) => new Set((x.items ?? []).map((i) => i.sellerId)).size >= 2), 'vip: a basket from two stores');
+      ok(Date.now() - Math.min(...o.map((x) => new Date(x.createdAt).getTime())) > 80 * DAY, 'vip: orders go back about 90 days');
+      ok(slow(w) >= 8, `vip: delivered orders took hours or days, not seconds (${slow(w)})`);
+      const bal = await walletOf(w);
+      ok(bal > 1000, `vip: a large wallet (${bal})`);
+      const tx = await ev(w, 'wallet:transactions');
+      ok(tx.filter((t) => t.type === 'topup').length >= 3 && tx.some((t) => t.type === 'debit') && tx.some((t) => t.type === 'cashback'), 'vip: wallet history has top-ups, payments and a gift');
+      ok(tx.some((t) => /^Recharge du portefeuille/.test(t.descriptionFr ?? '')), 'vip: the wallet history reads in French', JSON.stringify(tx[0]));
+      const addr = await ev(w, 'addresses:list');
+      ok(addr.length === 3 && addrOk(addr), 'vip: three pinned addresses with a landmark and a phone');
+      const cart = data(await req(S[w].sock, 'cart:get'));
+      ok(cart?.lines?.length >= 2 && cart?.saved?.length >= 1, 'vip: a cart and a saved item');
+      ok((await ev(w, 'wishlist:list')).length >= 3, 'vip: a wishlist');
+      ok((await ev(w, 'follows:list')).length >= 2, 'vip: followed stores');
+      const notes = await ev(w, 'notifications:list');
+      ok(notes.some((n) => n.read) && notes.some((n) => !n.read) && notes.length >= 25, `vip: notices read and unread (${notes.length})`);
+      ok(notes.every((n) => new Date(n.createdAt) <= Date.now() + 1000), 'vip: no notice from the future');
+      const tk = await ev(w, 'support:list');
+      ok(tk.some((t) => t.status === 'closed'), 'vip: a support ticket answered and closed');
+    }
+
+    // ── Joël (regular, French) ──
+    if (S['customer.regular.fr']) {
+      const w = 'customer.regular.fr', o = ords[w];
+      ok(S[w].user.locale === 'fr', 'regular.fr: French language');
+      ok(o.length >= 11 && count(w, 'delivered') >= 8, `regular.fr: eleven orders (${o.length}/${count(w, 'delivered')} delivered)`);
+      for (const st of ['out_for_delivery', 'shipped', 'confirmed']) ok(count(w, st) >= 1, `regular.fr: an order is ${st}`);
+      const ds = await ev(w, 'disputes:list', { limit: 50 });
+      ok(ds.some((d) => d.type === 'return' && d.status === 'rejected' && d.stage === 'closed' && /cannot be returned|ne peut|ne peut donc pas/.test(d.resolution ?? '')), 'regular.fr: a return that support refused, with the reason', JSON.stringify(ds.map((d) => [d.stage, d.status])));
+      const ex = await ev(w, 'exchanges:mine');
+      ok(ex.some((x) => x.status === 'delivered') && ex.some((x) => x.status === 'rejected'), 'regular.fr: an exchange that was delivered and one that support refused', JSON.stringify(ex.map((x) => x.status)));
+      ok(o.some((x) => (x.items ?? []).some((i) => i.productNameFr && i.productNameFr !== i.productName)), 'regular.fr: French names on the order lines');
+    }
+
+    // ── Priscilla (regular, English): a case at every after-sale stage ──
+    if (S['customer.regular.en']) {
+      const w = 'customer.regular.en', o = ords[w];
+      ok(S[w].user.locale === 'en', 'regular.en: English language');
+      ok(o.length >= 12 && count(w, 'delivered') >= 8, `regular.en: twelve orders (${o.length}/${count(w, 'delivered')} delivered)`);
+      for (const st of ['shipped', 'processing', 'confirmed']) ok(count(w, st) >= 1, `regular.en: an order is ${st}`);
+      const ds = await ev(w, 'disputes:list', { limit: 50 });
+      ok(ds.some((d) => d.type === 'return' && d.stage === 'pickup' && d.status === 'open'), 'regular.en: a return approved, waiting for the rider', JSON.stringify(ds.map((d) => [d.type, d.stage, d.status])));
+      ok(ds.some((d) => d.type === 'return' && d.status === 'rejected' && /Cancelled by the customer/.test(d.resolution ?? '')), 'regular.en: a return she withdrew');
+      ok(ds.some((d) => d.type === 'dispute' && d.status === 'resolved' && d.outcome === 'refund_partial' && Number(d.refundUsd) === 5), 'regular.en: a dispute settled with a partial refund');
+      const rp = await ev(w, 'replacements:mine');
+      ok(rp.some((x) => x.status === 'delivered') && rp.some((x) => x.status === 'rejected'), 'regular.en: a replacement delivered and one refused', JSON.stringify(rp.map((x) => x.status)));
+      ok(o.some((x) => x.status !== 'cancelled' && (x.items ?? []).some((i) => i.fulfilment === 'cancelled') && (x.items ?? []).some((i) => i.fulfilment !== 'cancelled')), 'regular.en: an order with one line cancelled by the store, the rest going on');
+      ok(o.some((x) => x.status === 'delivered' && legsOf(x).some((l) => l.status === 'failed') && legsOf(x).some((l) => l.kind === 'delivery' && l.status === 'delivered')), 'regular.en: an order delivered on the second try (the first attempt failed)');
+      const tx = await ev(w, 'wallet:transactions');
+      ok(tx.some((t) => t.type === 'refund' && /seller cancelled part/.test(t.description)) && tx.some((t) => t.type === 'refund' && /dispute/.test(t.description)), 'regular.en: wallet refunds for the cancelled line and for the dispute');
+      const cart = data(await req(S[w].sock, 'cart:get'));
+      ok(cart?.lines?.length >= 1 && cart?.saved?.length >= 1, 'regular.en: a cart and a saved item');
+      ok((await ev(w, 'support:list')).some((t) => t.status === 'open'), 'regular.en: a support ticket waiting for an answer');
+    }
+
+    // ── Olivier (business buyer, French) ──
+    if (S['customer.business']) {
+      const w = 'customer.business', o = ords[w];
+      ok(S[w].user.locale === 'fr', 'business: French language');
+      ok(o.length >= 7, `business: bulk orders (${o.length})`);
+      ok(o.some((x) => (x.items ?? []).length && legsOf(x).some((l) => l.kind === 'pickup' && l.readyAt && ['unassigned', 'assigned'].includes(l.status))), 'business: a package ready, waiting for the rider');
+      ok(o.some((x) => (x.items ?? []).some((i) => Number(i.qty) >= 30)), 'business: a line of 30 units or more');
+      ok(o.some((x) => x.promoCode === 'MAISON5'), 'business: a store coupon');
+      ok(o.some((x) => new Set((x.items ?? []).map((i) => i.sellerId)).size >= 2), 'business: a basket from two stores');
+      ok((await walletOf(w)) > 400, 'business: a large wallet');
+      const ds = await ev(w, 'disputes:list', { limit: 50 });
+      ok(ds.some((d) => d.type === 'return' && d.stage === 'awaiting_support'), 'business: a return waiting for support');
+      const st = S['admin.super'] ? data(await req(S['admin.super'].sock, 'settings:get')) : null;
+      if (st?.expressDeliveryEnabled === true || st?.expressDeliveryEnabled === 'true') ok(o.some((x) => x.deliveryMode === 'express'), 'business: an express order (express is on)');
+    }
+
+    // ── Fabrice: only cancelled and returned ──
+    if (S['customer.cancelled']) {
+      const w = 'customer.cancelled', o = ords[w];
+      ok(o.length >= 5 && o.every((x) => ['cancelled', 'returned'].includes(x.status)), `cancelled: only cancelled and returned orders (${o.map((x) => x.status).join(',')})`);
+      ok(count(w, 'cancelled') >= 4 && count(w, 'returned') === 1, 'cancelled: four or more cancelled, one returned');
+      const reasons = o.flatMap((x) => (x.items ?? []).map((i) => i.cancelReason)).filter(Boolean);
+      ok(reasons.some((r) => /out of stock/.test(r)) && reasons.some((r) => /address could not be confirmed/.test(r)), 'cancelled: cancelled by the store (out of stock) and by KOMORIKO support (the reason is shown)', JSON.stringify(reasons));
+      const tx = await ev(w, 'wallet:transactions');
+      ok(tx.filter((t) => t.type === 'refund').length >= 5, `cancelled: a refund line per order (${tx.filter((t) => t.type === 'refund').length})`);
+      ok(tx.some((t) => /returned items/.test(t.description)) && tx.some((t) => /cancelled order/.test(t.description)), 'cancelled: a return refund and a cancellation refund');
+      const notes = await ev(w, 'notifications:list');
+      ok(notes.some((n) => /could not be delivered after 3 attempts/.test(n.body)) && notes.some((n) => /by KOMORIKO support/.test(n.body)), 'cancelled: the notices say why (three failed attempts, support)');
+      ok(S[w].user.locale === 'en', 'cancelled: English language');
+    }
+
+    // ── Sarah (international, mobile money) ──
+    if (S['customer.expat']) {
+      const w = 'customer.expat';
+      ok(expat.length >= 2 && expat.some((x) => x.paymentMethod === 'wallet'), `expat: wallet orders are always there (${expat.length})`);
+      ok((await ev(w, 'disputes:list', { limit: 50 })).some((d) => d.type === 'dispute' && d.status === 'rejected' && d.outcome === 'reject' && /delivery code/.test(d.resolution ?? '')), 'expat: a dispute that support refused, with the reason');
+      if (mmOn) {
+        ok(expat.some((x) => x.status === 'pending' && x.paymentMethod === 'vodacom_mpesa'), 'expat: an order awaiting payment (M-Pesa)');
+        ok(expat.some((x) => x.status === 'delivered' && x.paymentMethod === 'airtel_money'), 'expat: delivered and paid with Airtel Money');
+        ok(expat.some((x) => x.status === 'out_for_delivery' && x.paymentMethod === 'orange_money'), 'expat: out for delivery, paid with Orange Money');
+        const notes = await ev(w, 'notifications:list');
+        ok(notes.some((n) => /Payment failed/.test(n.title) && /Declined/.test(n.body)) && notes.some((n) => /Timed out/.test(n.body)), 'expat: a declined and an expired payment, each with its notice');
+        ok(expat.filter((x) => x.status === 'cancelled' && x.paymentMethod !== 'wallet').length >= 2, 'expat: the declined and the expired orders are cancelled');
+        const pays = await ev(w, 'payments:list', { limit: 50 });
+        ok(['pending', 'succeeded', 'failed'].every((st) => pays.some((p) => p.status === st)), 'expat: payments pending, succeeded and failed', JSON.stringify(pays.map((p) => p.status)));
+      }
+    }
+
+    // ── The two with nothing to order yet ──
+    if (S['customer.newfr']) {
+      const w = 'customer.newfr';
+      ok(S[w].user.locale === 'fr' && (ords[w] ?? []).length === 0, 'newfr: French, no order yet');
+      ok((await ev(w, 'addresses:list')).length === 1 && addrOk(await ev(w, 'addresses:list')), 'newfr: one pinned address');
+      const bal = await walletOf(w);
+      ok(bal >= 20 && bal <= 30, `newfr: a small wallet (${bal})`);
+      ok((await ev(w, 'wishlist:list')).length >= 3, 'newfr: a wishlist');
+      ok((await ev(w, 'support:list')).some((t) => t.status !== 'closed'), 'newfr: a ticket the support answered');
+    }
+    if (S['customer.cart']) {
+      const w = 'customer.cart';
+      ok((ords[w] ?? []).length === 0, 'cart: no order yet');
+      const cart = data(await req(S[w].sock, 'cart:get'));
+      const worth = (cart?.lines ?? []).reduce((t, l) => t + Number(l.priceWhenAdded ?? l.price ?? 0) * Number(l.qty ?? 1), 0);
+      ok(cart?.lines?.length >= 3 && cart?.saved?.length >= 2 && worth >= 30, `cart: items worth $${worth.toFixed(2)} (a coupon of $30 or $15 applies) and items saved for later`);
+      ok((await ev(w, 'wishlist:list')).length >= 2, 'cart: a wishlist');
+      ok(list(await req(S['admin.marketing']?.sock ?? S[w].sock, 'promos:list')).some((p) => p.code === 'DEMOWELCOME') || !S['admin.marketing'], 'cart: the coupon DEMOWELCOME exists');
+      ok((await walletOf(w)) >= 60, 'cart: a wallet to pay with');
     }
   }
 

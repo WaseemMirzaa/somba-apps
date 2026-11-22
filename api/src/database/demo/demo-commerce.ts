@@ -34,13 +34,16 @@ import {
 } from './demo-flow';
 import { orderTypeSpecs } from './demo-orders';
 import { afterSaleSpecs, seedStoreSwitches, topUpForAfterSale } from './demo-aftersale';
+import { EXTRA_ADDRESSES, EXTRA_BOOK } from './demo-customers-data';
+import type { DemoAddress } from './demo-customers-data';
+import { customerSpecs, mobileMoneyUsable, seedCustomerExtras } from './demo-customers';
 import type { Stage } from './demo-flow';
 
 const H = 3_600_000;
 const D = 86_400_000;
 
 /** Delivery addresses of the demo customers: real communes and pins, made-up streets. */
-export const ADDRESSES = {
+const BASE_ADDRESSES = {
   gombe: {
     label: 'Home',
     line1: '12 Avenue du Commerce',
@@ -117,8 +120,13 @@ export const ADDRESSES = {
     lat: -4.3419,
     lng: 15.2701,
   },
-} as const;
-type AddrKey = keyof typeof ADDRESSES;
+} as const satisfies Record<string, DemoAddress>;
+/** Every demo address; the new customers' ones (with their landmark) are in `demo-customers-data.ts`. */
+export const ADDRESSES: Record<keyof typeof BASE_ADDRESSES | keyof typeof EXTRA_ADDRESSES, DemoAddress> = {
+  ...BASE_ADDRESSES,
+  ...EXTRA_ADDRESSES,
+};
+export type AddrKey = keyof typeof ADDRESSES;
 
 /** Which addresses each customer has in their address book (the first one is the default). */
 const BOOK: Record<string, AddrKey[]> = {
@@ -129,6 +137,7 @@ const BOOK: Record<string, AddrKey[]> = {
   'reviewer.2': ['kalamu'],
   'reviewer.3': ['bandalungwa'],
   'reviewer.4': ['kintambo'],
+  ...EXTRA_BOOK,
 };
 
 /** Wallet money each customer starts with (two top-ups, dated well before the first order). */
@@ -165,6 +174,16 @@ export interface OrderSpec {
   afterBackdate?: (c: Scenario) => Promise<void>;
   /** Same-commune express delivery: made only while `expressDeliveryEnabled` is on. */
   express?: boolean;
+  /**
+   * Paid with mobile money instead of the wallet, and how the payment ends: `pending` (awaiting payment), `paid`, `failed`
+   * (declined) or `expired` (nobody approved in time). Made only when the server's mobile-money provider is the sandbox or the
+   * manual one (never a real aggregator): the payment is settled by the same `decideManually` finance uses.
+   */
+  pay?: { method: 'airtel_money' | 'orange_money' | 'vodacom_mpesa'; phone: string; outcome: 'pending' | 'paid' | 'failed' | 'expired' };
+  /** Runs before a NEW order is placed (a dated top-up of the customer's wallet, for instance). */
+  before?: (c: { ctx: DemoCtx; user: User; spec: OrderSpec }) => Promise<void>;
+  /** Runs right after a NEW order is placed, before the journey (the payment's end for a mobile-money order). */
+  afterCreate?: (c: Scenario) => Promise<void>;
 }
 
 /** What a scenario step gets to work with. */
@@ -178,10 +197,11 @@ export interface Scenario {
 }
 
 const shipping = (key: AddrKey, areaId: string) => {
-  const a = ADDRESSES[key];
+  const a: DemoAddress = ADDRESSES[key];
   return JSON.stringify({
     label: a.label,
     line1: a.line1,
+    ...(a.line2 ? { line2: a.line2 } : {}),
     city: 'Kinshasa',
     commune: a.commune,
     region: 'Kinshasa',
@@ -223,6 +243,7 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
           userId: user.id,
           label: a.label,
           line1: a.line1,
+          line2: a.line2 ?? null,
           city: 'Kinshasa',
           commune: a.commune,
           region: 'Kinshasa',
@@ -275,10 +296,15 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
   // ── orders, oldest first so the wallet history reads in order ──────────────────
   const driver = new Driver(ctx);
   await topUpForAfterSale(ctx);
-  const all = [...orderSpecs(), ...orderTypeSpecs(), ...afterSaleSpecs()];
+  const all = [...orderSpecs(), ...orderTypeSpecs(), ...afterSaleSpecs(), ...customerSpecs()];
   const skippedExpress = all.filter((s) => s.express && !ctx.expressOn);
+  const mm = mobileMoneyUsable(ctx);
+  // The sandbox provider confirms a charge by itself after a moment; the demo settles its mobile-money orders by hand (an awaiting-payment
+  // order must stay awaiting, a declined one must not be "approved" a second later), so that timer is off for this run (this process only).
+  if (mm) process.env.MM_SANDBOX_AUTOCONFIRM_MS = '0';
+  const skippedPay = all.filter((s) => s.pay && !mm);
   const specs = all
-    .filter((s) => !s.express || ctx.expressOn)
+    .filter((s) => (!s.express || ctx.expressOn) && (!s.pay || mm))
     .sort((a, b) => b.placedAgoH - a.placedAgoH);
   let made = 0;
   for (const spec of specs) {
@@ -302,19 +328,36 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
     let order = mine.find((o) => signature(o.items ?? []) === sig) ?? null;
     const isNew = !order;
     if (!order) {
+      if (spec.before) await spec.before({ ctx, user, spec });
       order = await orders.create({ id: user.id, name: user.name }, {
         items: lines.map((l) => ({
           productId: l.productId,
           qty: l.qty,
           ...(l.variant !== 'Default' ? { variant: l.variant } : {}),
         })),
-        paymentMethod: 'wallet',
+        paymentMethod: spec.pay?.method ?? 'wallet',
+        ...(spec.pay ? { paymentPhone: spec.pay.phone } : {}),
         shippingAddress: shipping(spec.address, areaIds.get(spec.address)!),
         ...(spec.promo ? { promoCode: spec.promo } : {}),
       } as never);
       made++;
     }
+    const scenarioOf = (o: Order): Scenario => ({
+      ctx,
+      order: o,
+      spec,
+      driver,
+      user,
+      line: (sku: string) => {
+        const pid = ctx.products.get(sku)!.id;
+        return o.items.find((i) => i.productId === pid)!;
+      },
+    });
     if (isNew) {
+      if (spec.afterCreate) {
+        await spec.afterCreate(scenarioOf(order));
+        order = (await ds.getRepository(Order).findOne({ where: { id: order.id } }))!;
+      }
       if (spec.stage === 'cancelled')
         await orders.cancel({ id: user.id, role: 'customer' }, order.id);
       else await driver.drive(order.id, spec.stage);
@@ -323,17 +366,7 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
         .findOne({ where: { id: order.id } }))!;
     }
     const current = order;
-    const scenario: Scenario = {
-      ctx,
-      order: current,
-      spec,
-      driver,
-      user,
-      line: (sku: string) => {
-        const pid = ctx.products.get(sku)!.id;
-        return current.items.find((i) => i.productId === pid)!;
-      },
-    };
+    const scenario = scenarioOf(current);
     if (spec.after) await spec.after(scenario);
     if (isNew) {
       // Dated at the end: the after-sale steps above happen "a bit later", so they are shifted with the order.
@@ -361,6 +394,12 @@ export async function seedCommerce(ctx: DemoCtx): Promise<void> {
     log(
       `! ${skippedExpress.length} express-delivery order(s) NOT made: express delivery is off on this server. To get them, run the seed with --with-express (seed-demo.sh --with-express, or DEMO_WITH_EXPRESS=1); that switches expressDeliveryEnabled on. Switch it on only once the rider app that knows express is installed.`,
     );
+  if (skippedPay.length)
+    log(
+      `! ${skippedPay.length} mobile-money order(s) NOT made (awaiting payment, declined, expired, paid with Airtel or Orange): this server's mobile-money provider is neither the sandbox nor the manual one, and the demo never sends a charge to a real aggregator. They need MM_PROVIDER=manual (see deploy/DEMO-SEED.md).`,
+    );
+  // Wallets, carts, wishlists, follows, tickets and read notices of the new customers (the ones that have no order to carry them).
+  await seedCustomerExtras(ctx);
   await payoutsAndFinance(ctx);
   // The seller portal's after-sale sections: the stores' own switches (the platform defaults are not touched).
   await seedStoreSwitches(ctx);
@@ -447,7 +486,7 @@ async function seedMarketing(ctx: DemoCtx): Promise<void> {
 // The order scenarios
 // ─────────────────────────────────────────────────────────────────────────────────
 
-async function review(
+export async function review(
   c: Scenario,
   sku: string,
   rating: number,
@@ -476,7 +515,7 @@ async function review(
   return r;
 }
 
-async function openReturn(
+export async function openReturn(
   c: Scenario,
   sku: string,
   reason: string,
@@ -504,7 +543,7 @@ async function openReturn(
   return (await repo.findOne({ where: { id: view.id } }))!;
 }
 
-const viewerOf = (c: Scenario, key: string) => {
+export const viewerOf = (c: Scenario, key: string) => {
   const u = c.ctx.users.get(key)!;
   return {
     id: u.id,
@@ -696,8 +735,9 @@ export function orderSpecs(): OrderSpec[] {
           );
           d = (await repo.findOne({ where: { id: view.id } }))!;
         }
-        // Support answers first: sellers take no part in disputes.
-        if (d.stage === 'awaiting_support')
+        // Support answers first: sellers take no part in disputes. (Once: a second run finds the answer there.)
+        const answered: { n: number }[] = await c.ctx.ds.query('SELECT COUNT(*) AS n FROM dispute_messages WHERE disputeId = ?', [d.id]);
+        if (d.stage === 'awaiting_support' && Number(answered[0].n) === 0)
           await disputes.reply(
             viewerOf(c, 'admin.support'),
             d.id,
@@ -863,7 +903,8 @@ export function orderSpecs(): OrderSpec[] {
         );
         const disputes = c.ctx.app.get(DisputesService);
         // Support reviews the photo and answers; the customer replies in French. The return stays with support.
-        if (d.stage === 'awaiting_support') {
+        const talked: { n: number }[] = await c.ctx.ds.query('SELECT COUNT(*) AS n FROM dispute_messages WHERE disputeId = ?', [d.id]);
+        if (d.stage === 'awaiting_support' && Number(talked[0].n) === 0) {
           await disputes.reply(
             viewerOf(c, 'admin.support'),
             d.id,
