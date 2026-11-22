@@ -19,6 +19,8 @@ export interface StatementLine {
   /** The commission rate (%) frozen on the order line when it was placed. */
   commissionPct: number;
   commissionUsd: number;
+  /** The delivery fee this sale deducts (seller-paid orders; 0 otherwise). */
+  deliveryFeeUsd?: number;
   refundUsd: number;
   netUsd: number;
   deliveredAt: string | null;
@@ -27,6 +29,8 @@ export interface StatementLine {
 export interface StatementTotals {
   grossUsd: number;
   commissionUsd: number;
+  /** Delivery fees deducted on this statement's sales (seller-paid orders). */
+  deliveryFeeUsd?: number;
   refundsUsd: number;
   netUsd: number;
   /** Balance carried in: what was available before this statement's new lines. */
@@ -97,6 +101,8 @@ export function statementCsvRows(
     return rows;
   }
   rows.push([fr ? "Solde d'ouverture (USD)" : "Opening balance (USD)", usd(t.openingBalanceUsd)], []);
+  // The delivery-fee column appears only when a seller-paid order is on the statement: every other file reads as it always did.
+  const withFee = st.lines.some((l) => (l.deliveryFeeUsd ?? 0) !== 0);
   rows.push([
     fr ? "Commande" : "Order",
     fr ? "Produit" : "Product",
@@ -106,6 +112,7 @@ export function statementCsvRows(
     fr ? "Brut (USD)" : "Gross (USD)",
     fr ? "Commission (%)" : "Commission (%)",
     fr ? "Commission (USD)" : "Commission (USD)",
+    ...(withFee ? [fr ? "Frais de livraison (USD)" : "Delivery fee (USD)"] : []),
     fr ? "Remboursement (USD)" : "Refund (USD)",
     fr ? "Net (USD)" : "Net (USD)",
     fr ? "Livrée le" : "Delivered",
@@ -120,6 +127,7 @@ export function statementCsvRows(
       usd(l.grossUsd),
       l.commissionPct,
       usd(l.commissionUsd),
+      ...(withFee ? [usd(l.deliveryFeeUsd ?? 0)] : []),
       usd(l.refundUsd),
       usd(l.netUsd),
       opts.day(l.deliveredAt),
@@ -134,6 +142,7 @@ export function statementCsvRows(
     usd(t.grossUsd),
     "",
     usd(t.commissionUsd),
+    ...(withFee ? [usd(t.deliveryFeeUsd ?? 0)] : []),
     usd(t.refundsUsd),
     usd(t.netUsd),
     "",

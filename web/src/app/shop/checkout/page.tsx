@@ -20,6 +20,8 @@ import { addressTextFromChain, chainText, notServedArea, notServedText, type Are
 import { AddressPinEditor, UnpinnedWarning, pinRequiredText } from "@/components/shop/address-pin-editor";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
 import { platformFee, platformFeeLabel } from "@/lib/quote-text";
+import { useCartTotals } from "@/lib/cart-totals";
+import { inclDeliveryNote, vatLabel } from "@/lib/vat";
 import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { formatCurrency } from "@/lib/utils";
@@ -43,7 +45,7 @@ function CheckoutContent() {
   const rt = useRealtime();
   const { toast } = useToast();
   const router = useRouter();
-  const { promoDiscount, promoCode } = useShop();
+  const { promoDiscount, promoCode, promoSellerId } = useShop();
   const { lines, subtotal, hasUnavailable, hasVacation, savings } = useCartLines();
   const verification = useVerificationStatus();
 
@@ -78,7 +80,8 @@ function CheckoutContent() {
   const notServed = quoteNotServed ?? (addressUnserved ? { area: deepestArea?.name ?? address?.commune ?? address?.city ?? "", areaEn: deepestArea?.nameEn ?? undefined } : null);
   const deliveryFee = platformFee(quote);
   const discount = Math.min(promoDiscount, subtotal);
-  const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
+  const totals = useCartTotals(lines, discount, deliveryFee, promoSellerId);
+  const total = totals.total;
 
   /** A map pick pre-fills the typed fields (still editable) and keeps the pin for the order. */
   function applyPick(geo: AddressGeo, parts: PickedParts, meta: PickedMeta) {
@@ -263,8 +266,9 @@ function CheckoutContent() {
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"}${promoCode ? ` (${promoCode})` : ""}`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
-          { label: platformFeeLabel(fr), value: <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={address && !pinned ? (fr ? "Épinglez l'adresse" : "Pin the address") : undefined} /> },
-          { label: "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
+          ...(totals.vat > 0 ? [{ label: vatLabel(fr), value: <span data-testid="checkout-vat"><DualCurrency amount={totals.vat} /></span> }] : []),
+          ...(totals.showFeeLine ? [{ label: platformFeeLabel(fr), value: <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={address && !pinned ? (fr ? "Épinglez l'adresse" : "Pin the address") : undefined} /> }] : []),
+          { label: totals.feeInTotal ? `Total (${inclDeliveryNote(fr)})` : "Total", value: <DualCurrency amount={total} className="font-bold text-blue-700" /> },
         ]} />
       </DetailSection>
 

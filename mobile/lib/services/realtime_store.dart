@@ -77,6 +77,13 @@ class RealtimeStore extends ChangeNotifier {
   /// before checkout instead of letting the server refuse).
   bool requirePinnedAddress = false;
 
+  /// Public settings `vatEnabled`, `deliveryFeePaidBy`, `showPlatformFee`: the cart and checkout compute their estimate
+  /// from them (the order the server places is authoritative). Defaults are today's behaviour: no VAT, the customer pays the
+  /// fee, and it is shown as its own line.
+  bool vatEnabled = false;
+  bool feePaidBySeller = false;
+  bool showPlatformFee = true;
+
   /// Public settings `supportPhone`, `supportEmail`, `supportWhatsapp`: how Help offers to reach KOMORIKO. Blank = not offered.
   String supportPhone = '';
   String supportEmail = '';
@@ -495,6 +502,9 @@ class RealtimeStore extends ChangeNotifier {
     fxRate = double.tryParse('${m['fxRate'] ?? fxRate ?? ''}');
     if (m.containsKey('requireVerifiedForCheckout')) requireVerifiedForCheckout = '${m['requireVerifiedForCheckout']}' == 'true';
     if (m.containsKey('requirePinnedAddress')) requirePinnedAddress = '${m['requirePinnedAddress']}' == 'true';
+    if (m.containsKey('vatEnabled')) vatEnabled = '${m['vatEnabled']}' == 'true';
+    if (m.containsKey('deliveryFeePaidBy')) feePaidBySeller = '${m['deliveryFeePaidBy']}' == 'seller';
+    if (m.containsKey('showPlatformFee')) showPlatformFee = '${m['showPlatformFee']}' != 'false';
     if (m.containsKey('supportPhone')) supportPhone = '${m['supportPhone'] ?? ''}'.trim();
     if (m.containsKey('supportEmail')) supportEmail = '${m['supportEmail'] ?? ''}'.trim();
     if (m.containsKey('supportWhatsapp')) supportWhatsapp = '${m['supportWhatsapp'] ?? ''}'.trim();

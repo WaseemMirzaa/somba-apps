@@ -80,7 +80,7 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
   const plansBefore = (await req(admin.sock, 'sellers:plans')).data;
   const restore = async () => {
     if (plansBefore) await setting('sellerPlans', plansBefore).catch(() => undefined);
-    for (const k of ['commissionPct', 'productModeration', 'requireVerifiedForCheckout', 'minPayoutUsd', 'payoutClearanceHours']) {
+    for (const k of ['commissionPct', 'productModeration', 'requireVerifiedForCheckout', 'minPayoutUsd', 'payoutClearanceHours', 'vatEnabled', 'vatPct', 'deliveryFeePaidBy', 'showPlatformFee']) {
       if (saved[k] !== undefined) await setting(k, String(saved[k])).catch(() => undefined);
     }
   };
@@ -661,6 +661,59 @@ const UP = () => `${API}/uploads/${require('crypto').randomUUID()}.png`;
     ok(a.ok === false && /nothing to invoice/.test(a.error), 'a month with no sales is told there is nothing to invoice', a.error ?? 'was allowed');
     a = await req(admin.sock, 'finance:taxDocuments', { sellerId: shop1.store.id });
     ok(a.ok && a.data.items.length === 1, 'finance staff can read a store’s invoices (sellerId)', a.error ?? '');
+
+    // =======================================================================
+    section('5d. VAT and who pays the delivery fee');
+    a = await req(cust.sock, 'settings:get');
+    ok(a.ok && ['vatEnabled', 'vatPct', 'deliveryFeePaidBy', 'showPlatformFee'].every((k) => k in a.data), 'the four settings are public (shoppers read them)', JSON.stringify(a.data));
+    a = await setting('vatPct', '51');
+    ok(!a.ok, 'a VAT rate above 50 is refused', a.error ?? 'was allowed');
+    a = await mk(shop2, { name: `Vat product ${tag}`, price: 50, stock: 30 });
+    const vp = a.data;
+    await setting('vatEnabled', 'false');
+    await setting('deliveryFeePaidBy', 'customer');
+    await setting('showPlatformFee', 'true');
+    ok((await prod(vp.id)).vatPct === 0, 'with VAT off a listing carries vatPct 0');
+    a = await order([{ productId: vp.id, qty: 2 }]);
+    const noVat = a.data;
+    ok(a.ok && noVat.vatUsd === 0 && near(noVat.totalUsd, 100 + noVat.platformFeeUsd), 'VAT off (the default): no VAT, the total is goods + fee as before', a.error ?? JSON.stringify([noVat?.vatUsd, noVat?.totalUsd]));
+    await setting('vatEnabled', 'true');
+    await setting('vatPct', '16');
+    ok((await prod(vp.id)).vatPct === 16, 'with VAT on a listing carries the default rate');
+    a = await order([{ productId: vp.id, qty: 2 }]);
+    const withVat = a.data;
+    ok(a.ok && near(withVat.vatUsd, 16) && near(withVat.totalUsd, 100 + 16 + withVat.platformFeeUsd) && withVat.feePaidBySeller === false && withVat.showFee === true, 'VAT on: 16% of the goods is added, the customer still pays the fee', a.error ?? JSON.stringify([withVat?.vatUsd, withVat?.totalUsd, withVat?.platformFeeUsd]));
+    ok(withVat.items[0].vatPct === 16 && near(withVat.items[0].vatUsd, 16) && !('sellerFeeUsd' in withVat.items[0]) && !('commissionUsd' in withVat.items[0]), 'the line keeps its rate and VAT; the seller\'s fee and commission are not sent to the customer');
+    const fee = withVat.platformFeeUsd;
+    await setting('showPlatformFee', 'false');
+    a = await req(cust.sock, 'orders:list', { limit: 5 });
+    const listed = (a.data?.items ?? a.data ?? []).find((o) => o.id === withVat.id);
+    ok(listed && listed.showFee === false && near(listed.platformFeeUsd, fee) && near(listed.totalUsd, withVat.totalUsd), 'a hidden fee is still charged (the total is the same); the view says it is folded in', JSON.stringify(listed && [listed.showFee, listed.platformFeeUsd, listed.totalUsd]));
+    await setting('showPlatformFee', 'true');
+    await setting('deliveryFeePaidBy', 'seller');
+    a = await order([{ productId: vp.id, qty: 1 }]);
+    const sellerPays = a.data;
+    ok(a.ok && near(sellerPays.vatUsd, 8) && sellerPays.platformFeeUsd === 0 && sellerPays.deliveryFeeUsd === 0 && sellerPays.feePaidBySeller === true && near(sellerPays.totalUsd, 58), 'the seller pays the fee: goods + VAT only, no fee for the customer', a.error ?? JSON.stringify(sellerPays && [sellerPays.vatUsd, sellerPays.platformFeeUsd, sellerPays.totalUsd]));
+    await setting('deliveryFeePaidBy', 'customer');
+    ok(fee > 0, 'the demo route charges a delivery fee (so the seller-paid check means something)', String(fee));
+    await walk(sellerPays.id);
+    e = (await req(shop2.sock, 'finance:earnings', { q: sellerPays.reference })).data;
+    const spLine = e.items[0];
+    ok(near(spLine.grossUsd, 50) && near(spLine.commissionUsd, 5) && near(spLine.deliveryFeeUsd, fee) && near(spLine.netUsd, 45 - fee), 'seller finance: net = gross - commission - delivery fee; the VAT is nowhere in it', JSON.stringify(spLine));
+    await walk(withVat.id);
+    e = (await req(shop2.sock, 'finance:earnings', { q: withVat.reference })).data;
+    ok(near(e.items[0].grossUsd, 100) && near(e.items[0].netUsd, 90) && e.items[0].deliveryFeeUsd === 0, 'a customer-paid order earns the seller exactly what it did before VAT existed (100 - 10)', JSON.stringify(e.items[0]));
+    a = await req(shop2.sock, 'orders:sellerList', { q: sellerPays.reference });
+    const sv = (a.data?.items ?? []).find((o) => o.id === sellerPays.id);
+    ok(sv && near(sv.deliveryFeeUsd, fee) && !('vatUsd' in sv), 'the seller\'s order view shows their delivery fee share and no VAT', JSON.stringify(sv && sv.deliveryFeeUsd));
+    const vatMonth = new Date().toISOString().slice(0, 7);
+    a = await req(shop2.sock, 'finance:statements', { month: vatMonth });
+    ok(a.ok && a.data.totals.deliveryFeeUsd > 0 && a.data.lines.some((l) => near(l.deliveryFeeUsd, fee)), 'the monthly statement lists the fee as its own column and total', a.error ?? JSON.stringify(a.data?.totals));
+    a = await req(shop2.sock, 'finance:statements', { month: vatMonth, format: 'csv' });
+    ok(a.ok && /Delivery fee USD/.test(a.data.csv), 'and its CSV carries the delivery-fee column', a.error ?? '');
+    a = await req(shop1.sock, 'finance:statements', { month: vatMonth, format: 'csv' });
+    ok(a.ok && !/Delivery fee USD/.test(a.data.csv), 'a store with no seller-paid order gets the same CSV as before (no extra column)', a.error ?? '');
+    await setting('vatEnabled', 'false');
 
     // =======================================================================
     section('6. Seller order list: paging, search, filters, CSV, city, tracking');

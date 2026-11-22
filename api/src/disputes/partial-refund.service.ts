@@ -65,11 +65,13 @@ export class PartialRefundService {
     return refundableUsd(payment, order.items);
   }
 
-  /** The money a set of units is worth: price x qty, less the promo discount's share (the promo is spread over lines pro rata). */
-  static worth(order: Pick<Order, 'subtotalUsd' | 'discountUsd'>, units: { unitPriceUsd: number; qty: number }[]): number {
+  /** The money a set of units is worth: price x qty, less the promo discount's share (the promo is spread over lines pro rata), plus their VAT. */
+  static worth(order: Pick<Order, 'subtotalUsd' | 'discountUsd'>, units: { unitPriceUsd: number; qty: number; vatUsd?: number }[]): number {
     const value = units.reduce((t, u) => t + u.unitPriceUsd * u.qty, 0);
     const share = order.subtotalUsd > 0 ? value / order.subtotalUsd : 0;
-    return cents(Math.max(0, value - (order.discountUsd ?? 0) * share));
+    // The VAT the customer paid on those units goes back with them (`vatUsd`: the units' share of their line's VAT).
+    const vat = units.reduce((t, u) => t + (Number(u.vatUsd) || 0), 0);
+    return cents(Math.max(0, value - (order.discountUsd ?? 0) * share) + vat);
   }
 
   async refund(input: PartialRefundInput): Promise<PartialRefundResult> {
@@ -185,7 +187,7 @@ export class PartialRefundService {
       return out;
     }
     const room = (order.items ?? [])
-      .map((i) => ({ id: i.id, room: Math.max(0, i.priceUsd * i.qty - (i.refundedUsd ?? 0)) }))
+      .map((i) => ({ id: i.id, room: Math.max(0, i.priceUsd * i.qty + (i.vatUsd ?? 0) - (i.refundedUsd ?? 0)) }))
       .filter((r) => r.room > 0.004);
     const total = room.reduce((t, r) => t + r.room, 0);
     let rest = amount;

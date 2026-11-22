@@ -453,7 +453,8 @@ class _CartScreenState extends State<CartScreen> {
     final address = shop.deliveryAddress;
     final deliveryFee = quote?.platformFeeUsd ?? 0;
     final discount = shop.promoDiscount(shop.subtotal);
-    final total = shop.subtotal + deliveryFee - discount;
+    final totals = shop.cartTotals(shop.cart, quoteFeeUsd: deliveryFee);
+    final total = totals.total;
     final notServed = _quote.notice(s, address);
     return Container(
       padding: EdgeInsets.fromLTRB(16, 16, 16, 12 + MediaQuery.of(context).padding.bottom),
@@ -504,21 +505,28 @@ class _CartScreenState extends State<CartScreen> {
                     style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
               ),
             ),
-          const SizedBox(height: 6),
-          _row(
-              s.platformFee,
-              quote == null
-                  ? (address == null || _quote.error != null ? s.cartDeliveryLater : '…')
-                  : deliveryFee == 0
-                      ? s.free.toUpperCase()
-                      : money(deliveryFee)),
-          if (quote == null && address == null)
+          if (totals.vat > 0) ...[
+            const SizedBox(height: 6),
+            _row(s.vat, money(totals.vat), key: const ValueKey('cart-vat-row')),
+          ],
+          // The seller pays the fee (no row), or the admin folded it into the total.
+          if (totals.showFeeLine) ...[
+            const SizedBox(height: 6),
+            _row(
+                s.platformFee,
+                quote == null
+                    ? (address == null || _quote.error != null ? s.cartDeliveryLater : '…')
+                    : deliveryFee == 0
+                        ? s.free.toUpperCase()
+                        : money(deliveryFee)),
+          ],
+          if (totals.showFeeLine && quote == null && address == null)
             Align(
               alignment: Alignment.centerRight,
               child: Text(s.cartDeliveryHint,
                   key: const ValueKey('cart-delivery-hint'), textAlign: TextAlign.end, style: const TextStyle(fontSize: 11.5, color: AppColors.muted)),
             ),
-          if (quote != null && !quote.pinned)
+          if (totals.showFeeLine && quote != null && !quote.pinned)
             Align(
               alignment: Alignment.centerRight,
               child: Text(s.cartDeliveryUnpinned,
@@ -533,7 +541,7 @@ class _CartScreenState extends State<CartScreen> {
             NotServedNotice(message: notServed.headline, cities: notServed.cities, onChangeAddress: _changeAddress),
           ],
           const SizedBox(height: 10),
-          _row(s.total, money(total), bold: true),
+          _row(totals.feeInTotal ? s.totalInclDelivery : s.total, money(total), bold: true, key: const ValueKey('cart-total-row')),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
@@ -551,8 +559,9 @@ class _CartScreenState extends State<CartScreen> {
   /// What the shopper saves compared with the old prices (information only: the totals already use the charged prices).
   double get _savings => shop.cart.fold(0.0, (sum, i) => sum + ((i.product.strikePrice ?? i.product.price) - i.product.price) * i.qty);
 
-  Widget _row(String label, String value, {bool bold = false}) {
+  Widget _row(String label, String value, {bool bold = false, Key? key}) {
     return Row(
+      key: key,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         // The long French "Commission de la plateforme" must wrap, not overflow, on a small phone.

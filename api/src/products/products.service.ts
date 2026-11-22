@@ -26,6 +26,7 @@ import { planWrite, sameShape } from '../translation/translatable';
 import type { FieldInput, WritePlan, WriteState } from '../translation/translatable';
 import { isLocale, otherLocale } from '../translation/translator.provider';
 import type { Locale } from '../translation/translator.provider';
+import { parseVatConfig, vatPctFor } from '../orders/vat';
 import { score } from '../search/rank';
 import type { Searchable } from '../search/rank';
 
@@ -74,7 +75,11 @@ export interface StoreFields {
   /** LEGACY: preparation + local transit, 1-30, without handling. Served so the web wizard and older apps round-trip it. */
   deliveryDays: number;
 }
-export type ServedProduct = PricedProduct & ServedFields & StoreFields;
+/** The VAT a shopper is charged on this listing (additive: old clients ignore it). 0 while VAT is off; the order is authoritative. */
+export interface VatFields {
+  vatPct: number;
+}
+export type ServedProduct = PricedProduct & ServedFields & StoreFields & VatFields;
 
 const STATUSES = ['draft', 'pending', 'rejected', 'live', 'removed'] as const;
 const MAX_IMAGES = 8;
@@ -418,6 +423,17 @@ export class ProductsService {
     return out;
   }
 
+  /** `vatPct` of each listing: its category's rate, else the default, and 0 while VAT is off (two setting lookups and one category lookup per call). */
+  private async vatFields(products: Product[]): Promise<Map<string, VatFields>> {
+    const out = new Map<string, VatFields>();
+    if (!products.length) return out;
+    const [on, pct] = await Promise.all([this.settingRows?.findOne({ where: { key: 'vatEnabled' } }), this.settingRows?.findOne({ where: { key: 'vatPct' } })]);
+    const cfg = parseVatConfig(on?.value, pct?.value);
+    const rates = cfg.enabled ? await this.categories.vatRates(products.map((p) => p.categoryId).filter((x): x is string => !!x)) : new Map<string, number | null>();
+    for (const p of products) out.set(p.id, { vatPct: vatPctFor(cfg, p.categoryId ? rates.get(p.categoryId) : null) });
+    return out;
+  }
+
   /** The platform's local transit days (`localDeliveryDays`, default 1). */
   async localDays(): Promise<number> {
     const row = await this.settingRows?.findOne({ where: { key: 'localDeliveryDays' } });
@@ -493,9 +509,9 @@ export class ProductsService {
    * storefront, the warehouse) goes through here: effective price, both languages, category and store names.
    */
   async present(products: Product[]): Promise<ServedProduct[]> {
-    const [priced, texts, stores] = await Promise.all([this.withPricing(products), this.describe(products), this.storeFields(products)]);
+    const [priced, texts, stores, vat] = await Promise.all([this.withPricing(products), this.describe(products), this.storeFields(products), this.vatFields(products)]);
     return priced.map((p) => {
-      const served = Object.assign(p, texts.get(p.id)!, stores.get(p.id)!) as ServedProduct;
+      const served = Object.assign(p, texts.get(p.id)!, stores.get(p.id)!, vat.get(p.id)!) as ServedProduct;
       // Listings from before galleries existed (and seed data) have a cover but no list: serve it as a gallery of one.
       if (!served.images?.length && served.image) served.images = [served.image];
       return served;

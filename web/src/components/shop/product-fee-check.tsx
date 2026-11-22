@@ -88,7 +88,7 @@ export function ProductFeeCheck({ productId, fr, locale, onQuote }: { productId:
       {error && !quote && !notServed && <p role="alert" className="text-xs text-red-700">{error}</p>}
       {quote && (
         <p className="text-xs text-emerald-800" data-testid="fee-check-result">
-          {platformFee(quote) === 0 ? (fr ? "Gratuit" : "Free") : formatCurrency(platformFee(quote), locale)}
+          {platformFee(quote) === 0 ? (fr ? "Gratuit" : "Free") : quote.showFee === false ? (fr ? "Incluse dans le total" : "Included in the total") : formatCurrency(platformFee(quote), locale)}
           {feeOriginText(quote, fr) ? ` · ${feeOriginText(quote, fr)}` : ""}
         </p>
       )}

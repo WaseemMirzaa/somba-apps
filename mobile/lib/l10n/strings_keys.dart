@@ -37,6 +37,12 @@ extension StringsKeys on Strings {
   /// The ONE fee line a customer sees: the sum of every fee they pay, delivery included.
   String get platformFee => t('platformFee');
   String get total => t('total');
+
+  /// The one summed VAT line of a cart, a checkout and an order (shown only when VAT was charged).
+  String get vat => t('vat');
+
+  /// "Total" when the admin folds the delivery fee into it instead of showing its own line.
+  String get totalInclDelivery => t('totalInclDelivery');
   String get free => t('free');
   String get promoHint => t('promoHint');
   String get apply => t('apply');

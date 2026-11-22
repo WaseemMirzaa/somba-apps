@@ -52,6 +52,10 @@ export class PayoutStatementLine {
   @Column({ type: 'float' })
   commissionUsd: number;
 
+  /** The delivery fee a seller-paid sale deducts (0 otherwise). */
+  @Column({ type: 'float', default: 0 })
+  deliveryFeeUsd: number;
+
   @Column({ type: 'float', default: 0 })
   refundUsd: number;
 

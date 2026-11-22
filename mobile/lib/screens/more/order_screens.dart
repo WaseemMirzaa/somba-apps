@@ -140,8 +140,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           key: const ValueKey('order-campaign-saved'),
                           style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
                     ),
-                  const SizedBox(height: 8),
-                  _row(s.platformFee, o.platformFeeUsd == 0 ? s.free : money(o.platformFeeUsd), key: o.isExpress ? const ValueKey('order-delivery-express-row') : null),
+                  if (o.vatUsd > 0) ...[
+                    const SizedBox(height: 8),
+                    _row(s.vat, money(o.vatUsd), key: const ValueKey('order-vat-row')),
+                  ],
+                  // The seller pays the fee: no fee row. The admin hides the line: it is folded into the total below.
+                  if (!o.feePaidBySeller && o.showFee) ...[
+                    const SizedBox(height: 8),
+                    _row(s.platformFee, o.platformFeeUsd == 0 ? s.free : money(o.platformFeeUsd), key: o.isExpress ? const ValueKey('order-delivery-express-row') : null),
+                  ],
                   if (dayLabel(o.estimatedDeliveryDate, s.lang) != null) ...[
                     const SizedBox(height: 6),
                     _row(s.estimatedDelivery, dayLabel(o.estimatedDeliveryDate, s.lang)!, key: const ValueKey('order-estimate-row')),
@@ -151,7 +158,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     _row(s.promoRow(o.promoCode ?? ''), '- ${money(o.discountUsd)}'),
                   ],
                   const Divider(height: 22),
-                  _row(s.total, money(o.totalUsd), bold: true),
+                  _row(!o.feePaidBySeller && !o.showFee && o.platformFeeUsd > 0 ? s.totalInclDelivery : s.total, money(o.totalUsd), bold: true),
                   if (o.refundedUsd > 0) ...[
                     const SizedBox(height: 8),
                     _row(s.orderRefunded, money(o.refundedUsd), valueColor: AppColors.success, key: const ValueKey('order-refunded-row')),

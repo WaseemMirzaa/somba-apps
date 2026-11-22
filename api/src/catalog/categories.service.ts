@@ -87,6 +87,15 @@ export class CategoriesService {
     });
   }
 
+  /** The stored VAT % of categories by id (NULL = the global default is used). One lookup. */
+  async vatRates(ids: string[]): Promise<Map<string, number | null>> {
+    const out = new Map<string, number | null>();
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (!unique.length) return out;
+    for (const c of await this.repo.find({ where: { id: In(unique) }, select: ['id', 'vatPct'] })) out.set(c.id, typeof c.vatPct === 'number' ? c.vatPct : null);
+    return out;
+  }
+
   /** Names of categories by id, in both languages (for products, flash sales…). */
   async names(ids: string[]): Promise<Map<string, { name: string; nameFr: string }>> {
     const out = new Map<string, { name: string; nameFr: string }>();
@@ -139,6 +148,10 @@ export class CategoriesService {
     // Seller commission (%): blank / null = use the global default; 0 is a real rate.
     if (data?.commissionPct !== undefined) {
       out.commissionPct = data.commissionPct === null || (typeof data.commissionPct === 'string' && data.commissionPct.trim() === '') ? null : num(data.commissionPct, 'Seller commission', { min: 0, max: 60 });
+    }
+    // VAT (%): blank / null = use the global default (`settings.vatPct`); 0 is a real rate. Customers may see it.
+    if (data?.vatPct !== undefined) {
+      out.vatPct = data.vatPct === null || (typeof data.vatPct === 'string' && data.vatPct.trim() === '') ? null : num(data.vatPct, 'VAT', { min: 0, max: 50 });
     }
     return out;
   }

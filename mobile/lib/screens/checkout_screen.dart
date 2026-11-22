@@ -243,7 +243,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return false;
       }
     }
-    if (payment == 'wallet' && store.walletBalance + 0.001 < _subtotal + deliveryFee - shop.promoDiscount(_subtotal)) {
+    if (payment == 'wallet' && store.walletBalance + 0.001 < shop.cartTotals(_lines, quoteFeeUsd: deliveryFee).total) {
       _toast(s.checkoutWalletLow);
       return false;
     }
@@ -362,7 +362,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (_buyNow) _refreshLines();
     final subtotal = _subtotal;
     final discount = shop.promoDiscount(subtotal);
-    final total = subtotal + deliveryFee - discount;
+    final totals = shop.cartTotals(_lines, quoteFeeUsd: deliveryFee);
+    final total = totals.total;
     final address = _address;
     final savings = _lines.fold(0.0, (sum, i) => sum + ((i.product.strikePrice ?? i.product.price) - i.product.price) * i.qty);
 
@@ -531,15 +532,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Text(s.youSave(money(savings)),
                       key: const ValueKey('checkout-savings'), style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w700)),
                 ),
-              const SizedBox(height: 8),
-              _row(s.platformFee, unpriced ? (_quote.loading ? '…' : '—') : deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
+              if (totals.vat > 0) ...[
+                const SizedBox(height: 8),
+                _row(s.vat, money(totals.vat), key: const ValueKey('checkout-vat-row')),
+              ],
+              // The seller pays the fee (no row), or the admin folded it into the total.
+              if (totals.showFeeLine) ...[
+                const SizedBox(height: 8),
+                _row(s.platformFee, unpriced ? (_quote.loading ? '…' : '—') : deliveryFee == 0 ? s.free.toUpperCase() : money(deliveryFee)),
+              ],
               if (quote != null) DeliveryRouteLines(quote: quote),
               if (discount > 0) ...[
                 const SizedBox(height: 8),
                 _row(s.promoRow(shop.appliedPromo!.code), '- ${money(discount)}'),
               ],
               const Divider(height: 22),
-              _row(s.total, money(total), bold: true),
+              _row(totals.feeInTotal ? s.totalInclDelivery : s.total, money(total), bold: true, key: const ValueKey('checkout-total-row')),
               if (secondaryMoney(total) != null)
                 Align(
                     alignment: Alignment.centerRight,
@@ -629,7 +637,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: child,
       );
 
-  Widget _row(String label, String value, {bool bold = false}) => Row(
+  Widget _row(String label, String value, {bool bold = false, Key? key}) => Row(
+        key: key,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Flexible(

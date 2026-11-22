@@ -295,6 +295,10 @@ async function run() {
     setRepo.create({ key: 'requirePinnedAddress', value: 'false' }),
     setRepo.create({ key: 'requireSellerPickupPin', value: 'false' }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
+    setRepo.create({ key: 'vatEnabled', value: 'false' }),
+    setRepo.create({ key: 'vatPct', value: '16' }),
+    setRepo.create({ key: 'deliveryFeePaidBy', value: 'customer' }),
+    setRepo.create({ key: 'showPlatformFee', value: 'true' }),
     // Dev/demo data goes live without a moderator; production bootstrap turns moderation on.
     setRepo.create({ key: 'productModeration', value: 'false' }),
     setRepo.create({ key: 'requireDeliveryCode', value: 'false' }),

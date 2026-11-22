@@ -19,6 +19,7 @@ import { ProductsService } from '../products/products.service';
 import type { PricedProduct } from '../products/products.service';
 import { pageOf } from '../common/paging';
 import { platformFeeUsd } from './platform-fee';
+import { feePayerOf, orderLineMoney, parseVatConfig, vatPctFor, vatShareUsd } from './vat';
 import {
   ADMIN_ROLES,
   NotificationsService,
@@ -355,13 +356,25 @@ export class OrdersService {
     // category rate when the admin set one (0 is a real rate), else the global default.
     const defaultPct = Math.min(100, Math.max(0, Number((await this.settings.get('commissionPct')) ?? 12) || 0));
     const categoryRates = new Map<string, number | null>();
+    const categoryVat = new Map<string, number | null>();
+    const loadCategory = async (categoryId: string) => {
+      if (categoryRates.has(categoryId)) return;
+      const c = await this.orders.manager.findOne(Category, { where: { id: categoryId }, select: ['id', 'commissionPct', 'vatPct'] });
+      categoryRates.set(categoryId, typeof c?.commissionPct === 'number' && Number.isFinite(c.commissionPct) ? Math.min(100, Math.max(0, c.commissionPct)) : null);
+      categoryVat.set(categoryId, typeof c?.vatPct === 'number' && Number.isFinite(c.vatPct) ? c.vatPct : null);
+    };
     const rateFor = async (categoryId: string | null | undefined): Promise<number> => {
       if (!categoryId) return defaultPct;
-      if (!categoryRates.has(categoryId)) {
-        const c = await this.orders.manager.findOne(Category, { where: { id: categoryId }, select: ['id', 'commissionPct'] });
-        categoryRates.set(categoryId, typeof c?.commissionPct === 'number' && Number.isFinite(c.commissionPct) ? Math.min(100, Math.max(0, c.commissionPct)) : null);
-      }
+      await loadCategory(categoryId);
       return categoryRates.get(categoryId) ?? defaultPct;
+    };
+    // VAT in force NOW is frozen on every line too: 0 while the admin switch is off (the default), else the category's rate, else the default rate.
+    const vatConfig = parseVatConfig(await this.settings.get('vatEnabled'), await this.settings.get('vatPct'));
+    const feePaidBy = feePayerOf(await this.settings.get('deliveryFeePaidBy'));
+    const vatRateFor = async (categoryId: string | null | undefined): Promise<number> => {
+      if (!categoryId || !vatConfig.enabled) return vatPctFor(vatConfig, null);
+      await loadCategory(categoryId);
+      return vatPctFor(vatConfig, categoryVat.get(categoryId));
     };
 
     const items: OrderItem[] = [];
@@ -407,8 +420,10 @@ export class OrdersService {
       let sellerId: string | null = null;
       let sellerName: string | null = null;
       let commissionPct = defaultPct;
+      let vatPct = vatPctFor(vatConfig, null);
       if (product) {
         commissionPct = await rateFor(product.categoryId);
+        vatPct = await vatRateFor(product.categoryId);
         sellerId = product.sellerId ?? null;
         sellerName = product.sellerName ?? null;
         // The shopper must have chosen every option the seller defined; stored in its canonical form.
@@ -472,6 +487,7 @@ export class OrdersService {
       item.fulfilment = 'open';
       item.commissionPct = commissionPct;
       item.commissionUsd = Number(((price * qty * commissionPct) / 100).toFixed(2));
+      item.vatPct = vatPct;
       items.push(item);
     }
 
@@ -503,7 +519,21 @@ export class OrdersService {
         });
       }
     }
-    const total = Number((subtotal - discount + deliveryFee).toFixed(2));
+    // VAT per line on what the line costs after its share of the discount, and (seller pays) the line's share of the delivery fee.
+    const money = orderLineMoney({
+      lines: items,
+      discountUsd: discount,
+      lineDiscounts: items.some((i) => (i.couponDiscountUsd ?? 0) > 0) ? items.map((i) => i.couponDiscountUsd ?? 0) : null,
+      vatPcts: items.map((i) => i.vatPct),
+      feeUsd: deliveryFee,
+      feePaidBy,
+    });
+    items.forEach((item, i) => {
+      item.vatUsd = money.vatUsd[i];
+      item.sellerFeeUsd = money.feeUsd[i];
+    });
+    // total = goods - discount + VAT + the delivery fee when the customer pays it (the seller's fee never reaches the customer).
+    const total = Number((subtotal - discount + money.vatTotalUsd + (feePaidBy === 'customer' ? deliveryFee : 0)).toFixed(2));
     if (!(total > 0)) throw new BadRequestException('Order total must be greater than zero.');
 
     // Fail fast on wallet payments with insufficient funds — before creating
@@ -545,6 +575,8 @@ export class OrdersService {
       paymentMethod: input.paymentMethod,
       subtotalUsd: subtotal,
       deliveryFeeUsd: deliveryFee,
+      deliveryFeePaidBy: feePaidBy,
+      vatUsd: money.vatTotalUsd,
       discountUsd: discount,
       promoCode,
       campaignDiscountUsd: Number(campaignDiscount.toFixed(2)),
@@ -791,6 +823,8 @@ export class OrdersService {
       items,
       subtotalUsd: subtotal,
       totalUsd: subtotal,
+      // The delivery fee this seller pays on their lines (seller-paid orders only): it comes off their earnings.
+      deliveryFeeUsd: Number(live.reduce((t, i) => t + (Number(i.sellerFeeUsd) || 0), 0).toFixed(2)),
       sellerCount: new Set((order.items ?? []).map((i) => i.sellerId ?? i.productId)).size,
       // How many OTHER sellers still have to pack (no names: their business stays theirs).
       otherSellersPacking: new Set(
@@ -863,9 +897,11 @@ export class OrdersService {
    * lines to the warehouse that collects from them, because `origins` follows no line order). `tracking` is null before the
    * first delivery task exists. Never carries a phone, an address or the handover code of anyone else.
    */
-  async customerViews(orders: Order[]): Promise<(Order & { platformFeeUsd: number; rider?: RiderContact; tracking: SellerTracking | null; partiallyDelivered: boolean; hubs: { destination: HubName | null; origins: HubName[]; bySeller: Record<string, HubName> } })[]> {
+  async customerViews(orders: Order[]): Promise<(Order & { platformFeeUsd: number; feePaidBySeller: boolean; showFee: boolean; rider?: RiderContact; tracking: SellerTracking | null; partiallyDelivered: boolean; hubs: { destination: HubName | null; origins: HubName[]; bySeller: Record<string, HubName> } })[]> {
     const withRider = await this.withRiders(orders);
     if (!orders.length) return [];
+    // `showPlatformFee` off: the customer still pays the fee, but it is folded into the total (clients write "incl. delivery").
+    const showFeeSetting = (await this.settings.get('showPlatformFee')) !== 'false';
     const hubIds = [...new Set(orders.flatMap((o) => hubsOfOrder(o)))];
     const names = new Map<string, HubName>();
     // Orders placed before `originBySeller` existed: read it back from their pickup legs.
@@ -880,12 +916,17 @@ export class OrdersService {
     return withRider.map((o) =>
       Object.assign(Object.create(Object.getPrototypeOf(o)), o, {
         // The one fee line the customer sees (the sum of every fee they pay, delivery included); `deliveryFeeUsd` stays for old app builds.
-        platformFeeUsd: platformFeeUsd(o.deliveryFeeUsd),
+        // When the SELLER pays the fee the customer pays none: both read 0 (old builds then add up too) and `feePaidBySeller` says why.
+        platformFeeUsd: o.deliveryFeePaidBy === 'seller' ? 0 : platformFeeUsd(o.deliveryFeeUsd),
+        deliveryFeeUsd: o.deliveryFeePaidBy === 'seller' ? 0 : o.deliveryFeeUsd,
+        feePaidBySeller: o.deliveryFeePaidBy === 'seller',
+        showFee: o.deliveryFeePaidBy !== 'seller' && showFeeSetting,
         // The seller's commission on each line is the seller's business: it never reaches the customer.
         items: (o.items ?? []).map((i) => {
           const line = Object.assign(Object.create(Object.getPrototypeOf(i)), i) as Partial<OrderItem>;
           delete line.commissionPct;
           delete line.commissionUsd;
+          delete line.sellerFeeUsd;
           return line as OrderItem;
         }),
         tracking: tracking.get(o.id) ?? null,
@@ -1230,7 +1271,9 @@ export class OrdersService {
   ): Promise<{ done: boolean; refund: number; prepaid: boolean }> {
     // The promo discount is shared across lines pro rata, so a partial refund never exceeds what was paid.
     const value = targets.reduce((t, i) => t + i.priceUsd * i.qty, 0);
-    const refund = lineShareUsd(order, value);
+    // The VAT the customer paid on those lines goes back with them (VAT is never kept on a line that was not delivered).
+    const goods = lineShareUsd(order, value);
+    const refund = Number((goods + targets.reduce((t, i) => t + vatShareUsd(i, i.priceUsd * i.qty), 0)).toFixed(2));
     const payment = await this.payments.forOrder(order.id);
     const prepaid = payment?.status === 'succeeded';
 
@@ -1244,9 +1287,9 @@ export class OrdersService {
         .execute();
       if ((claim.affected ?? 0) !== targets.length) return false;
       if (prepaid && payment && refund > 0) {
-        const per = targets.length ? refund / value : 0;
+        const per = targets.length && value > 0 ? goods / value : 0;
         for (const i of targets) {
-          await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per).toFixed(2)) });
+          await m.update(OrderItem, { id: i.id }, { refundedUsd: Number((i.priceUsd * i.qty * per + vatShareUsd(i, i.priceUsd * i.qty)).toFixed(2)) });
         }
         // C-refund: recorded and capped like every refund (a payment already refunded cannot be refunded again here).
         await recordRefund(m, { payment, amountUsd: refund, to: 'wallet', kind: opts.kind, memo: opts.memo });

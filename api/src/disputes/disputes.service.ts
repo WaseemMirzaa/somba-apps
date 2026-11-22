@@ -27,6 +27,7 @@ import type {
 import { cleanAttachments, firstName, parseAttachments, storeAttachments } from '../common/attachments';
 import { pageOf } from '../common/paging';
 import { lockOrder } from '../common/order-lock';
+import { vatShareUsd } from '../orders/vat';
 import { RETURNS_DESK_ADMINS } from '../common/staff-access';
 import { SettingsService } from '../content/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -988,8 +989,8 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
       : (order.items ?? []).filter((i) => i.fulfilment !== 'cancelled').map((i) => ({ disputeItemId: '', orderItemId: i.id, unitPriceUsd: i.priceUsd, qty: i.qty }));
     const lines = units.map((u) => {
       const line = (order.items ?? []).find((i) => i.id === u.orderItemId);
-      const worth = PartialRefundService.worth(order, [u]);
-      const room = line ? Math.max(0, cents(line.priceUsd * line.qty - (line.refundedUsd ?? 0))) : worth;
+      const worth = PartialRefundService.worth(order, [{ ...u, vatUsd: line ? vatShareUsd(line, u.unitPriceUsd * u.qty) : 0 }]);
+      const room = line ? Math.max(0, cents(line.priceUsd * line.qty + (line.vatUsd ?? 0) - (line.refundedUsd ?? 0))) : worth;
       return { orderItemId: u.orderItemId, usd: Math.min(worth, room), disputeItemId: u.disputeItemId };
     });
     return { total: cents(lines.reduce((t, l) => t + l.usd, 0)), lines };

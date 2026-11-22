@@ -57,6 +57,14 @@ export interface PublicSettings {
   expressDeliveryEnabled: boolean;
   /** Riders and warehouse staff must scan each parcel label before a leg moves on (default on). */
   requireParcelScan: boolean;
+  /** VAT (public: the cart estimate needs it; the order is authoritative). Off = no VAT is charged or shown. */
+  vatEnabled: boolean;
+  /** The VAT % of a category that sets none. */
+  vatPct: number;
+  /** `deliveryFeePaidBy`: the seller pays the delivery fee, so the customer pays none. */
+  feePaidBySeller: boolean;
+  /** `showPlatformFee`: show the fee as its own line; false = folded into the total ("incl. delivery"). */
+  showPlatformFee: boolean;
 }
 
 const EMPTY_SETTINGS: PublicSettings = {
@@ -77,6 +85,10 @@ const EMPTY_SETTINGS: PublicSettings = {
   splitDeliveryAfterHours: 24,
   expressDeliveryEnabled: false,
   requireParcelScan: true,
+  vatEnabled: false,
+  vatPct: 16,
+  feePaidBySeller: false,
+  showPlatformFee: true,
 };
 
 const num = (v: string | undefined, d: number) => {
@@ -103,6 +115,10 @@ function parseSettings(raw: Record<string, string>): PublicSettings {
     splitDeliveryAfterHours: num(raw.splitDeliveryAfterHours, 24),
     expressDeliveryEnabled: raw.expressDeliveryEnabled === "true",
     requireParcelScan: raw.requireParcelScan !== "false",
+    vatEnabled: raw.vatEnabled === "true",
+    vatPct: num(raw.vatPct, 16),
+    feePaidBySeller: raw.deliveryFeePaidBy === "seller",
+    showPlatformFee: raw.showPlatformFee !== "false",
   };
 }
 
@@ -180,6 +196,10 @@ export function usePublicSettings(): PublicSettings {
         splitDeliveryAfterHours: raw.splitDeliveryAfterHours ?? str("splitDeliveryAfterHours"),
         expressDeliveryEnabled: raw.expressDeliveryEnabled ?? str("expressDeliveryEnabled"),
         requireParcelScan: raw.requireParcelScan ?? (cur.requireParcelScan === false ? "false" : "true"),
+        vatEnabled: raw.vatEnabled ?? (cur.vatEnabled ? "true" : "false"),
+        vatPct: raw.vatPct ?? str("vatPct"),
+        deliveryFeePaidBy: raw.deliveryFeePaidBy ?? (cur.feePaidBySeller ? "seller" : "customer"),
+        showPlatformFee: raw.showPlatformFee ?? (cur.showPlatformFee ? "true" : "false"),
       });
     });
   });

@@ -58,3 +58,19 @@ test("spreadsheet formulas in free text are neutralised", () => {
 test("filename is safe", () => {
   assert.equal(m.statementFilename({ payout }), "somba-statement-PO-123-4.csv");
 });
+
+test("a seller-paid delivery fee adds its column and total (and only then)", () => {
+  const st = {
+    payout,
+    legacy: false,
+    lines: [line({ deliveryFeeUsd: 2, netUsd: 178 })],
+    totals: { grossUsd: 200, commissionUsd: 20, deliveryFeeUsd: 2, refundsUsd: 0, netUsd: 178, openingBalanceUsd: 0, closingBalanceUsd: 78, amountUsd: 100 },
+  };
+  const rows = m.statementCsvRows(st, { fr: false, day });
+  const head = rows.findIndex((r) => r[0] === "Order");
+  assert.ok(rows[head].includes("Delivery fee (USD)"));
+  assert.deepEqual(rows[head + 1], ["SO-1", "Phone", "Default", 2, "Sale", "200.00", 10, "20.00", "2.00", "0.00", "178.00", "2026-10-21"]);
+  assert.deepEqual(rows.find((r) => r[0] === "Totals"), ["Totals", "", "", 2, "", "200.00", "", "20.00", "2.00", "0.00", "178.00", ""]);
+  const fr = m.statementCsvRows(st, { fr: true, day });
+  assert.ok(fr[fr.findIndex((r) => r[0] === "Commande")].includes("Frais de livraison (USD)"));
+});

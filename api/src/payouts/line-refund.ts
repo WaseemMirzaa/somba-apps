@@ -19,20 +19,22 @@ const round2 = (v: number) => Number(v.toFixed(2));
 /** Half a cent: `refundedUsd` is stored rounded to cents. */
 const HALF_CENT = 0.005;
 
-type LineFields = Pick<OrderItem, 'priceUsd' | 'qty' | 'refundedUsd' | 'couponDiscountUsd' | 'commissionUsd'>;
+type LineFields = Pick<OrderItem, 'priceUsd' | 'qty' | 'refundedUsd' | 'couponDiscountUsd' | 'commissionUsd'> & { vatUsd?: number | null; sellerFeeUsd?: number | null };
 type OrderFields = Pick<Order, 'subtotalUsd' | 'discountUsd'>;
 
 /** What the customer paid for the line: price x qty less its pro-rata share of the order's promo discount. */
-export function linePaidUsd(item: Pick<OrderItem, 'priceUsd' | 'qty'>, order: OrderFields | null | undefined): number {
+export function linePaidUsd(item: Pick<OrderItem, 'priceUsd' | 'qty'> & { vatUsd?: number | null }, order: OrderFields | null | undefined): number {
   const value = (Number(item.priceUsd) || 0) * (Number(item.qty) || 0);
   const subtotal = Number(order?.subtotalUsd) || 0;
   const discount = Number(order?.discountUsd) || 0;
-  if (!(subtotal > 0) || !(discount > 0)) return value;
-  return Math.max(0, value - discount * (value / subtotal));
+  // The VAT charged on the line was paid too (and is refunded with it): the refunded share is measured against both.
+  const vat = Number(item.vatUsd) || 0;
+  if (!(subtotal > 0) || !(discount > 0)) return value + vat;
+  return Math.max(0, value - discount * (value / subtotal)) + vat;
 }
 
 /** The share (0..1) of the line that was refunded. */
-export function refundedFraction(item: Pick<OrderItem, 'priceUsd' | 'qty' | 'refundedUsd'>, order: OrderFields | null | undefined): number {
+export function refundedFraction(item: Pick<OrderItem, 'priceUsd' | 'qty' | 'refundedUsd'> & { vatUsd?: number | null }, order: OrderFields | null | undefined): number {
   const refunded = Number(item.refundedUsd) || 0;
   if (!(refunded > 0)) return 0;
   const paid = linePaidUsd(item, order);
@@ -45,7 +47,9 @@ export interface LineRefund {
   grossUsd: number;
   /** Share of the stored commission the platform gives back. */
   commissionUsd: number;
-  /** What the seller loses: grossUsd - commissionUsd. */
+  /** Share of the delivery fee the seller paid that is given back (0 unless the seller pays the fee). */
+  deliveryFeeUsd: number;
+  /** What the seller loses: grossUsd - commissionUsd - deliveryFeeUsd. */
   netUsd: number;
   fraction: number;
 }
@@ -53,12 +57,14 @@ export interface LineRefund {
 /** What the refunds on the line take back from the seller, in cents (see the header). */
 export function lineRefund(item: LineFields, order: OrderFields | null | undefined): LineRefund {
   const fraction = refundedFraction(item, order);
-  if (fraction <= 0) return { grossUsd: 0, commissionUsd: 0, netUsd: 0, fraction: 0 };
+  if (fraction <= 0) return { grossUsd: 0, commissionUsd: 0, deliveryFeeUsd: 0, netUsd: 0, fraction: 0 };
   const gross = round2((Number(item.priceUsd) || 0) * (Number(item.qty) || 0) - (Number(item.couponDiscountUsd) || 0));
   const commission = round2(Number(item.commissionUsd) || 0);
   const grossUsd = fraction >= 1 ? gross : round2(gross * fraction);
   const commissionUsd = fraction >= 1 ? commission : round2(commission * fraction);
-  return { grossUsd, commissionUsd, netUsd: round2(grossUsd - commissionUsd), fraction };
+  const fee = round2(Number(item.sellerFeeUsd) || 0);
+  const deliveryFeeUsd = fraction >= 1 ? fee : round2(fee * fraction);
+  return { grossUsd, commissionUsd, deliveryFeeUsd, netUsd: round2(grossUsd - commissionUsd - deliveryFeeUsd), fraction };
 }
 
 /**
@@ -66,7 +72,7 @@ export function lineRefund(item: LineFields, order: OrderFields | null | undefin
  * unrounded, so a total can differ from the sum of rounded lines by a fraction of a cent per line.)
  */
 const SQL_VALUE = '(i.priceUsd * i.qty)';
-const SQL_PAID = `(CASE WHEN COALESCE(o.subtotalUsd, 0) > 0 AND COALESCE(o.discountUsd, 0) > 0 THEN ${SQL_VALUE} - o.discountUsd * ${SQL_VALUE} / o.subtotalUsd ELSE ${SQL_VALUE} END)`;
+const SQL_PAID = `((CASE WHEN COALESCE(o.subtotalUsd, 0) > 0 AND COALESCE(o.discountUsd, 0) > 0 THEN ${SQL_VALUE} - o.discountUsd * ${SQL_VALUE} / o.subtotalUsd ELSE ${SQL_VALUE} END) + COALESCE(i.vatUsd, 0))`;
 export const SQL_REFUNDED_FRACTION = `(CASE WHEN COALESCE(i.refundedUsd, 0) <= 0 THEN 0 WHEN ${SQL_PAID} <= 0 OR i.refundedUsd >= ${SQL_PAID} - ${HALF_CENT} THEN 1 ELSE i.refundedUsd / ${SQL_PAID} END)`;
 /** 1 - the refunded share: multiply a line amount by it to keep only what was not refunded. */
 export const SQL_KEPT_FRACTION = `(1 - ${SQL_REFUNDED_FRACTION})`;

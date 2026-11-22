@@ -32,7 +32,7 @@ describe('hub scoping of orders, incidents and inventory', () => {
     emitter = recordingEmitter();
     [gombe, limete, paris] = [await mkHub('Gombe'), await mkHub('Limete'), await mkHub('Paris')];
     const noop = { registerFanout: () => undefined, registerUserView: () => undefined, registerOrderSettledHandler: () => undefined, registerFailedHandler: () => undefined };
-    orders = new OrdersService(ds.getRepository(Order) as never, {} as never, {} as never, noop as never, {} as never, {} as never, noop as never, noop as never, {} as never, {} as never, {} as never, ds.getRepository(Hub));
+    orders = new OrdersService(ds.getRepository(Order) as never, {} as never, {} as never, noop as never, {} as never, {} as never, noop as never, noop as never, {} as never, {} as never, { get: async () => null } as never, ds.getRepository(Hub));
     // The warehouse service's custody view comes from the logistics service: serve it from the delivery tasks here.
     const logistics = {
       custody: async (hubId: string) => {

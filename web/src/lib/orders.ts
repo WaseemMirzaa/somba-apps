@@ -33,6 +33,12 @@ export interface OrderDetail {
   deliveryFee: number;
   /** The ONE fee line a customer sees ("Platform commission"): `platformFeeUsd`, else the delivery fee an older server sends. */
   platformFee: number;
+  /** The one VAT amount (already inside `amount`); 0 = none was charged, show no row. */
+  vat: number;
+  /** The seller pays the delivery fee: the customer paid none, show no fee row. */
+  feePaidBySeller: boolean;
+  /** Show the fee as its own row; false = it is folded into the total ("incl. delivery"). */
+  showFee: boolean;
   /** Promo-code discount already deducted. */
   discount: number;
   /** Campaign discount already deducted from the subtotal. */
@@ -122,6 +128,9 @@ export function toOrderDetail(o: Order, payment?: Payment): OrderDetail {
     subtotal: o.subtotalUsd,
     deliveryFee: o.deliveryFeeUsd,
     platformFee: o.platformFeeUsd ?? o.deliveryFeeUsd,
+    vat: o.vatUsd ?? 0,
+    feePaidBySeller: o.feePaidBySeller === true,
+    showFee: o.showFee !== false,
     discount: o.discountUsd ?? 0,
     campaignDiscount: o.campaignDiscountUsd ?? 0,
     paymentMethodId: o.paymentMethod,

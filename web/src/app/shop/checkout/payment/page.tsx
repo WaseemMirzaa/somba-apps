@@ -27,6 +27,8 @@ import {
 } from "@/lib/shop-live";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
 import { platformFee, platformFeeLabel } from "@/lib/quote-text";
+import { useCartTotals } from "@/lib/cart-totals";
+import { inclDeliveryNote, vatLabel } from "@/lib/vat";
 import { DeliveryQuoteCard } from "@/components/shop/delivery-quote";
 import { notServedArea, notServedCityNames, notServedFromError, notServedText, type NotServedInfo } from "@/lib/areas";
 import { pinRequiredText } from "@/components/shop/address-pin-editor";
@@ -42,7 +44,7 @@ function PaymentContent() {
   const rt = useRealtime();
   const router = useRouter();
   const params = useSearchParams();
-  const { promoCode, promoDiscount, clearCart, addToCart } = useShop();
+  const { promoCode, promoDiscount, promoSellerId, clearCart, addToCart } = useShop();
   const { lines, subtotal, hasUnavailable, savings } = useCartLines();
   const verification = useVerificationStatus();
 
@@ -60,7 +62,8 @@ function PaymentContent() {
   });
   const deliveryFee = platformFee(quote);
   const discount = Math.min(promoDiscount, subtotal);
-  const total = Math.round((Math.max(0, subtotal - discount) + deliveryFee) * 100) / 100;
+  const totals = useCartTotals(lines, discount, deliveryFee, promoSellerId);
+  const total = totals.total;
 
   const balance = rt.walletBalance;
   const walletEnough = balance >= total;
@@ -234,7 +237,8 @@ function PaymentContent() {
           { label: fr ? "Sous-total" : "Subtotal", value: <DualCurrency amount={subtotal} /> },
           ...(savings > 0 ? [{ label: fr ? "Dont économisé (promotions)" : "Includes promotion savings", value: <span className="text-amber-800">{formatCurrency(savings, locale)}</span> }] : []),
           ...(discount > 0 ? [{ label: `${fr ? "Réduction" : "Discount"} (${promoCode})`, value: <span className="text-emerald-600">-<DualCurrency amount={discount} /></span> }] : []),
-          { label: platformFeeLabel(fr), value: notServed ? (fr ? "Zone non desservie" : "Not served yet") : !quote ? (fr ? "Calcul…" : "Calculating…") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> },
+          ...(totals.vat > 0 ? [{ label: vatLabel(fr), value: <span data-testid="payment-vat"><DualCurrency amount={totals.vat} /></span> }] : []),
+          ...(totals.showFeeLine ? [{ label: platformFeeLabel(fr), value: notServed ? (fr ? "Zone non desservie" : "Not served yet") : !quote ? (fr ? "Calcul…" : "Calculating…") : deliveryFee === 0 ? (fr ? "GRATUIT" : "FREE") : <DualCurrency amount={deliveryFee} /> }] : []),
         ]} />
         <div className="mt-4">
           <DeliveryQuoteCard quote={quote} loading={quoteLoading} error={quoteError} fr={fr} locale={locale} notServed={notServed ?? orderNotServed} />
@@ -280,7 +284,7 @@ function PaymentContent() {
           </div>
         )}
 
-        <p className="mt-4 text-lg font-bold">Total: <DualCurrency amount={total} /></p>
+        <p className="mt-4 text-lg font-bold" data-testid="payment-total">Total{totals.feeInTotal ? ` (${inclDeliveryNote(fr)})` : ""}: <DualCurrency amount={total} /></p>
 
         {(verification.blocked || isVerificationError(error)) ? (
           <div className="mt-3"><VerificationNotice status={verification} serverMessage={isVerificationError(error) ? error : null} /></div>

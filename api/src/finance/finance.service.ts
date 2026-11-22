@@ -19,8 +19,8 @@ import { frenchLineNames } from '../translation/line-names';
 import { EARNING_STATES, OPEN_ORDER_STATUSES, dateInput, fixed2, lastMonths, lineState, monthRange, round2, toCsv } from './finance.util';
 import type { EarningState } from './finance.util';
 
-/** A line's net before refunds. */
-const SQL_FULL_NET = '(i.priceUsd * i.qty - i.couponDiscountUsd - i.commissionUsd)';
+/** A line's net before refunds: after the commission and, on an order whose delivery fee the seller pays, the line's share of that fee. VAT is never in it. */
+const SQL_FULL_NET = '(i.priceUsd * i.qty - i.couponDiscountUsd - i.commissionUsd - COALESCE(i.sellerFeeUsd, 0))';
 /** What the line still earns: the share refunded to the customer (and its commission) is out (SL-01). */
 const SQL_NET = `(${SQL_FULL_NET} * ${SQL_KEPT_FRACTION})`;
 /** What refunds took back: the whole line once the order is returned, else the refunded share of a partial refund. */
@@ -71,9 +71,11 @@ export interface EarningLine {
   couponUsd: number;
   commissionPct: number;
   commissionUsd: number;
+  /** The line's share of the delivery fee when the seller pays it (0 otherwise): deducted from the net, shown as "Delivery fee". */
+  deliveryFeeUsd: number;
   /** What partial refunds on this line took back from the seller (the refunded share of the gross less its commission); 0 on a returned order, whose state already says the whole line went back. */
   refundUsd: number;
-  /** grossUsd - commissionUsd - refundUsd. */
+  /** grossUsd - commissionUsd - deliveryFeeUsd - refundUsd. */
   netUsd: number;
   state: EarningState;
   /** When the money becomes withdrawable (delivered lines only). */
@@ -97,6 +99,7 @@ export interface StatementLine {
   grossUsd: number;
   commissionPct: number;
   commissionUsd: number;
+  deliveryFeeUsd: number;
   netUsd: number;
 }
 
@@ -184,6 +187,8 @@ export class FinanceService {
       .addSelect('i.couponDiscountUsd', 'couponUsd')
       .addSelect('i.commissionPct', 'commissionPct')
       .addSelect('i.commissionUsd', 'commissionUsd')
+      .addSelect('i.sellerFeeUsd', 'sellerFeeUsd')
+      .addSelect('i.vatUsd', 'vatUsd')
       .addSelect('i.refundedUsd', 'refundedUsd')
       .addSelect('o.subtotalUsd', 'subtotalUsd')
       .addSelect('o.discountUsd', 'discountUsd');
@@ -216,7 +221,7 @@ export class FinanceService {
   /** What refunds on a raw line row took back from the seller (see line-refund.ts). */
   private static refundOf(r: Record<string, unknown>) {
     return lineRefund(
-      { priceUsd: num(r.priceUsd), qty: num(r.qty), refundedUsd: num(r.refundedUsd), couponDiscountUsd: num(r.couponUsd), commissionUsd: num(r.commissionUsd) },
+      { priceUsd: num(r.priceUsd), qty: num(r.qty), refundedUsd: num(r.refundedUsd), couponDiscountUsd: num(r.couponUsd), commissionUsd: num(r.commissionUsd), vatUsd: num(r.vatUsd), sellerFeeUsd: num(r.sellerFeeUsd) },
       { subtotalUsd: num(r.subtotalUsd), discountUsd: num(r.discountUsd) },
     );
   }
@@ -262,6 +267,7 @@ export class FinanceService {
     const qty = num(r.qty);
     const gross = lineGross({ priceUsd: num(r.priceUsd), qty, couponDiscountUsd: num(r.couponUsd) });
     const commission = round2(num(r.commissionUsd));
+    const deliveryFee = round2(num(r.sellerFeeUsd));
     const orderStatus = String(r.orderStatus);
     const deliveredAt = orderStatus === 'delivered' || orderStatus === 'returned' ? toDate(r.orderUpdatedAt) : null;
     const payoutStatus = r.payoutStatus ? String(r.payoutStatus) : null;
@@ -284,8 +290,9 @@ export class FinanceService {
       couponUsd: round2(num(r.couponUsd)),
       commissionPct: num(r.commissionPct),
       commissionUsd: commission,
+      deliveryFeeUsd: deliveryFee,
       refundUsd: refund.netUsd,
-      netUsd: round2(gross - commission - refund.netUsd),
+      netUsd: round2(gross - commission - deliveryFee - refund.netUsd),
       state,
       clearanceEndsAt,
       payout: r.payoutId ? { id: String(r.payoutId), reference: String(r.payoutReference), status: String(payoutStatus) } : null,
@@ -354,6 +361,7 @@ export class FinanceService {
     const sales: StatementLine[] = rows.map((r) => {
       const gross = lineGross({ priceUsd: num(r.priceUsd), qty: num(r.qty), couponDiscountUsd: num(r.couponUsd) });
       const commission = round2(num(r.commissionUsd));
+      const fee = round2(num(r.sellerFeeUsd));
       const refund = String(r.orderStatus) === 'returned';
       const date = (toDate(r.orderUpdatedAt) ?? start).toISOString().slice(0, 10);
       return {
@@ -369,7 +377,8 @@ export class FinanceService {
         grossUsd: refund ? -gross : gross,
         commissionPct: num(r.commissionPct),
         commissionUsd: refund ? -commission : commission,
-        netUsd: round2(refund ? -(gross - commission) : gross - commission),
+        deliveryFeeUsd: refund ? -fee : fee,
+        netUsd: round2(refund ? -(gross - commission - fee) : gross - commission - fee),
       } satisfies StatementLine;
     });
     // SL-01: partial refunds on delivered orders, in the month they were paid back.
@@ -387,6 +396,7 @@ export class FinanceService {
       grossUsd: -refund.grossUsd,
       commissionPct: num(r.commissionPct),
       commissionUsd: -refund.commissionUsd,
+      deliveryFeeUsd: -refund.deliveryFeeUsd,
       netUsd: -refund.netUsd,
     }));
     // Stable: same-day lines keep the delivery order.
@@ -402,6 +412,9 @@ export class FinanceService {
       units: sales.reduce((t, l) => t + l.qty, 0),
       grossUsd: sum(sales, (l) => l.grossUsd),
       commissionUsd: sum(sales, (l) => l.commissionUsd),
+      // Delivery fees on seller-paid orders: charged on sales, credited back with refunds (same as the commission).
+      deliveryFeeUsd: sum(sales, (l) => l.deliveryFeeUsd),
+      deliveryFeeCreditedUsd: round2(-sum(refunds, (l) => l.deliveryFeeUsd)),
       refundsUsd: round2(-sum(refunds, (l) => l.netUsd)),
       commissionCreditedUsd: round2(-sum(refunds, (l) => l.commissionUsd)),
       netUsd: sum(lines, (l) => l.netUsd),
@@ -458,16 +471,19 @@ export class FinanceService {
   }
 
   private static statementCsv(s: { month: string; store: string; totals: ReturnType<typeof FinanceService.totalsOf> & { payoutsRequestedUsd: number; payoutsPaidUsd: number }; lines: StatementLine[] }, w: CsvWords, fr = false): string {
+    // The delivery-fee column and total appear only when a seller-paid order is in the file: every other file reads as it always did.
+    const withFee = s.lines.some((l) => l.deliveryFeeUsd !== 0);
     const rows: (string | number | null)[][] = [
       [w.t('h.statement'), s.month, s.store],
       [],
-      [w.t('h.date'), w.t('h.kind'), w.t('h.order'), w.t('h.product'), w.t('h.option'), w.t('h.qty'), w.t('h.sales'), w.t('h.commissionPct'), w.t('h.commission'), w.t('h.net')],
-      ...s.lines.map((l) => [l.date, w.kind(l.kind), l.orderReference, fr ? (l.productNameFr ?? l.productName) : l.productName, fr ? (l.variantFr ?? l.variant) : l.variant, l.qty, fixed2(l.grossUsd), l.commissionPct, fixed2(l.commissionUsd), fixed2(l.netUsd)]),
+      [w.t('h.date'), w.t('h.kind'), w.t('h.order'), w.t('h.product'), w.t('h.option'), w.t('h.qty'), w.t('h.sales'), w.t('h.commissionPct'), w.t('h.commission'), ...(withFee ? [w.t('h.deliveryFee')] : []), w.t('h.net')],
+      ...s.lines.map((l) => [l.date, w.kind(l.kind), l.orderReference, fr ? (l.productNameFr ?? l.productName) : l.productName, fr ? (l.variantFr ?? l.variant) : l.variant, l.qty, fixed2(l.grossUsd), l.commissionPct, fixed2(l.commissionUsd), ...(withFee ? [fixed2(l.deliveryFeeUsd)] : []), fixed2(l.netUsd)]),
       [],
       [w.t('t.orders'), s.totals.orders],
       [w.t('t.units'), s.totals.units],
       [w.t('t.sales'), fixed2(s.totals.grossUsd)],
       [w.t('t.commission'), fixed2(s.totals.commissionUsd)],
+      ...(withFee ? [[w.t('t.deliveryFee'), fixed2(s.totals.deliveryFeeUsd)]] : []),
       [w.t('t.returns'), fixed2(s.totals.refundsUsd)],
       [w.t('t.net'), fixed2(s.totals.netUsd)],
       [w.t('t.paid'), fixed2(s.totals.payoutsPaidUsd)],
@@ -512,6 +528,8 @@ export class FinanceService {
       line?: { itemId: string; qty: number; name: string; variant: string };
       grossUsd: number;
       commissionUsd: number;
+      /** Delivery fee deducted (seller-paid orders; 0 otherwise). */
+      deliveryFeeUsd: number;
       amountUsd: number;
       status: string;
       counts: boolean;
@@ -520,6 +538,7 @@ export class FinanceService {
     for (const r of lineRows) {
       const gross = lineGross({ priceUsd: num(r.priceUsd), qty: num(r.qty), couponDiscountUsd: num(r.couponUsd) });
       const commission = round2(num(r.commissionUsd));
+      const fee = round2(num(r.sellerFeeUsd));
       const refund = String(r.orderStatus) === 'returned';
       entries.push({
         id: String(r.itemId),
@@ -530,7 +549,8 @@ export class FinanceService {
         line: { itemId: String(r.itemId), qty: num(r.qty), name: String(r.productName), variant: String(r.variant) },
         grossUsd: refund ? -gross : gross,
         commissionUsd: refund ? -commission : commission,
-        amountUsd: round2(refund ? -(gross - commission) : gross - commission),
+        deliveryFeeUsd: refund ? -fee : fee,
+        amountUsd: round2(refund ? -(gross - commission - fee) : gross - commission - fee),
         status: refund ? 'returned' : 'delivered',
         counts: true,
       });
@@ -547,6 +567,7 @@ export class FinanceService {
         line: { itemId: String(r.itemId), qty, name: String(r.productName), variant: String(r.variant) },
         grossUsd: -refund.grossUsd,
         commissionUsd: -refund.commissionUsd,
+        deliveryFeeUsd: -refund.deliveryFeeUsd,
         amountUsd: -refund.netUsd,
         status: 'delivered',
         counts: true,
@@ -563,6 +584,7 @@ export class FinanceService {
         descriptionFr: PAYOUT_METHOD_FR[p.method] ?? p.method,
         grossUsd: 0,
         commissionUsd: 0,
+        deliveryFeeUsd: 0,
         amountUsd: p.status === 'rejected' ? 0 : round2(-p.amountUsd),
         status: p.status,
         counts: p.status !== 'rejected',
@@ -588,11 +610,12 @@ export class FinanceService {
     if (input.format === 'csv') {
       const lang = asLocale(input.locale) ?? 'en';
       const w = csvWords(lang);
+      const withFee = entries.some((e) => e.deliveryFeeUsd !== 0); // only when a seller-paid order is in the file
       return {
         filename: 'transactions.csv',
         csv: toCsv([
-          [w.t('h.date'), w.t('h.kind'), w.t('h.reference'), w.t('h.description'), w.t('h.sales'), w.t('h.commission'), w.t('h.amount'), w.t('h.status')],
-          ...entries.map((e) => [e.at.toISOString(), w.kind(e.kind), e.reference, lang === 'fr' ? (e.descriptionFr ?? e.description) : e.kind === 'payout' ? (PAYOUT_METHOD_EN[e.description] ?? e.description) : e.description, fixed2(e.grossUsd), fixed2(e.commissionUsd), fixed2(e.amountUsd), e.kind === 'payout' ? w.payoutStatus(e.status) : w.orderStatus(e.status)]),
+          [w.t('h.date'), w.t('h.kind'), w.t('h.reference'), w.t('h.description'), w.t('h.sales'), w.t('h.commission'), ...(withFee ? [w.t('h.deliveryFee')] : []), w.t('h.amount'), w.t('h.status')],
+          ...entries.map((e) => [e.at.toISOString(), w.kind(e.kind), e.reference, lang === 'fr' ? (e.descriptionFr ?? e.description) : e.kind === 'payout' ? (PAYOUT_METHOD_EN[e.description] ?? e.description) : e.description, fixed2(e.grossUsd), fixed2(e.commissionUsd), ...(withFee ? [fixed2(e.deliveryFeeUsd)] : []), fixed2(e.amountUsd), e.kind === 'payout' ? w.payoutStatus(e.status) : w.orderStatus(e.status)]),
         ]),
       };
     }
@@ -660,7 +683,7 @@ export class FinanceService {
       locale,
       seller: { name: seller.name, legalName: seller.legalName, taxNumber: seller.taxNumber, rccm: seller.rccm },
       lines: invoiceLines,
-      totals: { orders: totals.orders, units: totals.units, grossUsd: totals.grossUsd, commissionUsd: totals.commissionUsd, creditedUsd: totals.commissionCreditedUsd, netUsd: totals.netUsd },
+      totals: { orders: totals.orders, units: totals.units, grossUsd: totals.grossUsd, commissionUsd: totals.commissionUsd, creditedUsd: totals.commissionCreditedUsd, deliveryFeeUsd: totals.deliveryFeeUsd, deliveryFeeCreditedUsd: totals.deliveryFeeCreditedUsd, netUsd: totals.netUsd },
     });
     const dir = join(uploadRoot(), 'invoices', sellerUserId);
     mkdirSync(dir, { recursive: true });

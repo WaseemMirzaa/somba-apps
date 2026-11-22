@@ -37,6 +37,10 @@ const EXACT: Record<string, string> = {
   "Maximum express fee must be a number between 0 and 500.": "Le plafond des frais express doit être un nombre entre 0 et 500.",
   "Express maximum distance must be a number between 0 and 100.": "La distance maximale express doit être un nombre entre 0 et 100.",
   "Seller commission must be a number between 0 and 60.": "La commission vendeur doit être un nombre entre 0 et 60.",
+  "VAT must be a number between 0 and 50.": "La TVA doit être un nombre entre 0 et 50.",
+  "VAT switch must be one of: true, false.": "L’interrupteur de la TVA doit être « vrai » ou « faux ».",
+  "Show platform fee switch must be one of: true, false.": "L’interrupteur d’affichage des frais doit être « vrai » ou « faux ».",
+  "Delivery fee payer must be one of: customer, seller.": "Le payeur des frais de livraison doit être « client » ou « vendeur ».",
 
   // ── admin controls: support decides after-sale, chat closed, admin express, store policy approval (docs/contracts/admin-controls.md §8) ──
   "Messaging sellers is closed. Contact support from your account.": "La messagerie avec les vendeurs est fermée. Contactez le support depuis votre compte.",

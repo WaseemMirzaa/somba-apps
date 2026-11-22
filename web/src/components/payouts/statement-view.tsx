@@ -56,6 +56,7 @@ export function PayoutStatement({ payoutId }: { payoutId: string }) {
     { label: fr ? "Solde d'ouverture" : "Opening balance", value: money(totals.openingBalanceUsd) },
     { label: fr ? "Ventes brutes" : "Gross sales", value: money(totals.grossUsd) },
     { label: "Commission", value: `− ${money(totals.commissionUsd)}` },
+    ...((totals.deliveryFeeUsd ?? 0) > 0 ? [{ label: fr ? "Frais de livraison" : "Delivery fee", value: `− ${money(totals.deliveryFeeUsd ?? 0)}` }] : []),
     { label: fr ? "Remboursements" : "Refunds", value: `− ${money(totals.refundsUsd)}` },
     { label: fr ? "Net de ce relevé" : "Statement net", value: money(totals.netUsd), strong: true },
     { label: fr ? "Montant du versement" : "Payout amount", value: money(totals.amountUsd) },
@@ -117,6 +118,7 @@ export function PayoutStatement({ payoutId }: { payoutId: string }) {
             { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (r) => money(r.grossUsd as number) },
             { key: "commissionPct", label: fr ? "Taux" : "Rate", render: (r) => `${r.commissionPct as number}%` },
             { key: "commissionUsd", label: "Commission", render: (r) => money(r.commissionUsd as number) },
+            ...(lines.some((l) => (l.deliveryFeeUsd ?? 0) > 0) ? [{ key: "deliveryFeeUsd", label: fr ? "Frais de livraison" : "Delivery fee", render: (r: Record<string, unknown>) => ((r.deliveryFeeUsd as number) > 0 ? money(r.deliveryFeeUsd as number) : "—") }] : []),
             { key: "refundUsd", label: fr ? "Remb." : "Refund", render: (r) => ((r.refundUsd as number) > 0 ? money(r.refundUsd as number) : "—") },
             { key: "netUsd", label: "Net", render: (r) => <span className="font-semibold">{money(r.netUsd as number)}</span> },
             { key: "deliveredAt", label: fr ? "Livrée le" : "Delivered", render: (r) => localDay(r.deliveredAt as string | null) || "—" },
@@ -132,6 +134,11 @@ export function PayoutStatement({ payoutId }: { payoutId: string }) {
         <span className="text-slate-500">
           Commission <strong className="text-slate-900">{money(totals.commissionUsd)}</strong>
         </span>
+        {(totals.deliveryFeeUsd ?? 0) > 0 && (
+          <span className="text-slate-500">
+            {fr ? "Frais de livraison" : "Delivery fee"} <strong className="text-slate-900">{money(totals.deliveryFeeUsd ?? 0)}</strong>
+          </span>
+        )}
         <span className="text-slate-500">
           {fr ? "Remboursements" : "Refunds"} <strong className="text-slate-900">{money(totals.refundsUsd)}</strong>
         </span>

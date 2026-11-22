@@ -135,12 +135,14 @@ export class SellerOrdersService {
     ).map((r) => r.id);
     const views = await this.views(ids, keys);
     const w = csvWords(asLocale(input.locale) ?? 'en');
-    const rows: (string | number | null)[][] = [[w.t('h.order'), w.t('h.date'), w.t('h.status'), w.t('h.package'), w.t('h.customer'), w.t('h.city'), w.t('h.payment'), w.t('h.product'), w.t('h.option'), w.t('h.qty'), w.t('h.unitPrice'), w.t('h.coupon'), w.t('h.commission'), w.t('h.net')]];
+    // The delivery-fee column appears only when a line in the file carries a seller-paid fee: every other file reads as it always did.
+    const withFee = views.some((v) => (v.items as OrderItem[]).some((i) => i.fulfilment !== 'cancelled' && (Number(i.sellerFeeUsd) || 0) !== 0));
+    const rows: (string | number | null)[][] = [[w.t('h.order'), w.t('h.date'), w.t('h.status'), w.t('h.package'), w.t('h.customer'), w.t('h.city'), w.t('h.payment'), w.t('h.product'), w.t('h.option'), w.t('h.qty'), w.t('h.unitPrice'), w.t('h.coupon'), w.t('h.commission'), ...(withFee ? [w.t('h.deliveryFee')] : []), w.t('h.net')]];
     for (const v of views) {
       for (const i of v.items as OrderItem[]) {
         if (i.fulfilment === 'cancelled') continue;
         const gross = round2(i.priceUsd * i.qty - (Number(i.couponDiscountUsd) || 0));
-        rows.push([v.reference, new Date(v.createdAt).toISOString().slice(0, 19).replace('T', ' '), w.orderStatus(v.status), w.packageStatus(v.packageStatus), v.customerName, v.city, w.method(v.paymentMethod), i.productName, i.variant, i.qty, fixed2(i.priceUsd), fixed2(Number(i.couponDiscountUsd) || 0), fixed2(Number(i.commissionUsd) || 0), fixed2(gross - (Number(i.commissionUsd) || 0))]);
+        rows.push([v.reference, new Date(v.createdAt).toISOString().slice(0, 19).replace('T', ' '), w.orderStatus(v.status), w.packageStatus(v.packageStatus), v.customerName, v.city, w.method(v.paymentMethod), i.productName, i.variant, i.qty, fixed2(i.priceUsd), fixed2(Number(i.couponDiscountUsd) || 0), fixed2(Number(i.commissionUsd) || 0), ...(withFee ? [fixed2(Number(i.sellerFeeUsd) || 0)] : []), fixed2(gross - (Number(i.commissionUsd) || 0) - (Number(i.sellerFeeUsd) || 0))]);
       }
     }
     return { filename: 'orders.csv', total: views.length, csv: toCsv(rows) };

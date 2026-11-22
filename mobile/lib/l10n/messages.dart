@@ -46,6 +46,8 @@ const Map<String, (String, String)> _kMessagesBase = {
   'delivery': ('Delivery', 'Livraison'),
   'platformFee': ('Platform commission', 'Commission de la plateforme'),
   'total': ('Total', 'Total'),
+  'vat': ('VAT', 'TVA'),
+  'totalInclDelivery': ('Total (incl. delivery)', 'Total (livraison incluse)'),
   'free': ('Free', 'Gratuit'),
   'promoHint': ('Promo code', 'Code promo'),
   'apply': ('Apply', 'Appliquer'),

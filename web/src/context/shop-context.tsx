@@ -454,6 +454,10 @@ export type CartLine = CartItem & {
   /** The seller's store is on vacation: the line cannot be ordered until it is back. */
   onVacation: boolean;
   vacationNotice: { en: string; fr: string } | null;
+  /** The VAT % the server charges on this product (0 while VAT is off); the cart estimate multiplies by it, the order is authoritative. */
+  vatPct: number;
+  /** The product's store (a store coupon discounts only that store's lines). */
+  sellerId: string | null;
 };
 
 /** Cart lines enriched with the live catalogue (price, stock, availability). */
@@ -488,6 +492,8 @@ export function useCartLines(): {
         priceInfo: p ? priceView(p) : null,
         onVacation: !!p?.sellerOnVacation,
         vacationNotice: p?.sellerVacationNotice ?? null,
+        vatPct: p?.vatPct ?? 0,
+        sellerId: p?.sellerId ?? null,
       };
     });
     return {
