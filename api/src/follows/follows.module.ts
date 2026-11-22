@@ -6,7 +6,7 @@ import { ProductsModule } from '../products/products.module';
 import { FollowsGateway } from './follows.gateway';
 import { FollowsService } from './follows.service';
 
-/** Following stores: the follow list, the toggle, and the new-product notice to followers. */
+/** Following stores: the follow list, the toggle, and the new-product, deal and promotion notices to followers. */
 @Module({
   imports: [TypeOrmModule.forFeature([StoreFollow, Seller, Product, Notification]), NotificationsModule, ProductsModule],
   providers: [FollowsService, FollowsGateway],

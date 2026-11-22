@@ -23,6 +23,13 @@ export function noticeHref(n: Pick<AppNotification, "type" | "entityId" | "link"
       if (t === "chat") return "/shop/notifications"; // chat is closed: old chat notices open the notifications page
       if (t === "question") return pick(`/shop/products/${id}`, "/shop/products");
       if (t === "review") return pick(`/shop/products/${id}`, "/shop/products");
+      if (t === "store") return pick(`/shop/products/${id}`, "/shop/notifications"); // a followed store's new product
+      if (t === "flash") return "/shop/deals"; // a followed store's deal
+      if (t === "campaign" || t === "promo") {
+        // A followed store's promotion: the entityId is `<store id>:<campaign or coupon id>`
+        const store = (n.entityId ?? "").split(":")[0];
+        return store && (n.entityId ?? "").includes(":") ? `/shop/stores/${encodeURIComponent(store)}` : "/shop/notifications";
+      }
       return "/shop/notifications";
     case "seller":
       if (t === "order") return pick(`/seller/orders/${id}`, "/seller/orders");

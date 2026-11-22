@@ -76,6 +76,21 @@ describe('NotificationsService', () => {
     expect(push.sendToUser).not.toHaveBeenCalled();
   });
 
+  it.each(['flash', 'campaign', 'promo', 'store'])('a followed store\'s %s notice is in the promo push category: muted by the promo switch, still saved and shown in the bell', async (type) => {
+    const entityId = type === 'flash' || type === 'store' ? 'e1' : 's1:e1';
+    const off = make({ u1: { role: 'customer', prefs: JSON.stringify({ notify: { promo: false } }) } });
+    await off.svc.toUser('u1', { title: 'New deal from A', body: 'B', type, entityId });
+    await tick();
+    expect(off.emits).toContainEqual(['user', 'u1', 'notification:new']);
+    expect(off.saved).toHaveLength(1);
+    expect(off.push.sendToUser).not.toHaveBeenCalled();
+    // another category switched off does not mute it; a French user is pushed the authored French
+    const on = make({ u2: { role: 'customer', prefs: JSON.stringify({ notify: { order: false } }), locale: 'fr' } });
+    await on.svc.toUser('u2', { title: 'New deal from A', body: 'B', type, entityId, fr: { title: 'Nouvelle offre de A', body: 'Bonjour' } });
+    await tick();
+    expect(on.push.sendToUser).toHaveBeenCalledWith('u2', expect.objectContaining({ title: 'Nouvelle offre de A', body: 'Bonjour' }));
+  });
+
   it('sends staff alerts to web devices only, and rider tasks to phones too', async () => {
     const { svc, push } = make({ r9: { role: 'rider', prefs: JSON.stringify({ push: false }) } });
     await svc.toRole('admin_support', { title: 'T', body: 'B', type: 'support', entityId: 't1' });

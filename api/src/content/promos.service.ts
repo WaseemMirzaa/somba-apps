@@ -13,6 +13,7 @@ import { ROLE_GROUPS } from '../common/role-groups';
 /** Staff who run promo codes and flash sales and follow them live: the super admin and Marketing (group `content`). */
 const CONTENT_ROLES: string[] = [...ROLE_GROUPS.content];
 import { ProductsService } from '../products/products.service';
+import { FollowsService } from '../follows/follows.service';
 import { TranslationService } from '../translation/translation.service';
 import type { TranslationStatus } from '../translation/translation.service';
 import { planWrite } from '../translation/translatable';
@@ -128,6 +129,7 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
     private readonly translations?: TranslationService,
     @InjectRepository(Seller) private readonly sellers?: Repository<Seller>,
     private readonly notifications?: NotificationsService,
+    private readonly follows?: FollowsService,
   ) {
     // A machine finished a flash sale's other language: tell the same rooms as any flash-sale change.
     this.translations?.registerRepublisher('flash_sale', async (id) => {
@@ -468,13 +470,34 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The owning store hears its product is (or will be) on flash sale. */
-  private async noticeStart(fs: FlashSale, product: Product, served: Pick<ServedFlashSale, 'productName'>): Promise<void> {
+  private async noticeStart(fs: FlashSale, product: Product, served: Pick<ServedFlashSale, 'productName' | 'productNameFr'>): Promise<void> {
     const price = fs.flashPrice.toFixed(2);
     if (fs.phase === 'scheduled') {
       await this.notifySellers(product, 'Flash sale scheduled', `${served.productName} goes on flash sale at $${price} from ${when(fs.startsAt)}.`, fs.id);
     } else if (fs.phase === 'running') {
       await this.notifySellers(product, 'Flash sale started', `${served.productName} is now on flash sale at $${price}.`, fs.id);
+      await this.tellFollowersOfDeal(fs, product, served);
     }
+  }
+
+  /**
+   * A flash sale of a store is running (created already live, approved, started by the sweep or moved live by an edit):
+   * the store's followers hear of the deal once. Every path may call this; the follower notice dedupes per sale.
+   */
+  private async tellFollowersOfDeal(fs: FlashSale, product: Product, served: Pick<ServedFlashSale, 'productName' | 'productNameFr'>): Promise<void> {
+    if (!this.follows || fs.status !== 'approved' || product.status !== 'live') return;
+    const was = product.price.toFixed(2);
+    const now = fs.flashPrice.toFixed(2);
+    await this.follows
+      .notifyFollowers({
+        storeRef: product.sellerId,
+        kind: 'deal',
+        type: 'flash',
+        sourceId: fs.id,
+        body: `${served.productName}: $${now} instead of $${was}`,
+        bodyFr: `${served.productNameFr || served.productName} : ${now.replace('.', ',')} $ au lieu de ${was.replace('.', ',')} $`,
+      })
+      .catch((e) => this.logger.warn(`follower deal notice failed: ${(e as Error).message}`));
   }
 
   /** Marketing edits a sale (price, dates, title, on/off). Shoppers' prices follow at once. */
@@ -495,6 +518,7 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
     if (typeof next.startsAt === 'string' && typeof next.endsAt === 'string' && Date.parse(next.endsAt) <= Date.parse(next.startsAt)) {
       throw new BadRequestException('The end of a flash sale must be after its start.');
     }
+    const phaseBefore = fs.phase;
     Object.assign(fs, fields);
     const wordsSent = patch.title !== undefined || patch.titleFr !== undefined;
     if (wordsSent) {
@@ -518,7 +542,13 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
     } else await this.flashSales.save(fs);
     fs.phase = flashPhase(fs);
     await this.flashSales.update({ id }, { phase: fs.phase });
-    return (await this.announce(fs))!;
+    const served = (await this.announce(fs))!;
+    // An edit that moves a sale live (an earlier start, switched on) is a deal starting too.
+    if (fs.phase === 'running' && phaseBefore !== 'running') {
+      const product = await this.products.findOne({ where: { id: fs.productId } });
+      if (product) await this.tellFollowersOfDeal(fs, product, served);
+    }
+    return served;
   }
 
   /** Marketing deletes a sale; the price goes back to normal at once. */
@@ -608,7 +638,10 @@ export class PromosService implements OnModuleInit, OnModuleDestroy {
         const t = iso ? Date.parse(iso) : fallback?.getTime();
         return !t || !Number.isFinite(t) || now - t < STALE_MS;
       };
-      if (next === 'running' && fresh(f.startsAt, f.createdAt)) await this.notifySellers(product, 'Flash sale started', `${served.productName} is now on flash sale at $${f.flashPrice.toFixed(2)}.`, f.id);
+      if (next === 'running' && fresh(f.startsAt, f.createdAt)) {
+        await this.notifySellers(product, 'Flash sale started', `${served.productName} is now on flash sale at $${f.flashPrice.toFixed(2)}.`, f.id);
+        await this.tellFollowersOfDeal(f, product, served);
+      }
       else if (next === 'ended' && fresh(f.endsAt)) await this.notifySellers(product, 'Flash sale ended', `${served.productName}: the flash sale has ended; the price is back to normal.`, f.id);
     }
     return moved;

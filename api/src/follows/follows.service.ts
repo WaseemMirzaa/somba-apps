@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Notification, Product, Seller, StoreFollow } from '../database/entities';
 import { pageOf } from '../common/paging';
-import { frenchNotice } from '../notifications/localize';
+import { followerTitle, frenchNotice } from '../notifications/localize';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ProductsService, ServedProduct } from '../products/products.service';
@@ -142,7 +142,7 @@ export class FollowsService implements OnModuleInit {
     const store = (await this.sellers.findOne({ where: { id: product.sellerId } })) ?? (await this.sellers.findOne({ where: { userId: product.sellerId } }));
     if (!store || store.status !== 'approved') return 0;
     if (await this.notices.count({ where: { type: 'store', entityId: product.id } })) return 0;
-    const followers = (await this.follows.find({ where: { sellerId: store.id }, select: ['userId'] })).map((f) => f.userId).filter((id) => id !== store.userId);
+    const followers = await this.followerIds(store);
     if (!followers.length) return 0;
     const title = 'New from a store you follow';
     const body = `${store.name}: ${product.name}`;
@@ -154,5 +154,56 @@ export class FollowsService implements OnModuleInit {
         .catch((e) => this.logger.warn(`follower notice failed: ${(e as Error).message}`));
     }
     return followers.length;
+  }
+  /** The store a listing, deal or promotion belongs to (its id, or an older row's owner account id), when shoppers can see it. */
+  private async approvedStore(ref: string | null | undefined): Promise<Seller | null> {
+    if (!ref) return null;
+    const store = (await this.sellers.findOne({ where: { id: ref } })) ?? (await this.sellers.findOne({ where: { userId: ref } }));
+    return store && store.status === 'approved' ? store : null;
+  }
+
+  /** Every follower of a store, the owner excluded. */
+  private async followerIds(store: Seller): Promise<string[]> {
+    return (await this.follows.find({ where: { sellerId: store.id }, select: ['userId'] })).map((f) => f.userId).filter((id) => id !== store.userId);
+  }
+
+  /**
+   * A store's deal started or its promotion went live: every follower gets one notice (saved in the bell and pushed, in
+   * the `promo` category so Settings can mute it), once per (type, entityId) and follower. A sweep that runs again, a
+   * sale that is edited, a coupon that is switched off and on, or a second instance finds the follower already told and
+   * sends nothing. `deal` = a flash sale (opens the deals page); `promotion` = a seller campaign or a public coupon
+   * (their entity id is `<store id>:<campaign or coupon id>`, so the notice can open the store). Returns how many were told.
+   */
+  async notifyFollowers(input: {
+    storeRef: string | null | undefined;
+    kind: 'deal' | 'promotion';
+    type: 'flash' | 'campaign' | 'promo';
+    sourceId: string;
+    body: string;
+    bodyFr: string;
+  }): Promise<number> {
+    const store = await this.approvedStore(input.storeRef);
+    if (!store) return 0;
+    const followers = await this.followerIds(store);
+    if (!followers.length) return 0;
+    const entityId = input.type === 'flash' ? input.sourceId : `${store.id}:${input.sourceId}`;
+    const titles = followerTitle(input.kind, store.name);
+    const fr = { title: titles.fr, body: input.bodyFr };
+    let told = 0;
+    for (let i = 0; i < followers.length; i += BATCH) {
+      const chunk = followers.slice(i, i + BATCH);
+      try {
+        const done = new Set((await this.notices.find({ where: { type: input.type, entityId, userId: In(chunk) }, select: ['userId'] })).map((n) => n.userId));
+        const todo = chunk.filter((id) => !done.has(id));
+        if (!todo.length) continue;
+        const title = titles.en;
+        const body = input.body;
+        await this.notifications.toUsers(todo, { title, body, type: input.type, entityId, fr });
+        told += todo.length;
+      } catch (e) {
+        this.logger.warn(`follower notice failed: ${(e as Error).message}`);
+      }
+    }
+    return told;
   }
 }

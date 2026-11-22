@@ -13,6 +13,7 @@ import {
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ProductsModule } from '../products/products.module';
 import { ContentModule } from '../content/content.module';
+import { FollowsModule } from '../follows/follows.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { LogisticsModule } from '../logistics/logistics.module';
 import { LogisticsBridge } from '../after-sale/logistics-bridge';
@@ -32,6 +33,7 @@ import { SellerLapseService } from './seller-lapse.service';
     NotificationsModule,
     ProductsModule,
     ContentModule,
+    FollowsModule,
     WalletModule,
     LogisticsModule,
     SellerAfterSaleModule,

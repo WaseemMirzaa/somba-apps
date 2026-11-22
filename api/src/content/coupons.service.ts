@@ -5,6 +5,7 @@ import { Order, Promo, Seller } from '../database/entities';
 import { num, oneOf, optStr, str } from '../common/validate';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { ROLE_GROUPS } from '../common/role-groups';
+import { FollowsService } from '../follows/follows.service';
 
 /** Staff who follow coupons live: the super admin and Marketing (group `content`). */
 const CONTENT_ROLES: string[] = [...ROLE_GROUPS.content];
@@ -30,6 +31,7 @@ export class CouponsService {
     @InjectRepository(Order) private readonly orders: Repository<Order>,
     @InjectRepository(Seller) private readonly sellers: Repository<Seller>,
     private readonly emitter: RealtimeEmitter,
+    private readonly follows?: FollowsService,
   ) {}
 
   private async withUses(rows: Promo[]): Promise<ServedCoupon[]> {
@@ -100,7 +102,29 @@ export class CouponsService {
     const promo = await this.promos.save(this.promos.create(clean));
     const served = (await this.withUses([promo]))[0];
     this.publish(seller, served);
+    await this.tellFollowers(seller, promo);
     return served;
+  }
+
+  /**
+   * A coupon shoppers can see (on, public, not expired) is a promotion of the store: its followers hear of it once
+   * (the follower notice dedupes per coupon, so switching it off and on again does not repeat it).
+   */
+  private async tellFollowers(seller: Seller, promo: Promo): Promise<void> {
+    if (!this.follows || !promo.active || !promo.isPublic) return;
+    if (promo.expiresAt && new Date(promo.expiresAt).getTime() <= Date.now()) return;
+    const percent = promo.type === 'percent';
+    const amount = Number.isInteger(promo.value) ? String(promo.value) : promo.value.toFixed(2);
+    await this.follows
+      .notifyFollowers({
+        storeRef: seller.id,
+        kind: 'promotion',
+        type: 'promo',
+        sourceId: promo.id,
+        body: `Code ${promo.code}: ${percent ? `${amount}% off` : `$${amount} off`}`,
+        bodyFr: `Code ${promo.code} : ${percent ? `${amount} % de réduction` : `${amount.replace('.', ',')} $ de réduction`}`,
+      })
+      .catch(() => undefined);
   }
 
   /** The owner changes a coupon. Its code and kind stay; the amount, limits, expiry and visibility can move. */
@@ -123,6 +147,7 @@ export class CouponsService {
     const saved = await this.promos.save(promo);
     const served = (await this.withUses([saved]))[0];
     this.publish(seller, served);
+    await this.tellFollowers(seller, saved);
     return served;
   }
 

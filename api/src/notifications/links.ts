@@ -28,6 +28,12 @@ export function linkFor(role: string | null | undefined, type: string | null | u
       if (t === 'exchange') return pick(`/shop/exchanges/${id}`, '/shop/returns');
       if (t === 'replacement') return pick(`/shop/replacements/${id}`, '/shop/returns');
       if (t === 'question' || t === 'store') return pick(`/shop/products/${id}`, '/shop/notifications'); // entityId is the product
+      // A followed store's deal opens the deals page; its promotion (campaign or public coupon) opens the store: that entityId is `<store id>:<campaign or coupon id>`.
+      if (t === 'flash') return '/shop/deals';
+      if (t === 'campaign' || t === 'promo') {
+        const store = (entityId ?? '').split(':')[0];
+        return store && (entityId ?? '').includes(':') ? `/shop/stores/${encodeURIComponent(store)}` : '/shop/notifications';
+      }
       if (t === 'chat') return '/shop/notifications'; // customer <-> seller chat is closed: an old notice has no page to open
       return '/shop/notifications';
     case 'seller':

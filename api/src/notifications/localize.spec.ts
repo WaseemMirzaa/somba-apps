@@ -417,3 +417,15 @@ describe('dispute resolutions in French', () => {
     expect(resolutionFr('')).toBeNull();
   });
 });
+
+describe('follower notices (deal and promotion titles)', () => {
+  it('translates "New deal from <store>" / "New promotion from <store>", eliding before a vowel', () => {
+    expect(localizeNotice('New deal from Kinshasa Traders', 'x', 'fr')?.title).toBe('Nouvelle offre de Kinshasa Traders');
+    expect(localizeNotice('New promotion from Kinshasa Traders', 'x', 'fr')?.title).toBe('Nouvelle promotion de Kinshasa Traders');
+    expect(localizeNotice('New deal from Étoile', 'x', 'fr')?.title).toBe('Nouvelle offre d’Étoile');
+    expect(localizeNotice('New promotion from Hôtel Zen', 'x', 'fr')?.title).toBe('Nouvelle promotion d’Hôtel Zen');
+  });
+  it('an authored French wins', () => {
+    expect(frenchNotice({ title: 'New deal from A', body: 'b', titleFr: 'T', bodyFr: 'B' })).toEqual({ title: 'T', body: 'B' });
+  });
+});
