@@ -113,6 +113,7 @@ test("the EN / FR toggles opt out of browser translation, and html lang follows 
     assert.match(readFileSync(new URL(f, import.meta.url), "utf8"), /translate="no"/, f);
   }
   assert.match(readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8"), /somba-locale/);
+});
 
 test("the CMS home-card page is for Marketing and the Super Admin only (server group `content`)", () => {
   for (const d of ["super", "marketing"]) assert.equal(canAdminAccess(d, "/admin/cms"), true, d);
