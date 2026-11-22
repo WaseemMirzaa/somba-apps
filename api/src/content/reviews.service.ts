@@ -21,6 +21,46 @@ export const MAX_REVIEW_PHOTOS = 4;
 const REPLY_STAFF = ['admin', 'admin_operations', 'admin_moderation'];
 /** Staff who receive reported reviews. */
 export const MODERATORS = REPLY_STAFF;
+/** Staff who read every product question (the admin Q&A page): the moderators plus Support, which reads but does not answer. */
+export const QUESTION_READERS: readonly string[] = [...REPLY_STAFF, 'admin_support'];
+
+/** Lower-case, accents removed, ligatures expanded: "Électronique" -> "electronique". Null-safe. */
+export function foldSearch(v: unknown): string {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/œ/gi, 'oe')
+    .replace(/æ/gi, 'ae')
+    .toLowerCase()
+    .trim();
+}
+
+/** Every word of the query appears (accent- and case-insensitive) in at least one field; a blank query matches everything. */
+export function matchesQuery(query: unknown, fields: readonly unknown[]): boolean {
+  const words = foldSearch(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = fields.map(foldSearch).join(' ');
+  return words.every((w) => hay.includes(w));
+}
+
+/** One row of the admin Q&A list, or the detail of one question. */
+export type AdminQuestion = QuestionView & {
+  productName: string;
+  productNameFr: string;
+  productImage: string | null;
+  storeName: string;
+  /** The asker's name as stored; the detail view cuts it to a first name. */
+  customerName: string;
+  status: 'answered' | 'unanswered';
+};
+export interface AdminQuestionPage {
+  items: AdminQuestion[];
+  total: number;
+  /** Pass back as `cursor` for the next page; null on the last one. */
+  nextCursor: string | null;
+}
+/** Most rows a text search scans (newest first), so one search never reads the whole table. */
+const ADMIN_SEARCH_SCAN = 5000;
 
 /** A review as served: the row plus both languages of its text and of the seller's reply (each ABSENT when unknown). */
 export type ReviewView = Review & { textI18n?: TextI18n; replyI18n?: TextI18n };
@@ -459,6 +499,77 @@ export class ReviewsService {
         productImage: images.get(q.productId) ?? null,
       }),
     );
+  }
+
+  /** Attach product name (both languages), image, store and the asker to question rows, null-safe. */
+  private async adminRows(rows: ProductQuestion[]): Promise<AdminQuestion[]> {
+    await this.withQuestionI18n(rows);
+    const pids = [...new Set(rows.map((r) => r.productId).filter(Boolean))];
+    const names = pids.length ? await this.productsSvc.names(pids) : new Map<string, { name: string; nameFr: string }>();
+    const prods = pids.length ? await this.products.find({ where: { id: In(pids) }, select: { id: true, image: true, sellerId: true } }) : [];
+    const prodById = new Map(prods.map((p) => [p.id, p]));
+    const sids = [...new Set(rows.map((r) => r.sellerId ?? prodById.get(r.productId)?.sellerId).filter((x): x is string => !!x))];
+    const stores = sids.length ? await this.sellers.find({ where: { id: In(sids) }, select: { id: true, name: true } }) : [];
+    const storeName = new Map(stores.map((x) => [x.id, x.name ?? '']));
+    return rows.map((q) =>
+      Object.assign(q, {
+        productName: names.get(q.productId)?.name ?? '',
+        productNameFr: names.get(q.productId)?.nameFr ?? '',
+        productImage: prodById.get(q.productId)?.image ?? null,
+        storeName: storeName.get(q.sellerId ?? prodById.get(q.productId)?.sellerId ?? '') ?? '',
+        customerName: q.askedBy ?? '',
+        status: (q.answer ? 'answered' : 'unanswered') as 'answered' | 'unanswered',
+      }),
+    );
+  }
+
+  /**
+   * The admin Q&A list, newest first: filter by status / store / product and search the question, the answer, the product's
+   * English and French name, the store and the customer (accent- and case-insensitive, null fields never throw). Pages by `cursor`.
+   */
+  async adminList(
+    filter: { q?: unknown; status?: unknown; sellerId?: unknown; productId?: unknown; limit?: unknown; cursor?: unknown } = {},
+  ): Promise<AdminQuestionPage> {
+    const { take } = pageOf({ limit: filter.limit }, { def: 50, max: 200 });
+    const c = Number(filter.cursor);
+    const skip = Number.isFinite(c) && c >= 0 ? Math.floor(c) : 0;
+    const qb = this.questions.createQueryBuilder('q').orderBy('q.createdAt', 'DESC').addOrderBy('q.id', 'ASC');
+    if (filter.status === 'unanswered') qb.andWhere('q.answer IS NULL');
+    else if (filter.status === 'answered') qb.andWhere('q.answer IS NOT NULL');
+    if (typeof filter.sellerId === 'string' && filter.sellerId) {
+      const owned = await this.products.find({ where: { sellerId: filter.sellerId }, select: { id: true } });
+      qb.andWhere('(q.sellerId = :sid' + (owned.length ? ' OR q.productId IN (:...opids)' : '') + ')', { sid: filter.sellerId, opids: owned.map((p) => p.id) });
+    }
+    if (typeof filter.productId === 'string' && filter.productId) qb.andWhere('q.productId = :pid', { pid: filter.productId });
+    const text = typeof filter.q === 'string' ? filter.q.trim() : '';
+    if (!text) {
+      const total = await qb.getCount();
+      const rows = await qb.take(take).skip(skip).getMany();
+      const items = await this.adminRows(rows);
+      const next = skip + rows.length;
+      return { items, total, nextCursor: next < total ? String(next) : null };
+    }
+    const scanned = await this.adminRows(await qb.take(ADMIN_SEARCH_SCAN).getMany());
+    const hits = scanned.filter((r) =>
+      matchesQuery(text, [
+        r.question, r.answer, r.productName, r.productNameFr, r.storeName, r.customerName, r.answeredBy,
+        // the stored translations, so a French search finds a question written in English and the other way round
+        r.questionI18n?.en, r.questionI18n?.fr, r.answerI18n?.en, r.answerI18n?.fr,
+      ]),
+    );
+    const items = hits.slice(skip, skip + take);
+    const next = skip + items.length;
+    return { items, total: hits.length, nextCursor: next < hits.length ? String(next) : null };
+  }
+
+  /** One question in full for the admin: the question, its answer, both languages, the product, the store, the asker's first name. */
+  async adminGet(id: unknown): Promise<AdminQuestion> {
+    const row = typeof id === 'string' && id ? await this.questions.findOne({ where: { id } }) : null;
+    if (!row) throw new NotFoundException('Question not found.');
+    const [q] = await this.adminRows([row]);
+    q.customerName = String(q.customerName).trim().split(/\s+/)[0] ?? '';
+    q.askedBy = q.customerName;
+    return q;
   }
 
   /** How many questions wait for an answer (the seller's badge). */

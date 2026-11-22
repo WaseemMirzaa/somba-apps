@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SellerPortalDefaults, SellerPortalAccessSelects, useAfterSaleDefaults } from "@/components/admin/seller-portal-access";
 import { SectionError, SectionLoading } from "@/components/admin/query-state";
 import { useLocale } from "@/context/locale-context";
+import { matchesSearch } from "@/lib/i18n-fields";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useServerList } from "@/lib/admin-live";
 import type { Seller } from "@/lib/realtime/types";
@@ -23,7 +24,7 @@ export default function AdminSellerPortalPage() {
   const { defaults } = useAfterSaleDefaults();
   const sellers = useServerList<Row>("sellers:list", { pushEvents: ["seller:updated"], body: { limit: 200 } });
   const [q, setQ] = useState("");
-  const rows = useMemo(() => sellers.items.filter((s) => !q.trim() || s.name.toLowerCase().includes(q.trim().toLowerCase())), [sellers.items, q]);
+  const rows = useMemo(() => sellers.items.filter((s) => matchesSearch(q, [s.name])), [sellers.items, q]);
   const title = fr ? "Portail vendeur" : "Seller portal";
 
   return (

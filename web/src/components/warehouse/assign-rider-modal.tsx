@@ -7,6 +7,7 @@ import { useLocale } from "@/context/locale-context";
 import { errorMessage, useOpsQuery, type WarehouseRider } from "@/lib/warehouse-live";
 import { useHubs } from "@/lib/logistics";
 import { useHubScope } from "@/lib/warehouse";
+import { matchesSearch } from "@/lib/i18n-fields";
 
 type AssignRiderModalProps = {
   open: boolean;
@@ -55,11 +56,8 @@ function AssignRiderModalBody({
   const [error, setError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return ridersQ.data;
-    return ridersQ.data.filter(
-      (r) => r.name.toLowerCase().includes(q) || (r.phone ?? "").toLowerCase().includes(q),
-    );
+    if (!query.trim()) return ridersQ.data;
+    return ridersQ.data.filter((r) => matchesSearch(query, [r.name, r.phone]));
   }, [query, ridersQ.data]);
 
   const activeRider = ridersQ.data.find((r) => r.id === pickedId) ?? null;

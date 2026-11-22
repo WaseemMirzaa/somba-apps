@@ -96,3 +96,21 @@ test("the Seller portal page (after-sale sections) is for the Super Admin, Opera
   for (const d of ["finance", "marketing", "moderation", "warehouse"]) assert.equal(canAdminAccess(d, "/admin/seller-portal"), false, d);
   assert.equal(hrefs("super").filter((h) => h === "/admin/seller-portal").length, 1);
 });
+
+test("Product questions: Super Admin, Operations, Moderation and Support reach the page and its detail; others do not", () => {
+  for (const p of ["/admin/questions", "/admin/questions/q1"]) {
+    for (const d of ["super", "operations", "moderation", "support"]) assert.equal(canAdminAccess(d, p), true, `${d} ${p}`);
+    for (const d of ["finance", "marketing", "warehouse"]) assert.equal(canAdminAccess(d, p), false, `${d} ${p}`);
+  }
+  for (const d of ["operations", "moderation", "support"]) assert.ok(hrefs(d).includes("/admin/questions"), `${d} menu`);
+  assert.equal(hrefs("super").filter((h) => h === "/admin/questions").length, 1);
+  const i18n = readFileSync(new URL("./i18n.ts", import.meta.url), "utf8");
+  assert.equal([...i18n.matchAll(/\bproductQuestions: "/g)].length, 2);
+});
+
+test("the EN / FR toggles opt out of browser translation, and html lang follows the stored choice at first paint", () => {
+  for (const f of ["../components/layout/dashboard-layout.tsx", "../components/ui/language-toggle.tsx", "../app/rider/layout.tsx"]) {
+    assert.match(readFileSync(new URL(f, import.meta.url), "utf8"), /translate="no"/, f);
+  }
+  assert.match(readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8"), /somba-locale/);
+});

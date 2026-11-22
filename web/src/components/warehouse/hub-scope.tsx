@@ -48,7 +48,7 @@ export function HubScopeBar() {
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm">
       <Warehouse className="h-4 w-4 text-[var(--primary)]" />
-      <span className="font-medium text-slate-800">{hub ? (hub.name.toLowerCase().includes(hub.city.toLowerCase()) ? hub.name : `${hub.name} · ${hub.city}`) : fr ? "Mon entrepôt" : "My warehouse"}</span>
+      <span className="font-medium text-slate-800">{hub ? ((hub.name ?? "").toLowerCase().includes((hub.city ?? "").toLowerCase()) ? hub.name : `${hub.name} · ${hub.city}`) : fr ? "Mon entrepôt" : "My warehouse"}</span>
       {tier && <Badge variant="primary">{pickL(TIER_LABEL[tier], fr)}</Badge>}
     </div>
   );
