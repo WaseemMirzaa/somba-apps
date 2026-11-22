@@ -148,7 +148,8 @@ export function foldText(v: unknown): string {
 
 /** Every word of the query appears (accent- and case-insensitive) in at least one of the fields. */
 export function matchesSearch(query: string, fields: readonly (string | null | undefined)[]): boolean {
-  const words = foldText(query).split(/\s+/).filter(Boolean);
+  // an old SOM-… order reference is the same order as KOM-… (references were renamed)
+  const words = foldText(query).replace(/(^|[^a-z0-9])som-/g, "$1kom-").split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
   const haystack = fields.map(foldText).join(" ");
   return words.every((w) => haystack.includes(w));

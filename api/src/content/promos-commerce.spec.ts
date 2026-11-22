@@ -293,7 +293,7 @@ describe('promos.validate: platform codes and store coupons', () => {
   it('honours the usage limits like any code', async () => {
     const coupon = await w.coupons.create('u-kt', { code: 'ONCE', type: 'percent', value: 10, perUserLimit: 1, maxUses: 1 });
     expect((await w.promos.validate('ONCE', 100, 'c1', [line('a', shop.id, 100)])).ok).toBe(true);
-    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'SOM-9', customerId: 'c1', customerName: 'C', status: 'confirmed', promoCode: 'ONCE' }));
+    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'KOM-9', customerId: 'c1', customerName: 'C', status: 'confirmed', promoCode: 'ONCE' }));
     expect(await w.promos.validate('ONCE', 100, 'c1', [line('a', shop.id, 100)])).toMatchObject({ ok: false, reason: 'This code is no longer available.' });
     expect(coupon.code).toBe('ONCE');
   });

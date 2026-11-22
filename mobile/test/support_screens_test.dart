@@ -47,13 +47,13 @@ void main() {
         ];
 
     testWidgets('shows subject, reference, category, status badge and the unread count', (tester) async {
-      RealtimeStore.instance.orders.add(OrderDto.fromJson({'id': 'o1', 'reference': 'SOM-1042', 'customerName': 'A', 'status': 'shipped', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}));
+      RealtimeStore.instance.orders.add(OrderDto.fromJson({'id': 'o1', 'reference': 'KOM-1042', 'customerName': 'A', 'status': 'shipped', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}));
       tickets();
       await open(tester, const SupportListScreen());
       expect(find.text('Support'), findsOneWidget);
       expect(find.text('Where is my parcel?'), findsOneWidget);
       expect(find.text('TKT-1 · Delivery'), findsOneWidget);
-      expect(find.text('Order SOM-1042'), findsOneWidget);
+      expect(find.text('Order KOM-1042'), findsOneWidget);
       expect(find.text('In progress'), findsOneWidget);
       expect(find.text('Resolved'), findsOneWidget);
       expect(find.text('Closed'), findsOneWidget);
@@ -129,11 +129,11 @@ void main() {
         ]));
 
     testWidgets('shows both sides, photos as thumbnails, the category and the order', (tester) async {
-      RealtimeStore.instance.orders.add(OrderDto.fromJson({'id': 'o1', 'reference': 'SOM-1042', 'customerName': 'A', 'status': 'shipped', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}));
+      RealtimeStore.instance.orders.add(OrderDto.fromJson({'id': 'o1', 'reference': 'KOM-1042', 'customerName': 'A', 'status': 'shipped', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}));
       await open(tester, SupportTicketDetailScreen(ticket: withStaffReply(unread: 0, orderId: 'o1')));
       expect(find.text('TKT-0001'), findsOneWidget);
       expect(find.text('Where is my parcel?'), findsOneWidget);
-      expect(find.text('Category: Delivery · Order SOM-1042'), findsOneWidget);
+      expect(find.text('Category: Delivery · Order KOM-1042'), findsOneWidget);
       expect(find.text('It has been a week.'), findsOneWidget);
       expect(find.text('We are checking with the carrier.'), findsOneWidget);
       expect(find.text('KOMORIKO support'), findsOneWidget);
@@ -239,7 +239,7 @@ void main() {
     }
 
     testWidgets('"Open a new ticket" pre-links the same order and category', (tester) async {
-      RealtimeStore.instance.orders.add(OrderDto.fromJson({'id': 'o1', 'reference': 'SOM-1042', 'customerName': 'A', 'status': 'shipped', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}));
+      RealtimeStore.instance.orders.add(OrderDto.fromJson({'id': 'o1', 'reference': 'KOM-1042', 'customerName': 'A', 'status': 'shipped', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}));
       server.handlers['support:open'] = (b) => ticketJson('new', reference: 'TKT-NEW', category: b!['category'] as String, orderId: b['orderId'] as String?);
       await open(tester, SupportTicketDetailScreen(ticket: withStaffReply(unread: 0, status: 'resolved', orderId: 'o1')));
       await tester.tap(find.byKey(const ValueKey('ticket-open-new')));
@@ -249,7 +249,7 @@ void main() {
       expect(find.byType(NewTicketScreen), findsOneWidget);
       expect(find.byType(SupportTicketDetailScreen), findsNothing);
       // the order is already chosen in the form
-      expect(find.descendant(of: find.byKey(const ValueKey('ticket-order')), matching: find.text('SOM-1042')), findsOneWidget);
+      expect(find.descendant(of: find.byKey(const ValueKey('ticket-order')), matching: find.text('KOM-1042')), findsOneWidget);
       await tester.enterText(find.descendant(of: find.byKey(const ValueKey('ticket-subject')), matching: find.byType(TextField)), 'Still not here');
       await tester.enterText(find.descendant(of: find.byKey(const ValueKey('ticket-message')), matching: find.byType(TextField)), 'It is still missing');
       await tester.tap(find.text('Create ticket'));
@@ -296,8 +296,8 @@ void main() {
       fakePhotos(2);
       opened();
       RealtimeStore.instance.orders.addAll([
-        OrderDto.fromJson({'id': 'o1', 'reference': 'SOM-1042', 'customerName': 'A', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}),
-        OrderDto.fromJson({'id': 'o2', 'reference': 'SOM-1043', 'customerName': 'A', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}),
+        OrderDto.fromJson({'id': 'o1', 'reference': 'KOM-1042', 'customerName': 'A', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}),
+        OrderDto.fromJson({'id': 'o2', 'reference': 'KOM-1043', 'customerName': 'A', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5, 'items': []}),
       ]);
       await open(tester, Builder(builder: (context) => TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute<TicketView>(builder: (_) => const NewTicketScreen())), child: const Text('go'))));
       await tester.tap(find.text('go'));
@@ -306,10 +306,10 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('ticket-cat-payment')));
       await tester.pump();
       await tester.enterText(field('ticket-subject'), 'Charged twice');
-      await tester.enterText(field('ticket-message'), 'I was charged two times for SOM-1043.');
+      await tester.enterText(field('ticket-message'), 'I was charged two times for KOM-1043.');
       await tester.tap(find.byKey(const ValueKey('ticket-order')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('SOM-1043').last);
+      await tester.tap(find.text('KOM-1043').last);
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('photo-add')));
       await tester.pumpAndSettle();
@@ -320,7 +320,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(server.bodiesOf('support:open').single, {
         'subject': 'Charged twice',
-        'message': 'I was charged two times for SOM-1043.',
+        'message': 'I was charged two times for KOM-1043.',
         'category': 'payment',
         'orderId': 'o2',
         'attachments': ['/uploads/photo-1.jpg', '/uploads/photo-2.jpg'],

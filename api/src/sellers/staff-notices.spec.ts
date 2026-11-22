@@ -47,7 +47,7 @@ describe('notices reach the store staff whose role handles them', () => {
 
   it('an order notice goes to the owner, the orders member and the manager, not finance', async () => {
     const { svc, saved } = makeNotifications(team, users);
-    await svc.toUser('owner', { title: 'New order', body: 'SOM-1 · $1 from A', type: 'order' });
+    await svc.toUser('owner', { title: 'New order', body: 'KOM-1 · $1 from A', type: 'order' });
     expect(saved.map((n) => n.userId).sort()).toEqual(['m-mgr', 'm-ord', 'owner']);
   });
 

@@ -122,17 +122,17 @@ void main() {
     const fr = Strings('fr'), en = Strings('en');
 
     final notices = <(String, String, String, String)>[
-      ('New task assigned to you', 'SOM-1042: pickup is now in your tasks.', 'Nouvelle tâche qui vous est assignée', 'SOM-1042 : la collecte est maintenant dans vos tâches.'),
-      ('Task updated', 'SOM-1042: delivery now carries more parcels.', 'Tâche mise à jour', 'SOM-1042 : la livraison mise à jour, d’autres colis s’y ajoutent.'),
-      ('Delivery code unlocked', 'SOM-1042: you can enter the delivery code again.', 'Code de livraison déverrouillé', 'SOM-1042 : vous pouvez de nouveau saisir le code de livraison.'),
+      ('New task assigned to you', 'KOM-1042: pickup is now in your tasks.', 'Nouvelle tâche qui vous est assignée', 'KOM-1042 : la collecte est maintenant dans vos tâches.'),
+      ('Task updated', 'KOM-1042: delivery now carries more parcels.', 'Tâche mise à jour', 'KOM-1042 : la livraison mise à jour, d’autres colis s’y ajoutent.'),
+      ('Delivery code unlocked', 'KOM-1042: you can enter the delivery code again.', 'Code de livraison déverrouillé', 'KOM-1042 : vous pouvez de nouveau saisir le code de livraison.'),
       ('Transfer run assigned', 'TR-0042: 1 parcel to Entrepôt Limete is now in your tasks.', 'Tournée de transfert assignée', 'TR-0042 : 1 colis à destination d’Entrepôt Limete est ajouté à vos tâches.'),
       ('Transfer run assigned', 'TR-0042: 18 parcels to Kinshasa Hub are now in your tasks.', 'Tournée de transfert assignée', 'TR-0042 : 18 colis à destination de Kinshasa Hub sont ajoutés à vos tâches.'),
       ('Document approved', 'Your driver licence was approved.', 'Document approuvé', 'Votre document « permis de conduire » a été approuvé.'),
       ('Document rejected', 'Your vehicle registration was rejected: Photo is blurry', 'Document refusé', 'Votre document « carte grise » a été refusé : Photo is blurry'),
       ('Account suspended', 'Your account is suspended. Contact support for help.', 'Compte suspendu', 'Votre compte est suspendu. Contactez le support pour obtenir de l’aide.'),
       ('Account reinstated', 'Your account is active again.', 'Compte réactivé', 'Votre compte est de nouveau actif.'),
-      ('New delivery assigned to you', 'SOM-1042. Open the app to accept it.', 'Nouvelle livraison pour vous', 'SOM-1042. Ouvrez l’application pour l’accepter.'),
-      ('3 deliveries assigned to you', 'SOM-1, SOM-2, SOM-3 — collect them at the warehouse.', '3 livraisons pour vous', 'SOM-1, SOM-2, SOM-3 — à récupérer à l’entrepôt.'),
+      ('New delivery assigned to you', 'KOM-1042. Open the app to accept it.', 'Nouvelle livraison pour vous', 'KOM-1042. Ouvrez l’application pour l’accepter.'),
+      ('3 deliveries assigned to you', 'KOM-1, KOM-2, KOM-3 — collect them at the warehouse.', '3 livraisons pour vous', 'KOM-1, KOM-2, KOM-3 — à récupérer à l’entrepôt.'),
       ('Support reply', 'TKT-1: Merci, nous le contactons.', 'Réponse de l’assistance', 'TKT-1: Merci, nous le contactons.'),
     ];
 

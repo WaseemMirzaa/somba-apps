@@ -113,7 +113,7 @@ const ALLOWLIST = [
   [/^.+ → .+$/, "route label made of names (data)"],
   [/^SKU[-: ]/, "SKU (data)"],
   [/^[0-9a-f]{8}$/, "short id (data)"],
-  // Machine ids shown in tables: order SOM-..., parcel PKG-..., exception INC-/EXC-..., uuids.
+  // Machine ids shown in tables: order KOM-..., parcel PKG-..., exception INC-/EXC-..., uuids.
   [/^[A-Z]{2,4}-[0-9A-Z]{5,}( ·.*)?$/, "reference (data)"],
   [/^[0-9a-f]{8}-[0-9a-f]{4}-/, "uuid (data)"],
 ];
@@ -643,7 +643,7 @@ function allowed(s) {
 /** Strings the SERVER writes in English whatever the language (reported to the API owners, shown apart, not allowlisted). */
 const SERVER_STRINGS = [
   [/^A refresh token used at .* was presented again/, "audit detail written by the API"],
-  [/^(SOM|PKG|RET|EXC|REP)-[\w-]+ (pickup|delivery|transfer)( -> .*)?$/, "audit detail written by the API"],
+  [/^(KOM|SOM|PKG|RET|EXC|REP)-[\w-]+ (pickup|delivery|transfer)( -> .*)?$/, "audit detail written by the API"],
   [/^warehouse_staff .* -> /, "audit detail written by the API (role key inside)"],
   [/^Welcome credit from KOMORIKO/, "wallet transaction description written by the API"],
   [/^Wallet top-up via /, "wallet transaction description written by the API"],

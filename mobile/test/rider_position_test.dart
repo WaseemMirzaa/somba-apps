@@ -15,7 +15,7 @@ const _pin = (lat: -4.3217, lng: 15.3125); // the delivery pin (Gombe)
 
 OrderDto _order({bool withPin = true}) => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-2042',
+      'reference': 'KOM-2042',
       'customerName': 'Aline Mbuyi',
       'status': 'out_for_delivery',
       'paymentMethod': 'wallet',

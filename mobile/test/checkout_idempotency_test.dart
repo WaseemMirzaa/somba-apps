@@ -27,7 +27,7 @@ Future<dynamic> Function(Map<String, dynamic> body)? _onCreate;
 Map<String, dynamic> Function(Map<String, dynamic> body) _onLookup = (_) => {'state': 'none'};
 
 Map<String, dynamic> _order(String id) =>
-    {'id': id, 'reference': 'SOM-$id', 'status': 'confirmed', 'paymentMethod': 'wallet', 'totalUsd': 23, 'items': const []};
+    {'id': id, 'reference': 'KOM-$id', 'status': 'confirmed', 'paymentMethod': 'wallet', 'totalUsd': 23, 'items': const []};
 
 Future<dynamic> _fakeServer(String event, [Map<String, dynamic>? body]) async {
   _sent.add((event, body!));

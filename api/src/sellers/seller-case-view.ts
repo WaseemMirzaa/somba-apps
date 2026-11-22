@@ -191,7 +191,7 @@ export function redactReplacement(v: Any): SellerCaseView {
 
 export const redactCase = (kind: CaseKind, v: Any): SellerCaseView => (kind === 'return' ? redactReturn(v) : kind === 'exchange' ? redactExchange(v) : redactReplacement(v));
 
-/** The reference-led line every notice about a case carries: `RET-… · SOM-…`. */
+/** The reference-led line every notice about a case carries: `RET-… · KOM-…`. */
 export const caseLine = (v: { reference?: string | null; orderReference?: string | null }) => `${v.reference ?? ''} · ${v.orderReference ?? ''}`;
 
 /**

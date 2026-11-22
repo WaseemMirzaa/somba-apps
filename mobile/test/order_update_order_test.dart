@@ -12,7 +12,7 @@ import 'gap_helpers.dart';
 
 Map<String, dynamic> _order(String status, {String? updatedAt, String id = 'o1', double total = 25}) => {
       'id': id,
-      'reference': 'SOM-1',
+      'reference': 'KOM-1',
       'customerName': 'Aline',
       'status': status,
       'paymentMethod': 'airtel_money',

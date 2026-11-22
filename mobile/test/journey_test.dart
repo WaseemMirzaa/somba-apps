@@ -18,7 +18,7 @@ OrderDto _order(String status,
         {List<Map<String, dynamic>>? items, List<String> origins = const ['hub-a'], String? dest = 'hub-a', Object? tracking, String? updatedAt}) =>
     OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-1',
+      'reference': 'KOM-1',
       'status': status,
       'paymentMethod': 'wallet',
       'totalUsd': 10,
@@ -153,7 +153,7 @@ void main() {
 
   group('payload compatibility', () {
     test('an order from before the warehouse routing parses with no hubs and no legs', () {
-      final o = OrderDto.fromJson({'id': 'o', 'reference': 'SOM-9', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5, 'zoneId': 'gombe'});
+      final o = OrderDto.fromJson({'id': 'o', 'reference': 'KOM-9', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5, 'zoneId': 'gombe'});
       expect(o.destinationHubId, isNull);
       expect(o.originHubIds, isEmpty);
       expect(o.legs, isEmpty);

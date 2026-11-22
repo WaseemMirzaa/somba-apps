@@ -95,10 +95,10 @@ describe('me:delete over the socket', () => {
 
   it('is refused with an order on the road, over a second raw connection too', async () => {
     const u = await customer(0);
-    await ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: 'SOM-1', customerId: u.id, customerName: 'Marie', status: 'out_for_delivery', shippingAddress: '{"line1":"1 rue"}' }));
+    await ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: 'KOM-1', customerId: u.id, customerName: 'Marie', status: 'out_for_delivery', shippingAddress: '{"line1":"1 rue"}' }));
     const ack = await call(await open(u.id), 'me:delete', { password: PASSWORD });
     expect(ack).toMatchObject({ ok: false, code: 'account_blocked', blockers: [{ kind: 'open_order', count: 1 }] });
-    await expect(ds.getRepository(Order).findOneByOrFail({ reference: 'SOM-1' })).resolves.toMatchObject({ customerName: 'Marie', shippingAddress: '{"line1":"1 rue"}' });
+    await expect(ds.getRepository(Order).findOneByOrFail({ reference: 'KOM-1' })).resolves.toMatchObject({ customerName: 'Marie', shippingAddress: '{"line1":"1 rue"}' });
   });
 
   it('me:deleteCheck lists the reasons without changing anything', async () => {

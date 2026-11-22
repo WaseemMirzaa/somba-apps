@@ -73,7 +73,7 @@ async function order(lines: { product: Product; qty?: number; price?: number }[]
   const repo = ds.getRepository(Order);
   return repo.save(
     repo.create({
-      reference: `SOM-${++n}`,
+      reference: `KOM-${++n}`,
       customerId: 'c1',
       customerName: 'Cust',
       totalUsd: 10,
@@ -172,7 +172,7 @@ describe('SL-01: analytics:seller counts what partial refunds left', () => {
     const repo = ds.getRepository(Order);
     await repo.save(
       repo.create({
-        reference: 'SOM-R1',
+        reference: 'KOM-R1',
         customerId: 'c1',
         customerName: 'Cust',
         status: 'delivered',

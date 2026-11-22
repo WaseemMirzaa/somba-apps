@@ -44,7 +44,7 @@ Map<String, dynamic> legJson(
   final json = <String, dynamic>{
     'id': tid,
     'orderId': 'o-$tid',
-    'orderReference': 'SOM-1042',
+    'orderReference': 'KOM-1042',
     'status': status,
     'riderId': riderId,
     'hubId': 'h2',
@@ -80,7 +80,7 @@ Map<String, dynamic> legJson(
   };
   if (withOrder) {
     json['order'] = {
-      'reference': 'SOM-1042',
+      'reference': 'KOM-1042',
       'customerName': meetsCustomer ? 'Aline Kabila Mwamba' : 'Aline',
       'paymentMethod': 'stripe_card',
       'estimatedDeliveryDate': '2026-10-28',
@@ -112,9 +112,9 @@ List<Map<String, dynamic>> setBoxes({Set<String> picked = const {}, Set<String> 
     ];
 
 final setContents = <Map<String, dynamic>>[
-  {'name': 'Running shoes Air Comfort Pro', 'nameFr': 'Chaussures de course Air Comfort Pro', 'variant': 'Size 42 / Black', 'variantFr': 'Pointure 42 / Noir', 'qty': 2, 'orderReference': 'SOM-1042'},
-  {'name': 'Wireless earphones', 'nameFr': 'Écouteurs sans fil', 'variant': null, 'qty': 1, 'orderReference': 'SOM-1042'},
-  {'name': 'Phone case', 'nameFr': 'Coque de téléphone', 'variant': 'Blue', 'variantFr': 'Bleu', 'qty': 3, 'orderReference': 'SOM-1043'},
+  {'name': 'Running shoes Air Comfort Pro', 'nameFr': 'Chaussures de course Air Comfort Pro', 'variant': 'Size 42 / Black', 'variantFr': 'Pointure 42 / Noir', 'qty': 2, 'orderReference': 'KOM-1042'},
+  {'name': 'Wireless earphones', 'nameFr': 'Écouteurs sans fil', 'variant': null, 'qty': 1, 'orderReference': 'KOM-1042'},
+  {'name': 'Phone case', 'nameFr': 'Coque de téléphone', 'variant': 'Blue', 'variantFr': 'Bleu', 'qty': 3, 'orderReference': 'KOM-1043'},
 ];
 
 /// One leg of a two-order box set: the same boxes, contents and `parcelOrders` on both legs, its own order and id.
@@ -138,8 +138,8 @@ Map<String, dynamic> siblingLegJson(
     'scanRequired': true,
     'parcelContents': setContents,
     'parcelOrders': [
-      {'orderId': 'o-a', 'reference': 'SOM-1042'},
-      {'orderId': 'o-b', 'reference': 'SOM-1043'},
+      {'orderId': 'o-a', 'reference': 'KOM-1042'},
+      {'orderId': 'o-b', 'reference': 'KOM-1043'},
     ],
   };
 }
@@ -341,7 +341,7 @@ Map<String, dynamic> runJson(
     };
 
 /// A transfer leg that travels in run [runId].
-Map<String, dynamic> parcelJson(String id, String runId, {String status = 'picked_up', int? hop, int? hops, String reference = 'SOM-1042'}) => {
+Map<String, dynamic> parcelJson(String id, String runId, {String status = 'picked_up', int? hop, int? hops, String reference = 'KOM-1042'}) => {
       ...legJson('transfer', id: id, status: status),
       'orderReference': reference,
       'runId': runId,

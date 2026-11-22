@@ -45,78 +45,78 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   'Your account is active again.': [['Your account is active again.', 'Votre compte est de nouveau actif.']],
   // Orders and deliveries
   'We received {}. You\'ll get updates here in real time.': [
-    ["We received SOM-1001. You'll get updates here in real time.", 'Nous avons reçu SOM-1001. Vous recevrez les mises à jour ici en temps réel.'],
+    ["We received KOM-1001. You'll get updates here in real time.", 'Nous avons reçu KOM-1001. Vous recevrez les mises à jour ici en temps réel.'],
   ],
   'Approve the {} request on your phone to confirm {}.': [
-    ['Approve the Airtel Money request on your phone to confirm SOM-1001.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer SOM-1001.'],
-    ['Approve the Orange Money request on your phone to confirm SOM-1001.', 'Validez la demande Orange Money sur votre téléphone pour confirmer SOM-1001.'],
-    ['Approve the Vodacom M-Pesa request on your phone to confirm SOM-1001.', 'Validez la demande Vodacom M-Pesa sur votre téléphone pour confirmer SOM-1001.'],
+    ['Approve the Airtel Money request on your phone to confirm KOM-1001.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer KOM-1001.'],
+    ['Approve the Orange Money request on your phone to confirm KOM-1001.', 'Validez la demande Orange Money sur votre téléphone pour confirmer KOM-1001.'],
+    ['Approve the Vodacom M-Pesa request on your phone to confirm KOM-1001.', 'Validez la demande Vodacom M-Pesa sur votre téléphone pour confirmer KOM-1001.'],
     // a notice stored before the display names were used
-    ['Approve the airtel money request on your phone to confirm SOM-1001.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer SOM-1001.'],
+    ['Approve the airtel money request on your phone to confirm KOM-1001.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer KOM-1001.'],
   ],
-  '{} is handling {}.': [['Amadou is handling SOM-1001.', 'Amadou s’occupe de SOM-1001.']],
+  '{} is handling {}.': [['Amadou is handling KOM-1001.', 'Amadou s’occupe de KOM-1001.']],
   '{} reached the KOMORIKO warehouse and will be on its way soon.': [
-    ['SOM-1001 reached the KOMORIKO warehouse and will be on its way soon.', 'SOM-1001 est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'],
+    ['KOM-1001 reached the KOMORIKO warehouse and will be on its way soon.', 'KOM-1001 est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'],
   ],
   // The three-leg journey: warehouse desk, riders, sellers, routing alerts
   // RD-01: the delivery code lockout
   '{}: {} entered a wrong delivery code {} times. Call the customer to check the code.': [
-    ['SOM-1001: Amadou Kone entered a wrong delivery code 3 times. Call the customer to check the code.', 'SOM-1001 : Amadou Kone a saisi 3 fois un code de livraison erroné. Appelez le client pour vérifier le code.'],
+    ['KOM-1001: Amadou Kone entered a wrong delivery code 3 times. Call the customer to check the code.', 'KOM-1001 : Amadou Kone a saisi 3 fois un code de livraison erroné. Appelez le client pour vérifier le code.'],
   ],
   '{}: {} entered {} wrong delivery codes. The code step is locked until a supervisor unlocks it. Call the customer to check the code.': [
     [
-      'SOM-1001: Amadou Kone entered 15 wrong delivery codes. The code step is locked until a supervisor unlocks it. Call the customer to check the code.',
-      'SOM-1001 : Amadou Kone a saisi 15 codes de livraison erronés. La saisie du code est verrouillée jusqu’à ce qu’un superviseur la déverrouille. Appelez le client pour vérifier le code.',
+      'KOM-1001: Amadou Kone entered 15 wrong delivery codes. The code step is locked until a supervisor unlocks it. Call the customer to check the code.',
+      'KOM-1001 : Amadou Kone a saisi 15 codes de livraison erronés. La saisie du code est verrouillée jusqu’à ce qu’un superviseur la déverrouille. Appelez le client pour vérifier le code.',
     ],
   ],
   '{}: {} entered {} wrong delivery codes. The code step is locked for {} minutes. Call the customer to check the code.': [
     [
-      'SOM-1001: Amadou Kone entered 5 wrong delivery codes. The code step is locked for 15 minutes. Call the customer to check the code.',
-      'SOM-1001 : Amadou Kone a saisi 5 codes de livraison erronés. La saisie du code est verrouillée pendant 15 minutes. Appelez le client pour vérifier le code.',
+      'KOM-1001: Amadou Kone entered 5 wrong delivery codes. The code step is locked for 15 minutes. Call the customer to check the code.',
+      'KOM-1001 : Amadou Kone a saisi 5 codes de livraison erronés. La saisie du code est verrouillée pendant 15 minutes. Appelez le client pour vérifier le code.',
     ],
   ],
-  '{}: you can enter the delivery code again.': [['SOM-1001: you can enter the delivery code again.', 'SOM-1001 : vous pouvez de nouveau saisir le code de livraison.']],
+  '{}: you can enter the delivery code again.': [['KOM-1001: you can enter the delivery code again.', 'KOM-1001 : vous pouvez de nouveau saisir le code de livraison.']],
   '{}: {} needs a rider.': [
-    ['SOM-1001: pickup needs a rider.', 'SOM-1001 : tâche « enlèvement » à confier à un livreur.'],
-    ['SOM-1001: transfer needs a rider.', 'SOM-1001 : tâche « transfert » à confier à un livreur.'],
-    ['SOM-1001: delivery needs a rider.', 'SOM-1001 : tâche « livraison » à confier à un livreur.'],
-    ['SOM-1001: return pickup needs a rider.', 'SOM-1001 : tâche « retour client » à confier à un livreur.'],
-    ['SOM-1001: return transfer needs a rider.', 'SOM-1001 : tâche « transfert retour » à confier à un livreur.'],
-    ['SOM-1001: return to seller needs a rider.', 'SOM-1001 : tâche « retour au vendeur » à confier à un livreur.'],
-    ['SOM-1001: replacement delivery needs a rider.', 'SOM-1001 : tâche « livraison de remplacement » à confier à un livreur.'],
+    ['KOM-1001: pickup needs a rider.', 'KOM-1001 : tâche « enlèvement » à confier à un livreur.'],
+    ['KOM-1001: transfer needs a rider.', 'KOM-1001 : tâche « transfert » à confier à un livreur.'],
+    ['KOM-1001: delivery needs a rider.', 'KOM-1001 : tâche « livraison » à confier à un livreur.'],
+    ['KOM-1001: return pickup needs a rider.', 'KOM-1001 : tâche « retour client » à confier à un livreur.'],
+    ['KOM-1001: return transfer needs a rider.', 'KOM-1001 : tâche « transfert retour » à confier à un livreur.'],
+    ['KOM-1001: return to seller needs a rider.', 'KOM-1001 : tâche « retour au vendeur » à confier à un livreur.'],
+    ['KOM-1001: replacement delivery needs a rider.', 'KOM-1001 : tâche « livraison de remplacement » à confier à un livreur.'],
   ],
   '{}: {} is now in your tasks.': [
-    ['SOM-1001: pickup is now in your tasks.', 'SOM-1001 : tâche « enlèvement » ajoutée à vos tâches.'],
-    ['SOM-1001: return to seller is now in your tasks.', 'SOM-1001 : tâche « retour au vendeur » ajoutée à vos tâches.'],
+    ['KOM-1001: pickup is now in your tasks.', 'KOM-1001 : tâche « enlèvement » ajoutée à vos tâches.'],
+    ['KOM-1001: return to seller is now in your tasks.', 'KOM-1001 : tâche « retour au vendeur » ajoutée à vos tâches.'],
   ],
   '{}: {} has been open for {} hours.': [
-    ['SOM-1001: delivery has been open for 26 hours.', 'SOM-1001 : tâche « livraison » ouverte depuis 26 heures.'],
-    ['SOM-1001: return to seller has been open for 50 hours.', 'SOM-1001 : tâche « retour au vendeur » ouverte depuis 50 heures.'],
+    ['KOM-1001: delivery has been open for 26 hours.', 'KOM-1001 : tâche « livraison » ouverte depuis 26 heures.'],
+    ['KOM-1001: return to seller has been open for 50 hours.', 'KOM-1001 : tâche « retour au vendeur » ouverte depuis 50 heures.'],
   ],
   '{}: {} has been open for {} hours and needs a decision.': [
-    ['SOM-1001: delivery has been open for 74 hours and needs a decision.', 'SOM-1001 : tâche « livraison » ouverte depuis 74 heures, une décision est nécessaire.'],
+    ['KOM-1001: delivery has been open for 74 hours and needs a decision.', 'KOM-1001 : tâche « livraison » ouverte depuis 74 heures, une décision est nécessaire.'],
   ],
   '{}: the customer parcel is going back to the seller. Review the order.': [
-    ['SOM-1001: the customer parcel is going back to the seller. Review the order.', 'SOM-1001 : le colis du client retourne chez le vendeur. Vérifiez la commande.'],
+    ['KOM-1001: the customer parcel is going back to the seller. Review the order.', 'KOM-1001 : le colis du client retourne chez le vendeur. Vérifiez la commande.'],
   ],
   '{} could not be delivered and is going back to the seller. Our team will contact you about your order.': [
-    ['SOM-1001 could not be delivered and is going back to the seller. Our team will contact you about your order.', 'SOM-1001 n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.'],
+    ['KOM-1001 could not be delivered and is going back to the seller. Our team will contact you about your order.', 'KOM-1001 n’a pas pu être livrée et retourne chez le vendeur. Notre équipe vous contactera au sujet de votre commande.'],
   ],
   '{}: a rider will collect your package.': [
-    ['SOM-1001: a rider will collect your package.', 'SOM-1001 : un livreur viendra récupérer votre colis.'],
-    ['SOM-1001 · REP-12345678: a rider will collect your package.', 'SOM-1001 · REP-12345678 : un livreur viendra récupérer votre colis.'],
+    ['KOM-1001: a rider will collect your package.', 'KOM-1001 : un livreur viendra récupérer votre colis.'],
+    ['KOM-1001 · REP-12345678: a rider will collect your package.', 'KOM-1001 · REP-12345678 : un livreur viendra récupérer votre colis.'],
   ],
   // Store policies need approval; express is KOMORIKO's switch
   '{}: new returns or shipping policy to review.': [['Boutique Awa: new returns or shipping policy to review.', 'Boutique Awa : nouvelle politique de retour ou d’expédition à examiner.']],
   'KOMORIKO turned express delivery on for your store.': [['KOMORIKO turned express delivery on for your store.', 'KOMORIKO a activé la livraison express pour votre boutique.']],
   'KOMORIKO turned express delivery off for your store.': [['KOMORIKO turned express delivery off for your store.', 'KOMORIKO a désactivé la livraison express pour votre boutique.']],
-  '{}: your package reached the warehouse.': [['SOM-1001: your package reached the warehouse.', 'SOM-1001 : votre colis est arrivé à l’entrepôt.']],
-  '{}: the rider collected your package and is taking it to the customer.': [['SOM-1001: the rider collected your package and is taking it to the customer.', 'SOM-1001 : le livreur a récupéré votre colis et l’emmène chez le client.']],
+  '{}: your package reached the warehouse.': [['KOM-1001: your package reached the warehouse.', 'KOM-1001 : votre colis est arrivé à l’entrepôt.']],
+  '{}: the rider collected your package and is taking it to the customer.': [['KOM-1001: the rider collected your package and is taking it to the customer.', 'KOM-1001 : le livreur a récupéré votre colis et l’emmène chez le client.']],
   '{}: the delivery address has no map pin, so it was routed to {}.': [
-    ['SOM-1001: the delivery address has no map pin, so it was routed to Limete Hub.', 'SOM-1001 : l’adresse de livraison n’a pas de repère sur la carte, la commande a été dirigée vers Limete Hub.'],
+    ['KOM-1001: the delivery address has no map pin, so it was routed to Limete Hub.', 'KOM-1001 : l’adresse de livraison n’a pas de repère sur la carte, la commande a été dirigée vers Limete Hub.'],
   ],
   '{}: no warehouse has an active rider, so it was routed to {}. Add riders there.': [
-    ['SOM-1001: no warehouse has an active rider, so it was routed to Limete Hub. Add riders there.', 'SOM-1001 : aucun entrepôt n’a de livreur actif, la commande a été dirigée vers Limete Hub. Ajoutez-y des livreurs.'],
+    ['KOM-1001: no warehouse has an active rider, so it was routed to Limete Hub. Add riders there.', 'KOM-1001 : aucun entrepôt n’a de livreur actif, la commande a été dirigée vers Limete Hub. Ajoutez-y des livreurs.'],
   ],
   '{}: 1 parcel to {} is now in your tasks.': [['TR-0042: 1 parcel to Entrepôt Limete is now in your tasks.', 'TR-0042 : 1 colis à destination d’Entrepôt Limete est ajouté à vos tâches.']],
   '{}: {} parcels to {} are now in your tasks.': [
@@ -140,19 +140,19 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['TR-0042: 2 parcel(s) did not arrive from Kinshasa Hub at Entrepôt Limete.', 'TR-0042 : 2 colis envoyés de Kinshasa Hub ne sont pas arrivés à Entrepôt Limete.'],
   ],
   '{}: no lane connects {} to {}, so the parcel goes direct.': [
-    ['SOM-1001: no lane connects Entrepôt Limete to Entrepôt Kikwit, so the parcel goes direct.', 'SOM-1001 : aucune ligne ne relie Entrepôt Limete à Entrepôt Kikwit, le colis part en direct.'],
+    ['KOM-1001: no lane connects Entrepôt Limete to Entrepôt Kikwit, so the parcel goes direct.', 'KOM-1001 : aucune ligne ne relie Entrepôt Limete à Entrepôt Kikwit, le colis part en direct.'],
   ],
   '{}: {} has no active rider, so {} will handle it. Add riders to {}.': [
     [
-      'SOM-1001: Entrepôt Limete has no active rider, so Entrepôt Kinshasa will handle it. Add riders to Entrepôt Limete.',
-      'SOM-1001 : Entrepôt Limete n’a aucun livreur actif, Entrepôt Kinshasa s’en charge. Ajoutez des livreurs à Entrepôt Limete.',
+      'KOM-1001: Entrepôt Limete has no active rider, so Entrepôt Kinshasa will handle it. Add riders to Entrepôt Limete.',
+      'KOM-1001 : Entrepôt Limete n’a aucun livreur actif, Entrepôt Kinshasa s’en charge. Ajoutez des livreurs à Entrepôt Limete.',
     ],
   ],
   '{}: {} was scanned in but the next leg could not be created.': [
-    ['SOM-1001: pickup was scanned in but the next leg could not be created.', 'SOM-1001 : tâche « enlèvement » scannée à l’entrepôt, mais l’étape suivante n’a pas pu être créée.'],
+    ['KOM-1001: pickup was scanned in but the next leg could not be created.', 'KOM-1001 : tâche « enlèvement » scannée à l’entrepôt, mais l’étape suivante n’a pas pu être créée.'],
   ],
   '{}: {} failed after {} attempts ({}).': [
-    ['SOM-1001: transfer failed after 3 attempts (Customer not reachable).', 'SOM-1001 : tâche « transfert » échouée après 3 tentatives (Client injoignable).'],
+    ['KOM-1001: transfer failed after 3 attempts (Customer not reachable).', 'KOM-1001 : tâche « transfert » échouée après 3 tentatives (Client injoignable).'],
   ],
   // Followers hear of a store's deals and promotions
   '{}: ${} instead of ${}': [['Phone: $5.00 instead of $9.00', 'Phone : 5,00\u00A0$ au lieu de 9,00\u00A0$']],
@@ -164,79 +164,79 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
   '{}: {} item(s) to pack — ${}': [['SOM-1001: 2 item(s) to pack — $40.00', 'SOM-1001 : 2 article(s) à préparer — 40,00\u00A0$']],
   '{} is packed and ready.': [['SOM-1001 is packed and ready.', 'SOM-1001 : colis emballé et prêt.']],
   "{}: one seller's package is ready, waiting for {} more seller{}.": [
-    ["SOM-1001: one seller's package is ready, waiting for 2 more sellers.", 'SOM-1001 : le colis d’un vendeur est prêt, en attente de 2 autres vendeurs.'],
-    ["SOM-1001: one seller's package is ready, waiting for 1 more seller.", 'SOM-1001 : le colis d’un vendeur est prêt, en attente de 1 autre vendeur.'],
+    ["KOM-1001: one seller's package is ready, waiting for 2 more sellers.", 'KOM-1001 : le colis d’un vendeur est prêt, en attente de 2 autres vendeurs.'],
+    ["KOM-1001: one seller's package is ready, waiting for 1 more seller.", 'KOM-1001 : le colis d’un vendeur est prêt, en attente de 1 autre vendeur.'],
   ],
   '{}: {} was cancelled ({}).{} The rest of your order continues.': [
     [
-      'SOM-1001: Sneakers was cancelled (Out of stock). $12.50 was refunded to your wallet. The rest of your order continues.',
-      'SOM-1001 : Sneakers a été annulé (Out of stock). 12,50\u00A0$ ont été remboursés sur votre portefeuille. Le reste de votre commande continue.',
+      'KOM-1001: Sneakers was cancelled (Out of stock). $12.50 was refunded to your wallet. The rest of your order continues.',
+      'KOM-1001 : Sneakers a été annulé (Out of stock). 12,50\u00A0$ ont été remboursés sur votre portefeuille. Le reste de votre commande continue.',
     ],
     [
-      'SOM-1001: Sneakers was cancelled (Out of stock). The rest of your order continues.',
-      'SOM-1001 : Sneakers a été annulé (Out of stock). Le reste de votre commande continue.',
+      'KOM-1001: Sneakers was cancelled (Out of stock). The rest of your order continues.',
+      'KOM-1001 : Sneakers a été annulé (Out of stock). Le reste de votre commande continue.',
     ],
   ],
-  '{} was cancelled: {}.': [['SOM-1001 was cancelled: payment was not completed.', 'SOM-1001 a été annulée : le paiement n’a pas abouti.']],
+  '{} was cancelled: {}.': [['KOM-1001 was cancelled: payment was not completed.', 'KOM-1001 a été annulée : le paiement n’a pas abouti.']],
   '{} was cancelled{}.{}': [
     [
-      'SOM-1001 was cancelled by KOMORIKO support: Fraud check. $12.50 was refunded to your wallet.',
-      'SOM-1001 a été annulée par l’assistance KOMORIKO : Fraud check. 12,50\u00A0$ ont été remboursés sur votre portefeuille.',
+      'KOM-1001 was cancelled by KOMORIKO support: Fraud check. $12.50 was refunded to your wallet.',
+      'KOM-1001 a été annulée par l’assistance KOMORIKO : Fraud check. 12,50\u00A0$ ont été remboursés sur votre portefeuille.',
     ],
-    ['SOM-1001 was cancelled.', 'SOM-1001 a été annulée.'],
-    ['SOM-1001 was cancelled. $12.50 was refunded to your wallet.', 'SOM-1001 a été annulée. 12,50\u00A0$ ont été remboursés sur votre portefeuille.'],
+    ['KOM-1001 was cancelled.', 'KOM-1001 a été annulée.'],
+    ['KOM-1001 was cancelled. $12.50 was refunded to your wallet.', 'KOM-1001 a été annulée. 12,50\u00A0$ ont été remboursés sur votre portefeuille.'],
   ],
   '{} was cancelled{}. Do not pack it.': [
-    ['SOM-1001 was cancelled by the customer. Do not pack it.', 'SOM-1001 a été annulée par le client. Ne la préparez pas.'],
-    ['SOM-1001 was cancelled by KOMORIKO. Do not pack it.', 'SOM-1001 a été annulée par KOMORIKO. Ne la préparez pas.'],
-    ['SOM-1001 was cancelled (Fraud check). Do not pack it.', 'SOM-1001 a été annulée (Fraud check). Ne la préparez pas.'],
+    ['KOM-1001 was cancelled by the customer. Do not pack it.', 'KOM-1001 a été annulée par le client. Ne la préparez pas.'],
+    ['KOM-1001 was cancelled by KOMORIKO. Do not pack it.', 'KOM-1001 a été annulée par KOMORIKO. Ne la préparez pas.'],
+    ['KOM-1001 was cancelled (Fraud check). Do not pack it.', 'KOM-1001 a été annulée (Fraud check). Ne la préparez pas.'],
   ],
   '{}: {}. We will try again (attempt {} of {}).{}': [
     [
-      'SOM-1001: Customer not reachable. We will try again (attempt 2 of 3). You can also cancel the order.',
-      'SOM-1001 : Client injoignable. Nous allons réessayer (tentative 2 sur 3). Vous pouvez aussi annuler la commande.',
+      'KOM-1001: Customer not reachable. We will try again (attempt 2 of 3). You can also cancel the order.',
+      'KOM-1001 : Client injoignable. Nous allons réessayer (tentative 2 sur 3). Vous pouvez aussi annuler la commande.',
     ],
     // part of the order was delivered already: the order cannot be cancelled
-    ['SOM-1001: Customer not reachable. We will try again (attempt 2 of 3).', 'SOM-1001 : Client injoignable. Nous allons réessayer (tentative 2 sur 3).'],
+    ['KOM-1001: Customer not reachable. We will try again (attempt 2 of 3).', 'KOM-1001 : Client injoignable. Nous allons réessayer (tentative 2 sur 3).'],
   ],
   // A split order: one part at a time
-  '{}: part of your order is on its way. The rest will follow.': [['SOM-1001: part of your order is on its way. The rest will follow.', 'SOM-1001 : une partie de votre commande est en route. Le reste suivra.']],
-  '{}: part of your order was delivered. The rest will follow.': [['SOM-1001: part of your order was delivered. The rest will follow.', 'SOM-1001 : une partie de votre commande a été livrée. Le reste suivra.']],
+  '{}: part of your order is on its way. The rest will follow.': [['KOM-1001: part of your order is on its way. The rest will follow.', 'KOM-1001 : une partie de votre commande est en route. Le reste suivra.']],
+  '{}: part of your order was delivered. The rest will follow.': [['KOM-1001: part of your order was delivered. The rest will follow.', 'KOM-1001 : une partie de votre commande a été livrée. Le reste suivra.']],
   '{}: {} could not be delivered ({}).{}': [
-    ['SOM-1001: Lamp could not be delivered (Customer not reachable). $12.50 was refunded to your wallet.', 'SOM-1001 : Lamp n’a pas pu être livré (Client injoignable). 12,50\u00A0$ ont été remboursés sur votre portefeuille.'],
-    ['SOM-1001: Lamp could not be delivered (Customer not reachable).', 'SOM-1001 : Lamp n’a pas pu être livré (Client injoignable).'],
+    ['KOM-1001: Lamp could not be delivered (Customer not reachable). $12.50 was refunded to your wallet.', 'KOM-1001 : Lamp n’a pas pu être livré (Client injoignable). 12,50\u00A0$ ont été remboursés sur votre portefeuille.'],
+    ['KOM-1001: Lamp could not be delivered (Customer not reachable).', 'KOM-1001 : Lamp n’a pas pu être livré (Client injoignable).'],
   ],
-  '{}: {} now carries more parcels.': [['SOM-1001: delivery now carries more parcels.', 'SOM-1001 : tâche « livraison » mise à jour, d’autres colis s’y ajoutent.']],
+  '{}: {} now carries more parcels.': [['KOM-1001: delivery now carries more parcels.', 'KOM-1001 : tâche « livraison » mise à jour, d’autres colis s’y ajoutent.']],
   '{} could not be delivered after {} attempts ({}).{}': [
     [
-      'SOM-1001 could not be delivered after 3 attempts (Wrong address). $12.50 was refunded to your wallet.',
-      'SOM-1001 n’a pas pu être livrée après 3 tentatives (Adresse incorrecte). 12,50\u00A0$ ont été remboursés sur votre portefeuille.',
+      'KOM-1001 could not be delivered after 3 attempts (Wrong address). $12.50 was refunded to your wallet.',
+      'KOM-1001 n’a pas pu être livrée après 3 tentatives (Adresse incorrecte). 12,50\u00A0$ ont été remboursés sur votre portefeuille.',
     ],
     [
-      'SOM-1001 could not be delivered after 3 attempts (Wrong address).',
-      'SOM-1001 n’a pas pu être livrée après 3 tentatives (Adresse incorrecte).',
+      'KOM-1001 could not be delivered after 3 attempts (Wrong address).',
+      'KOM-1001 n’a pas pu être livrée après 3 tentatives (Adresse incorrecte).',
     ],
   ],
 
   // Payments, refunds, payouts
   '${} added to your wallet.': [['$25.00 added to your wallet.', '25,00\u00A0$ ajoutés à votre portefeuille.']],
-  'Payment for {} confirmed.': [['Payment for SOM-1001 confirmed.', 'Le paiement de SOM-1001 est confirmé.']],
+  'Payment for {} confirmed.': [['Payment for KOM-1001 confirmed.', 'Le paiement de KOM-1001 est confirmé.']],
   'Payment for your {} seller plan confirmed.': [['Payment for your Pro seller plan confirmed.', 'Le paiement de votre abonnement vendeur Pro est confirmé.']],
-  '${} for {} → wallet.': [['$12.50 for SOM-1001 → wallet.', '12,50\u00A0$ pour SOM-1001 → portefeuille.']],
+  '${} for {} → wallet.': [['$12.50 for KOM-1001 → wallet.', '12,50\u00A0$ pour KOM-1001 → portefeuille.']],
   '${} for {} is on its way back to your mobile-money number.': [
-    ['$12.50 for SOM-1001 is on its way back to your mobile-money number.', '12,50\u00A0$ pour SOM-1001 reviennent sur votre numéro mobile money.'],
+    ['$12.50 for KOM-1001 is on its way back to your mobile-money number.', '12,50\u00A0$ pour KOM-1001 reviennent sur votre numéro mobile money.'],
   ],
   '${} for {} is on its way back to your card.': [
-    ['$12.50 for SOM-1001 is on its way back to your card.', '12,50\u00A0$ pour SOM-1001 reviennent sur votre carte.'],
+    ['$12.50 for KOM-1001 is on its way back to your card.', '12,50\u00A0$ pour KOM-1001 reviennent sur votre carte.'],
   ],
   '${} for {} was sent back to your card.': [
-    ['$12.50 for SOM-1001 was sent back to your card.', '12,50\u00A0$ pour SOM-1001 ont été renvoyés sur votre carte.'],
+    ['$12.50 for KOM-1001 was sent back to your card.', '12,50\u00A0$ pour KOM-1001 ont été renvoyés sur votre carte.'],
   ],
   '${} for {} → wallet (the card refund could not be completed).': [
-    ['$12.50 for SOM-1001 → wallet (the card refund could not be completed).', '12,50\u00A0$ pour SOM-1001 → portefeuille (le remboursement sur la carte n’a pas pu aboutir).'],
+    ['$12.50 for KOM-1001 → wallet (the card refund could not be completed).', '12,50\u00A0$ pour KOM-1001 → portefeuille (le remboursement sur la carte n’a pas pu aboutir).'],
   ],
   'Complete the card payment to confirm {}.': [
-    ['Complete the card payment to confirm SOM-1001.', 'Finalisez le paiement par carte pour confirmer SOM-1001.'],
+    ['Complete the card payment to confirm KOM-1001.', 'Finalisez le paiement par carte pour confirmer KOM-1001.'],
   ],
   '{}: card payment was made in {}, expected USD. Review manually.': [
     ['PAY-1: card payment was made in EUR, expected USD. Review manually.', 'PAY-1 : le paiement par carte a été fait en EUR, USD attendus. À vérifier manuellement.'],
@@ -252,12 +252,12 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ],
   ],
   '${} for {} was sent to your mobile-money number.': [
-    ['$12.50 for SOM-1001 was sent to your mobile-money number.', '12,50\u00A0$ pour SOM-1001 ont été envoyés sur votre numéro mobile money.'],
+    ['$12.50 for KOM-1001 was sent to your mobile-money number.', '12,50\u00A0$ pour KOM-1001 ont été envoyés sur votre numéro mobile money.'],
   ],
   '${} for {} → wallet (the network could not take it back to your phone).': [
     [
-      '$12.50 for SOM-1001 → wallet (the network could not take it back to your phone).',
-      '12,50\u00A0$ pour SOM-1001 → portefeuille (le réseau n’a pas pu les renvoyer sur votre téléphone).',
+      '$12.50 for KOM-1001 → wallet (the network could not take it back to your phone).',
+      '12,50\u00A0$ pour KOM-1001 → portefeuille (le réseau n’a pas pu les renvoyer sur votre téléphone).',
     ],
   ],
   '{}: provider reported ${}, expected ${}. Review manually.': [
@@ -320,8 +320,8 @@ const BODY_CASES: Record<string, [sample: string, french: string][]> = {
     ['"Spring Sale" is now rejected.', '« Spring Sale » est maintenant refusée.'],
   ],
   '{} is now {}.': [
-    ['SOM-1001 is now out for delivery.', 'SOM-1001 est maintenant en cours de livraison.'],
-    ['SOM-1001 is now confirmed.', 'SOM-1001 est maintenant confirmée.'],
+    ['KOM-1001 is now out for delivery.', 'KOM-1001 est maintenant en cours de livraison.'],
+    ['KOM-1001 is now confirmed.', 'KOM-1001 est maintenant confirmée.'],
     ['Sneakers is now live.', 'Sneakers est maintenant en ligne.'],
     ['Sneakers is now rejected.', 'Sneakers est maintenant refusé.'],
   ],

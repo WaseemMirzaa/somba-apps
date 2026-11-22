@@ -39,7 +39,7 @@ beforeEach(async () => {
   const customers = new CustomersService(ds.getRepository(User), ds.getRepository(Order), ds.getRepository(WalletTransaction), emitter as never);
   svc = new FraudService(ds.getRepository(FraudAlert), ds.getRepository(Order), ds.getRepository(User), emitter as never, customers, audit, notifications as never);
   customer = await addUser({});
-  alert = await addAlert(customer.id, 'SOM-1');
+  alert = await addAlert(customer.id, 'KOM-1');
 });
 afterEach(async () => ds.destroy());
 
@@ -101,7 +101,7 @@ describe('fraud alerts: Block really blocks', () => {
   });
 
   it('another alert still blocking the same customer keeps the account suspended', async () => {
-    const second = await addAlert(customer.id, 'SOM-2');
+    const second = await addAlert(customer.id, 'KOM-2');
     await svc.setStatus(alert.id, 'blocked', as());
     await svc.setStatus(second.id, 'blocked', as());
     await svc.setStatus(alert.id, 'reviewed', as());
@@ -115,7 +115,7 @@ describe('fraud alerts: Block really blocks', () => {
     await expect(svc.setStatus(orphan.id, 'blocked', as())).rejects.toThrow('not linked to an account');
     await expect(svc.setStatus('nope', 'blocked', as())).rejects.toThrow('Alert not found.');
     const staff = await addUser({ role: 'rider', name: 'Rider' });
-    const staffAlert = await addAlert(staff.id, 'SOM-3');
+    const staffAlert = await addAlert(staff.id, 'KOM-3');
     await expect(svc.setStatus(staffAlert.id, 'blocked', as())).rejects.toThrow('Staff accounts are managed in Roles.');
     await expect(svc.setStatus(alert.id, 'blocked', as({ id: customer.id }))).rejects.toThrow('Account not found.');
     for (const a of [orphan, staffAlert, alert]) expect((await ds.getRepository(FraudAlert).findOneOrFail({ where: { id: a.id } })).status).toBe('open');

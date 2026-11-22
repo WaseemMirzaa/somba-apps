@@ -59,7 +59,7 @@ async function delivered(): Promise<Order> {
   const repo = ds.getRepository(Order);
   return repo.save(
     repo.create({
-      reference: `SOM-${++n}`,
+      reference: `KOM-${++n}`,
       customerId: customer.id,
       customerName: 'Marie',
       status: 'delivered',

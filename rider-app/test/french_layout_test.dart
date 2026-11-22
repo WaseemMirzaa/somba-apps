@@ -55,7 +55,7 @@ void main() {
     fakeSupport(tickets: [ticket('1', unread: 1), ticket('2', status: 'closed')]);
     store.notifications
       ..clear()
-      ..add(NotificationDto(id: 'n', title: 'Parcel ready for pickup', body: 'SOM-1 is packed and ready.', type: 'delivery', read: false));
+      ..add(NotificationDto(id: 'n', title: 'Parcel ready for pickup', body: 'KOM-1 is packed and ready.', type: 'delivery', read: false));
   });
 
   tearDown(() {

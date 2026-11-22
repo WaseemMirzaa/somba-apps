@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { loadTs } from "./ts-load.mjs";
 
 const p = await loadTs("pack-several");
-const order = (id) => ({ id, reference: `SOM-${id}`, createdAt: "2026-11-12T08:00:00Z", customerFirstName: "Ada", packageStatus: "to_pack", groupId: null, items: [] });
+const order = (id) => ({ id, reference: `KOM-${id}`, createdAt: "2026-11-12T08:00:00Z", customerFirstName: "Ada", packageStatus: "to_pack", groupId: null, items: [] });
 
 test("the ticked orders come out in the cluster's order", () => {
   const orders = [order("1"), order("2"), order("3")];

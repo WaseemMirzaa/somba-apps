@@ -12,11 +12,11 @@ const task = (orderId, o = {}) => ({ id: orderId, orderId, deliveredAt: null, up
 const f = (o = {}) => ({ query: "", from: "", to: "", ...o });
 
 test("a reference matches whatever the case, spaces or #", () => {
-  assert.equal(m.matchesReference("SOM-1042", "som-10"), true);
-  assert.equal(m.matchesReference("SOM-1042", " #1042 "), true);
-  assert.equal(m.matchesReference("SOM-1042", "1043"), false);
-  assert.equal(m.matchesReference("SOM-1042", ""), true);
-  assert.equal(m.matchesReference("SOM-1042", "   "), true);
+  assert.equal(m.matchesReference("KOM-1042", "som-10"), true);
+  assert.equal(m.matchesReference("KOM-1042", " #1042 "), true);
+  assert.equal(m.matchesReference("KOM-1042", "1043"), false);
+  assert.equal(m.matchesReference("KOM-1042", ""), true);
+  assert.equal(m.matchesReference("KOM-1042", "   "), true);
 });
 
 test("days are inclusive at both ends, whatever the hour, and either end may be open", () => {
@@ -42,21 +42,21 @@ test("a finished leg is dated by delivery, else last touched, else creation", ()
 
 test("tasks: the search and the days combine", () => {
   const all = [
-    task("SOM-1001", { deliveredAt: "2026-10-20T10:00:00" }),
-    task("SOM-1002", { deliveredAt: "2026-10-21T10:00:00" }),
-    task("SOM-2001", { updatedAt: "2026-10-21T11:00:00" }), // a failure has no deliveredAt
+    task("KOM-1001", { deliveredAt: "2026-10-20T10:00:00" }),
+    task("KOM-1002", { deliveredAt: "2026-10-21T10:00:00" }),
+    task("KOM-2001", { updatedAt: "2026-10-21T11:00:00" }), // a failure has no deliveredAt
   ];
   assert.equal(m.filterFinishedTasks(all, f()).length, 3);
-  assert.deepEqual(m.filterFinishedTasks(all, f({ query: "som-100" })).map((t) => t.id), ["SOM-1001", "SOM-1002"]);
-  assert.deepEqual(m.filterFinishedTasks(all, f({ from: "2026-10-21", to: "2026-10-21" })).map((t) => t.id), ["SOM-1002", "SOM-2001"]);
-  assert.deepEqual(m.filterFinishedTasks(all, f({ query: "2001", from: "2026-10-21", to: "2026-10-22" })).map((t) => t.id), ["SOM-2001"]);
+  assert.deepEqual(m.filterFinishedTasks(all, f({ query: "som-100" })).map((t) => t.id), ["KOM-1001", "KOM-1002"]);
+  assert.deepEqual(m.filterFinishedTasks(all, f({ from: "2026-10-21", to: "2026-10-21" })).map((t) => t.id), ["KOM-1002", "KOM-2001"]);
+  assert.deepEqual(m.filterFinishedTasks(all, f({ query: "2001", from: "2026-10-21", to: "2026-10-22" })).map((t) => t.id), ["KOM-2001"]);
   assert.deepEqual(m.filterFinishedTasks(all, f({ query: "nope" })), []);
 });
 
 test("runs are found by their own reference or by the order reference of a parcel inside", () => {
   const r1 = { id: "r1", reference: "TR-0007", closedAt: "2026-10-20T12:00:00" };
   const r2 = { id: "r2", reference: "TR-0008", closedAt: "2026-10-22T12:00:00" };
-  const refs = (r) => (r.id === "r1" ? ["SOM-3001"] : []);
+  const refs = (r) => (r.id === "r1" ? ["KOM-3001"] : []);
   assert.deepEqual(m.filterFinishedRuns([r1, r2], refs, f({ query: "tr-0008" })).map((r) => r.id), ["r2"]);
   assert.deepEqual(m.filterFinishedRuns([r1, r2], refs, f({ query: "3001" })).map((r) => r.id), ["r1"]);
   assert.deepEqual(m.filterFinishedRuns([r1, r2], refs, f({ from: "2026-10-22", to: "2026-10-22" })).map((r) => r.id), ["r2"]);

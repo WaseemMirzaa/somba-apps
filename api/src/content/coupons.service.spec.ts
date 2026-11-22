@@ -47,8 +47,8 @@ describe('store coupons', () => {
     const mine = await create();
     const other = await w.store('Other Shop', 'u-other');
     await w.coupons.create('u-other', { code: 'OTHER5', type: 'fixed', value: 5 });
-    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'SOM-1', customerId: 'c', customerName: 'C', status: 'confirmed', promoCode: 'SPRING10' }));
-    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'SOM-2', customerId: 'c', customerName: 'C', status: 'cancelled', promoCode: 'SPRING10' }));
+    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'KOM-1', customerId: 'c', customerName: 'C', status: 'confirmed', promoCode: 'SPRING10' }));
+    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'KOM-2', customerId: 'c', customerName: 'C', status: 'cancelled', promoCode: 'SPRING10' }));
     const own = await w.coupons.list({ id: 'u-kt', role: 'seller' });
     expect(own.map((c) => [c.code, c.uses])).toEqual([['SPRING10', 1]]); // the cancelled order does not count
     const all = await w.coupons.list({ id: 'a', role: 'admin_marketing' });
@@ -70,7 +70,7 @@ describe('store coupons', () => {
   it('deletes an unused coupon, but only switches off one that already discounted an order', async () => {
     const a = await create({ code: 'UNUSED' });
     const b = await create({ code: 'USED' });
-    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'SOM-3', customerId: 'c', customerName: 'C', status: 'delivered', promoCode: 'USED' }));
+    await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'KOM-3', customerId: 'c', customerName: 'C', status: 'delivered', promoCode: 'USED' }));
     expect(await w.coupons.remove('u-kt', a.id)).toEqual({ id: a.id, deleted: true });
     expect(await w.ds.getRepository(Promo).findOneBy({ id: a.id })).toBeNull();
     const r = await w.coupons.remove('u-kt', b.id);
@@ -102,7 +102,7 @@ describe('coupon use counts reach the seller (throttled)', () => {
     await create({ code: 'BURST' });
     w.emitter.sent.length = 0;
     for (let i = 0; i < 4; i++) {
-      await orderWith(`SOM-B${i}`, 'BURST');
+      await orderWith(`KOM-B${i}`, 'BURST');
       w.coupons.usageChanged('BURST');
     }
     expect(pushes('BURST')).toHaveLength(0); // held back by the throttle
@@ -118,8 +118,8 @@ describe('coupon use counts reach the seller (throttled)', () => {
 
   it('a cancelled order brings the count back down', async () => {
     await create({ code: 'BACK' });
-    const o = await orderWith('SOM-C1', 'BACK');
-    await orderWith('SOM-C2', 'BACK');
+    const o = await orderWith('KOM-C1', 'BACK');
+    await orderWith('KOM-C2', 'BACK');
     w.coupons.usageChanged('BACK');
     await w.coupons.flushUsagePushes();
     expect(pushes('BACK').pop()?.payload).toMatchObject({ uses: 2 });
@@ -141,7 +141,7 @@ describe('coupon use counts reach the seller (throttled)', () => {
     process.env.COUPON_USAGE_PUSH_MS = '0';
     try {
       await create({ code: 'NOW' });
-      await orderWith('SOM-N1', 'NOW');
+      await orderWith('KOM-N1', 'NOW');
       w.emitter.sent.length = 0;
       w.coupons.usageChanged('NOW');
       await new Promise((r) => setTimeout(r, 100));

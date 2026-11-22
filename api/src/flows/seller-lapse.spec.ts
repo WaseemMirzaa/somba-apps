@@ -15,11 +15,11 @@ let notices: { to: string; title: string; body: string; type?: string; entityId?
 
 async function replacement(over: Partial<Replacement> = {}) {
   const repo = ds.getRepository(Replacement);
-  return repo.save(repo.create({ reference: `REP-${Math.random()}`.slice(0, 20), orderId: 'o1', orderReference: 'SOM-1', customerId: 'c1', customerName: 'Marie', sellerId: store.id, sku: 'S1', productName: 'Cup', status: 'requested', sellerDueAt: new Date(T0.getTime() + 48 * HOUR), ...over }));
+  return repo.save(repo.create({ reference: `REP-${Math.random()}`.slice(0, 20), orderId: 'o1', orderReference: 'KOM-1', customerId: 'c1', customerName: 'Marie', sellerId: store.id, sku: 'S1', productName: 'Cup', status: 'requested', sellerDueAt: new Date(T0.getTime() + 48 * HOUR), ...over }));
 }
 async function exchange(over: Partial<Exchange> = {}) {
   const repo = ds.getRepository(Exchange);
-  return repo.save(repo.create({ reference: `EXC-${Math.random()}`.slice(0, 20), orderId: 'o1', orderReference: 'SOM-1', customerId: 'c1', customerName: 'Marie', sellerId: store.id, fromSku: 'S1', fromName: 'Polo M', toSku: 'S2', toName: 'Polo L', status: 'requested', sellerDueAt: new Date(T0.getTime() + 48 * HOUR), ...over }));
+  return repo.save(repo.create({ reference: `EXC-${Math.random()}`.slice(0, 20), orderId: 'o1', orderReference: 'KOM-1', customerId: 'c1', customerName: 'Marie', sellerId: store.id, fromSku: 'S1', fromName: 'Polo M', toSku: 'S2', toName: 'Polo L', status: 'requested', sellerDueAt: new Date(T0.getTime() + 48 * HOUR), ...over }));
 }
 
 beforeEach(async () => {
@@ -55,8 +55,8 @@ describe('replacements and exchanges that wait too long for support', () => {
     expect(await svc.sweep()).toBe(0);
     expect(notices.map((n) => [n.to, n.title, n.type, n.entityId, n.body])).toEqual(
       expect.arrayContaining([
-        ['role:admin_support', 'Replacement waiting for support', 'replacement', r.id, `${r.reference} · SOM-1`],
-        ['role:admin_support', 'Exchange waiting for support', 'exchange', x.id, `${x.reference} · SOM-1`],
+        ['role:admin_support', 'Replacement waiting for support', 'replacement', r.id, `${r.reference} · KOM-1`],
+        ['role:admin_support', 'Exchange waiting for support', 'exchange', x.id, `${x.reference} · KOM-1`],
       ]),
     );
     expect(notices).toHaveLength(2);

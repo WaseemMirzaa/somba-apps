@@ -35,7 +35,7 @@ ProductDto _shoe({double price = 30, bool options = true}) => ProductDto.fromJso
 
 OrderDto _order({String variant = 'Size: 40 · Colour: Black', int qty = 2}) => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-1042',
+      'reference': 'KOM-1042',
       'customerName': 'Aline',
       'status': 'delivered',
       'paymentMethod': 'wallet',

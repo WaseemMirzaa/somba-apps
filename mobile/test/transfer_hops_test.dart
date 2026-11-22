@@ -34,7 +34,7 @@ const _pickup = {'kind': 'pickup', 'status': 'delivered', 'pickedUpAt': '2026-10
 
 OrderDto _order(String status, List<Map<String, dynamic>> legs, {Object? routes, String origin = 'hub-limete', String dest = 'hub-kikwit'}) => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-2077',
+      'reference': 'KOM-2077',
       'status': status,
       'paymentMethod': 'wallet',
       'totalUsd': 10,

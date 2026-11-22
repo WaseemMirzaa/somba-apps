@@ -279,7 +279,7 @@ Tickets: `id, reference, userId, userName, role (the creator's role: customer|se
 
 Bodies are data (references, names) plus, where a notice quotes what somebody wrote, that text. The quote is served in the receiver's language: see "Notices that quote people's words" in `stored-text-i18n.md`.
 
-Wallet history lines added (French in `localizeWalletDescription`): `Refund for SOM-… (returned items)`, `Refund for SOM-… (dispute)`,
+Wallet history lines added (French in `localizeWalletDescription`): `Refund for KOM-… (returned items)`, `Refund for KOM-… (dispute)`,
 `Exchange EXC-…: price difference`, `Exchange EXC-… : price difference refunded`, `Exchange EXC-… rejected: price difference returned`.
 
 ---

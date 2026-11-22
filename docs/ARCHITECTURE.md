@@ -1082,7 +1082,7 @@ _Source: `api/src/database/entities/order.entity.ts`_
 | Field | DB type | Null | Default | Index | Notes |
 |---|---|---|---|---|---|
 | `id` | uuid |  |  | PK |  |
-| `reference` | varchar(20) |  |  | unique | Short human-facing reference, e.g. SOM-1042. |
+| `reference` | varchar(20) |  |  | unique | Short human-facing reference, e.g. KOM-1042. |
 | `customerId` | varchar |  |  | yes |  |
 | `customerName` | varchar |  |  |  |  |
 | `status` | varchar(20) |  | pending | yes | Values: pending, confirmed, processing, shipped, out_for_delivery, delivered, cancelled, returned |
@@ -2230,7 +2230,7 @@ Priority: **P0** = blocks a real launch with real money · **P1** = expected by 
 | D10 | Zones live in a JSON setting | `settings.deliveryZones` | No editing UI, no geometry, no per-zone rules | `zones` table (name, city, polygon/communes, fee, ETA, active) | P1 |
 | D11 | Wallet is a single balance + log | `users.walletBalance` + `wallet_transactions` | Finance needs a provable ledger across wallet, commissions, payouts, refunds | Double-entry `ledger_entries` (account, debit, credit, ref) with balances derived/checked | P1 |
 | D12 | Dates as strings | `flash_sales.startsAt/endsAt`, campaign dates are varchar | Cannot query/schedule reliably | `DATETIME` columns + timezone policy (store UTC) | P2 |
-| D13 | Random order reference | `SOM-` + time + random | Small collision risk; unique index will reject a duplicate insert | Sequence table or retry on duplicate | P2 |
+| D13 | Random order reference | `KOM-` + time + random | Small collision risk; unique index will reject a duplicate insert | Sequence table or retry on duplicate | P2 |
 | D14 | No soft-delete/versioning on key records | Hard updates | Price history, product edits and policy changes are lost | `deletedAt`, price history table, audit of edits | P2 |
 | D15 | Indexes for scale | Few composite indexes | Lists will slow down with volume | Composite indexes (e.g. `orders(customerId, createdAt)`, `delivery_tasks(status, zoneId)`, `payments(status, method, createdAt)`) | P2 |
 

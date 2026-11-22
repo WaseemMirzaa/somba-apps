@@ -234,14 +234,14 @@ describe('AfterSaleGateway', () => {
 
   it('A-03: staff actions on an exchange are audited, with any wallet credit; a customer’s own are not', async () => {
     const { gw, exc, audit } = make();
-    exc.create.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: 0, status: 'requested' } as never);
+    exc.create.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'KOM-1', priceDiffUsd: 0, status: 'requested' } as never);
     await gw.exchangesCreate(client('customer', 'c1'), { orderId: 'o', toSku: 'x', toName: 'X' });
     expect(audit.record).not.toHaveBeenCalled();
-    exc.create.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: 0, status: 'requested' } as never);
+    exc.create.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'KOM-1', priceDiffUsd: 0, status: 'requested' } as never);
     await gw.exchangesCreate(client('admin_operations', 'a2'), { orderId: 'o', toSku: 'x', toName: 'X' });
-    exc.respond.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: -40, status: 'approved' } as never);
+    exc.respond.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'KOM-1', priceDiffUsd: -40, status: 'approved' } as never);
     await gw.exchangesRespond(client('admin_operations', 'a2'), { id: 'e1', approve: true });
-    exc.setStatus.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'SOM-1', priceDiffUsd: -40, status: 'delivered' } as never);
+    exc.setStatus.mockResolvedValueOnce({ id: 'e1', reference: 'EXC-1', orderReference: 'KOM-1', priceDiffUsd: -40, status: 'delivered' } as never);
     await gw.exchangesSetStatus(client('admin', 'a1'), { id: 'e1', status: 'delivered' });
     expect(audit.record.mock.calls.map(([e]) => `${e.action}|${e.role}|${e.entity}|${e.entityId}`)).toEqual([
       'exchange.create|admin_operations|exchange|e1',

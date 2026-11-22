@@ -57,7 +57,7 @@ Map<String, dynamic> _orderJson({
 }) =>
     {
       'id': 'o1',
-      'reference': 'SOM-1',
+      'reference': 'KOM-1',
       'customerName': 'Aline',
       'status': status,
       'paymentMethod': 'wallet',

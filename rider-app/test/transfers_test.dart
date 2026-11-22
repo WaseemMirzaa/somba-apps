@@ -221,7 +221,7 @@ void main() {
     test('a refresh reads this driver\'s runs and nobody else\'s; their parcels fold into the run card', () async {
       serverTasks = [
         parcelJson('t1', 'a1', hop: 1, hops: 2),
-        parcelJson('t2', 'a1', hop: 1, hops: 2, reference: 'SOM-1043'),
+        parcelJson('t2', 'a1', hop: 1, hops: 2, reference: 'KOM-1043'),
         legJson('delivery', id: 'plain', status: 'assigned'),
       ];
       serverRuns = [runJson('a1', taskIds: ['t1', 't2'], count: 2), runJson('b2', riderId: 'someone-else')];
@@ -574,7 +574,7 @@ void main() {
       testWidgets('one card per run: "Transfer to <warehouse> · 18 parcels", from, the parcel list, hand-over at the receiving warehouse', (t) async {
         seed(
           runs: [TransferRun.fromJson(runJson('a1', taskIds: ['t1', 't2']))],
-          parcels: [parcelJson('t1', 'a1'), parcelJson('t2', 'a1', reference: 'SOM-1043')],
+          parcels: [parcelJson('t1', 'a1'), parcelJson('t2', 'a1', reference: 'KOM-1043')],
         );
         await show(t, lang);
         expect(find.byKey(const ValueKey('run-a1')), findsOneWidget);
@@ -593,7 +593,7 @@ void main() {
         await t.tap(find.byKey(const ValueKey('run-parcels-a1')));
         await t.pump();
         expect(find.byKey(const ValueKey('run-parcel-t1')), findsOneWidget);
-        expect(find.textContaining('SOM-1043'), findsOneWidget);
+        expect(find.textContaining('KOM-1043'), findsOneWidget);
         expect(find.textContaining('2× '), findsWidgets, reason: 'the items of the parcel');
         await t.tap(find.byKey(const ValueKey('run-parcels-a1')));
         await t.pump();

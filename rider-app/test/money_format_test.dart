@@ -41,11 +41,11 @@ void main() {
 
   group('amounts inside French notification texts (older servers, no French wording)', () {
     test('an amount is grouped and uses the decimal comma', () {
-      expect(localizeNotification(fr, 'New order', r'SOM-8 · $1202.00 from Marie').$2, 'SOM-8 · 1 202,00 \$ de Marie');
+      expect(localizeNotification(fr, 'New order', r'KOM-8 · $1202.00 from Marie').$2, 'KOM-8 · 1 202,00 \$ de Marie');
     });
 
     test('English notices are shown as received', () {
-      const raw = r'SOM-7 · $1202.00 from Marie';
+      const raw = r'KOM-7 · $1202.00 from Marie';
       expect(localizeNotification(en, 'New order', raw), ('New order', raw));
     });
   });

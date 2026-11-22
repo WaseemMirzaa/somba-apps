@@ -20,7 +20,8 @@ test("a shelf label is a SKU in lower case, a bin label is the bin code in upper
 });
 
 test("order references and unknown text are told apart, and noise is cleaned", () => {
-  assert.deepEqual(m.classifyScan("som-1234ab"), { kind: "order", value: "SOM-1234AB" });
+  assert.deepEqual(m.classifyScan("som-1234ab"), { kind: "order", value: "KOM-1234AB" }); // an old SOM- label still scans
+  assert.deepEqual(m.classifyScan("kom-1234ab"), { kind: "order", value: "KOM-1234AB" });
   assert.deepEqual(m.classifyScan("A-01"), { kind: "unknown", value: "A-01" });
   assert.deepEqual(m.classifyScan("   "), { kind: "unknown", value: "" });
   assert.equal(m.cleanScan("AB\u0000C\u001f D"), "ABC D");

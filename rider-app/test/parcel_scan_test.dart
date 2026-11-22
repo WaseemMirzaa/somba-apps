@@ -462,7 +462,7 @@ void main() {
     });
 
     test('a leg reads the box set contents and orders; a leg without them has empty lists (an older server)', () {
-      final t = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042'));
+      final t = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'KOM-1042'));
       expect(t.parcelContents.map((c) => c.text('en')), [
         '2× Running shoes Air Comfort Pro (Size 42 / Black)',
         '1× Wireless earphones',
@@ -473,8 +473,8 @@ void main() {
         '1× Écouteurs sans fil',
         '3× Coque de téléphone (Bleu)',
       ]);
-      expect(t.parcelContents.map((c) => c.orderReference), ['SOM-1042', 'SOM-1042', 'SOM-1043']);
-      expect(t.parcelOrders.map((o) => (o.orderId, o.reference)), [('o-a', 'SOM-1042'), ('o-b', 'SOM-1043')]);
+      expect(t.parcelContents.map((c) => c.orderReference), ['KOM-1042', 'KOM-1042', 'KOM-1043']);
+      expect(t.parcelOrders.map((o) => (o.orderId, o.reference)), [('o-a', 'KOM-1042'), ('o-b', 'KOM-1043')]);
       expect(t.parcels.every((p) => p.groupId == 'g1'), isTrue);
       final old = leg('delivery');
       expect(old.parcelContents, isEmpty);
@@ -482,7 +482,7 @@ void main() {
     });
 
     test('a push (no order snapshot) keeps the contents the list knew when it carries none', () {
-      final old = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042'));
+      final old = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'KOM-1042'));
       final push = DeliveryTaskDto.fromJson({...legJson('delivery', id: 's1', withOrder: false), 'orderId': 'o-a'});
       expect(push.withOrderFrom(old).parcelContents, hasLength(3));
       expect(push.withOrderFrom(old).parcelOrders, hasLength(2));
@@ -490,7 +490,7 @@ void main() {
 
     testWidgets('a lone leg with boxes lists what is in them, with options, in the rider\'s language', (t) async {
       await show(t, [
-        {..._task('pickup', 'assigned'), 'parcelContents': setContents, 'parcelOrders': [{'orderId': 'o-a', 'reference': 'SOM-1042'}]}
+        {..._task('pickup', 'assigned'), 'parcelContents': setContents, 'parcelOrders': [{'orderId': 'o-a', 'reference': 'KOM-1042'}]}
       ]);
       expect(find.text('In the parcels'), findsOneWidget);
       expect(find.textContaining('2× Running shoes Air Comfort Pro (Size 42 / Black)', findRichText: true), findsOneWidget);
@@ -525,8 +525,8 @@ void main() {
 
   group('sibling legs, one stop', () {
     List<Map<String, dynamic>> pair(String kind, String status, {Set<String> picked = const {}, Set<String> dropped = const {}}) => [
-          siblingLegJson(kind, id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: status, picked: picked, dropped: dropped),
-          siblingLegJson(kind, id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: status, picked: picked, dropped: dropped),
+          siblingLegJson(kind, id: 's1', orderId: 'o-a', reference: 'KOM-1042', status: status, picked: picked, dropped: dropped),
+          siblingLegJson(kind, id: 's2', orderId: 'o-b', reference: 'KOM-1043', status: status, picked: picked, dropped: dropped),
         ];
 
     List<DeliveryTaskDto> dtos(List<Map<String, dynamic>> rows) => rows.map(DeliveryTaskDto.fromJson).toList();
@@ -537,17 +537,17 @@ void main() {
       final stops = groupStops(rows);
       expect(stops, hasLength(1));
       expect(stops.single.legs.map((l) => l.id), ['s1', 's2']);
-      expect(stops.single.references, ['SOM-1042', 'SOM-1043']);
+      expect(stops.single.references, ['KOM-1042', 'KOM-1043']);
       expect(stops.single.isGroup, isTrue);
     });
 
     test('a different status or kind, a set of one order, a finished leg and a legacy leg stand alone', () {
-      final a = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit'));
-      final b = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: 'assigned'));
-      final pickup = DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit'));
-      final done1 = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 'd1', orderId: 'o-a', reference: 'SOM-1042', status: 'delivered'));
-      final done2 = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 'd2', orderId: 'o-b', reference: 'SOM-1043', status: 'delivered'));
-      final lone = DeliveryTaskDto.fromJson({...siblingLegJson('delivery', id: 'l1', orderId: 'o-c', reference: 'SOM-1050', status: 'in_transit'), 'parcelOrders': [{'orderId': 'o-c', 'reference': 'SOM-1050'}]});
+      final a = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'KOM-1042', status: 'in_transit'));
+      final b = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'KOM-1043', status: 'assigned'));
+      final pickup = DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p1', orderId: 'o-a', reference: 'KOM-1042', status: 'in_transit'));
+      final done1 = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 'd1', orderId: 'o-a', reference: 'KOM-1042', status: 'delivered'));
+      final done2 = DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 'd2', orderId: 'o-b', reference: 'KOM-1043', status: 'delivered'));
+      final lone = DeliveryTaskDto.fromJson({...siblingLegJson('delivery', id: 'l1', orderId: 'o-c', reference: 'KOM-1050', status: 'in_transit'), 'parcelOrders': [{'orderId': 'o-c', 'reference': 'KOM-1050'}]});
       final legacy = leg('delivery', id: 'old', status: 'in_transit');
       final stops = groupStops([a, b, pickup, done1, done2, lone, legacy]);
       expect(stops.map((s) => s.legs.map((l) => l.id).toList()), [['s1'], ['s2'], ['p1'], ['d1'], ['d2'], ['l1'], ['old']]);
@@ -556,8 +556,8 @@ void main() {
 
     test('a box both legs hold counts once, and is scanned only when every leg has it', () {
       final rows = dtos([
-        siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'}),
-        siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}),
+        siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'KOM-1042', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'}),
+        siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'KOM-1043', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}),
       ]);
       final stop = groupStops(rows).single;
       expect(stop.parcels.map((p) => p.code), ['PKG-7KQ2M9XA', 'PKG-4HT8W3NB']);
@@ -570,13 +570,13 @@ void main() {
       await show(t, pair('delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}));
       expect(find.byKey(const ValueKey('task-s1')), findsOneWidget);
       expect(find.byKey(const ValueKey('task-s2')), findsNothing);
-      expect(find.text('SOM-1042 · SOM-1043'), findsOneWidget);
+      expect(find.text('KOM-1042 · KOM-1043'), findsOneWidget);
       expect(find.text('2 orders'), findsOneWidget);
-      expect(find.text('Same address: SOM-1042, SOM-1043'), findsOneWidget);
+      expect(find.text('Same address: KOM-1042, KOM-1043'), findsOneWidget);
       expect(find.text('Active · 1'), findsOneWidget);
       // The whole box set, each line with its order.
-      expect(find.textContaining('2× Running shoes Air Comfort Pro (Size 42 / Black) · SOM-1042', findRichText: true), findsOneWidget);
-      expect(find.textContaining('3× Phone case (Blue) · SOM-1043', findRichText: true), findsOneWidget);
+      expect(find.textContaining('2× Running shoes Air Comfort Pro (Size 42 / Black) · KOM-1042', findRichText: true), findsOneWidget);
+      expect(find.textContaining('3× Phone case (Blue) · KOM-1043', findRichText: true), findsOneWidget);
       // Two boxes, not four; both legs' scans are one count.
       expect(find.text('0 of 2 scanned'), findsOneWidget);
       expect(find.text('Scan parcels (0 of 2)'), findsOneWidget);
@@ -588,8 +588,8 @@ void main() {
     testWidgets('in French', (t) async {
       await show(t, pair('delivery', 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}), lang: 'fr');
       expect(find.text('2 commandes'), findsOneWidget);
-      expect(find.text('Même adresse : SOM-1042, SOM-1043'), findsOneWidget);
-      expect(find.textContaining('3× Coque de téléphone (Bleu) · SOM-1043', findRichText: true), findsOneWidget);
+      expect(find.text('Même adresse : KOM-1042, KOM-1043'), findsOneWidget);
+      expect(find.textContaining('3× Coque de téléphone (Bleu) · KOM-1043', findRichText: true), findsOneWidget);
       expect(find.text('0 sur 2 scanné'), findsOneWidget);
     });
 
@@ -625,8 +625,8 @@ void main() {
         'required': true,
         'contents': setContents,
         'orders': [
-          {'orderId': 'o-a', 'reference': 'SOM-1042'},
-          {'orderId': 'o-b', 'reference': 'SOM-1043'}
+          {'orderId': 'o-a', 'reference': 'KOM-1042'},
+          {'orderId': 'o-b', 'reference': 'KOM-1043'}
         ],
       };
     }
@@ -696,10 +696,10 @@ void main() {
       final scanner = await showSet(t, 'pickup', 'assigned');
       await t.tap(find.byKey(const ValueKey('scan-parcels-s1')));
       await settle(t);
-      expect(find.descendant(of: find.byType(AppBar), matching: find.text('SOM-1042 · SOM-1043')), findsOneWidget);
+      expect(find.descendant(of: find.byType(AppBar), matching: find.text('KOM-1042 · KOM-1043')), findsOneWidget);
       final onScanner = find.byType(ParcelScanScreen);
       expect(find.descendant(of: onScanner, matching: find.byType(ParcelContentsList)), findsOneWidget);
-      expect(find.descendant(of: onScanner, matching: find.textContaining('3× Phone case (Blue) · SOM-1043', findRichText: true)), findsOneWidget);
+      expect(find.descendant(of: onScanner, matching: find.textContaining('3× Phone case (Blue) · KOM-1043', findRichText: true)), findsOneWidget);
       scanner.emit('PKG-7KQ2M9XA');
       await settle(t);
     });
@@ -751,7 +751,7 @@ void main() {
       await settle(t);
       await t.pump(const Duration(milliseconds: 400));
       expect(updates.map((u) => u['taskId']), ['s1', 's2']);
-      expect(find.text('Done for 1 of 2 orders. Not done: SOM-1043: This delivery was just updated. Refresh and try again.'), findsOneWidget);
+      expect(find.text('Done for 1 of 2 orders. Not done: KOM-1043: This delivery was just updated. Refresh and try again.'), findsOneWidget);
     });
 
     testWidgets('and in French', (t) async {
@@ -760,7 +760,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('next-s1')));
       await settle(t);
       await t.pump(const Duration(milliseconds: 400));
-      expect(find.text('Fait pour 1 sur 2 commandes. Non fait : SOM-1043 : Cette livraison vient d’être mise à jour. Actualisez et réessayez.'), findsOneWidget);
+      expect(find.text('Fait pour 1 sur 2 commandes. Non fait : KOM-1043 : Cette livraison vient d’être mise à jour. Actualisez et réessayez.'), findsOneWidget);
     });
 
     testWidgets('the first leg refused (nothing changed): its refusal is shown and the second leg is not touched', (t) async {
@@ -796,13 +796,13 @@ void main() {
           'destination': {'area': 'Gombe', 'address': priv ? '12, avenue du Commerce, Gombe' : null, 'phone': priv ? '+243812345678' : null, 'recipient': priv ? 'Aline Kabila Mwamba' : null},
           'contents': setContents,
           'orders': [
-            {'orderId': 'o-a', 'reference': 'SOM-1042'},
-            {'orderId': 'o-b', 'reference': 'SOM-1043'}
+            {'orderId': 'o-a', 'reference': 'KOM-1042'},
+            {'orderId': 'o-b', 'reference': 'KOM-1043'}
           ],
           'group': {'id': 'g1', 'orders': 2, 'locked': true, 'contentsRev': 1},
           'legs': [
-            {'id': 's1', 'orderId': 'o-a', 'orderReference': 'SOM-1042', 'kind': 'delivery', 'status': 'in_transit'},
-            {'id': 's2', 'orderId': 'o-b', 'orderReference': 'SOM-1043', 'kind': 'delivery', 'status': 'in_transit'},
+            {'id': 's1', 'orderId': 'o-a', 'orderReference': 'KOM-1042', 'kind': 'delivery', 'status': 'in_transit'},
+            {'id': 's2', 'orderId': 'o-b', 'orderReference': 'KOM-1043', 'kind': 'delivery', 'status': 'in_transit'},
           ],
         };
 
@@ -825,9 +825,9 @@ void main() {
       expect(find.text('Aline Kabila Mwamba'), findsOneWidget);
       expect(find.text('12, avenue du Commerce, Gombe'), findsOneWidget);
       expect(find.text('+243812345678'), findsOneWidget);
-      expect(find.text('SOM-1042 · SOM-1043'), findsWidgets);
+      expect(find.text('KOM-1042 · KOM-1043'), findsWidgets);
       expect(find.byKey(const ValueKey('resolved-contents-line-2')), findsOneWidget);
-      expect(find.text('SOM-1043 · Delivery · In transit'), findsOneWidget);
+      expect(find.text('KOM-1043 · Delivery · In transit'), findsOneWidget);
     });
 
     testWidgets('no street, phone or recipient from the server (a pickup, a box that is not yours): none is drawn', (t) async {
@@ -909,8 +909,8 @@ void main() {
             'Ces commandes ne peuvent pas partager une étiquette : le client, le jour, l’adresse de livraison ou le mode de livraison diffèrent.',
         'A rider already collected these boxes. The orders in them cannot change; pack the other orders in a new set.':
             'Un livreur a déjà récupéré ces boîtes. Les commandes qu’elles contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.',
-        'SOM-1042: A rider already collected these boxes. The orders in them cannot change; pack the other orders in a new set.':
-            'SOM-1042 : un livreur a déjà récupéré ces boîtes. Les commandes qu’elles contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.',
+        'KOM-1042: A rider already collected these boxes. The orders in them cannot change; pack the other orders in a new set.':
+            'KOM-1042 : un livreur a déjà récupéré ces boîtes. Les commandes qu’elles contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.',
         'Orders with several sellers keep their own labels: they cannot be packed together.':
             'Les commandes de plusieurs vendeurs gardent leurs propres étiquettes : elles ne peuvent pas être préparées ensemble.',
         'A label set needs at least one order.': 'Un ensemble d’étiquettes doit contenir au moins une commande.',

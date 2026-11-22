@@ -18,13 +18,13 @@ void main() {
 
   group('parsing', () {
     test('a full conversation', () {
-      final c = ChatConversation.fromJson(convJson(id: 'c9', unread: 3, productId: 'p1', productName: 'Shoes', productImage: '/uploads/x.jpg', orderId: 'o1', orderReference: 'SOM-1'));
+      final c = ChatConversation.fromJson(convJson(id: 'c9', unread: 3, productId: 'p1', productName: 'Shoes', productImage: '/uploads/x.jpg', orderId: 'o1', orderReference: 'KOM-1'));
       expect(c.id, 'c9');
       expect(c.side, 'buyer');
       expect(c.storeName, 'Mama Tech');
       expect(c.unread, 3);
       expect(c.productName, 'Shoes');
-      expect(c.orderReference, 'SOM-1');
+      expect(c.orderReference, 'KOM-1');
       expect(c.lastMessageAt, isNotNull);
       expect(c.hasContext, isTrue);
     });

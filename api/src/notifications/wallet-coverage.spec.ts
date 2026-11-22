@@ -40,7 +40,7 @@ function callBody(src: string, open: number): string {
 }
 
 /** Literal wording of a description, each `${...}` replaced by a sample reference. */
-const sample = (literal: string) => literal.slice(1, -1).replace(/\$\{via\}/g, 'phone').replace(/\$\{[^}]*\}/g, 'SOM-1001');
+const sample = (literal: string) => literal.slice(1, -1).replace(/\$\{via\}/g, 'phone').replace(/\$\{[^}]*\}/g, 'KOM-1001');
 
 /** Every plain string or template literal inside an expression (the wording a description is made of). */
 function literalsIn(expr: string): string[] {
@@ -72,7 +72,7 @@ describe('wallet lines (French)', () => {
 
   it('finds the descriptions the server writes', () => {
     expect(lines.length).toBeGreaterThan(8);
-    expect(lines.map((l) => l.text)).toEqual(expect.arrayContaining(['Order SOM-1001', 'Wallet top-up via SOM-1001', 'Refund for SOM-1001']));
+    expect(lines.map((l) => l.text)).toEqual(expect.arrayContaining(['Order KOM-1001', 'Wallet top-up via KOM-1001', 'Refund for KOM-1001']));
   });
 
   it('has a French version for every wallet description', () => {
@@ -81,11 +81,11 @@ describe('wallet lines (French)', () => {
   });
 
   it('names both refund channels in a failed-refund line', () => {
-    expect(localizeWalletDescription('Refund for SOM-1001 (phone refund failed)', 'fr')).toBe('Remboursement de SOM-1001 (échec du remboursement mobile)');
-    expect(localizeWalletDescription('Refund for SOM-1001 (card refund failed)', 'fr')).toBe('Remboursement de SOM-1001 (échec du remboursement par carte)');
+    expect(localizeWalletDescription('Refund for KOM-1001 (phone refund failed)', 'fr')).toBe('Remboursement de KOM-1001 (échec du remboursement mobile)');
+    expect(localizeWalletDescription('Refund for KOM-1001 (card refund failed)', 'fr')).toBe('Remboursement de KOM-1001 (échec du remboursement par carte)');
   });
 
   it('keeps the English line for English readers', () => {
-    expect(localizeWalletDescription('Order SOM-1001', 'en')).toBe('Order SOM-1001');
+    expect(localizeWalletDescription('Order KOM-1001', 'en')).toBe('Order KOM-1001');
   });
 });

@@ -99,7 +99,7 @@ async function store(name: string, locale: 'en' | 'fr') {
 }
 async function delivered(customerId: string, productId: string) {
   const repo = ds.getRepository(Order);
-  await repo.save(repo.create({ reference: `SOM-${Math.random()}`.slice(0, 18), customerId, customerName: 'x', status: 'delivered', totalUsd: 10, items: [{ productId, productName: 'Phone', variant: 'Default', qty: 1, priceUsd: 10 }] as OrderItem[] }));
+  await repo.save(repo.create({ reference: `KOM-${Math.random()}`.slice(0, 18), customerId, customerName: 'x', status: 'delivered', totalUsd: 10, items: [{ productId, productName: 'Phone', variant: 'Default', qty: 1, priceUsd: 10 }] as OrderItem[] }));
 }
 
 const FR_QUESTION = 'Est-ce que ce produit est neuf ?';

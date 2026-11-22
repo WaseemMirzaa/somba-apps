@@ -35,7 +35,7 @@ describe('delivery code lockout (RD-01)', () => {
   const mkTask = async (extra: Partial<DeliveryTask> = {}) => {
     const n = ++seq;
     const order = await ds.getRepository(Order).save(
-      ds.getRepository(Order).create({ reference: `SOM-${n}`, customerId: 'cust1', customerName: 'Marie', status: 'out_for_delivery', paymentMethod: 'stripe_card', totalUsd: 50, shippingAddress: '{}' }),
+      ds.getRepository(Order).create({ reference: `KOM-${n}`, customerId: 'cust1', customerName: 'Marie', status: 'out_for_delivery', paymentMethod: 'stripe_card', totalUsd: 50, shippingAddress: '{}' }),
     );
     return ds.getRepository(DeliveryTask).save(
       ds.getRepository(DeliveryTask).create({
@@ -229,7 +229,7 @@ describe('delivery code lockout (RD-01)', () => {
       expect(lines.map((l) => l.detail)).toEqual(expect.arrayContaining([expect.stringContaining('try 1 '), expect.stringContaining('try 2 '), expect.stringContaining('try 3 ')]));
       // the 1st and 2nd wrong codes are quiet, the 3rd tells the warehouse side
       expect(notif.toAdmins).toHaveBeenCalledTimes(1);
-      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Wrong delivery codes', type: 'task', entityId: task.id, body: expect.stringMatching(/^SOM-\d+: .+ entered a wrong delivery code 3 times\. Call the customer to check the code\.$/) }), 'logisticsDesk');
+      expect(notif.toAdmins).toHaveBeenCalledWith(expect.objectContaining({ title: 'Wrong delivery codes', type: 'task', entityId: task.id, body: expect.stringMatching(/^KOM-\d+: .+ entered a wrong delivery code 3 times\. Call the customer to check the code\.$/) }), 'logisticsDesk');
       expect(notif.toUsers).toHaveBeenCalledTimes(1);
       expect(JSON.stringify(notif.toAdmins.mock.calls)).not.toMatch(/1357|2468|9753|4321/);
     });

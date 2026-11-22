@@ -112,7 +112,7 @@ describe('demo removal', () => {
       );
     const realOrder = await mkOrder(
       realCustomer.id,
-      'SOM-REAL',
+      'KOM-REAL',
       realProduct.id,
       realSeller.id,
     );
@@ -159,10 +159,10 @@ describe('demo removal', () => {
         sellerId: dSeller.id,
       }),
     );
-    const dOrder = await mkOrder(dCust.id, 'SOM-DEMO', dProduct.id, dSeller.id);
+    const dOrder = await mkOrder(dCust.id, 'KOM-DEMO', dProduct.id, dSeller.id);
     const demoOnReal = await mkOrder(
       dCust.id,
-      'SOM-DEMO2',
+      'KOM-DEMO2',
       realProduct.id,
       realSeller.id,
     );
@@ -349,7 +349,7 @@ describe('demo removal', () => {
       .findOneOrFail({ where: { name: 'Demo Store' } });
     await ds.getRepository(Order).save(
       ds.getRepository(Order).create({
-        reference: 'SOM-REAL2',
+        reference: 'KOM-REAL2',
         customerId: d.id,
         customerName: 'x',
         status: 'confirmed',
@@ -374,7 +374,7 @@ describe('demo removal', () => {
       uploadDir: dirs.up,
       privateDir: dirs.priv,
     });
-    expect(res.blockers[0]).toMatch(/SOM-REAL2/);
+    expect(res.blockers[0]).toMatch(/KOM-REAL2/);
     expect(res.deleted).toEqual([]);
     expect(await ds.getRepository(User).count()).toBe(5);
   });
@@ -387,7 +387,7 @@ describe('demo removal', () => {
     await ds.getRepository(DeliveryTask).save(
       ds.getRepository(DeliveryTask).create({
         orderId: 'real-order',
-        orderReference: 'SOM-REAL',
+        orderReference: 'KOM-REAL',
         kind: 'delivery',
         status: 'unassigned',
         hubId: hub.id,
@@ -534,7 +534,7 @@ describe('demo removal', () => {
       const task = await ds.getRepository(DeliveryTask).save(
         ds.getRepository(DeliveryTask).create({
           orderId: w.realOrder.id,
-          orderReference: 'SOM-REAL',
+          orderReference: 'KOM-REAL',
           kind: 'delivery',
           status: 'assigned',
           riderId: rider.id,
@@ -545,7 +545,7 @@ describe('demo removal', () => {
         uploadDir: dirs.up,
         privateDir: dirs.priv,
       });
-      expect(res.blockers.join(' ')).toMatch(/SOM-REAL/);
+      expect(res.blockers.join(' ')).toMatch(/KOM-REAL/);
       expect(res.deleted).toEqual([]);
       expect(
         await ds.getRepository(DeliveryTask).count({ where: { id: task.id } }),
@@ -562,7 +562,7 @@ describe('demo removal', () => {
       const realTask = await ds.getRepository(DeliveryTask).save(
         ds.getRepository(DeliveryTask).create({
           orderId: w.realOrder.id,
-          orderReference: 'SOM-REAL',
+          orderReference: 'KOM-REAL',
           kind: 'delivery',
           status: 'unassigned',
         }),
@@ -593,7 +593,7 @@ describe('demo removal', () => {
       const demoTask = await ds.getRepository(DeliveryTask).save(
         ds.getRepository(DeliveryTask).create({
           orderId: w.dOrder.id,
-          orderReference: 'SOM-DEMO',
+          orderReference: 'KOM-DEMO',
           kind: 'delivery',
           status: 'unassigned',
         }),

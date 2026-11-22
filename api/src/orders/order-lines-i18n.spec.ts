@@ -21,7 +21,7 @@ async function order(items: Partial<OrderItem>[]): Promise<Order> {
   const repo = ds.getRepository(Order);
   return repo.save(
     repo.create({
-      reference: `SOM-${++n}`,
+      reference: `KOM-${++n}`,
       customerId: 'c1',
       customerName: 'Cust',
       items: items.map((i) => ({ qty: 1, priceUsd: 10, variant: 'Default', productName: 'Thing', ...i })) as OrderItem[],

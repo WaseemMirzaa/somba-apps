@@ -5,7 +5,7 @@ const fr = (title: string, body: string) => localizeNotice(title, body, 'fr');
 describe('localizeNotice', () => {
   it('only translates for French', () => {
     for (const locale of ['en', 'de', '', null, undefined]) {
-      expect(localizeNotice('Order placed', 'We received SOM-1.', locale)).toBeNull();
+      expect(localizeNotice('Order placed', 'We received KOM-1.', locale)).toBeNull();
     }
   });
 
@@ -15,8 +15,8 @@ describe('localizeNotice', () => {
   });
 
   it('keeps the unknown half of a partial match as received', () => {
-    expect(fr('Support reply', 'SOM-1: the box is on its way')).toEqual({ title: 'Réponse de l’assistance', body: 'SOM-1: the box is on its way' });
-    expect(fr('Hello', 'SOM-1001 was cancelled.')).toEqual({ title: 'Hello', body: 'SOM-1001 a été annulée.' });
+    expect(fr('Support reply', 'KOM-1: the box is on its way')).toEqual({ title: 'Réponse de l’assistance', body: 'KOM-1: the box is on its way' });
+    expect(fr('Hello', 'KOM-1001 was cancelled.')).toEqual({ title: 'Hello', body: 'KOM-1001 a été annulée.' });
   });
 
   describe('titles', () => {
@@ -83,43 +83,43 @@ describe('localizeNotice', () => {
   // Every regex of the customer app's notification_text.dart, with the French it produces.
   describe('bodies from the customer app', () => {
     it.each([
-      ['SOM-1 reached the KOMORIKO warehouse and will be on its way soon.', 'SOM-1 est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'],
-      ['Approve the airtel money request on your phone to confirm SOM-1.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer SOM-1.'],
-      ['Approve the vodacom_mpesa request on your phone to confirm SOM-1.', 'Validez la demande Vodacom M-Pesa sur votre téléphone pour confirmer SOM-1.'],
-      ["We received SOM-1. You'll get updates here in real time.", 'Nous avons reçu SOM-1. Vous recevrez les mises à jour ici en temps réel.'],
-      ['SOM-1 is now out for delivery.', 'SOM-1 est maintenant en cours de livraison.'],
-      ['SOM-1 is now shipped.', 'SOM-1 est maintenant expédiée.'],
-      ['SOM-1 is now delivered.', 'SOM-1 est maintenant livrée.'],
-      ['SOM-1 is now somewhere.', 'SOM-1 est maintenant somewhere.'],
-      ['SOM-1 was cancelled. Refund credited to your wallet.', 'SOM-1 a été annulée. Le remboursement a été crédité sur votre portefeuille.'],
-      ['SOM-1 was cancelled. $5.00 was refunded to your wallet.', 'SOM-1 a été annulée. 5,00\u00A0$ ont été remboursés sur votre portefeuille.'],
-      ['SOM-1 was cancelled.', 'SOM-1 a été annulée.'],
-      ['SOM-1 was cancelled: Declined by subscriber..', 'SOM-1 a été annulée : Refusé par l’abonné..'],
-      ['SOM-1 was cancelled: payment was not completed.', 'SOM-1 a été annulée : le paiement n’a pas abouti.'],
-      ['SOM-1 was cancelled: out of stock.', 'SOM-1 a été annulée : out of stock.'],
-      ['Amadou is handling SOM-1.', 'Amadou s’occupe de SOM-1.'],
+      ['KOM-1 reached the KOMORIKO warehouse and will be on its way soon.', 'KOM-1 est arrivé à l’entrepôt KOMORIKO et sera bientôt en route.'],
+      ['Approve the airtel money request on your phone to confirm KOM-1.', 'Validez la demande Airtel Money sur votre téléphone pour confirmer KOM-1.'],
+      ['Approve the vodacom_mpesa request on your phone to confirm KOM-1.', 'Validez la demande Vodacom M-Pesa sur votre téléphone pour confirmer KOM-1.'],
+      ["We received KOM-1. You'll get updates here in real time.", 'Nous avons reçu KOM-1. Vous recevrez les mises à jour ici en temps réel.'],
+      ['KOM-1 is now out for delivery.', 'KOM-1 est maintenant en cours de livraison.'],
+      ['KOM-1 is now shipped.', 'KOM-1 est maintenant expédiée.'],
+      ['KOM-1 is now delivered.', 'KOM-1 est maintenant livrée.'],
+      ['KOM-1 is now somewhere.', 'KOM-1 est maintenant somewhere.'],
+      ['KOM-1 was cancelled. Refund credited to your wallet.', 'KOM-1 a été annulée. Le remboursement a été crédité sur votre portefeuille.'],
+      ['KOM-1 was cancelled. $5.00 was refunded to your wallet.', 'KOM-1 a été annulée. 5,00\u00A0$ ont été remboursés sur votre portefeuille.'],
+      ['KOM-1 was cancelled.', 'KOM-1 a été annulée.'],
+      ['KOM-1 was cancelled: Declined by subscriber..', 'KOM-1 a été annulée : Refusé par l’abonné..'],
+      ['KOM-1 was cancelled: payment was not completed.', 'KOM-1 a été annulée : le paiement n’a pas abouti.'],
+      ['KOM-1 was cancelled: out of stock.', 'KOM-1 a été annulée : out of stock.'],
+      ['Amadou is handling KOM-1.', 'Amadou s’occupe de KOM-1.'],
       [
-        'SOM-1: Customer unreachable. We will try again (attempt 1 of 3). You can also cancel the order.',
-        'SOM-1 : Client injoignable. Nous allons réessayer (tentative 1 sur 3). Vous pouvez aussi annuler la commande.',
+        'KOM-1: Customer unreachable. We will try again (attempt 1 of 3). You can also cancel the order.',
+        'KOM-1 : Client injoignable. Nous allons réessayer (tentative 1 sur 3). Vous pouvez aussi annuler la commande.',
       ],
       [
-        'SOM-1 could not be delivered after 3 attempts (no one home). $9.99 was refunded to your wallet.',
-        'SOM-1 n’a pas pu être livrée après 3 tentatives (no one home). 9,99\u00A0$ ont été remboursés sur votre portefeuille.',
+        'KOM-1 could not be delivered after 3 attempts (no one home). $9.99 was refunded to your wallet.',
+        'KOM-1 n’a pas pu être livrée après 3 tentatives (no one home). 9,99\u00A0$ ont été remboursés sur votre portefeuille.',
       ],
-      ['SOM-1 could not be delivered after 3 attempts (no one home).', 'SOM-1 n’a pas pu être livrée après 3 tentatives (no one home).'],
+      ['KOM-1 could not be delivered after 3 attempts (no one home).', 'KOM-1 n’a pas pu être livrée après 3 tentatives (no one home).'],
       [
-        'SOM-1 could not be delivered after 3 attempts (no one home). Your payment was refunded to your wallet.',
-        'SOM-1 n’a pas pu être livrée après 3 tentatives (no one home). Votre paiement a été remboursé sur votre portefeuille.',
+        'KOM-1 could not be delivered after 3 attempts (no one home). Your payment was refunded to your wallet.',
+        'KOM-1 n’a pas pu être livrée après 3 tentatives (no one home). Votre paiement a été remboursé sur votre portefeuille.',
       ],
       ['$25.00 added to your wallet.', '25,00\u00A0$ ajoutés à votre portefeuille.'],
-      ['Payment for SOM-1 confirmed.', 'Le paiement de SOM-1 est confirmé.'],
-      ['$7.50 for SOM-1 → wallet.', '7,50\u00A0$ pour SOM-1 → portefeuille.'],
-      ['$7.50 for SOM-1.', '7,50\u00A0$ pour SOM-1.'],
-      ['$7.50 for SOM-1 is on its way back to your mobile-money number.', '7,50\u00A0$ pour SOM-1 reviennent sur votre numéro mobile money.'],
-      ['$7.50 for SOM-1 was sent to your mobile-money number.', '7,50\u00A0$ pour SOM-1 ont été envoyés sur votre numéro mobile money.'],
+      ['Payment for KOM-1 confirmed.', 'Le paiement de KOM-1 est confirmé.'],
+      ['$7.50 for KOM-1 → wallet.', '7,50\u00A0$ pour KOM-1 → portefeuille.'],
+      ['$7.50 for KOM-1.', '7,50\u00A0$ pour KOM-1.'],
+      ['$7.50 for KOM-1 is on its way back to your mobile-money number.', '7,50\u00A0$ pour KOM-1 reviennent sur votre numéro mobile money.'],
+      ['$7.50 for KOM-1 was sent to your mobile-money number.', '7,50\u00A0$ pour KOM-1 ont été envoyés sur votre numéro mobile money.'],
       [
-        '$7.50 for SOM-1 → wallet (the network could not take it back to your phone).',
-        '7,50\u00A0$ pour SOM-1 → portefeuille (le réseau n’a pas pu les renvoyer sur votre téléphone).',
+        '$7.50 for KOM-1 → wallet (the network could not take it back to your phone).',
+        '7,50\u00A0$ pour KOM-1 → portefeuille (le réseau n’a pas pu les renvoyer sur votre téléphone).',
       ],
       ['RET-1: we received your goods. Your request is being reviewed.', 'RET-1 : nous avons reçu vos articles. Votre demande est en cours d’examen.'],
     ])('%s', (en, french) => {
@@ -129,30 +129,30 @@ describe('localizeNotice', () => {
 
   describe('bodies the app did not cover', () => {
     it.each([
-      ['Order cancelled', 'SOM-1 was cancelled by KOMORIKO support: fraud check.', 'SOM-1 a été annulée par l’assistance KOMORIKO : fraud check.'],
+      ['Order cancelled', 'KOM-1 was cancelled by KOMORIKO support: fraud check.', 'KOM-1 a été annulée par l’assistance KOMORIKO : fraud check.'],
       [
         'Order cancelled',
-        'SOM-1 was cancelled by KOMORIKO support: no stock. Sorry. $12.00 was refunded to your wallet.',
-        'SOM-1 a été annulée par l’assistance KOMORIKO : no stock. Sorry. 12,00\u00A0$ ont été remboursés sur votre portefeuille.',
+        'KOM-1 was cancelled by KOMORIKO support: no stock. Sorry. $12.00 was refunded to your wallet.',
+        'KOM-1 a été annulée par l’assistance KOMORIKO : no stock. Sorry. 12,00\u00A0$ ont été remboursés sur votre portefeuille.',
       ],
-      ['Order cancelled', 'SOM-1 was cancelled (Customer refused). Do not pack it.', 'SOM-1 a été annulée (Le client a refusé). Ne la préparez pas.'],
-      ['Order cancelled', 'SOM-1 was cancelled by the customer. Do not pack it.', 'SOM-1 a été annulée par le client. Ne la préparez pas.'],
-      ['Order cancelled', 'SOM-1 was cancelled by KOMORIKO. Do not pack it.', 'SOM-1 a été annulée par KOMORIKO. Ne la préparez pas.'],
-      ['Delivery update', 'SOM-1 is now in your deliveries.', 'SOM-1 est maintenant dans vos livraisons.'],
-      ['New order', 'SOM-1 · $40.00 from Jean Mukendi', 'SOM-1 · 40,00\u00A0$ de Jean Mukendi'],
-      ['New order', 'SOM-1: 3 item(s) to pack — $40.00', 'SOM-1 : 3 article(s) à préparer — 40,00\u00A0$'],
-      ['New delivery available', 'SOM-1. Open the app to accept it.', 'SOM-1. Ouvrez l’application pour l’accepter.'],
-      ['3 deliveries assigned to you', 'SOM-1, SOM-2, SOM-3 — collect them at the warehouse.', 'SOM-1, SOM-2, SOM-3 — à récupérer à l’entrepôt.'],
-      ['Parcel ready for pickup', 'SOM-1 is packed and ready.', 'SOM-1 : colis emballé et prêt.'],
+      ['Order cancelled', 'KOM-1 was cancelled (Customer refused). Do not pack it.', 'KOM-1 a été annulée (Le client a refusé). Ne la préparez pas.'],
+      ['Order cancelled', 'KOM-1 was cancelled by the customer. Do not pack it.', 'KOM-1 a été annulée par le client. Ne la préparez pas.'],
+      ['Order cancelled', 'KOM-1 was cancelled by KOMORIKO. Do not pack it.', 'KOM-1 a été annulée par KOMORIKO. Ne la préparez pas.'],
+      ['Delivery update', 'KOM-1 is now in your deliveries.', 'KOM-1 est maintenant dans vos livraisons.'],
+      ['New order', 'KOM-1 · $40.00 from Jean Mukendi', 'KOM-1 · 40,00\u00A0$ de Jean Mukendi'],
+      ['New order', 'KOM-1: 3 item(s) to pack — $40.00', 'KOM-1 : 3 article(s) à préparer — 40,00\u00A0$'],
+      ['New delivery available', 'KOM-1. Open the app to accept it.', 'KOM-1. Ouvrez l’application pour l’accepter.'],
+      ['3 deliveries assigned to you', 'KOM-1, KOM-2, KOM-3 — collect them at the warehouse.', 'KOM-1, KOM-2, KOM-3 — à récupérer à l’entrepôt.'],
+      ['Parcel ready for pickup', 'KOM-1 is packed and ready.', 'KOM-1 : colis emballé et prêt.'],
       [
         'Seller package ready',
-        "SOM-1: one seller's package is ready, waiting for 1 more seller.",
-        'SOM-1 : le colis d’un vendeur est prêt, en attente de 1 autre vendeur.',
+        "KOM-1: one seller's package is ready, waiting for 1 more seller.",
+        'KOM-1 : le colis d’un vendeur est prêt, en attente de 1 autre vendeur.',
       ],
       [
         'Item cancelled by the seller',
-        'SOM-1: Sneakers, Hat was cancelled (out of stock). $12.00 was refunded to your wallet. The rest of your order continues.',
-        'SOM-1 : Sneakers, Hat a été annulé (out of stock). 12,00\u00A0$ ont été remboursés sur votre portefeuille. Le reste de votre commande continue.',
+        'KOM-1: Sneakers, Hat was cancelled (out of stock). $12.00 was refunded to your wallet. The rest of your order continues.',
+        'KOM-1 : Sneakers, Hat a été annulé (out of stock). 12,00\u00A0$ ont été remboursés sur votre portefeuille. Le reste de votre commande continue.',
       ],
       ['Payment', 'PAY-1 · airtel_money · $40.00 · pending', 'PAY-1 · Airtel Money · 40,00\u00A0$ · en attente'],
       ['Payment', 'PAY-1 · stripe_card · $40.00 · succeeded', 'PAY-1 · carte bancaire · 40,00\u00A0$ · réussi'],
@@ -180,9 +180,9 @@ describe('localizeNotice', () => {
         'PO-1 · TechZone : le transfert a échoué. Il est de nouveau dans la file d’attente.',
       ],
       ['Return received', 'RET-1: we received your goods. Your request is being reviewed.', 'RET-1 : nous avons reçu vos articles. Votre demande est en cours d’examen.'],
-      ['Returned goods received', 'RET-1 · SOM-1: the warehouse received the returned goods.', 'RET-1 · SOM-1 : l’entrepôt a reçu les articles retournés.'],
+      ['Returned goods received', 'RET-1 · KOM-1: the warehouse received the returned goods.', 'RET-1 · KOM-1 : l’entrepôt a reçu les articles retournés.'],
       ['Dispute resolved', 'DP-1: Refunded to wallet', 'DP-1 : Remboursé sur le portefeuille'],
-      ['Return resolved', 'RET-1 · SOM-1: Resolved', 'RET-1 · SOM-1 : Résolu'],
+      ['Return resolved', 'RET-1 · KOM-1: Resolved', 'RET-1 · KOM-1 : Résolu'],
       ['Dispute closed', 'DP-1: Rejected', 'DP-1 : Refusé'],
       ['Dispute closed', 'DP-1: The goods were used', 'DP-1: The goods were used'],
       ['The seller replied to your review', 'Your review: Thanks for the feedback!', 'Votre avis : Thanks for the feedback!'],
@@ -211,7 +211,7 @@ describe('localizeNotice', () => {
     it('does not mistake a one-word campaign or product name for an order reference', () => {
       expect(fr('', '"Promo" is now active.')?.body).toBe('« Promo » est maintenant active.');
       expect(fr('', 'Sneakers is now live.')?.body).toBe('Sneakers est maintenant en ligne.');
-      expect(fr('', 'SOM-1 is now pending.')?.body).toBe('SOM-1 est maintenant en attente.');
+      expect(fr('', 'KOM-1 is now pending.')?.body).toBe('KOM-1 est maintenant en attente.');
     });
 
     it('leaves a bare body alone unless it is a failed-payment reason', () => {
@@ -248,7 +248,7 @@ describe('helpers', () => {
 
 describe('frenchNotice', () => {
   it('prefers what the sender authored over the built-in translation', () => {
-    const stored = { title: 'Order placed', body: 'We received SOM-1. You\'ll get updates here in real time.', titleFr: 'Sur mesure', bodyFr: 'Texte à moi' };
+    const stored = { title: 'Order placed', body: 'We received KOM-1. You\'ll get updates here in real time.', titleFr: 'Sur mesure', bodyFr: 'Texte à moi' };
     expect(frenchNotice(stored)).toEqual({ title: 'Sur mesure', body: 'Texte à moi' });
   });
 
@@ -258,7 +258,7 @@ describe('frenchNotice', () => {
   });
 
   it('fills a missing authored half from the built-in translation', () => {
-    expect(frenchNotice({ title: 'Order placed', body: 'SOM-1 was cancelled.', titleFr: null, bodyFr: 'Mon texte' })).toEqual({
+    expect(frenchNotice({ title: 'Order placed', body: 'KOM-1 was cancelled.', titleFr: null, bodyFr: 'Mon texte' })).toEqual({
       title: 'Commande enregistrée',
       body: 'Mon texte',
     });
@@ -267,19 +267,19 @@ describe('frenchNotice', () => {
 
 describe('localizeWalletDescription', () => {
   it.each([
-    ['Order SOM-1', 'Commande SOM-1'],
+    ['Order KOM-1', 'Commande KOM-1'],
     ['Wallet top-up via airtel_money', 'Recharge du portefeuille via Airtel Money'],
     ['Wallet top-up via orange_money', 'Recharge du portefeuille via Orange Money'],
     ['Wallet top-up via card', 'Recharge du portefeuille via carte bancaire'],
-    ['Refund for cancelled order SOM-1', 'Remboursement de la commande annulée SOM-1'],
-    ['Refund for SOM-1', 'Remboursement de SOM-1'],
-    ['Refund for SOM-1 (phone refund failed)', 'Remboursement de SOM-1 (échec du remboursement mobile)'],
-    ['Refund: seller cancelled part of SOM-1', 'Remboursement : le vendeur a annulé une partie de SOM-1'],
+    ['Refund for cancelled order KOM-1', 'Remboursement de la commande annulée KOM-1'],
+    ['Refund for KOM-1', 'Remboursement de KOM-1'],
+    ['Refund for KOM-1 (phone refund failed)', 'Remboursement de KOM-1 (échec du remboursement mobile)'],
+    ['Refund: seller cancelled part of KOM-1', 'Remboursement : le vendeur a annulé une partie de KOM-1'],
     ['Payout PO-1', 'Versement PO-1'],
     ['Seller plan pro', 'Abonnement vendeur pro'],
     ['Welcome store credit', 'Crédit de bienvenue'],
-    ['Refund: part of SOM-1 could not be delivered', 'Remboursement : une partie de SOM-1 n’a pas pu être livrée'],
-    ['Payment PAY-1 arrived after order SOM-1 was closed', 'Paiement PAY-1 reçu après la clôture de la commande SOM-1'],
+    ['Refund: part of KOM-1 could not be delivered', 'Remboursement : une partie de KOM-1 n’a pas pu être livrée'],
+    ['Payment PAY-1 arrived after order KOM-1 was closed', 'Paiement PAY-1 reçu après la clôture de la commande KOM-1'],
     ['Welcome credit from KOMORIKO (demo)', 'Crédit de bienvenue KOMORIKO (démo)'],
     ['Demo starter credit (not real money)', 'Crédit de départ de la démo (pas de l’argent réel)'],
   ])('%s → %s', (en, french) => {
@@ -288,8 +288,8 @@ describe('localizeWalletDescription', () => {
 
   it('returns unknown lines as received, and everything as is for other languages', () => {
     expect(localizeWalletDescription('Manual adjustment by finance', 'fr')).toBe('Manual adjustment by finance');
-    expect(localizeWalletDescription('Order SOM-1', 'en')).toBe('Order SOM-1');
-    expect(localizeWalletDescription('Order SOM-1', undefined)).toBe('Order SOM-1');
+    expect(localizeWalletDescription('Order KOM-1', 'en')).toBe('Order KOM-1');
+    expect(localizeWalletDescription('Order KOM-1', undefined)).toBe('Order KOM-1');
   });
 });
 
@@ -320,9 +320,9 @@ describe('payment method names (English display names, and the ids older notices
     ['airtel money', 'Airtel Money'], // a notice stored before the display names were used
     ['orange_money', 'Orange Money'],
   ])('the approve-on-your-phone notice for %s', (method, french) => {
-    expect(fr('Approve your payment', `Approve the ${method} request on your phone to confirm SOM-1.`)).toEqual({
+    expect(fr('Approve your payment', `Approve the ${method} request on your phone to confirm KOM-1.`)).toEqual({
       title: 'Validez votre paiement',
-      body: `Validez la demande ${french} sur votre téléphone pour confirmer SOM-1.`,
+      body: `Validez la demande ${french} sur votre téléphone pour confirmer KOM-1.`,
     });
   });
 
@@ -377,11 +377,11 @@ describe('French money: 52,00 $ (comma decimals, non-breaking spaces)', () => {
   });
 
   it.each([
-    ['SOM-1 · $0.50 from Jean', `SOM-1 · 0,50${NBSP}$ de Jean`],
-    ['SOM-1: 3 item(s) to pack — $1500.00', `SOM-1 : 3 article(s) à préparer — 1${NBSP}500,00${NBSP}$`],
+    ['KOM-1 · $0.50 from Jean', `KOM-1 · 0,50${NBSP}$ de Jean`],
+    ['KOM-1: 3 item(s) to pack — $1500.00', `KOM-1 : 3 article(s) à préparer — 1${NBSP}500,00${NBSP}$`],
     ['$25.00 added to your wallet.', `25,00${NBSP}$ ajoutés à votre portefeuille.`],
-    ['$7.50 for SOM-1.', `7,50${NBSP}$ pour SOM-1.`],
-    ['SOM-1 was cancelled. $5.00 was refunded to your wallet.', `SOM-1 a été annulée. 5,00${NBSP}$ ont été remboursés sur votre portefeuille.`],
+    ['$7.50 for KOM-1.', `7,50${NBSP}$ pour KOM-1.`],
+    ['KOM-1 was cancelled. $5.00 was refunded to your wallet.', `KOM-1 a été annulée. 5,00${NBSP}$ ont été remboursés sur votre portefeuille.`],
     ['PAY-1: provider reported $12.00, expected $1250.00. Review manually.', `PAY-1 : le prestataire a indiqué 12,00${NBSP}$, 1${NBSP}250,00${NBSP}$ attendus. À vérifier manuellement.`],
     ['PAY-1: pawaPay could not refund $9.00. It was credited to the customer\'s wallet.', `PAY-1 : pawaPay n’a pas pu rembourser 9,00${NBSP}$. Le montant a été crédité sur le portefeuille du client.`],
     ['PO-1 · $2000.00 credited to your wallet.', `PO-1 · 2${NBSP}000,00${NBSP}$ crédités sur votre portefeuille.`],
@@ -391,10 +391,10 @@ describe('French money: 52,00 $ (comma decimals, non-breaking spaces)', () => {
 
   it('never leaves a dot-decimal amount or a plain-space dollar sign in a French body', () => {
     const samples = [
-      'SOM-1 · $12.50 from Jean',
+      'KOM-1 · $12.50 from Jean',
       '$25.00 added to your wallet.',
       'PO-1 · $40.00 sent to your bank account (ref B-7).',
-      'SOM-1: Sneakers was cancelled (out of stock). $12.00 was refunded to your wallet. The rest of your order continues.',
+      'KOM-1: Sneakers was cancelled (out of stock). $12.00 was refunded to your wallet. The rest of your order continues.',
     ];
     for (const en of samples) {
       const body = fr('', en)!.body;

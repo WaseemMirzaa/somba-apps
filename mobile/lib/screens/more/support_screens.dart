@@ -31,7 +31,7 @@ Color _statusColor(String status) => switch (status) {
 String _statusLabel(Strings s, String status) =>
     switch (status) { 'pending' => s.ticketInprogress, 'resolved' => s.ticketResolved, 'closed' => s.ticketClosed, _ => s.ticketOpen };
 
-/// "Order SOM-1042" for a ticket's linked order (a neutral label when the order isn't on this phone).
+/// "Order KOM-1042" for a ticket's linked order (a neutral label when the order isn't on this phone).
 String? _orderLine(Strings s, String? orderId) {
   if ((orderId ?? '').isEmpty) return null;
   final o = RealtimeStore.instance.orderById(orderId!);

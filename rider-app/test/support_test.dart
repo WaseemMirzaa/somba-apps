@@ -232,7 +232,7 @@ void main() {
         expect(find.byType(Image), findsOneWidget, reason: 'the agent attached a photo');
         expect(find.byKey(const ValueKey('thread-status')), findsOneWidget);
         expect(find.text(s.t('cat_delivery')), findsOneWidget);
-        expect(find.text(s.ticketOrderRef('SOM-1042')), findsOneWidget, reason: 'the linked order, by its reference');
+        expect(find.text(s.ticketOrderRef('KOM-1042')), findsOneWidget, reason: 'the linked order, by its reference');
         expect(find.byKey(const ValueKey('thread-input')), findsOneWidget);
         expect(find.byKey(const ValueKey('thread-closed')), findsNothing);
         expectButtonRules(t);
@@ -425,7 +425,7 @@ void main() {
       // the order list has one entry per order among my tasks
       await t.tap(find.byKey(const ValueKey('ticket-order')));
       await t.pumpAndSettle();
-      await t.tap(find.text('SOM-1042').last);
+      await t.tap(find.text('KOM-1042').last);
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('ticket-add-photos')));
       await t.pumpAndSettle();
@@ -451,7 +451,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('ticket-order')));
       await t.pumpAndSettle();
       expect(find.text(const Strings('fr').ticketOrderNone), findsWidgets);
-      expect(find.text('SOM-1042'), findsNWidgets(3), reason: 'three tasks of three orders (ids differ), listed once each');
+      expect(find.text('KOM-1042'), findsNWidgets(3), reason: 'three tasks of three orders (ids differ), listed once each');
       await t.tapAt(const Offset(5, 5));
       await t.pumpAndSettle();
 

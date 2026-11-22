@@ -48,7 +48,7 @@ ProductDto _product() => ProductDto(
 
 OrderDto _order(String status) => OrderDto(
       id: 'o-$status',
-      reference: 'SOM-1042',
+      reference: 'KOM-1042',
       customerName: 'Aline',
       status: status,
       paymentMethod: 'airtel_money',
@@ -71,7 +71,7 @@ OrderDto _order(String status) => OrderDto(
 /// Two sellers, one of them cancelled a line (reason + refund): the longest French strings.
 OrderDto _multiSellerOrder() => OrderDto.fromJson({
       'id': 'o-multi',
-      'reference': 'SOM-1043',
+      'reference': 'KOM-1043',
       'customerName': 'Aline',
       'status': 'processing',
       'paymentMethod': 'airtel_money',

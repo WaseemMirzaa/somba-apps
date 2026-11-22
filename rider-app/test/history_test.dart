@@ -35,11 +35,11 @@ TransferRun _run(String id, String ref, {String status = 'closed', String? close
 void main() {
   group('rules', () {
     test('a reference matches whatever the case, spaces or #', () {
-      expect(matchesReference('SOM-1042', 'som-10'), isTrue);
-      expect(matchesReference('SOM-1042', ' #1042 '), isTrue);
-      expect(matchesReference('SOM-1042', '1043'), isFalse);
-      expect(matchesReference('SOM-1042', ''), isTrue);
-      expect(matchesReference('SOM-1042', '   '), isTrue);
+      expect(matchesReference('KOM-1042', 'som-10'), isTrue);
+      expect(matchesReference('KOM-1042', ' #1042 '), isTrue);
+      expect(matchesReference('KOM-1042', '1043'), isFalse);
+      expect(matchesReference('KOM-1042', ''), isTrue);
+      expect(matchesReference('KOM-1042', '   '), isTrue);
     });
 
     test('days are inclusive at both ends, whatever the hour', () {
@@ -59,9 +59,9 @@ void main() {
     });
 
     test('tasks: search and days combine', () {
-      final a = _done('a', 'SOM-1001', deliveredAt: '2026-10-20T10:00:00');
-      final b = _done('b', 'SOM-1002', deliveredAt: '2026-10-21T10:00:00');
-      final c = _done('c', 'SOM-2001', deliveredAt: '2026-10-21T11:00:00', status: 'failed');
+      final a = _done('a', 'KOM-1001', deliveredAt: '2026-10-20T10:00:00');
+      final b = _done('b', 'KOM-1002', deliveredAt: '2026-10-21T10:00:00');
+      final c = _done('c', 'KOM-2001', deliveredAt: '2026-10-21T11:00:00', status: 'failed');
       final all = [a, b, c];
       expect(filterFinishedTasks(all).length, 3);
       expect(filterFinishedTasks(all, query: 'som-100').map((t) => t.id), ['a', 'b']);
@@ -71,7 +71,7 @@ void main() {
     });
 
     test('runs: found by their own reference or by the order reference of a parcel inside', () {
-      final p = _done('p1', 'SOM-3001', deliveredAt: '2026-10-20T10:00:00');
+      final p = _done('p1', 'KOM-3001', deliveredAt: '2026-10-20T10:00:00');
       final r1 = _run('r1', 'TR-0007', closedAt: '2026-10-20T12:00:00', taskIds: ['p1']);
       final r2 = _run('r2', 'TR-0008', closedAt: '2026-10-22T12:00:00', taskIds: ['p2']);
       List<DeliveryTaskDto> parcels(TransferRun r) => r.id == 'r1' ? [p] : const [];
@@ -101,9 +101,9 @@ void main() {
         ..clear()
         ..addAll(tasks ??
             [
-              _done('a', 'SOM-1001', deliveredAt: '2026-10-20T10:00:00'),
-              _done('b', 'SOM-1002', deliveredAt: '2026-10-21T10:00:00'),
-              _done('c', 'SOM-2001', deliveredAt: '2026-10-21T11:00:00', status: 'failed'),
+              _done('a', 'KOM-1001', deliveredAt: '2026-10-20T10:00:00'),
+              _done('b', 'KOM-1002', deliveredAt: '2026-10-21T10:00:00'),
+              _done('c', 'KOM-2001', deliveredAt: '2026-10-21T11:00:00', status: 'failed'),
             ]);
       t.view.physicalSize = const Size(360 * 3, 740 * 3);
       t.view.devicePixelRatio = 3;

@@ -138,7 +138,7 @@ describe('toAdmins with an audience: only the departments that own the subject a
     await user('mkt', 'admin_marketing');
     await user('mod', 'admin_moderation');
   });
-  const order = { title: 'New order', body: 'SOM-1 · $20.00 from Marie', type: 'order', entityId: 'o1' };
+  const order = { title: 'New order', body: 'KOM-1 · $20.00 from Marie', type: 'order', entityId: 'o1' };
 
   it('a new order reaches the super admin and Operations live and by push, and not marketing, finance, support or moderation', async () => {
     await svc.toAdmins(order, 'orderOps');

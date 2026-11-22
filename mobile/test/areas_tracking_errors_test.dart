@@ -73,7 +73,7 @@ Map<String, dynamic> _nestedLeg({int hop = 1, int hops = 2, String from = 'Entre
 
 OrderDto _order(List<Map<String, dynamic>> legs, {String status = 'shipped'}) => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-2077',
+      'reference': 'KOM-2077',
       'status': status,
       'paymentMethod': 'wallet',
       'totalUsd': 10,

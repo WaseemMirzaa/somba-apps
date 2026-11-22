@@ -88,7 +88,7 @@ Map<String, dynamic> _line(String id, String name, String nameFr, double price, 
 
 OrderDto _order(String status, {bool multi = false, String method = 'airtel_money', String? id}) => OrderDto.fromJson({
       'id': id ?? 'o-$status${multi ? '-multi' : ''}',
-      'reference': 'SOM-104${multi ? 3 : 2}',
+      'reference': 'KOM-104${multi ? 3 : 2}',
       'customerName': 'Aline',
       'status': status,
       'paymentMethod': method,
@@ -157,8 +157,8 @@ Future<void> _seed(String lang) async {
   store.payments
     ..clear()
     ..addAll([
-      PaymentDto.fromJson({'id': 'pay1', 'reference': 'PAY-77', 'orderId': 'o-pending', 'orderReference': 'SOM-1042', 'method': 'airtel_money', 'amountUsd': 356.8}),
-      PaymentDto.fromJson({'id': 'pay2', 'reference': 'PAY-78', 'orderId': 'o-pending-card', 'orderReference': 'SOM-1042', 'method': 'stripe_card', 'amountUsd': 356.8}),
+      PaymentDto.fromJson({'id': 'pay1', 'reference': 'PAY-77', 'orderId': 'o-pending', 'orderReference': 'KOM-1042', 'method': 'airtel_money', 'amountUsd': 356.8}),
+      PaymentDto.fromJson({'id': 'pay2', 'reference': 'PAY-78', 'orderId': 'o-pending-card', 'orderReference': 'KOM-1042', 'method': 'stripe_card', 'amountUsd': 356.8}),
     ]);
   store.riderLocations['o-out_for_delivery'] = RiderLocationDto(orderId: 'o-out_for_delivery', lat: -4.3217, lng: 15.3125);
   store.notifications
@@ -166,8 +166,8 @@ Future<void> _seed(String lang) async {
     ..addAll([
       NotificationDto.fromJson({
         'id': 'n1',
-        'title': 'Your order SOM-1042 is out for delivery',
-        'titleFr': 'Votre commande SOM-1042 est en cours de livraison',
+        'title': 'Your order KOM-1042 is out for delivery',
+        'titleFr': 'Votre commande KOM-1042 est en cours de livraison',
         'body': 'Jean-Pierre is on the way. Keep your delivery code ready.',
         'bodyFr': 'Jean-Pierre est en route. Gardez votre code de livraison à portée de main.',
         'type': 'order',

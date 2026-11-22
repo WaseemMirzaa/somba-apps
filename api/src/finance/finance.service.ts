@@ -18,6 +18,7 @@ import { asLocale } from '../common/locale';
 import { frenchLineNames } from '../translation/line-names';
 import { EARNING_STATES, OPEN_ORDER_STATUSES, dateInput, fixed2, lastMonths, lineState, monthRange, round2, toCsv } from './finance.util';
 import type { EarningState } from './finance.util';
+import { normalizeOrderRef } from '../common/order-ref';
 
 /** A line's net before refunds: after the commission and, on an order whose delivery fee the seller pays, the line's share of that fee. VAT is never in it. */
 const SQL_FULL_NET = '(i.priceUsd * i.qty - i.couponDiscountUsd - i.commissionUsd - COALESCE(i.sellerFeeUsd, 0))';
@@ -203,7 +204,7 @@ export class FinanceService {
     const to = dateInput(input.to, true);
     if (from) qb.andWhere(`${dateColumn} >= :fromDate`, { fromDate: from });
     if (to) qb.andWhere(`${dateColumn} <= :toDate`, { toDate: to });
-    const q = typeof input.q === 'string' ? input.q.trim().slice(0, 80).toLowerCase() : '';
+    const q = typeof input.q === 'string' ? normalizeOrderRef(input.q.trim().slice(0, 80)).toLowerCase() : '';
     if (q) qb.andWhere('(LOWER(o.reference) LIKE :q OR LOWER(i.productName) LIKE :q)', { q: `%${q}%` });
   }
 

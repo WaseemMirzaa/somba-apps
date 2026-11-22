@@ -53,7 +53,7 @@ describe('split order: a customer leg that fails', () => {
     const n = ++seq;
     const o = await ds.getRepository(Order).save(
       ds.getRepository(Order).create({
-        reference: `SOM-${n}`,
+        reference: `KOM-${n}`,
         customerId: customer.id,
         customerName: 'Marie Dubois',
         status: 'confirmed',
@@ -235,7 +235,7 @@ describe('split order: a customer leg that fails', () => {
       const n = ++seq;
       const o = await ds.getRepository(Order).save(
         ds.getRepository(Order).create({
-          reference: `SOM-X${n}`,
+          reference: `KOM-X${n}`,
           customerId: customer.id,
           customerName: 'Marie Dubois',
           status: 'confirmed',

@@ -21,7 +21,7 @@ DeliveryTaskDto _task(String status,
     DeliveryTaskDto(
       id: 't77',
       orderId: 'o',
-      orderReference: 'SOM-77',
+      orderReference: 'KOM-77',
       status: status,
       addressRaw: address,
       customerName: 'Marie Dubois',
@@ -586,7 +586,7 @@ void main() {
         final task = DeliveryTaskDto.fromJson({
           'id': 't1',
           'orderId': 'o',
-          'orderReference': 'SOM-77',
+          'orderReference': 'KOM-77',
           'status': 'in_transit',
           'order': {
             'shippingAddress': _typed,

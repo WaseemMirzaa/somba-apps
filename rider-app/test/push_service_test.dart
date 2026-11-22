@@ -56,14 +56,14 @@ class _FakeBackend implements PushBackend {
 
 PushMessage _task(String taskId, String view) => PushMessage(
       title: 'New task assigned to you',
-      body: 'SOM-77: pickup is now in your tasks.',
+      body: 'KOM-77: pickup is now in your tasks.',
       data: {'type': 'task', 'entityId': taskId, 'orderId': 'o-77', 'view': view, 'notificationId': 'n-$taskId', 'link': '/rider/tasks/$taskId'},
     );
 
 DeliveryTaskDto _dto(String id, String status) => DeliveryTaskDto(
       id: id,
       orderId: 'o-$id',
-      orderReference: 'SOM-$id',
+      orderReference: 'KOM-$id',
       status: status,
       customerName: 'Marie Dubois',
     );

@@ -17,7 +17,7 @@ import 'package:somba_rider/theme/app_theme.dart';
 Map<String, dynamic> _taskJson({List<Map<String, dynamic>>? items}) => {
       'id': 't1',
       'orderId': 'o1',
-      'orderReference': 'SOM-101',
+      'orderReference': 'KOM-101',
       'status': 'assigned',
       'order': {
         'customerName': 'Aline',
@@ -33,7 +33,7 @@ Map<String, dynamic> _taskJson({List<Map<String, dynamic>>? items}) => {
 DeliveryTaskDto _task(String status, {List<OrderLine> items = const []}) => DeliveryTaskDto(
       id: 't-$status',
       orderId: 'o-$status',
-      orderReference: 'SOM-9$status',
+      orderReference: 'KOM-9$status',
       status: status,
       addressRaw: '{"line1":"12 avenue du Commerce","commune":"Gombe","city":"Kinshasa"}',
       customerName: 'Aline',
@@ -89,7 +89,7 @@ void main() {
       // what the API sends since the cargo of a leg keeps `nameFr`: a transfer or a pickup has no order block
       final t = DeliveryTaskDto.fromJson({
         'id': 't',
-        'orderReference': 'SOM-1',
+        'orderReference': 'KOM-1',
         'kind': 'pickup',
         'items': [
           {'name': 'Blue Cotton T-Shirt', 'nameFr': 'T-shirt bleu en coton', 'qty': 1},
@@ -101,7 +101,7 @@ void main() {
     });
 
     test('an old payload (no order, no items) still parses', () {
-      final t = DeliveryTaskDto.fromJson({'id': 't', 'orderReference': 'SOM-1'});
+      final t = DeliveryTaskDto.fromJson({'id': 't', 'orderReference': 'KOM-1'});
       expect(t.items, isEmpty);
       expect(const OrderLine('X', 1).displayName('fr'), 'X');
       expect(const OrderLine('X', 1, nameFr: '  ').displayName('fr'), 'X', reason: 'a blank French name is no name');
@@ -128,7 +128,7 @@ void main() {
 
     test('French prefers the server wording, then the phone\'s patterns, then the raw text', () {
       expect(displayNotice(fr, title: 'New order', body: 'x', titleFr: 'Titre', bodyFr: 'Corps'), ('Titre', 'Corps'));
-      expect(displayNotice(fr, title: 'Parcel ready for pickup', body: 'SOM-1 is packed and ready.'), ('Colis prêt à récupérer', 'SOM-1 est emballé et prêt.'));
+      expect(displayNotice(fr, title: 'Parcel ready for pickup', body: 'KOM-1 is packed and ready.'), ('Colis prêt à récupérer', 'KOM-1 est emballé et prêt.'));
       expect(displayNotice(fr, title: 'Something new', body: 'Raw text'), ('Something new', 'Raw text'));
       expect(displayNotice(fr, title: 'New order', body: 'x', titleFr: ' ', bodyFr: ''), ('Nouvelle commande', 'x'));
     });
@@ -183,14 +183,14 @@ void main() {
         ..clear()
         ..addAll([
           NotificationDto(id: 'n1', title: 'New order', body: 'raw', titleFr: 'Titre du serveur', bodyFr: 'Corps du serveur', type: 'system', read: true),
-          NotificationDto(id: 'n2', title: 'Parcel ready for pickup', body: 'SOM-1 is packed and ready.', type: 'system', read: true),
+          NotificationDto(id: 'n2', title: 'Parcel ready for pickup', body: 'KOM-1 is packed and ready.', type: 'system', read: true),
         ]);
       await show(tester, 'fr', Scaffold(body: ProfileScreen(locale: const Locale('fr'), onLocaleChanged: (_) {})));
       expect(find.text('Titre du serveur'), findsOneWidget);
       expect(find.text('Corps du serveur'), findsOneWidget);
       expect(find.text('New order'), findsNothing);
       expect(find.text('Colis prêt à récupérer'), findsOneWidget);
-      expect(find.text('SOM-1 est emballé et prêt.'), findsOneWidget);
+      expect(find.text('KOM-1 est emballé et prêt.'), findsOneWidget);
     });
 
     testWidgets('in English the notification list shows the server text', (tester) async {

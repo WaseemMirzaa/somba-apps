@@ -64,7 +64,7 @@ test("Print is enabled only once every QR image of the sheet has settled", () =>
 });
 
 test("a label's contents: every product x qty with its options, in the reader's language, cut with a count when too long", () => {
-  const c = (name, variant, qty, extra = {}) => ({ name, variant, qty, orderReference: "SOM-1", ...extra });
+  const c = (name, variant, qty, extra = {}) => ({ name, variant, qty, orderReference: "KOM-1", ...extra });
   assert.equal(p.contentLineText(c("Blue T-shirt", "L / Blue", 2), false), "2 × Blue T-shirt (L / Blue)");
   assert.equal(p.contentLineText(c("Blue T-shirt", null, 1), false), "1 × Blue T-shirt");
   assert.equal(p.contentLineText(c("Blue T-shirt", "L / Blue", 2, { nameFr: "T-shirt bleu", variantFr: "L / Bleu" }), true), "2 × T-shirt bleu (L / Bleu)");
@@ -76,8 +76,8 @@ test("a label's contents: every product x qty with its options, in the reader's 
   assert.equal(many.lines.length, 4);
   assert.equal(many.more, "+ 8 autre(s) ligne(s)");
   assert.equal(p.labelContents(undefined, false).lines.length, 0);
-  assert.equal(p.isSharedSet({ orderRefs: ["SOM-1", "SOM-2"] }), true);
-  assert.equal(p.isSharedSet({ orderRefs: ["SOM-1"] }), false);
+  assert.equal(p.isSharedSet({ orderRefs: ["KOM-1", "KOM-2"] }), true);
+  assert.equal(p.isSharedSet({ orderRefs: ["KOM-1"] }), false);
 });
 
 test("a stored paper choice falls back to A6", () => {

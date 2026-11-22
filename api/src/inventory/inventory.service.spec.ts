@@ -174,7 +174,7 @@ describe('inventory:overview', () => {
     const fine = await w.product(shop, { name: 'Plenty', stock: 100 });
     const out = await w.product(shop, { name: 'Sold out', stock: 0 });
     // 3 units of "Plenty" are reserved by an open order.
-    const order = await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'SOM-1', customerId: 'c', customerName: 'C', status: 'confirmed' }));
+    const order = await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'KOM-1', customerId: 'c', customerName: 'C', status: 'confirmed' }));
     await w.ds.getRepository(OrderItem).save(w.ds.getRepository(OrderItem).create({ orderId: order.id, productId: fine.id, productName: 'Plenty', qty: 3, priceUsd: 10 }));
     const view = await w.inventory.overview(owner);
     expect(view.summary).toEqual({ products: 3, units: 104, outOfStock: 1, lowStock: 1 });

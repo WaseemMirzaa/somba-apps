@@ -230,7 +230,7 @@ final List<(RegExp, String Function(RegExpMatch))> _patternsFr = [
   (RegExp(r'^Collect (PKG-[A-Z0-9]+) first: this leg is not picked up yet\.$'), (m) => 'Récupérez d’abord ${m[1]} : cette étape n’est pas encore récupérée.'),
   // same-day parcel groups (docs/contracts/logistics.md section 19)
   (RegExp(r'^Pack at most (\d+) orders at once\.$'), (m) => 'Préparez au plus ${m[1]} commandes à la fois.'),
-  // the same refusal, prefixed with the order it concerns ("SOM-1042: A rider already collected these boxes. ...")
+  // the same refusal, prefixed with the order it concerns ("KOM-1042: A rider already collected these boxes. ...")
   (RegExp(r'^(.+): A rider already collected these boxes\. The orders in them cannot change; pack the other orders in a new set\.$'),
       (m) => '${m[1]} : un livreur a déjà récupéré ces boîtes. Les commandes qu’elles contiennent ne peuvent plus changer ; préparez les autres commandes dans un nouvel ensemble.'),
   // delivery code

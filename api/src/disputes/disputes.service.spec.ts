@@ -35,7 +35,7 @@ async function makeOrder(lines: { sellerId: string; productId: string; qty: numb
   const subtotal = lines.reduce((t, l) => t + l.qty * l.price, 0);
   return repo.save(
     repo.create({
-      reference: `SOM-${Math.floor(Math.random() * 1e8)}`,
+      reference: `KOM-${Math.floor(Math.random() * 1e8)}`,
       customerId: customer.id,
       customerName: customer.name,
       status: 'delivered',
@@ -601,7 +601,7 @@ const at = (ms: number) => jest.setSystemTime(new Date(T0.getTime() + ms));
 
 async function deliveredLeg(orderId: string, kind: 'delivery' | 'return_pickup' | 'pickup' | 'replacement_delivery', deliveredAt: Date) {
   const repo = ds.getRepository(DeliveryTask);
-  return repo.save(repo.create({ orderId, orderReference: 'SOM-T', status: 'delivered', kind, deliveredAt }));
+  return repo.save(repo.create({ orderId, orderReference: 'KOM-T', status: 'delivered', kind, deliveredAt }));
 }
 
 describe('time limits on a fake clock: the return deadline', () => {

@@ -34,8 +34,8 @@ test("the form is prefilled from the product, the store or the order, in the rea
   const store = contactSupportPrefill(params(contactSupportHref({ storeName: "Mama Shop" })), true);
   assert.equal(store.subject, "Question sur la boutique Mama Shop");
   assert.equal(store.message, "Boutique: Mama Shop\n\n");
-  const order = contactSupportPrefill(params(contactSupportHref({ orderId: "SOM-1" })), false);
-  assert.equal(order.orderParam, "SOM-1");
+  const order = contactSupportPrefill(params(contactSupportHref({ orderId: "KOM-1" })), false);
+  assert.equal(order.orderParam, "KOM-1");
   assert.equal(order.subject, ""); // the page fills the subject once the order is loaded
   assert.deepEqual(contactSupportPrefill(params("/shop/support"), false), { subject: "", message: "", orderParam: null });
   assert.equal(contactSupportPrefill(params("/shop/support?subject=Hello"), false).subject, "Hello");

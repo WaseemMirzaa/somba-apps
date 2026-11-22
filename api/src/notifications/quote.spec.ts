@@ -38,9 +38,9 @@ describe('quotedNotice', () => {
   });
 
   it('the wording around the quote is the one localize.ts already has', () => {
-    const n = quotedNotice({ title: 'Return rejected', body: (q) => `${'RET-1'} · SOM-9: ${q}`, text: 'Trop tard', i18n: { sourceLang: 'fr', en: 'Too late', fr: 'Trop tard' } });
-    expect(n.body).toBe('RET-1 · SOM-9: Too late');
-    expect(n.fr?.body).toBe('RET-1 · SOM-9: Trop tard');
+    const n = quotedNotice({ title: 'Return rejected', body: (q) => `${'RET-1'} · KOM-9: ${q}`, text: 'Trop tard', i18n: { sourceLang: 'fr', en: 'Too late', fr: 'Trop tard' } });
+    expect(n.body).toBe('RET-1 · KOM-9: Too late');
+    expect(n.fr?.body).toBe('RET-1 · KOM-9: Trop tard');
     expect(n.fr?.title).toBe(frenchNotice({ title: 'Return rejected', body: '' })?.title);
   });
 

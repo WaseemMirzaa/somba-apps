@@ -42,7 +42,7 @@ ProductDto _shoe() => ProductDto.fromJson({
 
 OrderDto _order({String method = 'airtel_money', String status = 'delivered'}) => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-1042',
+      'reference': 'KOM-1042',
       'customerName': 'Aline',
       'status': status,
       'paymentMethod': method,

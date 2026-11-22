@@ -179,7 +179,7 @@ describe('frenchBody: the notice body a French reader gets', () => {
   });
 
   it('returns null when there is nothing the table or the catalogue knows', () => {
-    expect(frenchBody({ title: 'Order placed', body: 'We received SOM-1. You\'ll get updates here in real time.' }, quoted, names)).toBeNull();
+    expect(frenchBody({ title: 'Order placed', body: 'We received KOM-1. You\'ll get updates here in real time.' }, quoted, names)).toBeNull();
   });
 });
 

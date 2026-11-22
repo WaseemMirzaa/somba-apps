@@ -44,7 +44,7 @@ const line = (name: string, deliveredAt: Date | null, fulfilment: OrderItem['ful
   ({ productId: `ext:${name}`, productName: name, variant: 'Default', qty: 1, priceUsd: 10, sellerId: `s-${name}`, fulfilment, deliveredAt }) as unknown as OrderItem;
 async function order(lines: OrderItem[], status: Order['status'] = 'processing') {
   const repo = w.ds.getRepository(Order);
-  return repo.save(repo.create({ reference: `SOM-${Math.floor(Math.random() * 1e8)}`, customerId: owner.id, customerName: 'Jean', status, totalUsd: 20, items: lines }));
+  return repo.save(repo.create({ reference: `KOM-${Math.floor(Math.random() * 1e8)}`, customerId: owner.id, customerName: 'Jean', status, totalUsd: 20, items: lines }));
 }
 const statusOf = async (id: string) => (await w.ds.getRepository(Order).findOneByOrFail({ id })).status;
 

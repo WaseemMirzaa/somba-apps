@@ -25,7 +25,7 @@ export function classifyScan(raw: string): ScanCode {
   if (m) return { kind: "sku", value: `SKU-${m[1].toLowerCase()}` };
   m = /^bin[-:](.+)$/i.exec(v);
   if (m && m[1].trim()) return { kind: "bin", value: m[1].trim().toUpperCase() };
-  if (/^som-[0-9a-z]+$/i.test(v)) return { kind: "order", value: v.toUpperCase() };
+  if (/^(?:som|kom)-[0-9a-z]+$/i.test(v)) return { kind: "order", value: v.toUpperCase().replace(/^SOM-/, "KOM-") };
   return { kind: "unknown", value: v };
 }
 

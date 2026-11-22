@@ -20,14 +20,14 @@ describe('customers:wallet (read-only)', () => {
     const c = await addUser({ walletBalance: 42.5 });
     const txs = ds.getRepository(WalletTransaction);
     for (let i = 1; i <= 3; i++) {
-      const row = await txs.save(txs.create({ userId: c.id, type: i === 3 ? 'debit' : 'topup', amount: 10 * i, balance: 10 * i, description: i === 3 ? 'Order SOM-1001' : 'Top-up' }));
+      const row = await txs.save(txs.create({ userId: c.id, type: i === 3 ? 'debit' : 'topup', amount: 10 * i, balance: 10 * i, description: i === 3 ? 'Order KOM-1001' : 'Top-up' }));
       await txs.update({ id: row.id }, { createdAt: new Date(Date.UTC(2026, 0, i)) });
     }
     await txs.save(txs.create({ userId: 'someone-else', type: 'topup', amount: 99, balance: 99, description: 'Top-up' }));
     const w = await svc.wallet(c.id);
     expect(w.balance).toBe(42.5);
     expect(w.transactions.map((t) => t.amount)).toEqual([30, 20, 10]); // newest first, only this customer
-    expect(w.transactions[0]).toMatchObject({ type: 'debit', description: 'Order SOM-1001', descriptionFr: 'Commande SOM-1001' });
+    expect(w.transactions[0]).toMatchObject({ type: 'debit', description: 'Order KOM-1001', descriptionFr: 'Commande KOM-1001' });
   });
 
   it('pages with limit and offset (20 by default, 100 at most)', async () => {

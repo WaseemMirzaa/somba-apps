@@ -66,7 +66,7 @@ Future<dynamic> _fakeServer(String event, [Map<String, dynamic>? body]) async {
   final failure = _nextFailure;
   _nextFailure = null;
   if (failure != null) throw failure;
-  return {'id': 'o-${_sent.length}', 'reference': 'SOM-${_sent.length}', 'status': 'confirmed', 'paymentMethod': body['paymentMethod'], 'items': const []};
+  return {'id': 'o-${_sent.length}', 'reference': 'KOM-${_sent.length}', 'status': 'confirmed', 'paymentMethod': body['paymentMethod'], 'items': const []};
 }
 
 void main() {

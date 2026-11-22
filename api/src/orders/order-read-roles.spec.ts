@@ -43,7 +43,7 @@ async function mkOrder(over: Partial<Order> = {}) {
   const repo = w.ds.getRepository(Order);
   return repo.save(
     repo.create({
-      reference: `SOM-${Math.floor(Math.random() * 1e8)}`,
+      reference: `KOM-${Math.floor(Math.random() * 1e8)}`,
       customerId: 'cust-1',
       customerName: 'Jean Mukendi',
       status: 'confirmed',
