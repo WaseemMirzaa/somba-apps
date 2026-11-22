@@ -19,7 +19,7 @@ export function useOrderRefs(): { orders: OrderRef[]; refOf: (orderId: string | 
   };
 }
 
-/** "Order SOM-123" link for a ticket (nothing when the ticket has no order). */
+/** "Order KOM-123" link for a ticket (nothing when the ticket has no order). */
 export function OrderLink({ orderId, reference, fr, enabled }: { orderId: string | null | undefined; reference: string | null; fr: boolean; enabled: boolean }) {
   if (!orderId) return <span className="text-slate-400">—</span>;
   const label = reference ?? `#${orderId.replace(/-/g, "").slice(0, 6).toUpperCase()}`;

@@ -27,7 +27,7 @@ OrderDto _order(
 }) =>
     OrderDto.fromJson({
       'id': id,
-      'reference': 'SOM-2042',
+      'reference': 'KOM-2042',
       'customerName': 'Aline Mbuyi',
       'status': status,
       'paymentMethod': 'wallet',
@@ -60,7 +60,7 @@ void main() {
 
       test('has the reference, date, customer, every item, the totals and the payment method ($lang)', () {
         final t = receiptText(s, _order('delivered', shipping: '{"line1":"12 Avenue de la Paix","commune":"Gombe","city":"Kinshasa"}'));
-        expect(t, contains('${s.receiptOrder}: SOM-2042'));
+        expect(t, contains('${s.receiptOrder}: KOM-2042'));
         expect(t, contains('${s.receiptDate}: 01/10/2026 09:30'));
         expect(t, contains('${s.receiptCustomer}: Aline Mbuyi'));
         expect(t, contains('${s.receiptDeliverTo}: 12 Avenue de la Paix, Gombe, Kinshasa'));
@@ -73,7 +73,7 @@ void main() {
         expect(t, contains('${s.total}: ${money(63)}'));
         expect(t, contains('${s.receiptPaidWith}: ${s.paymentLabel('wallet')}'));
         expect(t, contains(s.receiptTitle));
-        expect(t.indexOf('SOM-2042') < t.indexOf('Phone case'), isTrue, reason: 'header before the lines');
+        expect(t.indexOf('KOM-2042') < t.indexOf('Phone case'), isTrue, reason: 'header before the lines');
         expect(t.indexOf('Charger') < t.indexOf('${s.total}:'), isTrue, reason: 'lines before the total');
       });
     }
@@ -97,7 +97,7 @@ void main() {
 
     test('without an address or a date the receipt still builds', () {
       const s = Strings('en');
-      final o = OrderDto(id: 'x', reference: 'SOM-1', customerName: 'A', status: 'delivered', paymentMethod: 'wallet', totalUsd: 1);
+      final o = OrderDto(id: 'x', reference: 'KOM-1', customerName: 'A', status: 'delivered', paymentMethod: 'wallet', totalUsd: 1);
       final t = receiptText(s, o);
       expect(t, contains('${s.receiptDate}: —'));
       expect(t, isNot(contains(s.receiptDeliverTo)));

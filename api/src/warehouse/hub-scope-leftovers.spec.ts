@@ -21,7 +21,7 @@ describe('hub scoping of orders, incidents and inventory', () => {
 
   const mkHub = (name: string) => ds.getRepository(Hub).save(ds.getRepository(Hub).create({ name, city: 'X', lat: -4.3, lng: 15.3 }));
   const mkOrder = (o: Partial<Order>) =>
-    ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `SOM-${++seq}`, customerId: 'c', customerName: 'C', status: 'confirmed', ...o }));
+    ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `KOM-${++seq}`, customerId: 'c', customerName: 'C', status: 'confirmed', ...o }));
   const mkProduct = (name: string, stock: number) => ds.getRepository(Product).save(ds.getRepository(Product).create({ name, price: 5, stock, status: 'live' } as DeepPartial<Product>));
   const line = (orderId: string, p: Product, qty: number) =>
     ds.getRepository(OrderItem).save(ds.getRepository(OrderItem).create({ orderId, productId: p.id, productName: p.name, qty, priceUsd: 5 } as DeepPartial<OrderItem>));
@@ -152,13 +152,13 @@ describe('hub scoping of orders, incidents and inventory', () => {
 
     it('an admin names the hub, or the parcel decides', async () => {
       expect(await raise(null, { hub: 'limete' })).toMatchObject({ hubId: limete.id, hub: 'Limete' });
-      const t = await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: 'o', orderReference: 'SOM-1', status: 'assigned', kind: 'delivery', hubId: paris.id }));
+      const t = await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: 'o', orderReference: 'KOM-1', status: 'assigned', kind: 'delivery', hubId: paris.id }));
       expect(await raise(null, { taskId: t.id })).toMatchObject({ hubId: paris.id });
       expect(await raise(null, { hub: 'Nowhere' })).toMatchObject({ hubId: null, hub: 'Nowhere' });
     });
 
     it('staff cannot raise an incident on another warehouse\'s parcel', async () => {
-      const t = await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: 'o', orderReference: 'SOM-1', status: 'assigned', kind: 'delivery', hubId: paris.id, fromHubId: paris.id, toHubId: limete.id }));
+      const t = await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: 'o', orderReference: 'KOM-1', status: 'assigned', kind: 'delivery', hubId: paris.id, fromHubId: paris.id, toHubId: limete.id }));
       await expect(raise(gombe.id, { taskId: t.id })).rejects.toThrow('That parcel belongs to another warehouse.');
       expect(await raise(limete.id, { taskId: t.id })).toMatchObject({ hubId: limete.id }); // the receiving end may
     });

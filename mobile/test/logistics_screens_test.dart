@@ -44,7 +44,7 @@ ProductDto _seller(String id, {String seller = 's1', bool vacation = false}) => 
 
 OrderDto _order(String status, {List<String> origins = const ['hub-a'], String dest = 'hub-b', String fulfilment = 'received'}) => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-77',
+      'reference': 'KOM-77',
       'status': status,
       'paymentMethod': 'wallet',
       'totalUsd': 25,
@@ -432,7 +432,7 @@ void main() {
 
 Map<String, dynamic> _orderJson(String status) => {
       'id': 'o1',
-      'reference': 'SOM-77',
+      'reference': 'KOM-77',
       'status': status,
       'paymentMethod': 'wallet',
       'totalUsd': 25,

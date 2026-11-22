@@ -32,7 +32,7 @@ describe('French commerce notices', () => {
 
   it('flash sale lines are not swallowed by the general "X is now Y." rule', () => {
     expect(fr('Flash sale started', 'Phone case is now on flash sale at $4.50.')?.body).toBe(`Phone case est maintenant en vente flash à 4,50${NB}$.`);
-    expect(fr('Order update', 'SOM-1001 is now confirmed.')?.body).toBe('SOM-1001 est maintenant confirmée.'); // unchanged
+    expect(fr('Order update', 'KOM-1001 is now confirmed.')?.body).toBe('KOM-1001 est maintenant confirmée.'); // unchanged
   });
 
   it('a one-word product name works', () => {

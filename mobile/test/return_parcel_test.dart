@@ -20,7 +20,7 @@ import 'aftersale_helpers.dart';
 import 'button_rules.dart';
 import 'gap_helpers.dart';
 
-const _label = {'code': 'PKG-7KQ2M9XA', 'boxNo': 1, 'boxCount': 1, 'orderReference': 'SOM-1042'};
+const _label = {'code': 'PKG-7KQ2M9XA', 'boxNo': 1, 'boxCount': 1, 'orderReference': 'KOM-1042'};
 
 void main() {
   late AsFake server;
@@ -56,7 +56,7 @@ void main() {
   group('parsing the answer', () {
     test('an object becomes a label', () {
       final p = ReturnParcel.tryParse(_label)!;
-      expect((p.code, p.boxNo, p.boxCount, p.orderReference, p.isSingleBox), ('PKG-7KQ2M9XA', 1, 1, 'SOM-1042', true));
+      expect((p.code, p.boxNo, p.boxCount, p.orderReference, p.isSingleBox), ('PKG-7KQ2M9XA', 1, 1, 'KOM-1042', true));
       expect(ReturnParcel.tryParse({'code': 'PKG-AAAA2222', 'boxNo': 2, 'boxCount': 3})!.isSingleBox, isFalse);
     });
 
@@ -114,7 +114,7 @@ void main() {
         expect(find.byType(QrImageView), findsOneWidget);
         expect(find.byKey(const ValueKey('parcel-qr-PKG-7KQ2M9XA')), findsOneWidget);
         expect(tester.widget<Text>(find.byKey(const ValueKey('parcel-code'))).data, 'PKG-7KQ2M9XA');
-        expect(tester.widget<Text>(find.byKey(const ValueKey('parcel-box'))).data, '${s.asPlBox(1, 1)} · SOM-1042');
+        expect(tester.widget<Text>(find.byKey(const ValueKey('parcel-box'))).data, '${s.asPlBox(1, 1)} · KOM-1042');
         expect(tester.widget<Text>(find.byKey(const ValueKey('parcel-write'))).data, s.asPlWrite);
         expect(s.asPlWrite, lang == 'en' ? contains('Write this code on the package') : contains('Écrivez ce code sur le colis'));
         expect(find.byTooltip(s.asPlCopy), findsOneWidget);
@@ -125,7 +125,7 @@ void main() {
     testWidgets('"Box n of m" when the return has several boxes', (tester) async {
       server.handlers['parcels:forReturn'] = (_) => {..._label, 'boxNo': 2, 'boxCount': 3};
       await open(tester);
-      expect(tester.widget<Text>(find.byKey(const ValueKey('parcel-box'))).data, 'Box 2 of 3 · SOM-1042');
+      expect(tester.widget<Text>(find.byKey(const ValueKey('parcel-box'))).data, 'Box 2 of 3 · KOM-1042');
     });
 
     for (final lang in ['en', 'fr']) {

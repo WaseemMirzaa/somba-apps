@@ -57,7 +57,7 @@ Map<String, dynamic> _line(String id, String name, double price, int qty, String
 
 OrderDto _order(String id, List<Map<String, dynamic>> items) => OrderDto.fromJson({
       'id': id,
-      'reference': 'SOM-$id',
+      'reference': 'KOM-$id',
       'customerName': 'Aline',
       'status': 'processing',
       'paymentMethod': 'wallet',
@@ -275,7 +275,7 @@ void main() {
           ..clear()
           ..add(_order('o1', [_line('p1', 'Red Phone', 20, 2, 's1', 'Boutique Kin'), _line('p3', 'Blue Shoes', 30, 1, 's2', 'Mama Tech')]));
         await _show(tester, OrderSuccessScreen(locale: Locale(lang), orderId: 'o1'), lang: lang, phone: true);
-        expect(find.text('SOM-o1'), findsOneWidget);
+        expect(find.text('KOM-o1'), findsOneWidget);
         expect(find.text(s.orderSplitNote(2)), findsOneWidget);
         expect(find.byKey(const ValueKey('order-split-store-0')), findsOneWidget);
         expect(tester.widget<Text>(find.byKey(const ValueKey('order-split-store-0'))).data, 'Boutique Kin');

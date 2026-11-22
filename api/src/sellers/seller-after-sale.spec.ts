@@ -39,7 +39,7 @@ describe('after-sale access: pure rules', () => {
 
 describe('redaction: what a store may see of a case', () => {
   const ret = {
-    id: 'r1', reference: 'RET-1001', orderId: 'o1', orderReference: 'SOM-1001', customerId: 'c1', customerName: 'Awa Diallo Kone', customerPhone: '+243970000000',
+    id: 'r1', reference: 'RET-1001', orderId: 'o1', orderReference: 'KOM-1001', customerId: 'c1', customerName: 'Awa Diallo Kone', customerPhone: '+243970000000',
     type: 'return', category: 'damaged', reason: 'Arrived broken', status: 'open', stage: 'approved', attachments: ['/uploads/a.jpg'], sellerId: 's1',
     resolution: null, resolutionFr: null, refundUsd: 0, createdAt: new Date('2026-11-01'), updatedAt: new Date('2026-11-02'), sellerReason: 'old', escalatedAt: null,
     items: [{ id: 'i1', productName: 'Kettle', productNameFr: 'Bouilloire', variant: 'Red', variantFr: 'Rouge', qty: 2, unitPriceUsd: 10 }],
@@ -47,7 +47,7 @@ describe('redaction: what a store may see of a case', () => {
   };
   it('a return: first name only, no id / phone / address, no customer thread', () => {
     const v = redactReturn(ret) as unknown as Record<string, unknown>;
-    expect(v).toMatchObject({ sellerView: true, kind: 'return', reference: 'RET-1001', orderReference: 'SOM-1001', customerFirstName: 'Awa', stage: 'approved', reason: 'Arrived broken', attachments: ['/uploads/a.jpg'] });
+    expect(v).toMatchObject({ sellerView: true, kind: 'return', reference: 'RET-1001', orderReference: 'KOM-1001', customerFirstName: 'Awa', stage: 'approved', reason: 'Arrived broken', attachments: ['/uploads/a.jpg'] });
     expect((v.items as unknown[])[0]).toEqual({ name: 'Kettle', nameFr: 'Bouilloire', variant: 'Red', variantFr: 'Rouge', qty: 2 });
     for (const leak of ['customerId', 'customerName', 'customerPhone', 'messages', 'messageCount', 'address', 'sellerReason', 'pickupTaskId']) expect(v).not.toHaveProperty(leak);
     expect(JSON.stringify(v)).not.toMatch(/Diallo|Kone|\+243|customer says/);
@@ -59,11 +59,11 @@ describe('redaction: what a store may see of a case', () => {
     expect(v.timeline.map((s) => s.key)).toEqual(['opened', 'refused']);
   });
   it('an exchange shows both items and the price difference; a replacement the dispatch status', () => {
-    const ex = redactExchange({ id: 'e1', reference: 'EXC-1', orderId: 'o', orderReference: 'SOM-2', customerId: 'c', customerName: 'Jean Mbala', status: 'approved', fromName: 'Shirt S', toName: 'Shirt M', fromNameFr: 'Chemise S', toNameFr: null, qty: 1, priceDiffUsd: -2, sellerReason: 'ok', createdAt: new Date(), updatedAt: new Date(), attachments: [] });
+    const ex = redactExchange({ id: 'e1', reference: 'EXC-1', orderId: 'o', orderReference: 'KOM-2', customerId: 'c', customerName: 'Jean Mbala', status: 'approved', fromName: 'Shirt S', toName: 'Shirt M', fromNameFr: 'Chemise S', toNameFr: null, qty: 1, priceDiffUsd: -2, sellerReason: 'ok', createdAt: new Date(), updatedAt: new Date(), attachments: [] });
     expect(ex).toMatchObject({ kind: 'exchange', customerFirstName: 'Jean', priceDiffUsd: -2, decisionNote: 'ok' });
     expect(ex.items.map((i) => i.name)).toEqual(['Shirt S', 'Shirt M']);
     expect(ex.timeline.filter((s) => s.done).map((s) => s.key)).toEqual(['requested', 'approved']);
-    const rep = redactReplacement({ id: 'p1', reference: 'REP-1', orderId: 'o', orderReference: 'SOM-3', customerName: 'Mimi', status: 'dispatched', dispatchStatus: 'dispatched', productName: 'Lamp', qty: 1, createdAt: new Date(), updatedAt: new Date(), attachments: [] });
+    const rep = redactReplacement({ id: 'p1', reference: 'REP-1', orderId: 'o', orderReference: 'KOM-3', customerName: 'Mimi', status: 'dispatched', dispatchStatus: 'dispatched', productName: 'Lamp', qty: 1, createdAt: new Date(), updatedAt: new Date(), attachments: [] });
     expect(rep).toMatchObject({ kind: 'replacement', dispatchStatus: 'dispatched', customerFirstName: 'Mimi' });
   });
 });
@@ -86,7 +86,7 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
 
   const addReturn = (over: Partial<Dispute> = {}) =>
     ds.getRepository(Dispute).save(
-      ds.getRepository(Dispute).create({ reference: `RET-${++reRun}`, orderId: 'o1', orderReference: 'SOM-1', customerId: 'cust-1', customerName: 'Awa Diallo', type: 'return', reason: 'broken', status: 'open', stage: 'awaiting_support', sellerId: storeA.id, ...over }),
+      ds.getRepository(Dispute).create({ reference: `RET-${++reRun}`, orderId: 'o1', orderReference: 'KOM-1', customerId: 'cust-1', customerName: 'Awa Diallo', type: 'return', reason: 'broken', status: 'open', stage: 'awaiting_support', sellerId: storeA.id, ...over }),
     );
 
   beforeEach(async () => {
@@ -169,7 +169,7 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
     const pushed = emitter.sent.find((e) => e.event === 'dispute:updated' && e.to === 'user:owner-a');
     expect(pushed?.payload).toMatchObject({ sellerView: true, customerFirstName: 'Awa', reference: d.reference });
     expect(JSON.stringify(pushed?.payload)).not.toContain('Diallo');
-    expect(notices).toEqual([{ to: 'owner-a', title: 'Return opened on your item', body: `${d.reference} · SOM-1`, type: 'seller_return', entityId: d.id }]);
+    expect(notices).toEqual([{ to: 'owner-a', title: 'Return opened on your item', body: `${d.reference} · KOM-1`, type: 'seller_return', entityId: d.id }]);
     await view.decided('return', full);
     expect(notices[1]).toMatchObject({ title: 'Return decided', type: 'seller_return' });
     // another store's case never reaches this one
@@ -212,7 +212,7 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
     });
 
     it('the redaction helper keeps first name, items, stage, money and legs', () => {
-      const v = withholdReasons(redactReturn({ id: 'r', reference: 'RET-1', orderId: 'o', orderReference: 'SOM-1', customerName: 'Awa Diallo', status: 'open', stage: 'approved', reason: 'x', category: 'damaged', attachments: ['/a.jpg'], refundUsd: 5, items: [{ productName: 'Kettle', qty: 1 }], createdAt: new Date(), updatedAt: new Date() }));
+      const v = withholdReasons(redactReturn({ id: 'r', reference: 'RET-1', orderId: 'o', orderReference: 'KOM-1', customerName: 'Awa Diallo', status: 'open', stage: 'approved', reason: 'x', category: 'damaged', attachments: ['/a.jpg'], refundUsd: 5, items: [{ productName: 'Kettle', qty: 1 }], createdAt: new Date(), updatedAt: new Date() }));
       expect(v).toMatchObject({ customerFirstName: 'Awa', stage: 'approved', refundUsd: 5, reasonHidden: true });
       expect(v.items).toHaveLength(1);
     });
@@ -249,7 +249,7 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
         await access.setStoreAccess({ sellerId: storeA.id, returns: false });
         await expect(threads.customerConversation(sellerCaller('owner-a'), { kind: 'return', caseId: ret.id })).rejects.toThrow('This section is turned off for your store.');
         await access.setStoreAccess({ sellerId: storeA.id, returns: null, exchanges: true });
-        const ex = await ds.getRepository(Exchange).save(ds.getRepository(Exchange).create({ reference: 'EXC-9', orderId: 'o', orderReference: 'SOM-9', customerId: 'c', customerName: 'x', sellerId: storeA.id, fromSku: 'a', fromName: 'A', toSku: 'b', toName: 'B' }));
+        const ex = await ds.getRepository(Exchange).save(ds.getRepository(Exchange).create({ reference: 'EXC-9', orderId: 'o', orderReference: 'KOM-9', customerId: 'c', customerName: 'x', sellerId: storeA.id, fromSku: 'a', fromName: 'A', toSku: 'b', toName: 'B' }));
         expect(await threads.customerConversation(sellerCaller('owner-a'), { kind: 'exchange', caseId: ex.id })).toEqual([]);
       });
 
@@ -279,7 +279,7 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
       await expect(threads.list(sellerCaller('owner-b'), { kind: 'return', caseId: ret.id })).rejects.toThrow('Request not found.');
       await expect(threads.list(sellerCaller('owner-a'), { kind: 'return', caseId: ret.id })).resolves.toEqual([]);
       // only the section that is on: exchanges are still off
-      const ex = await ds.getRepository(Exchange).save(ds.getRepository(Exchange).create({ reference: 'EXC-1', orderId: 'o', orderReference: 'SOM-9', customerId: 'c', customerName: 'x', sellerId: storeA.id, fromSku: 'a', fromName: 'A', toSku: 'b', toName: 'B' }));
+      const ex = await ds.getRepository(Exchange).save(ds.getRepository(Exchange).create({ reference: 'EXC-1', orderId: 'o', orderReference: 'KOM-9', customerId: 'c', customerName: 'x', sellerId: storeA.id, fromSku: 'a', fromName: 'A', toSku: 'b', toName: 'B' }));
       await expect(threads.list(sellerCaller('owner-a'), { kind: 'exchange', caseId: ex.id })).rejects.toThrow('This section is turned off for your store.');
     });
 
@@ -287,7 +287,7 @@ describe('seller after-sale view: switches, reads and the private thread', () =>
       await access.setDefaults({ returns: true });
       const m1 = await threads.send(sellerCaller('owner-a'), { kind: 'return', caseId: ret.id, text: 'Where is the parcel?' });
       expect(m1).toMatchObject({ authorSide: 'seller', text: 'Where is the parcel?', caseKind: 'return' });
-      expect(roleNotices).toEqual([{ role: 'admin_support', title: `Seller message on ${ret.reference}`, body: `${ret.reference} · SOM-1`, type: 'return', entityId: ret.id }]);
+      expect(roleNotices).toEqual([{ role: 'admin_support', title: `Seller message on ${ret.reference}`, body: `${ret.reference} · KOM-1`, type: 'return', entityId: ret.id }]);
       expect(emitter.sent.some((e) => e.event === 'caseThread:message' && e.to.includes('admin_support'))).toBe(true);
       // support sees one unread case, replies, and the store hears it
       expect(await threads.unread(staff('admin_support'))).toMatchObject({ count: 1, cases: [{ kind: 'return', caseId: ret.id, unread: 1 }] });

@@ -114,8 +114,8 @@ describe('NotificationsService', () => {
   });
 
   describe('French', () => {
-    const placed = { title: 'Order placed', body: "We received SOM-1. You'll get updates here in real time." };
-    const placedFr = { title: 'Commande enregistrée', body: 'Nous avons reçu SOM-1. Vous recevrez les mises à jour ici en temps réel.' };
+    const placed = { title: 'Order placed', body: "We received KOM-1. You'll get updates here in real time." };
+    const placedFr = { title: 'Commande enregistrée', body: 'Nous avons reçu KOM-1. Vous recevrez les mises à jour ici en temps réel.' };
 
     it('adds titleFr / bodyFr to the live event, from the built-in translation', async () => {
       const { svc, payloads, saved } = make({ u1: { role: 'customer', prefs: null } });

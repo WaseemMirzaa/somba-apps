@@ -42,7 +42,7 @@ void main() {
   group('inbox (earlier chats)', () {
     void twoThreads() => server.handlers['chat:list'] = (_) => [
           convJson(id: 'a', unread: 2, productId: 'p1', productName: 'Running shoes', productNameFr: 'Baskets de running', preview: 'It is in stock', at: '2026-10-24T09:30:00Z'),
-          convJson(id: 'b', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'SOM-1042', preview: 'Your parcel left today', at: '2026-10-20T09:30:00Z'),
+          convJson(id: 'b', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'KOM-1042', preview: 'Your parcel left today', at: '2026-10-20T09:30:00Z'),
         ];
 
     testWidgets('lists the old threads with store, context and last message, newest first, with no unread badge', (tester) async {
@@ -52,7 +52,7 @@ void main() {
       expect(find.text('Mama Tech'), findsOneWidget);
       expect(find.text('Kin Tech'), findsOneWidget);
       expect(find.text('About: Running shoes'), findsOneWidget);
-      expect(find.text('Order SOM-1042'), findsOneWidget);
+      expect(find.text('Order KOM-1042'), findsOneWidget);
       expect(find.text('It is in stock'), findsOneWidget);
       expect(find.byType(CountBadge), findsNothing, reason: 'nothing new can arrive: no unread counts');
       expect(server.bodiesOf('chat:list').first, {'as': 'buyer', 'limit': ChatStore.pageSize, 'offset': 0});
@@ -108,7 +108,7 @@ void main() {
       await open(tester, const ChatInboxScreen(locale: Locale('fr')), lang: 'fr');
       expect(find.text('Anciennes discussions avec les boutiques'), findsOneWidget);
       expect(find.text('À propos de : Baskets de running'), findsOneWidget); // the product in French, not the English name
-      expect(find.text('Commande SOM-1042'), findsOneWidget);
+      expect(find.text('Commande KOM-1042'), findsOneWidget);
     });
 
     testWidgets('tapping a row opens the thread', (tester) async {
@@ -176,9 +176,9 @@ void main() {
     });
 
     testWidgets('"Contact support" from an order chat opens a new ticket for that order', (tester) async {
-      thread(conversation: convJson(orderId: 'o1', orderReference: 'SOM-1042'));
-      await openThread(tester, c: conv(convJson(orderId: 'o1', orderReference: 'SOM-1042')));
-      expect(find.text('Order SOM-1042'), findsOneWidget);
+      thread(conversation: convJson(orderId: 'o1', orderReference: 'KOM-1042'));
+      await openThread(tester, c: conv(convJson(orderId: 'o1', orderReference: 'KOM-1042')));
+      expect(find.text('Order KOM-1042'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('chat-contact-support')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));

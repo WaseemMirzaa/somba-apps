@@ -20,7 +20,7 @@ final _sent = <Map<String, dynamic>>[];
 
 Future<dynamic> _fakeServer(String event, [Map<String, dynamic>? body]) async {
   _sent.add(body!);
-  return {'id': 'o-${_sent.length}', 'reference': 'SOM-${_sent.length}', 'status': 'confirmed', 'paymentMethod': body['paymentMethod'], 'items': const []};
+  return {'id': 'o-${_sent.length}', 'reference': 'KOM-${_sent.length}', 'status': 'confirmed', 'paymentMethod': body['paymentMethod'], 'items': const []};
 }
 
 /// A saved address; pinned on the map unless [pinned] is false.

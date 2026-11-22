@@ -6,6 +6,7 @@ import { Order, OrderItem, Product, Seller } from '../database/entities';
 import { dateInput, fixed2, round2, toCsv } from '../finance/finance.util';
 import { csvWords } from '../finance/csv-labels';
 import { asLocale } from '../common/locale';
+import { normalizeOrderRef } from '../common/order-ref';
 import { OrdersService } from './orders.service';
 import { sellerTracking } from './seller-tracking';
 
@@ -67,13 +68,13 @@ export class SellerOrdersService {
         qb.andWhere("i.fulfilment = :step AND o.status IN ('confirmed','processing')", { step });
       } else throw new BadRequestException(`Status must be one of: ${[...ORDER_STATUSES, ...PACKAGE_STATUSES].join(', ')}.`);
     }
-    const one = typeof input.id === 'string' ? input.id.trim().slice(0, 80) : '';
+    const one = typeof input.id === 'string' ? normalizeOrderRef(input.id.trim().slice(0, 80)) : '';
     if (one) qb.andWhere('(o.id = :oneId OR o.reference = :oneId)', { oneId: one });
     const from = dateInput(input.from, false);
     const to = dateInput(input.to, true);
     if (from) qb.andWhere('o.createdAt >= :fromDate', { fromDate: from });
     if (to) qb.andWhere('o.createdAt <= :toDate', { toDate: to });
-    const q = typeof input.q === 'string' ? input.q.trim().slice(0, 80).toLowerCase() : '';
+    const q = typeof input.q === 'string' ? normalizeOrderRef(input.q.trim().slice(0, 80)).toLowerCase() : '';
     if (q) {
       // The customer's FIRST name only: a prefix of the stored full name, and only for a one-word search, so a
       // search can never confirm a surname.

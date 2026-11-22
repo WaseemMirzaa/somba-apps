@@ -40,7 +40,7 @@ async function customer(walletBalance = 0) {
   return users.save(u);
 }
 const order = (customerId: string, status: Order['status'], extra: Partial<Order> = {}) =>
-  ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `SOM-${++seq}`, customerId, customerName: 'Marie Dubois', status, shippingAddress: ADDRESS, totalUsd: 40, ...extra }));
+  ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `KOM-${++seq}`, customerId, customerName: 'Marie Dubois', status, shippingAddress: ADDRESS, totalUsd: 40, ...extra }));
 const row = (id: string) => ds.getRepository(User).findOneByOrFail({ id });
 
 beforeEach(async () => {

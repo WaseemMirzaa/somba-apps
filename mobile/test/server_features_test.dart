@@ -83,7 +83,7 @@ void main() {
 
   test('order lines and the order carry list prices and the campaign discount', () {
     final o = OrderDto.fromJson({
-      'id': 'o1', 'reference': 'SOM-1', 'status': 'pending', 'paymentMethod': 'wallet',
+      'id': 'o1', 'reference': 'KOM-1', 'status': 'pending', 'paymentMethod': 'wallet',
       'subtotalUsd': 80, 'totalUsd': 83, 'campaignDiscountUsd': 20,
       'items': [
         {'productId': 'p', 'productName': 'x', 'qty': 1, 'priceUsd': 80, 'listPriceUsd': 100},

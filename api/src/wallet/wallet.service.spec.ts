@@ -21,24 +21,24 @@ function make(history: { description: string }[] = []) {
 describe('WalletService French', () => {
   it('adds descriptionFr to every line of the history', async () => {
     const { svc } = make([
-      { description: 'Order SOM-1' },
+      { description: 'Order KOM-1' },
       { description: 'Wallet top-up via airtel_money' },
-      { description: 'Refund for cancelled order SOM-1' },
+      { description: 'Refund for cancelled order KOM-1' },
       { description: 'Payout PO-1' },
       { description: 'Manual adjustment' },
     ]);
     const list = await svc.list('u1');
     expect(list.map((t) => t.description)).toEqual([
-      'Order SOM-1',
+      'Order KOM-1',
       'Wallet top-up via airtel_money',
-      'Refund for cancelled order SOM-1',
+      'Refund for cancelled order KOM-1',
       'Payout PO-1',
       'Manual adjustment',
     ]);
     expect(list.map((t) => t.descriptionFr)).toEqual([
-      'Commande SOM-1',
+      'Commande KOM-1',
       'Recharge du portefeuille via Airtel Money',
-      'Remboursement de la commande annulée SOM-1',
+      'Remboursement de la commande annulée KOM-1',
       'Versement PO-1',
       'Manual adjustment',
     ]);
@@ -46,10 +46,10 @@ describe('WalletService French', () => {
 
   it('adds descriptionFr to the live transaction, and returns the stored row', async () => {
     const { svc, events, manager } = make();
-    const tx = await svc.apply('u1', 'refund', 12.5, 'Refund for SOM-9', manager as never);
+    const tx = await svc.apply('u1', 'refund', 12.5, 'Refund for KOM-9', manager as never);
     const live = events.find(([, ev]) => ev === 'wallet:transaction')![2] as { description: string; descriptionFr: string; amount: number; balance: number };
-    expect(live).toMatchObject({ description: 'Refund for SOM-9', descriptionFr: 'Remboursement de SOM-9', amount: 12.5, balance: 80 });
-    expect(tx).toMatchObject({ description: 'Refund for SOM-9' });
+    expect(live).toMatchObject({ description: 'Refund for KOM-9', descriptionFr: 'Remboursement de KOM-9', amount: 12.5, balance: 80 });
+    expect(tx).toMatchObject({ description: 'Refund for KOM-9' });
     expect(tx).not.toHaveProperty('descriptionFr');
   });
 

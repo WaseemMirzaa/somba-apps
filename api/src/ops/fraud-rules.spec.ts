@@ -20,11 +20,11 @@ const daysAgo = (d: number) => hoursAgo(d * 24);
 const addUser = (over: Partial<User> = {}) =>
   ds.getRepository(User).save(ds.getRepository(User).create({ emailHash: `h-${++seq}`, email: `u${seq}@x.test`, passwordHash: 'x', name: `Customer ${seq}`, role: 'customer', createdAt: daysAgo(60), ...over }));
 const addOrder = (u: User, over: Partial<Order> = {}) =>
-  ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `SOM-${++seq}`, customerId: u.id, customerName: u.name, status: 'pending', paymentMethod: 'wallet', totalUsd: 20, ...over }));
+  ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `KOM-${++seq}`, customerId: u.id, customerName: u.name, status: 'pending', paymentMethod: 'wallet', totalUsd: 20, ...over }));
 const addPayment = (u: User, status: Payment['status'], over: Partial<Payment> = {}) =>
   ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: `PAY-${++seq}`, userId: u.id, method: 'airtel_money', amountUsd: 10, status, ...over }));
 const addDispute = (u: User, orderId: string, over: Partial<Dispute> = {}) =>
-  ds.getRepository(Dispute).save(ds.getRepository(Dispute).create({ reference: `RET-${++seq}`, orderId, orderReference: 'SOM-x', customerId: u.id, customerName: u.name, type: 'return', reason: 'Not as described', ...over }));
+  ds.getRepository(Dispute).save(ds.getRepository(Dispute).create({ reference: `RET-${++seq}`, orderId, orderReference: 'KOM-x', customerId: u.id, customerName: u.name, type: 'return', reason: 'Not as described', ...over }));
 const alertsOf = (u: User) => ds.getRepository(FraudAlert).find({ where: { customerId: u.id }, order: { createdAt: 'ASC' } });
 const types = async (u: User) => (await alertsOf(u)).map((a) => a.type);
 

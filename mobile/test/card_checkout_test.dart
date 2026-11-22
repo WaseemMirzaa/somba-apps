@@ -53,7 +53,7 @@ Future<dynamic> _fakeOrders(String event, [Map<String, dynamic>? body]) async {
   _sent.add(body!);
   final order = {
     'id': 'o-${_sent.length}',
-    'reference': 'SOM-${_sent.length}',
+    'reference': 'KOM-${_sent.length}',
     'status': 'pending',
     'paymentMethod': body['paymentMethod'],
     'totalUsd': 23,
@@ -87,7 +87,7 @@ Map<String, dynamic> _sheetAnswer(Map<String, dynamic>? body) {
 
 OrderDto _cardOrder({String status = 'pending'}) => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-2042',
+      'reference': 'KOM-2042',
       'customerName': 'Aline Mbuyi',
       'status': status,
       'paymentMethod': 'stripe_card',
@@ -101,7 +101,7 @@ OrderDto _cardOrder({String status = 'pending'}) => OrderDto.fromJson({
     });
 
 PaymentDto _cardPayment({String status = 'pending'}) =>
-    PaymentDto(id: 'pay1', reference: 'PAY-1', orderId: 'o1', orderReference: 'SOM-2042', method: 'stripe_card', amountUsd: 23, status: status);
+    PaymentDto(id: 'pay1', reference: 'PAY-1', orderId: 'o1', orderReference: 'KOM-2042', method: 'stripe_card', amountUsd: 23, status: status);
 
 void main() {
   setUpAll(() async {
@@ -488,7 +488,7 @@ void main() {
 
 Map<String, dynamic> _orderJson(String id) => {
       'id': id,
-      'reference': 'SOM-1',
+      'reference': 'KOM-1',
       'status': 'pending',
       'paymentMethod': 'stripe_card',
       'totalUsd': 23,

@@ -249,7 +249,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       expect(calls, isNot(contains('rider:tasks')));
 
-      store.applyNotificationPush({'id': 'n1', 'title': 'Task updated', 'body': 'SOM-1042: more parcels were added to it.', 'type': 'task', 'entityId': 'a'});
+      store.applyNotificationPush({'id': 'n1', 'title': 'Task updated', 'body': 'KOM-1042: more parcels were added to it.', 'type': 'task', 'entityId': 'a'});
       expect(store.notifications.first.title, 'Task updated');
       await Future<void>.delayed(const Duration(milliseconds: 900));
       expect(calls, contains('rider:tasks'));
@@ -257,7 +257,7 @@ void main() {
     });
 
     test('"Task updated" is shown in French', () {
-      expect(localizeNotification(const Strings('fr'), 'Task updated', 'SOM-1042: x').$1, 'Tâche mise à jour');
+      expect(localizeNotification(const Strings('fr'), 'Task updated', 'KOM-1042: x').$1, 'Tâche mise à jour');
       expect(localizeNotification(const Strings('en'), 'Task updated', 'x').$1, 'Task updated');
     });
   });

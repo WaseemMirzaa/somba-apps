@@ -45,15 +45,15 @@ describe('seed wipe', () => {
       runs.create({ reference: 'TR-0006', fromHubId: k.id, toHubId: l.id }),
     ]);
     const tasks = ds.getRepository(DeliveryTask);
-    const t1 = await tasks.save(tasks.create({ orderId: 'o1', orderReference: 'SOM-1', kind: 'transfer', status: 'picked_up', runId: r1.id, fromHubId: k.id, toHubId: l.id }));
-    await tasks.save(tasks.create({ orderId: 'o2', orderReference: 'SOM-2', kind: 'transfer', status: 'assigned', runId: r2.id, fromHubId: k.id, toHubId: l.id }));
+    const t1 = await tasks.save(tasks.create({ orderId: 'o1', orderReference: 'KOM-1', kind: 'transfer', status: 'picked_up', runId: r1.id, fromHubId: k.id, toHubId: l.id }));
+    await tasks.save(tasks.create({ orderId: 'o2', orderReference: 'KOM-2', kind: 'transfer', status: 'assigned', runId: r2.id, fromHubId: k.id, toHubId: l.id }));
     await ds.getRepository(WarehouseBatch).save(ds.getRepository(WarehouseBatch).create({ reference: 'BATCH-1', hubId: k.id, taskIds: JSON.stringify([t1.id]) }));
     await ds.getRepository(HubCoverage).save(ds.getRepository(HubCoverage).create({ hubId: l.id, areaId: 'area-1', feeOverrideUsd: null }));
     const cat = await ds.getRepository(Category).save(ds.getRepository(Category).create({ name: 'Phones' }));
     const product = await ds.getRepository(Product).save(ds.getRepository(Product).create({ name: 'Phone', price: 10, categoryId: cat.id }));
     const order = await ds.getRepository(Order).save(
       ds.getRepository(Order).create({
-        reference: 'SOM-1',
+        reference: 'KOM-1',
         customerId: 'c1',
         customerName: 'Marie',
         status: 'confirmed',
@@ -77,7 +77,7 @@ describe('seed wipe', () => {
 
   it('clears the refund ledger with the payments (a re-seeded demo must not count the refunds of orders that are gone)', async () => {
     const { order } = await useTheDemo();
-    const pay = await ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: 'PAY-1', orderId: order.id, orderReference: 'SOM-1', userId: 'c1', method: 'stripe_card', amountUsd: 10, status: 'succeeded', refundedUsd: 4 }));
+    const pay = await ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: 'PAY-1', orderId: order.id, orderReference: 'KOM-1', userId: 'c1', method: 'stripe_card', amountUsd: 10, status: 'succeeded', refundedUsd: 4 }));
     await ds.getRepository(PaymentRefund).save(ds.getRepository(PaymentRefund).create({ paymentId: pay.id, orderId: order.id, userId: 'c1', amountUsd: 4, refundTo: 'wallet', kind: 'return' }));
     expect(await count(PaymentRefund)).toBe(1);
     await wipeSeededData(ds);

@@ -38,7 +38,7 @@ function build(provider: TranslatorProvider) {
 
 async function delivered(userId = 'c1') {
   const repo = ds.getRepository(Order);
-  return repo.save(repo.create({ reference: `SOM-${Math.random()}`.slice(0, 18), customerId: userId, customerName: 'x', status: 'delivered', totalUsd: 10, items: [{ productId: product.id, productName: 'Phone', variant: 'Default', qty: 1, priceUsd: 10 }] as OrderItem[] }));
+  return repo.save(repo.create({ reference: `KOM-${Math.random()}`.slice(0, 18), customerId: userId, customerName: 'x', status: 'delivered', totalUsd: 10, items: [{ productId: product.id, productName: 'Phone', variant: 'Default', qty: 1, priceUsd: 10 }] as OrderItem[] }));
 }
 const rowsOf = (id: string) => ds.getRepository(Translation).find({ where: { entityId: id }, order: { entityType: 'ASC', locale: 'ASC' } });
 const sentTo = (event: string) => emitter.sent.filter((e) => e.event === event);

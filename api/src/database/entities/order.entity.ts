@@ -36,7 +36,7 @@ export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  /** Short human-facing reference, e.g. SOM-1042. */
+  /** Short human-facing reference, e.g. KOM-1042. */
   @Index({ unique: true })
   @Column({ type: 'varchar', length: 20 })
   reference: string;

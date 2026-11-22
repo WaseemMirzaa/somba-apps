@@ -33,7 +33,7 @@ describe('parcels', () => {
     return ds.getRepository(User).save(ds.getRepository(User).create({ emailHash: `h${n}`, email: `u${n}@t.test`, passwordHash: 'x', name: `${role}${n}`, role, hubId, ...extra }));
   };
   const mkTask = (over: Partial<DeliveryTask> = {}) =>
-    ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: 'o1', orderReference: 'SOM-1', kind: 'pickup' as DeliveryKind, status: 'assigned' as DeliveryStatus, riderId: rider.id, sellerId: 's1', hubId: hubA.id, toHubId: hubA.id, ...over }));
+    ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: 'o1', orderReference: 'KOM-1', kind: 'pickup' as DeliveryKind, status: 'assigned' as DeliveryStatus, riderId: rider.id, sellerId: 's1', hubId: hubA.id, toHubId: hubA.id, ...over }));
   const staff = (u: User): Actor => ({ id: u.id, role: u.role, name: u.name, hubId: u.hubId, tier: u.warehouseTier });
   const codes = async (orderId = 'o1') => (await parcels.activeFor(orderId, ['s1'])).map((p) => p.code);
   const status = async (id: string) => (await ds.getRepository(DeliveryTask).findOneByOrFail({ id })).status;
@@ -308,8 +308,8 @@ describe('parcels', () => {
       expect(await scan(pickup.id, one.code)).toMatchObject({ total: 1, scanned: 1 });
       await expect(delivery.updateStatus(pickup.id, 'picked_up', rider.id)).resolves.toMatchObject({ status: 'picked_up' });
       // The customer (and only the customer) reads the label of their return.
-      await ds.getRepository(Order).save(ds.getRepository(Order).create({ id: 'o1', reference: 'SOM-1', customerId: 'c1', customerName: 'C', status: 'delivered', totalUsd: 1 } as never));
-      expect(await parcels.returnParcelFor({ id: 'c1', role: 'customer' }, 'd1')).toMatchObject({ code: one.code, orderReference: 'SOM-1' });
+      await ds.getRepository(Order).save(ds.getRepository(Order).create({ id: 'o1', reference: 'KOM-1', customerId: 'c1', customerName: 'C', status: 'delivered', totalUsd: 1 } as never));
+      expect(await parcels.returnParcelFor({ id: 'c1', role: 'customer' }, 'd1')).toMatchObject({ code: one.code, orderReference: 'KOM-1' });
       await expect(parcels.returnParcelFor({ id: 'c2', role: 'customer' }, 'd1')).rejects.toThrow('Return not found.');
       expect(await parcels.returnParcelFor({ id: 'c1', role: 'customer' }, 'none')).toBeNull();
     });
@@ -337,7 +337,7 @@ describe('parcels', () => {
       const k = ++n;
       return ds.getRepository(Order).save(
         ds.getRepository(Order).create({
-          reference: `SOM-G${k}`,
+          reference: `KOM-G${k}`,
           customerId: 'cust1',
           customerName: 'Marie Dubois',
           status: 'processing',

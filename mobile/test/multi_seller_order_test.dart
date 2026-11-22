@@ -48,7 +48,7 @@ Map<String, dynamic> _line(String id, String sellerId, String sellerName, {Strin
 
 OrderDto _order(String id, String status, List<Map<String, dynamic>> items, {String method = 'wallet'}) => OrderDto.fromJson({
       'id': id,
-      'reference': 'SOM-$id',
+      'reference': 'KOM-$id',
       'customerName': 'Aline',
       'status': status,
       'paymentMethod': method,
@@ -325,10 +325,10 @@ void main() {
       testWidgets('the order list hints at cancelled items only on orders that are not cancelled', (tester) async {
         RealtimeStore.instance.orders.add(_order('gone', 'cancelled', [_line('p1', 's1', 'Boutique Kin', fulfilment: 'cancelled', refunded: 20)]));
         await show(tester, OrdersScreen(locale: Locale(lang)), lang);
-        expect(find.byKey(const ValueKey('order-cancelled-hint-SOM-multi')), findsOneWidget);
+        expect(find.byKey(const ValueKey('order-cancelled-hint-KOM-multi')), findsOneWidget);
         expect(find.text(s.ordersCancelledOne), findsOneWidget);
-        expect(find.byKey(const ValueKey('order-cancelled-hint-SOM-single')), findsNothing);
-        expect(find.byKey(const ValueKey('order-cancelled-hint-SOM-gone')), findsNothing);
+        expect(find.byKey(const ValueKey('order-cancelled-hint-KOM-single')), findsNothing);
+        expect(find.byKey(const ValueKey('order-cancelled-hint-KOM-gone')), findsNothing);
         expect(overflows, isEmpty);
       });
     });

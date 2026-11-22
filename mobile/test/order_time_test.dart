@@ -1,5 +1,5 @@
 // Order times come from the API as UTC instants and must show in the device's time zone.
-// SOM-821943591 was placed at 18:38 in Karachi (+05:00); the API sends 13:38Z.
+// KOM-821943591 was placed at 18:38 in Karachi (+05:00); the API sends 13:38Z.
 // Run with a non-UTC zone to see the conversion: TZ=Asia/Karachi flutter test test/order_time_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -11,7 +11,7 @@ void main() {
 
   OrderDto placed() => OrderDto.fromJson({
         'id': '1afcc7eb-e0fb-48ed-a434-b00532c0d818',
-        'reference': 'SOM-821943591',
+        'reference': 'KOM-821943591',
         'createdAt': '2026-10-22T13:38:02.221Z',
       });
 

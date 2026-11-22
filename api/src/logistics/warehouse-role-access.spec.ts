@@ -53,7 +53,7 @@ describe('warehouse and logistics desk: who may work it', () => {
   };
   const mkTask = async (over: Partial<DeliveryTask> = {}) => {
     const t = await ds.getRepository(DeliveryTask).save(
-      ds.getRepository(DeliveryTask).create({ orderId: `o${++seq}`, orderReference: `SOM-${seq}`, kind: 'delivery' as DeliveryKind, status: 'unassigned' as DeliveryStatus, hubId: hubA.id, fromHubId: hubA.id, address: '12 Rue du Lac, Gombe', ...over }),
+      ds.getRepository(DeliveryTask).create({ orderId: `o${++seq}`, orderReference: `KOM-${seq}`, kind: 'delivery' as DeliveryKind, status: 'unassigned' as DeliveryStatus, hubId: hubA.id, fromHubId: hubA.id, address: '12 Rue du Lac, Gombe', ...over }),
     );
     return t;
   };

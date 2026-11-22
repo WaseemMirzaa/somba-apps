@@ -44,7 +44,7 @@ describe('warehouse operations', () => {
   const mkTask = async (over: Partial<DeliveryTask> & { age?: number } = {}) => {
     const { age, ...rest } = over;
     const t = await ds.getRepository(DeliveryTask).save(
-      ds.getRepository(DeliveryTask).create({ orderId: `o${++seq}`, orderReference: `SOM-${seq}`, kind: 'delivery' as DeliveryKind, status: 'unassigned' as DeliveryStatus, hubId: hub.id, fromHubId: hub.id, ...rest }),
+      ds.getRepository(DeliveryTask).create({ orderId: `o${++seq}`, orderReference: `KOM-${seq}`, kind: 'delivery' as DeliveryKind, status: 'unassigned' as DeliveryStatus, hubId: hub.id, fromHubId: hub.id, ...rest }),
     );
     if (age !== undefined) await ds.getRepository(DeliveryTask).update({ id: t.id }, { createdAt: hoursAgo(age) });
     return (await ds.getRepository(DeliveryTask).findOneByOrFail({ id: t.id }))!;
@@ -490,7 +490,7 @@ describe('warehouse operations', () => {
       [s1, s2] = [await mkSeller('Shop One'), await mkSeller('Shop Two')];
       order = await ds.getRepository(Order).save(
         ds.getRepository(Order).create({
-          reference: 'SOM-RET',
+          reference: 'KOM-RET',
           customerId: 'cust1',
           customerName: 'Marie',
           status: 'confirmed',

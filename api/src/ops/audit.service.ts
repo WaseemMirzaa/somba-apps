@@ -5,6 +5,7 @@ import { AuditLog } from '../database/entities';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { AUDIT_ROLES } from '../common/role-groups';
 import { pageOf } from '../common/paging';
+import { normalizeOrderRef } from '../common/order-ref';
 
 /** What `audit:list` accepts; every field is optional and they combine with AND. */
 export interface AuditFilter {
@@ -67,7 +68,8 @@ export class AuditService {
     const actor = text(f.actor, 'Actor');
     const role = text(f.role, 'Role');
     const entity = text(f.entity, 'Entity');
-    const q = text(f.q, 'Search');
+    const rawQ = text(f.q, 'Search');
+    const q = rawQ ? normalizeOrderRef(rawQ) : rawQ;
 
     const qb = this.repo.createQueryBuilder('a');
     if (action) qb.andWhere('a.action = :action', { action });

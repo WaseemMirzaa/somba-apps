@@ -31,7 +31,7 @@ beforeEach(async () => {
   user = await ds.getRepository(User).save(ds.getRepository(User).create({ emailHash: 'h1', email: 'a@b.c', passwordHash: 'x', name: 'Marie', role: 'customer', walletBalance: 0 }));
   order = await ds.getRepository(Order).save(
     ds.getRepository(Order).create({
-      reference: 'SOM-1',
+      reference: 'KOM-1',
       customerId: user.id,
       customerName: 'Marie',
       status: 'delivered',
@@ -46,7 +46,7 @@ beforeEach(async () => {
     }),
   );
   payment = await ds.getRepository(Payment).save(
-    ds.getRepository(Payment).create({ reference: 'PAY-1', orderId: order.id, orderReference: 'SOM-1', userId: user.id, method: 'stripe_card', amountUsd: 63, status: 'succeeded' }),
+    ds.getRepository(Payment).create({ reference: 'PAY-1', orderId: order.id, orderReference: 'KOM-1', userId: user.id, method: 'stripe_card', amountUsd: 63, status: 'succeeded' }),
   );
   const wallet = new WalletService(ds.getRepository(User), ds.getRepository(WalletTransaction), emitter as never);
   const notifications = { toUser: async (_u: string, n: { title: string; body: string }) => void notices.push(n), toRole: async () => undefined };
@@ -62,7 +62,7 @@ const row = () => ds.getRepository(Payment).findOneByOrFail({ id: payment.id });
 const ledger = () => ds.getRepository(PaymentRefund).find({ order: { createdAt: 'ASC', id: 'ASC' } });
 const balance = async () => (await ds.getRepository(User).findOneByOrFail({ id: user.id })).walletBalance;
 const returned = (usd = 40) =>
-  partial.refund({ orderId: order.id, amountUsd: usd, toWallet: true, memo: 'Refund for SOM-1 (returned items)', source: { kind: 'return', disputeId: 'd-1', disputeReference: 'RET-0001' } });
+  partial.refund({ orderId: order.id, amountUsd: usd, toWallet: true, memo: 'Refund for KOM-1 (returned items)', source: { kind: 'return', disputeId: 'd-1', disputeReference: 'RET-0001' } });
 
 describe('every path writes the same record', () => {
   it('a return refund (clip 2: $40 of $63) is on the payment and in the ledger, with the return it belongs to', async () => {
@@ -70,7 +70,7 @@ describe('every path writes the same record', () => {
     expect(out).toMatchObject({ refundedUsd: 40, to: 'wallet' });
     expect(await row()).toMatchObject({ status: 'succeeded', refundedUsd: 40, refundTo: 'wallet', refundStatus: 'completed' });
     expect(await ledger()).toEqual([
-      expect.objectContaining({ paymentId: payment.id, orderId: order.id, orderReference: 'SOM-1', userId: user.id, amountUsd: 40, refundTo: 'wallet', status: 'completed', kind: 'return', disputeId: 'd-1', disputeReference: 'RET-0001', memo: 'Refund for SOM-1 (returned items)' }),
+      expect.objectContaining({ paymentId: payment.id, orderId: order.id, orderReference: 'KOM-1', userId: user.id, amountUsd: 40, refundTo: 'wallet', status: 'completed', kind: 'return', disputeId: 'd-1', disputeReference: 'RET-0001', memo: 'Refund for KOM-1 (returned items)' }),
     ]);
     expect(await balance()).toBe(40);
   });
@@ -110,7 +110,7 @@ describe('every path writes the same record', () => {
   it('a cancellation records itself', async () => {
     const back = await payments.refundCancelledOrder(order);
     expect(back).toBe(63);
-    expect(await ledger()).toEqual([expect.objectContaining({ kind: 'cancellation', amountUsd: 63, refundTo: 'wallet', memo: 'Refund for cancelled order SOM-1' })]);
+    expect(await ledger()).toEqual([expect.objectContaining({ kind: 'cancellation', amountUsd: 63, refundTo: 'wallet', memo: 'Refund for cancelled order KOM-1' })]);
     expect(await row()).toMatchObject({ status: 'refunded', refundedUsd: 63 });
     expect(await payments.refundCancelledOrder(order)).toBe(0); // a second call pays nothing and writes nothing
     expect(await ledger()).toHaveLength(1);
@@ -232,8 +232,8 @@ describe('finance counts every refund', () => {
   it('all the paths add up, each payment counted once; a full refund after a return does not count the return twice', async () => {
     await returned(40);
     await payments.refund(order.id, true); // the rest: 23
-    const other = await ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: 'SOM-2', customerId: user.id, customerName: 'Marie', status: 'confirmed', paymentMethod: 'stripe_card', totalUsd: 10, items: [{ productId: 'p3', productName: 'P3', variant: 'Default', qty: 1, priceUsd: 10 }] as OrderItem[] }));
-    await ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: 'PAY-2', orderId: other.id, orderReference: 'SOM-2', userId: user.id, method: 'stripe_card', amountUsd: 10, status: 'succeeded' }));
+    const other = await ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: 'KOM-2', customerId: user.id, customerName: 'Marie', status: 'confirmed', paymentMethod: 'stripe_card', totalUsd: 10, items: [{ productId: 'p3', productName: 'P3', variant: 'Default', qty: 1, priceUsd: 10 }] as OrderItem[] }));
+    await ds.getRepository(Payment).save(ds.getRepository(Payment).create({ reference: 'PAY-2', orderId: other.id, orderReference: 'KOM-2', userId: user.id, method: 'stripe_card', amountUsd: 10, status: 'succeeded' }));
     await payments.refundCancelledOrder(other);
     const f = await analytics.financeStats();
     expect(f).toMatchObject({ refundsUsd: 73, refundsCount: 2 });

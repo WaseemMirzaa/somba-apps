@@ -32,7 +32,7 @@ const mkUser = (role: string, hubId: string | null = null, active = true) => {
   return ds.getRepository(User).save(ds.getRepository(User).create({ emailHash: `h${n}`, email: `u${n}@t.test`, passwordHash: 'x', name: `User ${n}`, role: role as never, hubId, active }));
 };
 const mkTask = (o: Partial<DeliveryTask>) =>
-  ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: `o${++seq}`, orderReference: `SOM-${seq}`, status: 'in_transit', kind: 'delivery', ...o }));
+  ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: `o${++seq}`, orderReference: `KOM-${seq}`, status: 'in_transit', kind: 'delivery', ...o }));
 const files = () => (existsSync(proofDir()) ? readdirSync(proofDir()) : []);
 
 beforeEach(async () => {

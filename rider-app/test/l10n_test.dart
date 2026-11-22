@@ -52,7 +52,7 @@ class _FakeReporter extends LocationReporter {
   }
 }
 
-DeliveryTaskDto _task(String id, String status) => DeliveryTaskDto(id: id, orderId: 'o-$id', orderReference: 'SOM-$id', status: status);
+DeliveryTaskDto _task(String id, String status) => DeliveryTaskDto(id: id, orderId: 'o-$id', orderReference: 'KOM-$id', status: status);
 
 void main() {
   setUp(() async {
@@ -303,11 +303,11 @@ void main() {
     });
 
     test('rider notices are French: task, support and attention notices', () {
-      expect(localizeNotification(fr, 'New task assigned to you', 'SOM-1: pickup is now in your tasks.'), ('Nouvelle tâche qui vous est assignée', 'SOM-1 : la collecte est maintenant dans vos tâches.'));
-      expect(localizeNotification(fr, 'New task assigned to you', 'SOM-1: return to seller is now in your tasks.').$2, 'SOM-1 : le retour au vendeur est maintenant dans vos tâches.');
+      expect(localizeNotification(fr, 'New task assigned to you', 'KOM-1: pickup is now in your tasks.'), ('Nouvelle tâche qui vous est assignée', 'KOM-1 : la collecte est maintenant dans vos tâches.'));
+      expect(localizeNotification(fr, 'New task assigned to you', 'KOM-1: return to seller is now in your tasks.').$2, 'KOM-1 : le retour au vendeur est maintenant dans vos tâches.');
       expect(localizeNotification(fr, 'Support reply', 'TKT-1: Merci').$1, 'Réponse de l’assistance');
-      expect(localizeNotification(fr, 'Task needs attention', 'SOM-1: transfer failed after 3 attempts (Customer unreachable).'),
-          ('Tâche à vérifier', 'SOM-1 : le transfert a échoué après 3 tentatives (Customer unreachable).'));
+      expect(localizeNotification(fr, 'Task needs attention', 'KOM-1: transfer failed after 3 attempts (Customer unreachable).'),
+          ('Tâche à vérifier', 'KOM-1 : le transfert a échoué après 3 tentatives (Customer unreachable).'));
       expect(localizeNotification(fr, 'Ticket resolved', 'TKT-1 · x').$1, 'Ticket résolu');
       expect(localizeNotification(const Strings('en'), 'Support reply', 'TKT-1: Merci').$1, 'Support reply');
     });
@@ -318,12 +318,12 @@ void main() {
       expect(ApiException('Not allowed.').toString(), 'Action non autorisée.');
       expect(ApiException.local('err_offline').toString(), contains('Impossible de joindre le serveur'));
       expect(Strings.current.errorText(StateError('boom')), Strings.current.errUnexpected);
-      expect(localizeNotification(Strings.current, 'Parcel ready for pickup', 'SOM-7 is packed and ready.'), ('Colis prêt à récupérer', 'SOM-7 est emballé et prêt.'));
-      expect(localizeNotification(Strings.current, 'New delivery available', 'SOM-8. Open the app to accept it.').$2, 'SOM-8. Ouvrez l’application pour l’accepter.');
-      expect(localizeNotification(Strings.current, '3 deliveries assigned to you', 'SOM-1, SOM-2, SOM-3 — collect them at the warehouse.'),
-          ('3 livraisons pour vous', 'SOM-1, SOM-2, SOM-3 — à récupérer à l’entrepôt.'));
-      expect(localizeNotification(Strings.current, 'New delivery assigned to you', 'SOM-9 is now in your deliveries.'),
-          ('Nouvelle livraison pour vous', 'SOM-9 est maintenant dans vos livraisons.'));
+      expect(localizeNotification(Strings.current, 'Parcel ready for pickup', 'KOM-7 is packed and ready.'), ('Colis prêt à récupérer', 'KOM-7 est emballé et prêt.'));
+      expect(localizeNotification(Strings.current, 'New delivery available', 'KOM-8. Open the app to accept it.').$2, 'KOM-8. Ouvrez l’application pour l’accepter.');
+      expect(localizeNotification(Strings.current, '3 deliveries assigned to you', 'KOM-1, KOM-2, KOM-3 — collect them at the warehouse.'),
+          ('3 livraisons pour vous', 'KOM-1, KOM-2, KOM-3 — à récupérer à l’entrepôt.'));
+      expect(localizeNotification(Strings.current, 'New delivery assigned to you', 'KOM-9 is now in your deliveries.'),
+          ('Nouvelle livraison pour vous', 'KOM-9 est maintenant dans vos livraisons.'));
       expect(Strings.current.usd(12.5).replaceAll(RegExp(r'[  ]'), ' '), '12,50 \$');
       await Strings.setLang('en', persist: false);
       expect(Strings.current.usd(12.5), '\$12.50');

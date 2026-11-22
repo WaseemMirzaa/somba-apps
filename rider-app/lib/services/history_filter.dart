@@ -3,8 +3,8 @@ import 'models.dart';
 /// The Done list's search and date filter: a finished task by its order reference, a finished transfer run by its
 /// reference (TR-0042) or by the order reference of any parcel inside it, and both by the day they ended.
 
-/// "som-12 " matches "SOM-1234": case, spaces and a leading "#" are ignored.
-String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[\s#]'), '');
+/// "som-12 " (the old prefix) and "kom-12" both match "KOM-1234": case, spaces and a leading "#" are ignored.
+String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[\s#]'), '').replaceAll('som-', 'kom-');
 
 /// Does [reference] contain what the rider typed? An empty query matches everything.
 bool matchesReference(String reference, String query) {

@@ -62,7 +62,7 @@ void main() {
         store.walletBalance = 1000;
         store.debugPlaceOrderRequest = (event, [body]) async {
           _sent.add(body!);
-          return {'id': 'o1', 'reference': 'SOM-1', 'status': 'confirmed', 'paymentMethod': 'wallet', 'items': const []};
+          return {'id': 'o1', 'reference': 'KOM-1', 'status': 'confirmed', 'paymentMethod': 'wallet', 'items': const []};
         };
         ShopState.instance.addToCart(productByUuid('p1')!);
       });

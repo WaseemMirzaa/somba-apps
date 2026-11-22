@@ -15,7 +15,7 @@ describe('riders, warehouses and tasks', () => {
     return ds.getRepository(User).save(ds.getRepository(User).create({ emailHash: `e${n}`, email: `r${n}@t.test`, passwordHash: 'x', name: `Rider ${n}`, role: 'rider', hubId, active }));
   };
   const mkTask = (o: Partial<DeliveryTask> & { orderId: string }) =>
-    ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderReference: `SOM-${++seq}`, status: 'unassigned', kind: 'delivery', ...o }));
+    ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderReference: `KOM-${++seq}`, status: 'unassigned', kind: 'delivery', ...o }));
 
   beforeEach(async () => {
     ds = new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: ENTITIES, synchronize: true });

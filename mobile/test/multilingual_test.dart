@@ -75,7 +75,7 @@ Map<String, dynamic> _oldProduct() => {
 
 Map<String, dynamic> _orderJson() => {
       'id': 'o1',
-      'reference': 'SOM-77',
+      'reference': 'KOM-77',
       'customerName': 'Aline',
       'status': 'delivered',
       'paymentMethod': 'wallet',
@@ -109,7 +109,7 @@ Future<dynamic> _fakeTranslate(String event, [Map<String, dynamic>? body]) async
 final _sent = <Map<String, dynamic>>[];
 Future<dynamic> _fakeOrders(String event, [Map<String, dynamic>? body]) async {
   _sent.add(body!);
-  return {'id': 'o-1', 'reference': 'SOM-1', 'status': 'confirmed', 'paymentMethod': body['paymentMethod'], 'items': const []};
+  return {'id': 'o-1', 'reference': 'KOM-1', 'status': 'confirmed', 'paymentMethod': body['paymentMethod'], 'items': const []};
 }
 
 void main() {
@@ -207,8 +207,8 @@ void main() {
       expect(n.asRead().read, isTrue);
       final old = NotificationDto.fromJson({'id': 'n2', 'title': 'Order placed', 'body': 'x', 'type': 'order'});
       expect((old.titleFr, old.bodyFr), (null, null));
-      final w = WalletTransactionDto.fromJson({'id': 'w', 'type': 'topup', 'amount': 5, 'balance': 5, 'description': 'Order SOM-1', 'descriptionFr': 'Commande SOM-1'});
-      expect(w.descriptionFr, 'Commande SOM-1');
+      final w = WalletTransactionDto.fromJson({'id': 'w', 'type': 'topup', 'amount': 5, 'balance': 5, 'description': 'Order KOM-1', 'descriptionFr': 'Commande KOM-1'});
+      expect(w.descriptionFr, 'Commande KOM-1');
       expect(WalletTransactionDto.fromJson({'id': 'w', 'description': 'x'}).descriptionFr, isNull);
     });
 
@@ -273,20 +273,20 @@ void main() {
 
     test('notices prefer the server\'s French, then the phone\'s patterns, then the raw text', () {
       const fr = Strings('fr'), en = Strings('en');
-      expect(displayNotice(fr, title: 'Order placed', body: 'We received SOM-1. You\'ll get updates here in real time.', titleFr: 'Titre serveur', bodyFr: 'Corps serveur'),
+      expect(displayNotice(fr, title: 'Order placed', body: 'We received KOM-1. You\'ll get updates here in real time.', titleFr: 'Titre serveur', bodyFr: 'Corps serveur'),
           ('Titre serveur', 'Corps serveur'));
       expect(displayNotice(fr, title: 'Order placed', body: 'x'), ('Commande enregistrée', 'x'), reason: 'older server: the phone\'s pattern');
       expect(displayNotice(fr, title: 'Promo', body: 'Free!'), ('Promo', 'Free!'));
       expect(displayNotice(fr, title: 'Order placed', body: 'x', titleFr: '  ', bodyFr: null), ('Commande enregistrée', 'x'));
       expect(displayNotice(en, title: 'Order placed', body: 'x', titleFr: 'Titre', bodyFr: 'Corps'), ('Order placed', 'x'), reason: 'English shows what the server wrote');
-      expect(localizeWalletDescription(fr, 'Order SOM-1', descriptionFr: 'Commande SOM-1 (serveur)'), 'Commande SOM-1 (serveur)');
-      expect(localizeWalletDescription(fr, 'Refund for SOM-9'), 'Remboursement de SOM-9');
-      expect(localizeWalletDescription(en, 'Order SOM-1', descriptionFr: 'Commande SOM-1'), 'Order SOM-1');
+      expect(localizeWalletDescription(fr, 'Order KOM-1', descriptionFr: 'Commande KOM-1 (serveur)'), 'Commande KOM-1 (serveur)');
+      expect(localizeWalletDescription(fr, 'Refund for KOM-9'), 'Remboursement de KOM-9');
+      expect(localizeWalletDescription(en, 'Order KOM-1', descriptionFr: 'Commande KOM-1'), 'Order KOM-1');
     });
 
     test('a push carries the French wording when the server puts it in the data', () {
-      const m = PushMessage(title: 'Order update', body: 'SOM-1 is now shipped.', data: {'titleFr': 'Mise à jour', 'bodyFr': 'SOM-1 est expédiée.'});
-      expect((m.titleFr, m.bodyFr), ('Mise à jour', 'SOM-1 est expédiée.'));
+      const m = PushMessage(title: 'Order update', body: 'KOM-1 is now shipped.', data: {'titleFr': 'Mise à jour', 'bodyFr': 'KOM-1 est expédiée.'});
+      expect((m.titleFr, m.bodyFr), ('Mise à jour', 'KOM-1 est expédiée.'));
       expect(const PushMessage(title: 'x').titleFr, isNull);
     });
 
@@ -673,7 +673,7 @@ void main() {
           NotificationDto.fromJson({
             'id': 'n1',
             'title': 'Order update',
-            'body': 'SOM-1 is now shipped.',
+            'body': 'KOM-1 is now shipped.',
             'titleFr': 'Titre du serveur',
             'bodyFr': 'Corps du serveur',
             'type': 'order',
@@ -699,7 +699,7 @@ void main() {
       seedNotices();
       await open(tester, const NotificationsScreen(locale: Locale('en')), 'en');
       expect(find.text('Order update'), findsOneWidget);
-      expect(find.text('SOM-1 is now shipped.'), findsOneWidget);
+      expect(find.text('KOM-1 is now shipped.'), findsOneWidget);
       expect(find.text('Titre du serveur'), findsNothing);
     });
 
@@ -708,13 +708,13 @@ void main() {
       RealtimeStore.instance.walletTransactions
         ..clear()
         ..addAll([
-          WalletTransactionDto.fromJson({'id': 'w1', 'type': 'debit', 'amount': 20, 'balance': 80, 'description': 'Order SOM-5', 'descriptionFr': 'Commande SOM-5 (serveur)'}),
-          WalletTransactionDto.fromJson({'id': 'w2', 'type': 'refund', 'amount': 5, 'balance': 85, 'description': 'Refund for SOM-9'}),
+          WalletTransactionDto.fromJson({'id': 'w1', 'type': 'debit', 'amount': 20, 'balance': 80, 'description': 'Order KOM-5', 'descriptionFr': 'Commande KOM-5 (serveur)'}),
+          WalletTransactionDto.fromJson({'id': 'w2', 'type': 'refund', 'amount': 5, 'balance': 85, 'description': 'Refund for KOM-9'}),
         ]);
       RealtimeStore.instance.notifyListeners();
       await tester.pump();
-      expect(find.text('Commande SOM-5 (serveur)'), findsOneWidget);
-      expect(find.text('Remboursement de SOM-9'), findsOneWidget);
+      expect(find.text('Commande KOM-5 (serveur)'), findsOneWidget);
+      expect(find.text('Remboursement de KOM-9'), findsOneWidget);
     });
   });
 

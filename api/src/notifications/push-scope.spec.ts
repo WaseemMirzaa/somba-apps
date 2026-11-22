@@ -86,8 +86,8 @@ describe('PushService language', () => {
     { token: 'U1', userId: 'a4', role: 'admin', app: 'web' }, // owner not found: English
     { token: 'F3', userId: 'a5', role: 'rider', app: 'rider', locale: 'fr' },
   ];
-  const en = { title: 'Order placed', body: 'We received SOM-1.' };
-  const fr = { title: 'Commande enregistrée', body: 'Nous avons reçu SOM-1.' };
+  const en = { title: 'Order placed', body: 'We received KOM-1.' };
+  const fr = { title: 'Commande enregistrée', body: 'Nous avons reçu KOM-1.' };
 
   it('sends each device of a role the text in its owner’s language, one multicast per language', async () => {
     const { svc, sent } = make(rows);

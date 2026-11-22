@@ -24,7 +24,7 @@ beforeEach(async () => {
   for (const [id, role, name] of [['a1', 'admin_support', 'Agent'], ['a2', 'admin_support', 'Agent Two'], ['c1', 'customer', 'Marie']] as const) {
     await ds.getRepository(User).save(ds.getRepository(User).create({ id, emailHash: id, email: `${id}@x.y`, passwordHash: 'x', name, role }));
   }
-  order = await ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: 'SOM-1', customerId: 'c1', customerName: 'Marie', status: 'delivered', totalUsd: 10 }));
+  order = await ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: 'KOM-1', customerId: 'c1', customerName: 'Marie', status: 'delivered', totalUsd: 10 }));
   const notifications = {
     toUser: async (to: string, n: { title: string; body: string }) => void notices.push({ to, ...n }),
     toRole: async (to: string, n: { title: string; body: string }) => void notices.push({ to: `role:${to}`, ...n }),
@@ -85,7 +85,7 @@ describe('opening a ticket', () => {
 
   it('a rider can only link an order they carry', async () => {
     await expect(svc.open(rider, { subject: 'x y', message: 'hello there', orderId: order.id })).rejects.toThrow('Order not found.');
-    await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: order.id, orderReference: 'SOM-1', riderId: 'r1', status: 'assigned', kind: 'delivery' } as never));
+    await ds.getRepository(DeliveryTask).save(ds.getRepository(DeliveryTask).create({ orderId: order.id, orderReference: 'KOM-1', riderId: 'r1', status: 'assigned', kind: 'delivery' } as never));
     expect((await svc.open(rider, { subject: 'My run', message: 'hello there', orderId: order.id })).orderId).toBe(order.id);
   });
 

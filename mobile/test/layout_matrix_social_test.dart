@@ -34,12 +34,12 @@ Future<FakeServer> _seed(String lang) async {
   store.orders
     ..clear()
     ..add(OrderDto.fromJson({
-      'id': 'o1', 'reference': 'SOM-1042', 'customerName': 'Aline', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5,
+      'id': 'o1', 'reference': 'KOM-1042', 'customerName': 'Aline', 'status': 'delivered', 'paymentMethod': 'wallet', 'totalUsd': 5,
       'createdAt': '2026-10-01T09:30:00Z', 'items': [],
     }));
   server.handlers['chat:list'] = (_) => [
         convJson(id: 'a', storeName: _longStore, unread: 12, productId: 'p1', productName: _longProduct, preview: _longText, logo: '/uploads/logo.png'),
-        convJson(id: 'b', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'SOM-1042', preview: 'Votre colis est parti aujourd’hui', at: '2026-10-20T09:30:00Z'),
+        convJson(id: 'b', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'KOM-1042', preview: 'Votre colis est parti aujourd’hui', at: '2026-10-20T09:30:00Z'),
         convJson(id: 'c', storeName: 'Boutique générale', preview: '📷', at: '2026-10-10T09:30:00Z', unread: 120),
       ];
   server.handlers['chat:unread'] = (_) => {'total': 132, 'buyer': 132, 'seller': 0};
@@ -83,7 +83,7 @@ void main() {
   final screens = <String, Widget Function(Locale l)>{
     'chat inbox': (l) => ChatInboxScreen(locale: l),
     'chat thread (product context, photos, paging)': (l) => ChatThreadScreen(conversation: ChatConversation.fromJson(convJson(id: 'a', storeName: _longStore, productId: 'p1', productName: _longProduct)), locale: l),
-    'chat thread (order context)': (l) => ChatThreadScreen(conversation: ChatConversation.fromJson(convJson(id: 'a', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'SOM-1042')), locale: l),
+    'chat thread (order context)': (l) => ChatThreadScreen(conversation: ChatConversation.fromJson(convJson(id: 'a', storeName: 'Kin Tech', orderId: 'o1', orderReference: 'KOM-1042')), locale: l),
     'contact-support button (order)': (l) => Scaffold(body: Padding(padding: const EdgeInsets.all(16), child: ContactSupportButton(orderId: 'o1', locale: l))),
     'contact-support button (long product name)': (l) => Scaffold(body: Padding(padding: const EdgeInsets.all(16), child: ContactSupportButton(about: _longProduct, locale: l))),
     'new ticket (about a product, subject prefilled)': (l) => NewTicketScreen(initialSubject: 'About: $_longProduct', locale: l),

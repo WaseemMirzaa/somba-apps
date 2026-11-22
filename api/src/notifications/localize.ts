@@ -534,7 +534,7 @@ const BODIES: Rule[] = [
   [/^Your (driver licence|vehicle insurance|vehicle registration|ID|document) was rejected: (.+)$/, (m) => `Votre document « ${RIDER_DOCUMENTS[m[1]]} » a été refusé : ${m[2]}`],
   [/^(.+) is now (live|rejected|draft|removed)\.$/, (m) => `${m[1]} est maintenant ${pick(PRODUCT_STATUSES, m[2])}.`],
 
-  // Order status ("SOM-12345 is now out for delivery.")
+  // Order status ("KOM-12345 is now out for delivery.")
   [/^(\S+) is now (.+)\.$/, (m) => `${m[1]} est maintenant ${orderStatusFr(m[2])}.`],
 
   // Cancellations and failed deliveries

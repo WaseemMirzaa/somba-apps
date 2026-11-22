@@ -19,7 +19,7 @@ async function setup(over: { amount?: number; discount?: number; method?: string
   );
   const order = await ds.getRepository(Order).save(
     ds.getRepository(Order).create({
-      reference: 'SOM-1',
+      reference: 'KOM-1',
       customerId: user.id,
       customerName: 'Marie',
       status: 'delivered',
@@ -37,7 +37,7 @@ async function setup(over: { amount?: number; discount?: number; method?: string
     ds.getRepository(Payment).create({
       reference: 'PAY-1',
       orderId: order.id,
-      orderReference: 'SOM-1',
+      orderReference: 'KOM-1',
       userId: user.id,
       method: over.method ?? 'stripe_card',
       amountUsd: over.amount ?? order.totalUsd,
@@ -82,19 +82,19 @@ describe('PartialRefundService', () => {
   it('pays part of an order into the wallet, writes it on the lines and keeps the payment open', async () => {
     const { user, order } = await setup();
     const line = order.items.find((i) => i.productId === 'p1')!;
-    const out = await svc.refund({ orderId: order.id, amountUsd: 40, toWallet: true, memo: 'Refund for SOM-1 (returned items)', lines: [{ orderItemId: line.id, usd: 40 }] });
+    const out = await svc.refund({ orderId: order.id, amountUsd: 40, toWallet: true, memo: 'Refund for KOM-1 (returned items)', lines: [{ orderItemId: line.id, usd: 40 }] });
     expect(out).toMatchObject({ refundedUsd: 40, to: 'wallet' });
     expect((await ds.getRepository(User).findOneBy({ id: user.id }))!.walletBalance).toBe(40);
     const tx = await ds.getRepository(WalletTransaction).find({ where: { userId: user.id } });
     expect(tx).toHaveLength(1);
-    expect(tx[0]).toMatchObject({ type: 'refund', amount: 40, description: 'Refund for SOM-1 (returned items)' });
+    expect(tx[0]).toMatchObject({ type: 'refund', amount: 40, description: 'Refund for KOM-1 (returned items)' });
     expect((await ds.getRepository(OrderItem).findOneBy({ id: line.id }))!.refundedUsd).toBe(40);
     expect((await ds.getRepository(Payment).findOneBy({ orderId: order.id }))!.status).toBe('succeeded');
     expect(await svc.outstanding(order.id)).toBe(23);
     // C-refund: recorded on the payment (running total) and in the ledger, the way every refund path does
     expect((await ds.getRepository(Payment).findOneBy({ orderId: order.id }))!.refundedUsd).toBe(40);
     expect(await ds.getRepository(PaymentRefund).find()).toEqual([expect.objectContaining({ amountUsd: 40, refundTo: 'wallet', status: 'completed', kind: 'dispute', disputeId: null })]);
-    expect(notices).toEqual([expect.objectContaining({ to: user.id, title: 'Refund issued', body: '$40.00 for SOM-1 → wallet.', type: 'payment', entityId: order.id })]);
+    expect(notices).toEqual([expect.objectContaining({ to: user.id, title: 'Refund issued', body: '$40.00 for KOM-1 → wallet.', type: 'payment', entityId: order.id })]);
     expect(emitter.sent.some((e) => e.event === 'payment:updated' && e.to === `user:${user.id}`)).toBe(true);
   });
 

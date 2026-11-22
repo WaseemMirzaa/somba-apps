@@ -58,6 +58,6 @@ tap msg:trackOrder 2.5
 wait 1.5
 tohome
 tap icon:receipt_long_rounded 1.5
-tap "keyp:order-SOM#0" 2
+tap "keyp:order-KOM#0" 2
 say "The order page shows the payment as paid, and the order is already being prepared||La page commande indique le paiement comme réglé, et la commande est déjà en préparation" 3.8
 wait 1

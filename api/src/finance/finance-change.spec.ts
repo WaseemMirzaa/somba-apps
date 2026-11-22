@@ -24,7 +24,7 @@ describe('financeVersion', () => {
   it('changes when an order, a payment or a payout does, and not otherwise', async () => {
     const a = await financeVersion(w.ds.manager);
     expect(await financeVersion(w.ds.manager)).toEqual(a);
-    const o = await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'SOM-1', customerId: 'c', customerName: 'C', status: 'pending' }));
+    const o = await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'KOM-1', customerId: 'c', customerName: 'C', status: 'pending' }));
     const b = await financeVersion(w.ds.manager);
     expect(b.version).not.toBe(a.version);
     await w.ds.getRepository(Order).update({ id: o.id }, { status: 'confirmed' });
@@ -40,7 +40,7 @@ describe('financeVersion', () => {
 describe('finance:changed', () => {
   it('goes to admin and admin_finance when an order, payment or payout is saved or updated — once for a burst', async () => {
     const orders = w.ds.getRepository(Order);
-    const o = await orders.save(orders.create({ reference: 'SOM-1', customerId: 'c', customerName: 'C', status: 'pending' }));
+    const o = await orders.save(orders.create({ reference: 'KOM-1', customerId: 'c', customerName: 'C', status: 'pending' }));
     await orders.update({ id: o.id }, { status: 'confirmed' });
     await orders.createQueryBuilder().update(Order).set({ status: 'delivered' }).where('id = :id', { id: o.id }).execute(); // a conditional UPDATE, as the services use
     await wait(120);

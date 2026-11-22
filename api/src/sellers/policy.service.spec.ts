@@ -269,7 +269,7 @@ describe('migrations', () => {
   it('awaiting_support moves the seller stages of OPEN requests and nothing else', async () => {
     const q = ds.createQueryRunner();
     const mk = (stage: string, status = 'open') =>
-      q.query("INSERT INTO disputes (id, reference, orderId, orderReference, customerId, customerName, type, reason, status, stage) VALUES (?, ?, 'o', 'SOM-1', 'c', 'C', 'return', 'reason', ?, ?)", [`id-${stage}-${status}`, `R-${stage}-${status}`, status, stage]);
+      q.query("INSERT INTO disputes (id, reference, orderId, orderReference, customerId, customerName, type, reason, status, stage) VALUES (?, ?, 'o', 'KOM-1', 'c', 'C', 'return', 'reason', ?, ?)", [`id-${stage}-${status}`, `R-${stage}-${status}`, status, stage]);
     for (const st of ['awaiting_seller', 'seller_rejected', 'seller_timeout', 'seller_replied', 'escalated', 'approved', 'pickup', 'received']) await mk(st);
     await mk('awaiting_seller', 'rejected');
     const mig = new AwaitingSupport1793480000001();

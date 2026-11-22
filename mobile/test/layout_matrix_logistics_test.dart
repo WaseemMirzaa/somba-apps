@@ -57,7 +57,7 @@ Map<String, dynamic> _line(String id, String seller, String store, String fulfil
 
 OrderDto _order(String id, String status, {List<String> origins = const ['hub-limete'], bool legs = false, bool open = false}) => OrderDto.fromJson({
       'id': id,
-      'reference': 'SOM-2077',
+      'reference': 'KOM-2077',
       'status': status,
       'paymentMethod': 'wallet',
       'totalUsd': 134.5,

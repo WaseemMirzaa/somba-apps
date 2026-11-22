@@ -21,7 +21,7 @@ test("a box code is PKG- plus 8 characters without 0, O, 1, I; typing is forgivi
   assert.equal(m.normalizeBoxCode("PKG-7KQ2M9X1"), null);
   assert.equal(m.normalizeBoxCode("PKG-7KQ2M9XI"), null);
   assert.equal(m.normalizeBoxCode("PKG-AB12CD"), null, "the legacy per-leg code stays a desk lookup");
-  assert.equal(m.normalizeBoxCode("SOM-12345"), null);
+  assert.equal(m.normalizeBoxCode("KOM-12345"), null);
   assert.equal(m.isBoxCode("PKG-7KQ2M9XA"), true);
 });
 
@@ -124,7 +124,7 @@ test("sibling legs list the same box: it counts once and is scanned only when ev
 
 test("the contents of sibling legs are listed once", () => {
   const line = (name, qty, ref, variant = null) => ({ name, variant, qty, orderReference: ref });
-  const same = [line("Lamp", 1, "SOM-1"), line("Cap", 2, "SOM-2", "One size")];
+  const same = [line("Lamp", 1, "KOM-1"), line("Cap", 2, "KOM-2", "One size")];
   const out = m.mergeContents([{ parcelContents: same }, { parcelContents: same }, {}]);
   assert.equal(out.length, 2);
   assert.deepEqual(m.mergeContents([]), []);

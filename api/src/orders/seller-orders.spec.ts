@@ -24,7 +24,7 @@ afterEach(async () => w.ds.destroy());
 let n = 0;
 async function order(over: Partial<Order> = {}, lines: { seller: Seller; name: string; qty?: number; price?: number; fulfilment?: string }[] = [{ seller: shop, name: 'Phone case' }], at?: Date) {
   const o = await w.ds.getRepository(Order).save(
-    w.ds.getRepository(Order).create({ reference: `SOM-${2000 + ++n}`, customerId: 'c1', customerName: 'Jean Mukendi', status: 'confirmed', paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '12 Avenue de la Paix', city: 'Lubumbashi', phone: '+243...' }), ...over }),
+    w.ds.getRepository(Order).create({ reference: `KOM-${2000 + ++n}`, customerId: 'c1', customerName: 'Jean Mukendi', status: 'confirmed', paymentMethod: 'stripe_card', shippingAddress: JSON.stringify({ line1: '12 Avenue de la Paix', city: 'Lubumbashi', phone: '+243...' }), ...over }),
   );
   for (const l of lines) {
     const p = await w.product(l.seller, { name: l.name, price: l.price ?? 10 });
@@ -44,6 +44,8 @@ describe('cityOf', () => {
     expect(cityOf(null)).toBeNull();
   });
 });
+
+const a2 = (o: { reference: string }) => o.reference.replace(/^KOM-/, 'SOM-');
 
 describe('seller order list', () => {
   it('shows only the seller’s lines, the customer’s first name and city, never the street or contact', async () => {
@@ -82,6 +84,9 @@ describe('seller order list', () => {
     expect((await svc.page(owner, shop.id, { q: 'kabila' })).total).toBe(0); // the surname is not searchable
     expect((await svc.page(owner, shop.id, { q: 'marie kabila' })).total).toBe(0);
     expect((await svc.page(owner, shop.id, { q: 'zzz' })).total).toBe(0);
+    // an old SOM- reference (a printed label, a screenshot) still finds the order, by search and by id
+    expect((await svc.page(owner, shop.id, { q: a2(a) })).total).toBe(1);
+    expect((await svc.page(owner, shop.id, { id: a2(a) })).total).toBe(1);
   });
 
   it('filters by order status, package step and date range', async () => {
@@ -117,7 +122,7 @@ describe('seller order list', () => {
     const lines = r.csv.split('\r\n').filter(Boolean);
     expect(lines).toHaveLength(2);
     expect(lines[0]).toBe('\uFEFFOrder,Date,Status,Package,Customer,City,Payment,Product,Option,Qty,Unit price USD,Coupon USD,Commission USD,Net USD');
-    expect(lines[1]).toMatch(/^SOM-\d+,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,confirmed,to_pack,Jean,Lubumbashi,stripe_card,"Lamp, large",Default,2,25\.00,0\.00,1\.00,49\.00$/);
+    expect(lines[1]).toMatch(/^KOM-\d+,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,confirmed,to_pack,Jean,Lubumbashi,stripe_card,"Lamp, large",Default,2,25\.00,0\.00,1\.00,49\.00$/);
     expect(r.csv).not.toContain('Theirs');
     expect(r.csv).not.toContain('Mukendi');
     expect(r.filename).toBe('orders.csv');
@@ -128,7 +133,7 @@ describe('seller order list', () => {
     const r = await svc.csv(owner, shop.id, { locale: 'fr' });
     const lines = r.csv.split('\r\n').filter(Boolean);
     expect(lines[0]).toBe('\uFEFFCommande,Date,Statut,Colis,Client,Ville,Paiement,Produit,Option,Qté,Prix unitaire USD,Coupon USD,Commission USD,Net USD');
-    expect(lines[1]).toMatch(/^SOM-\d+,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,confirmée,à emballer,Jean,Lubumbashi,Carte,"Lamp, large",Default,2,25\.00,0\.00,1\.00,49\.00$/);
+    expect(lines[1]).toMatch(/^KOM-\d+,\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,confirmée,à emballer,Jean,Lubumbashi,Carte,"Lamp, large",Default,2,25\.00,0\.00,1\.00,49\.00$/);
     // An unknown language is English, as before.
     expect((await svc.csv(owner, shop.id, { locale: 'de' })).csv.split('\r\n')[0]).toBe('\uFEFFOrder,Date,Status,Package,Customer,City,Payment,Product,Option,Qty,Unit price USD,Coupon USD,Commission USD,Net USD');
     // The old plain-array event takes the same switch.

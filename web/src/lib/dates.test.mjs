@@ -21,7 +21,7 @@ function inZone(tz, fn) {
   }
 }
 
-// SOM-821943591: placed 18:38 local in Karachi (+05:00); the API sends the UTC instant.
+// KOM-821943591: placed 18:38 local in Karachi (+05:00); the API sends the UTC instant.
 const placed = "2026-10-22T13:38:02.221Z";
 
 test("an API instant shows the viewer's local time, not UTC", () => {

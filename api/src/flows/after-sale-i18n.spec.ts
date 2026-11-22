@@ -69,7 +69,7 @@ async function order(lines: { product: Product; name?: string }[], status: Order
   const repo = ds.getRepository(Order);
   return repo.save(
     repo.create({
-      reference: `SOM-${++n}`,
+      reference: `KOM-${++n}`,
       customerId: 'c1',
       customerName: 'Cust',
       status,

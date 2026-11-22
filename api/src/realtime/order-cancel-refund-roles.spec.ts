@@ -11,7 +11,7 @@ describe('order cancel and refund at the gateway', () => {
   let orders: { cancel: jest.Mock; adminCancel: jest.Mock; updateStatus: jest.Mock; refund: jest.Mock };
   let gw: RealtimeGateway;
   const as = (role: string, id = `${role}-1`) => ({ data: { user: { id, role, name: `${role} name` } } }) as never;
-  const order = { id: 'o1', reference: 'SOM-1', status: 'cancelled' };
+  const order = { id: 'o1', reference: 'KOM-1', status: 'cancelled' };
 
   beforeEach(() => {
     audit = { record: jest.fn(async () => undefined) };
@@ -19,7 +19,7 @@ describe('order cancel and refund at the gateway', () => {
       cancel: jest.fn(async () => order),
       adminCancel: jest.fn(async () => order),
       updateStatus: jest.fn(async () => ({ ...order, status: 'processing' })),
-      refund: jest.fn(async () => ({ orderReference: 'SOM-1', refund: { amountUsd: 25, refundTo: 'wallet' } })),
+      refund: jest.fn(async () => ({ orderReference: 'KOM-1', refund: { amountUsd: 25, refundTo: 'wallet' } })),
     };
     gw = Object.assign(Object.create(RealtimeGateway.prototype), { audit, orders });
   });

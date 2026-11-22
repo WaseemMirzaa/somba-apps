@@ -85,10 +85,10 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
     case _Scenario.stop:
       // Two orders of one box set met at one address, on the road with the customer's code to ask, and a set of two orders to collect.
       store.myTasks.addAll([
-        DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'SOM-1042', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'})),
-        DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'SOM-1043', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'})),
-        DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p1', orderId: 'o-a', reference: 'SOM-1042')),
-        DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p2', orderId: 'o-b', reference: 'SOM-1043')),
+        DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's1', orderId: 'o-a', reference: 'KOM-1042', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'})),
+        DeliveryTaskDto.fromJson(siblingLegJson('delivery', id: 's2', orderId: 'o-b', reference: 'KOM-1043', status: 'in_transit', picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}, dropped: {'PKG-7KQ2M9XA'})),
+        DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p1', orderId: 'o-a', reference: 'KOM-1042')),
+        DeliveryTaskDto.fromJson(siblingLegJson('pickup', id: 'p2', orderId: 'o-b', reference: 'KOM-1043')),
       ]);
     case _Scenario.contents:
       // A lone leg whose box holds products with options, and an older leg whose payload carries no contents at all.
@@ -98,7 +98,7 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
           'parcels': setBoxes(picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'}),
           'parcelContents': setContents,
           'parcelOrders': [
-            {'orderId': 'o-a', 'reference': 'SOM-1042'}
+            {'orderId': 'o-a', 'reference': 'KOM-1042'}
           ],
         }),
         DeliveryTaskDto.fromJson(legJson('pickup', id: 'c2', orderItems: [
@@ -119,7 +119,7 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
         ]);
       store.myTasks.addAll([
         DeliveryTaskDto.fromJson(parcelJson('p1', 'a1', hop: 1, hops: 2)),
-        DeliveryTaskDto.fromJson(parcelJson('p2', 'a1', hop: 1, hops: 2, reference: 'SOM-1043')),
+        DeliveryTaskDto.fromJson(parcelJson('p2', 'a1', hop: 1, hops: 2, reference: 'KOM-1043')),
         DeliveryTaskDto.fromJson({...legJson('transfer', id: 'x', status: 'assigned'), 'hop': 2, 'hops': 3}),
       ]);
       store.assignment = RiderAssignment.fromJson({
@@ -140,7 +140,7 @@ Future<void> _seed(String lang, {_Scenario scenario = _Scenario.cards}) async {
   store.notifications
     ..clear()
     ..addAll([
-      NotificationDto(id: 'n', title: 'New task assigned to you', body: 'SOM-1042: pickup is now in your tasks.', type: 'task', read: false),
+      NotificationDto(id: 'n', title: 'New task assigned to you', body: 'KOM-1042: pickup is now in your tasks.', type: 'task', read: false),
       NotificationDto(id: 'n2', title: 'Support reply', body: 'TKT-1: Merci, nous le contactons.', type: 'support', read: false),
     ]);
   fakeSupport(tickets: [
@@ -197,7 +197,7 @@ void main() {
     'deliveries: contents with options on a leg': ((l) => const Scaffold(body: DeliveriesScreen()), null, _Scenario.contents),
     'delivery code dialog: one code for a stop': ((l) => Scaffold(body: Center(child: DeliveryCodeDialog(legCount: 2, onSubmit: (_) async {}))), null, _Scenario.stop),
     'parcel scanner: contents and the box resolved': ((l) => ParcelScanScreen(
-          title: 'SOM-1042 · SOM-1043',
+          title: 'KOM-1042 · KOM-1043',
           stage: ParcelStage.dropoff,
           parcels: () => [for (final b in setBoxes(picked: {'PKG-7KQ2M9XA', 'PKG-4HT8W3NB'})) ParcelDto.tryParse(b)!],
           contents: () => [for (final c in setContents) ParcelContent.tryParse(c)!],
@@ -214,12 +214,12 @@ void main() {
             'destination': {'area': 'Gombe', 'address': '12, avenue du Commerce, près du marché central, Gombe, Kinshasa', 'phone': '+243812345678', 'recipient': 'Aline Kabila Mwamba'},
             'contents': setContents,
             'orders': [
-              {'orderId': 'o-a', 'reference': 'SOM-1042'},
-              {'orderId': 'o-b', 'reference': 'SOM-1043'}
+              {'orderId': 'o-a', 'reference': 'KOM-1042'},
+              {'orderId': 'o-b', 'reference': 'KOM-1043'}
             ],
             'legs': [
-              {'id': 's1', 'orderId': 'o-a', 'orderReference': 'SOM-1042', 'kind': 'delivery', 'status': 'in_transit'},
-              {'id': 's2', 'orderId': 'o-b', 'orderReference': 'SOM-1043', 'kind': 'delivery', 'status': 'in_transit'},
+              {'id': 's1', 'orderId': 'o-a', 'orderReference': 'KOM-1042', 'kind': 'delivery', 'status': 'in_transit'},
+              {'id': 's2', 'orderId': 'o-b', 'orderReference': 'KOM-1043', 'kind': 'delivery', 'status': 'in_transit'},
             ],
           }),
         ), (t) async {

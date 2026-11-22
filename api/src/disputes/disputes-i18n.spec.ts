@@ -57,7 +57,7 @@ async function order(): Promise<Order> {
   const repo = ds.getRepository(Order);
   return repo.save(
     repo.create({
-      reference: `SOM-${Math.floor(Math.random() * 1e8)}`,
+      reference: `KOM-${Math.floor(Math.random() * 1e8)}`,
       customerId: customer.id,
       customerName: customer.name,
       status: 'delivered',

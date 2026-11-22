@@ -36,7 +36,7 @@ async function sale(opts: { status?: string; hoursAgo?: number; price?: number; 
   const pct = opts.pct ?? 10;
   const gross = price * qty - (opts.coupon ?? 0);
   const order = await w.ds.getRepository(Order).save(
-    w.ds.getRepository(Order).create({ reference: `SOM-${1000 + ++n}`, customerId: 'c1', customerName: 'Jean Mukendi', status: (opts.status ?? 'delivered') as never, shippingAddress: JSON.stringify({ city: 'Kinshasa' }) }),
+    w.ds.getRepository(Order).create({ reference: `KOM-${1000 + ++n}`, customerId: 'c1', customerName: 'Jean Mukendi', status: (opts.status ?? 'delivered') as never, shippingAddress: JSON.stringify({ city: 'Kinshasa' }) }),
   );
   const item = await w.ds.getRepository(OrderItem).save(
     w.ds.getRepository(OrderItem).create({
@@ -200,7 +200,7 @@ describe('earnings: paging and filters happen in the database', () => {
     await sale({ name: 'Mine' });
     const other = await w.store('Other Shop', 'u-other');
     const p = await w.product(other, { name: 'Theirs' });
-    const o = await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'SOM-X', customerId: 'c', customerName: 'C', status: 'delivered' }));
+    const o = await w.ds.getRepository(Order).save(w.ds.getRepository(Order).create({ reference: 'KOM-X', customerId: 'c', customerName: 'C', status: 'delivered' }));
     await w.ds.getRepository(OrderItem).save(w.ds.getRepository(OrderItem).create({ orderId: o.id, productId: p.id, productName: 'Theirs', qty: 1, priceUsd: 50 }));
     expect((await w.finance.earnings(owner)).items.map((i) => i.productName)).toEqual(['Mine']);
     expect((await w.finance.earnings({ id: 'a', role: 'admin_finance' }, { sellerId: other.id })).items.map((i) => i.productName)).toEqual(['Theirs']);

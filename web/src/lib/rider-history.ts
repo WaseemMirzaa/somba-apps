@@ -5,8 +5,8 @@
  * No imports: `npm test` loads this file on its own.
  */
 
-/** "som-12 " matches "SOM-1234": case, spaces and a leading "#" are ignored. */
-const norm = (s: string): string => s.toLowerCase().replace(/[\s#]/g, "");
+/** "som-12 " (the old prefix) and "kom-12" both match "KOM-1234": case, spaces and a leading "#" are ignored. */
+const norm = (s: string): string => s.toLowerCase().replace(/[\s#]/g, "").replace(/som-/g, "kom-");
 
 /** Does `reference` contain what the rider typed? An empty query matches everything. */
 export function matchesReference(reference: string, query: string): boolean {

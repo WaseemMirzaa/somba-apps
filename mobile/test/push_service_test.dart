@@ -202,7 +202,7 @@ void main() {
         ..clear()
         ..add(OrderDto.fromJson({
           'id': 'o1',
-          'reference': 'SOM-o1',
+          'reference': 'KOM-o1',
           'customerName': 'Aline',
           'status': 'processing',
           'paymentMethod': 'wallet',

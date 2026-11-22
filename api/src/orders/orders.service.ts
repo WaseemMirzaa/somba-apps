@@ -56,6 +56,7 @@ import { PART_DELIVERED, anyDelivered, isPartiallyDelivered, lineShareUsd } from
 import { ORDER_HUB_SQL, hubsOfOrder, orderHubParams, pushOrderToOps } from '../logistics/hub-scope';
 import { parseAddressPin } from '../common/geo/geo';
 import { inRoleGroup } from '../common/role-groups';
+import { ORDER_REF_PREFIX, normalizeOrderRef } from '../common/order-ref';
 import { ORDER_ACCESS_DENIED, OrderAudience, orderAudienceOf, withoutAddress } from '../common/order-access';
 
 /**
@@ -1134,7 +1135,7 @@ export class OrdersService {
     const keys = await this.sellerKeys(user.id);
     const take = Math.min(50, Math.max(1, Math.floor(Number(query.limit) || 10)));
     const skip = Math.max(0, Math.floor(Number(query.offset) || 0));
-    const needle = typeof query.q === 'string' ? query.q.trim().slice(0, 80).toLowerCase() : '';
+    const needle = typeof query.q === 'string' ? normalizeOrderRef(query.q.trim().slice(0, 80)).toLowerCase() : '';
     const ids = (
       await this.orders
         .createQueryBuilder('o')
@@ -1718,6 +1719,6 @@ export class OrdersService {
 
   private static newReference(): string {
     const n = Math.floor(1000 + Math.random() * 9000);
-    return `SOM-${Date.now().toString().slice(-5)}${n}`.slice(0, 20);
+    return `${ORDER_REF_PREFIX}${Date.now().toString().slice(-5)}${n}`.slice(0, 20);
   }
 }

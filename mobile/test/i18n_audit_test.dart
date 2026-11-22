@@ -37,7 +37,7 @@ import 'matrix_helpers.dart';
 
 OrderDto _order() => OrderDto.fromJson({
       'id': 'o1',
-      'reference': 'SOM-1042',
+      'reference': 'KOM-1042',
       'customerName': 'Aline',
       'status': 'delivered',
       'paymentMethod': 'airtel_money',
@@ -149,33 +149,33 @@ void main() {
 
     // Every shape a shopper's notice can take (title, body) and the French the phone shows when the server sent none.
     final notices = <(String, String, String, String)>[
-      ('Order placed', "We received SOM-1042. You'll get updates here in real time.", 'Commande enregistrée', 'Nous avons reçu SOM-1042. Vous recevrez les mises à jour ici en temps réel.'),
-      ('Complete your payment', 'Complete the card payment to confirm SOM-1042.', 'Finalisez votre paiement', 'Finalisez le paiement par carte pour confirmer SOM-1042.'),
-      ('Pickup scheduled', 'SOM-1042: a rider will collect your package.', 'Enlèvement programmé', 'SOM-1042 : un livreur viendra récupérer votre colis.'),
-      ('Package at the warehouse', 'SOM-1042: your package reached the warehouse.', 'Colis à l’entrepôt', 'SOM-1042 : votre colis est arrivé à l’entrepôt.'),
-      ('Item cancelled by the seller', 'SOM-1042: Lamp was cancelled (Out of stock). \$12.50 was refunded to your wallet. The rest of your order continues.', 'Article annulé par le vendeur',
-          'SOM-1042 : Lamp a été annulé (Rupture de stock). 12,50 \$ ont été remboursés sur votre portefeuille. Le reste de votre commande continue.'),
-      ('Delivery attempt failed', 'SOM-1042: Customer not reachable. We will try again (attempt 1 of 3).', 'Échec de la livraison', 'SOM-1042 : Client injoignable. Nous allons réessayer (tentative 1 sur 3).'),
-      ('Items could not be delivered', 'SOM-1042: Lamp could not be delivered (Customer not reachable). \$12.50 was refunded to your wallet.', 'Articles non livrés',
-          'SOM-1042 : Lamp n’a pas pu être livré (Client injoignable). 12,50 \$ ont été remboursés sur votre portefeuille.'),
-      ('Order cancelled', 'SOM-1042 was cancelled by KOMORIKO support: Fraud check. \$20.00 was refunded to your wallet.', 'Commande annulée',
-          'SOM-1042 a été annulée par l’assistance KOMORIKO : Fraud check. 20,00 \$ ont été remboursés sur votre portefeuille.'),
+      ('Order placed', "We received KOM-1042. You'll get updates here in real time.", 'Commande enregistrée', 'Nous avons reçu KOM-1042. Vous recevrez les mises à jour ici en temps réel.'),
+      ('Complete your payment', 'Complete the card payment to confirm KOM-1042.', 'Finalisez votre paiement', 'Finalisez le paiement par carte pour confirmer KOM-1042.'),
+      ('Pickup scheduled', 'KOM-1042: a rider will collect your package.', 'Enlèvement programmé', 'KOM-1042 : un livreur viendra récupérer votre colis.'),
+      ('Package at the warehouse', 'KOM-1042: your package reached the warehouse.', 'Colis à l’entrepôt', 'KOM-1042 : votre colis est arrivé à l’entrepôt.'),
+      ('Item cancelled by the seller', 'KOM-1042: Lamp was cancelled (Out of stock). \$12.50 was refunded to your wallet. The rest of your order continues.', 'Article annulé par le vendeur',
+          'KOM-1042 : Lamp a été annulé (Rupture de stock). 12,50 \$ ont été remboursés sur votre portefeuille. Le reste de votre commande continue.'),
+      ('Delivery attempt failed', 'KOM-1042: Customer not reachable. We will try again (attempt 1 of 3).', 'Échec de la livraison', 'KOM-1042 : Client injoignable. Nous allons réessayer (tentative 1 sur 3).'),
+      ('Items could not be delivered', 'KOM-1042: Lamp could not be delivered (Customer not reachable). \$12.50 was refunded to your wallet.', 'Articles non livrés',
+          'KOM-1042 : Lamp n’a pas pu être livré (Client injoignable). 12,50 \$ ont été remboursés sur votre portefeuille.'),
+      ('Order cancelled', 'KOM-1042 was cancelled by KOMORIKO support: Fraud check. \$20.00 was refunded to your wallet.', 'Commande annulée',
+          'KOM-1042 a été annulée par l’assistance KOMORIKO : Fraud check. 20,00 \$ ont été remboursés sur votre portefeuille.'),
       ('Payment failed', 'Declined by subscriber.', 'Paiement échoué', 'Refusé par l’abonné.'),
       ('Payment failed', 'Timed out waiting for the card payment.', 'Paiement échoué', 'Délai de paiement par carte dépassé.'),
-      ('Refund issued', '\$20.00 for SOM-1042 is on its way back to your card.', 'Remboursement effectué', '20,00 \$ pour SOM-1042 reviennent sur votre carte.'),
-      ('Refund issued', '\$20.00 for SOM-1042 → wallet (the card refund could not be completed).', 'Remboursement effectué',
-          '20,00 \$ pour SOM-1042 → portefeuille (le remboursement sur la carte n’a pas pu aboutir).'),
-      ('Return approved', 'RET-7 · SOM-1042', 'Retour approuvé', 'RET-7 · SOM-1042'),
-      ('Return rejected', 'RET-7 · SOM-1042: Item used', 'Retour refusé', 'RET-7 · SOM-1042: Item used'),
-      ('Returned goods received', 'RET-7 · SOM-1042: the warehouse received the returned goods.', 'Articles retournés reçus', 'RET-7 · SOM-1042 : l’entrepôt a reçu les articles retournés.'),
-      ('Dispute resolved', 'DSP-3 · SOM-1042: Refunded to wallet', 'Litige résolu', 'DSP-3 · SOM-1042 : Remboursé sur le portefeuille'),
-      ('Exchange shipped', 'SOM-1042', 'Échange shipped', 'SOM-1042'),
-      ('Exchange delivered', 'SOM-1042', 'Échange livré', 'SOM-1042'),
-      ('Replacement dispatched', 'SOM-1042', 'Remplacement expédié', 'SOM-1042'),
+      ('Refund issued', '\$20.00 for KOM-1042 is on its way back to your card.', 'Remboursement effectué', '20,00 \$ pour KOM-1042 reviennent sur votre carte.'),
+      ('Refund issued', '\$20.00 for KOM-1042 → wallet (the card refund could not be completed).', 'Remboursement effectué',
+          '20,00 \$ pour KOM-1042 → portefeuille (le remboursement sur la carte n’a pas pu aboutir).'),
+      ('Return approved', 'RET-7 · KOM-1042', 'Retour approuvé', 'RET-7 · KOM-1042'),
+      ('Return rejected', 'RET-7 · KOM-1042: Item used', 'Retour refusé', 'RET-7 · KOM-1042: Item used'),
+      ('Returned goods received', 'RET-7 · KOM-1042: the warehouse received the returned goods.', 'Articles retournés reçus', 'RET-7 · KOM-1042 : l’entrepôt a reçu les articles retournés.'),
+      ('Dispute resolved', 'DSP-3 · KOM-1042: Refunded to wallet', 'Litige résolu', 'DSP-3 · KOM-1042 : Remboursé sur le portefeuille'),
+      ('Exchange shipped', 'KOM-1042', 'Échange shipped', 'KOM-1042'),
+      ('Exchange delivered', 'KOM-1042', 'Échange livré', 'KOM-1042'),
+      ('Replacement dispatched', 'KOM-1042', 'Remplacement expédié', 'KOM-1042'),
       ('Support reply', 'We have fixed it.', 'Réponse de l’assistance', 'We have fixed it.'),
       ('The seller replied to your review', 'Thank you!', 'Le vendeur a répondu à votre avis', 'Thank you!'),
       ('Your question was answered', 'Yes, it is waterproof.', 'Votre question a reçu une réponse', 'Yes, it is waterproof.'),
-      ('Seller did not respond', 'SOM-1042: the seller did not answer in time.', 'Le vendeur n’a pas répondu', 'SOM-1042: the seller did not answer in time.'),
+      ('Seller did not respond', 'KOM-1042: the seller did not answer in time.', 'Le vendeur n’a pas répondu', 'KOM-1042: the seller did not answer in time.'),
       ('Account suspended', 'Your account is suspended. Contact support for help.', 'Compte suspendu', 'Votre compte est suspendu. Contactez le support pour obtenir de l’aide.'),
       ('Two-factor authentication enabled', 'Signing in to your account now asks for a code from your authenticator app.', 'Authentification à deux facteurs activée',
           'La connexion à votre compte demande maintenant un code de votre application d’authentification.'),
@@ -196,25 +196,25 @@ void main() {
     });
 
     test('the server\'s own French wins in French, and English ignores it', () {
-      expect(displayNotice(fr, title: 'Order update', body: 'SOM-1 is now shipped.', titleFr: 'Mise à jour', bodyFr: 'SOM-1 est expédiée.'), ('Mise à jour', 'SOM-1 est expédiée.'));
-      expect(displayNotice(en, title: 'Order update', body: 'SOM-1 is now shipped.', titleFr: 'Mise à jour', bodyFr: 'SOM-1 est expédiée.'), ('Order update', 'SOM-1 is now shipped.'));
+      expect(displayNotice(fr, title: 'Order update', body: 'KOM-1 is now shipped.', titleFr: 'Mise à jour', bodyFr: 'KOM-1 est expédiée.'), ('Mise à jour', 'KOM-1 est expédiée.'));
+      expect(displayNotice(en, title: 'Order update', body: 'KOM-1 is now shipped.', titleFr: 'Mise à jour', bodyFr: 'KOM-1 est expédiée.'), ('Order update', 'KOM-1 is now shipped.'));
       // A "French" text that is a copy of the English was never translated: the phone's own wording is used.
-      expect(displayNotice(fr, title: 'Order cancelled', body: 'SOM-1 was cancelled.', titleFr: 'Order cancelled', bodyFr: 'SOM-1 was cancelled.'), ('Commande annulée', 'SOM-1 a été annulée.'));
+      expect(displayNotice(fr, title: 'Order cancelled', body: 'KOM-1 was cancelled.', titleFr: 'Order cancelled', bodyFr: 'KOM-1 was cancelled.'), ('Commande annulée', 'KOM-1 a été annulée.'));
       // One half in French only: the other half falls back to the phone's own wording.
-      expect(displayNotice(fr, title: 'Order cancelled', body: 'SOM-1 was cancelled.', titleFr: '', bodyFr: null), ('Commande annulée', 'SOM-1 a été annulée.'));
+      expect(displayNotice(fr, title: 'Order cancelled', body: 'KOM-1 was cancelled.', titleFr: '', bodyFr: null), ('Commande annulée', 'KOM-1 a été annulée.'));
     });
 
     test('wallet history lines the server writes are shown in French', () {
       final cases = {
-        'Order SOM-1': 'Commande SOM-1',
+        'Order KOM-1': 'Commande KOM-1',
         'Wallet top-up via vodacom_mpesa': 'Recharge du portefeuille via Vodacom M-Pesa',
-        'Refund for cancelled order SOM-1': 'Remboursement de la commande annulée SOM-1',
-        'Refund for SOM-1': 'Remboursement de SOM-1',
-        'Refund for SOM-1 (returned items)': 'Remboursement de SOM-1 (articles retournés)',
-        'Refund for SOM-1 (dispute)': 'Remboursement de SOM-1 (litige)',
+        'Refund for cancelled order KOM-1': 'Remboursement de la commande annulée KOM-1',
+        'Refund for KOM-1': 'Remboursement de KOM-1',
+        'Refund for KOM-1 (returned items)': 'Remboursement de KOM-1 (articles retournés)',
+        'Refund for KOM-1 (dispute)': 'Remboursement de KOM-1 (litige)',
         'Exchange EX-2: price difference': 'Échange EX-2 : différence de prix',
         'Exchange EX-2: price difference refunded': 'Échange EX-2 : différence de prix remboursée',
-        'Refund: seller cancelled part of SOM-1': 'Remboursement : le vendeur a annulé une partie de SOM-1',
+        'Refund: seller cancelled part of KOM-1': 'Remboursement : le vendeur a annulé une partie de KOM-1',
         'Welcome store credit': 'Crédit de bienvenue',
       };
       cases.forEach((en, frText) => expect(localizeWalletDescription(fr, en), frText, reason: en));

@@ -11,7 +11,7 @@ describe('addresses feed the fraud signals', () => {
   let geo: Awaited<ReturnType<typeof geoWorld>>['geo'];
   const count = () => ds.getRepository(FraudSignal).count({ where: { kind: 'address_change' } });
   const order = (status: Order['status']) =>
-    ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `SOM-${Math.random()}`, customerId: 'u1', customerName: 'U', status, paymentMethod: 'wallet', totalUsd: 1 }));
+    ds.getRepository(Order).save(ds.getRepository(Order).create({ reference: `KOM-${Math.random()}`, customerId: 'u1', customerName: 'U', status, paymentMethod: 'wallet', totalUsd: 1 }));
 
   beforeEach(async () => {
     ds = new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: ENTITIES, synchronize: true });

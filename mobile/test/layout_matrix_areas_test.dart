@@ -53,7 +53,7 @@ const _pickupLeg = {'kind': 'pickup', 'status': 'delivered', 'pickedUpAt': '2026
 /// A shipped order relayed through two hops (Limete > Kinshasa > Kikwit), with the given legs.
 OrderDto _relayed(String id, List<Map<String, dynamic>> legs, {Object? routes}) => OrderDto.fromJson({
       'id': id,
-      'reference': 'SOM-2077',
+      'reference': 'KOM-2077',
       'status': 'shipped',
       'paymentMethod': 'wallet',
       'totalUsd': 134.5,

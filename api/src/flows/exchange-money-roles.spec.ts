@@ -24,7 +24,7 @@ async function order(lines: { product: Product; price?: number }[], status: Orde
   const repo = ds.getRepository(Order);
   return repo.save(
     repo.create({
-      reference: `SOM-${Math.floor(Math.random() * 1e8)}`,
+      reference: `KOM-${Math.floor(Math.random() * 1e8)}`,
       customerId: customer.id,
       customerName: customer.name,
       status,

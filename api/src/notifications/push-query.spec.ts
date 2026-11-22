@@ -37,8 +37,8 @@ describe('PushService device query', () => {
   afterAll(() => ds.destroy());
   beforeEach(() => void (sent.length = 0));
 
-  const en = { title: 'Order placed', body: 'We received SOM-1.' };
-  const fr = { title: 'Commande enregistrée', body: 'Nous avons reçu SOM-1.' };
+  const en = { title: 'Order placed', body: 'We received KOM-1.' };
+  const fr = { title: 'Commande enregistrée', body: 'Nous avons reçu KOM-1.' };
 
   it('serves each device of a role in its owner’s language', async () => {
     expect(await svc.sendToRole('admin', { ...en, fr })).toBe(4);

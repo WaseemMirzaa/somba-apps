@@ -67,7 +67,7 @@ describe('LogisticsService (three legs, scoping, tiers)', () => {
     const pin = opts.pin === undefined ? GOMBE_PIN : opts.pin;
     const o = await ds.getRepository(Order).save(
       ds.getRepository(Order).create({
-        reference: `SOM-${n}`,
+        reference: `KOM-${n}`,
         customerId: 'cust1',
         customerName: 'Marie Dubois',
         status: 'confirmed',

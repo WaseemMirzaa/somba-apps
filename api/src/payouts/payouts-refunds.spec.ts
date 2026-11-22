@@ -65,7 +65,7 @@ async function sell(price: number, qty: number, opts: { pct?: number; promo?: nu
   const n = ++seq;
   const order = await ds.getRepository(Order).save(
     ds.getRepository(Order).create({
-      reference: `SOM-${n}`,
+      reference: `KOM-${n}`,
       customerId: customer.id,
       customerName: 'Marie',
       status: 'delivered',

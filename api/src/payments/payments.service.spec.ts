@@ -24,7 +24,7 @@ async function make(patch: Partial<Payment> = {}, opts: { pawapay?: null; refund
   );
   const order = await ds.getRepository(Order).save(
     ds.getRepository(Order).create({
-      reference: 'SOM-1',
+      reference: 'KOM-1',
       customerId: user.id,
       customerName: 'Marie',
       status: opts.orderStatus ?? 'delivered',
@@ -39,7 +39,7 @@ async function make(patch: Partial<Payment> = {}, opts: { pawapay?: null; refund
   );
   await ds.getRepository(Payment).save(
     ds.getRepository(Payment).create({
-      reference: 'PAY-1', orderId: order.id, orderReference: 'SOM-1', userId: user.id, method: 'airtel_money', amountUsd: 40, status: 'succeeded', providerRef: 'dep-1',
+      reference: 'PAY-1', orderId: order.id, orderReference: 'KOM-1', userId: user.id, method: 'airtel_money', amountUsd: 40, status: 'succeeded', providerRef: 'dep-1',
       ...patch,
     }),
   );
@@ -125,7 +125,7 @@ describe('PaymentsService.refund', () => {
     expect(out.refund).toMatchObject({ amountUsd: 40, refundTo: 'phone', status: 'sending', kind: 'admin', refundRef: 'ref-1' });
     expect(t.pawapay.refund).toHaveBeenCalledWith(expect.objectContaining({ depositId: 'dep-1', amountUsd: 40 }));
     expect(t.apply).not.toHaveBeenCalled();
-    expect(t.notices[0].body).toMatch(/\$40\.00 for SOM-1 is on its way back to your mobile-money number/);
+    expect(t.notices[0].body).toMatch(/\$40\.00 for KOM-1 is on its way back to your mobile-money number/);
     t.pawapay.check.mockResolvedValue({ found: true, final: true, succeeded: true });
     await t.svc.reconcileRefund(out.refundRef!);
     expect((await t.row()).refundStatus).toBe('completed');
@@ -161,8 +161,8 @@ describe('PaymentsService.refund', () => {
   it('a wallet refund says how much was refunded (lines a seller already refunded are left out)', async () => {
     const t = await make({}, { refundedLine: 10 });
     const out = await t.svc.refund(t.order.id, true);
-    expect(t.apply).toHaveBeenCalledWith(t.user.id, 'refund', 30, 'Refund for SOM-1', expect.anything());
-    expect(t.notices[0].body).toBe('$30.00 for SOM-1 → wallet.');
+    expect(t.apply).toHaveBeenCalledWith(t.user.id, 'refund', 30, 'Refund for KOM-1', expect.anything());
+    expect(t.notices[0].body).toBe('$30.00 for KOM-1 → wallet.');
     expect(out.refund.amountUsd).toBe(30);
   });
 

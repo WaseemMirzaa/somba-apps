@@ -14,12 +14,12 @@ const NB = ' ';
 
 /** The sentences (`${...}` shown as `{}`) with an instance and its French. A detail that is only data needs no entry. */
 const CASES: Record<string, [sample: string, french: string][]> = {
-  '{} (status set to cancelled)': [['SOM-1001 (status set to cancelled)', 'SOM-1001 (statut passé à annulée)']],
-  '{} -> {}': [['SOM-1001 -> shipped', 'SOM-1001 -> expédiée'], ['SOM-1001 -> out_for_delivery', 'SOM-1001 -> en cours de livraison']],
+  '{} (status set to cancelled)': [['KOM-1001 (status set to cancelled)', 'KOM-1001 (statut passé à annulée)']],
+  '{} -> {}': [['KOM-1001 -> shipped', 'KOM-1001 -> expédiée'], ['KOM-1001 -> out_for_delivery', 'KOM-1001 -> en cours de livraison']],
   '{} ${} to {}': [
-    ['SOM-1001 $12.50 to phone (pawaPay)', `SOM-1001 12,50${NB}$ vers le téléphone (pawaPay)`],
-    ['SOM-1001 $12.50 to card (Stripe)', `SOM-1001 12,50${NB}$ vers la carte (Stripe)`],
-    ['SOM-1001 $12.50 to wallet', `SOM-1001 12,50${NB}$ vers le portefeuille`],
+    ['KOM-1001 $12.50 to phone (pawaPay)', `KOM-1001 12,50${NB}$ vers le téléphone (pawaPay)`],
+    ['KOM-1001 $12.50 to card (Stripe)', `KOM-1001 12,50${NB}$ vers la carte (Stripe)`],
+    ['KOM-1001 $12.50 to wallet', `KOM-1001 12,50${NB}$ vers le portefeuille`],
   ],
   '{} ${} ref {}': [['PO-1 $40 ref ABC123', `PO-1 40${NB}$ réf. ABC123`], ['PO-1 $40 ref wallet', `PO-1 40${NB}$ réf. portefeuille`]],
   '{} ${} ref {} (batch)': [['PO-1 $40 ref ABC123 (batch)', `PO-1 40${NB}$ réf. ABC123 (lot)`]],
@@ -33,17 +33,17 @@ const CASES: Record<string, [sample: string, french: string][]> = {
   ],
   'rider {}: {}': [['rider r1: created', 'livreur r1 : créé'], ['rider r1: vehicleType, plate', 'livreur r1 : vehicleType, plate']],
   '{} of rider {}{}': [['driver_licence of rider r1: blurry', 'driver_licence du livreur r1 : blurry'], ['ID of rider r1', 'ID du livreur r1']],
-  '{}: wrong delivery code, try {} (rider {})': [['SOM-1: wrong delivery code, try 2 (rider r1)', 'SOM-1 : code de livraison erroné, essai 2 (livreur r1)']],
+  '{}: wrong delivery code, try {} (rider {})': [['KOM-1: wrong delivery code, try 2 (rider r1)', 'KOM-1 : code de livraison erroné, essai 2 (livreur r1)']],
   '{}: delivery code unlocked by {} (was at {} wrong tries)': [
-    ['SOM-1: delivery code unlocked by Awa (was at 5 wrong tries)', 'SOM-1 : code de livraison déverrouillé par Awa (en était à 5 essais erronés)'],
+    ['KOM-1: delivery code unlocked by Awa (was at 5 wrong tries)', 'KOM-1 : code de livraison déverrouillé par Awa (en était à 5 essais erronés)'],
   ],
   '{}: delivery code locked after {} wrong tries (rider {}), {}': [
-    ['SOM-1: delivery code locked after 5 wrong tries (rider r1), for 15 minutes', 'SOM-1 : code de livraison verrouillé après 5 essais erronés (livreur r1), pendant 15 minutes'],
-    ['SOM-1: delivery code locked after 15 wrong tries (rider r1), until a supervisor unlocks it', 'SOM-1 : code de livraison verrouillé après 15 essais erronés (livreur r1), jusqu’à ce qu’un superviseur le déverrouille'],
+    ['KOM-1: delivery code locked after 5 wrong tries (rider r1), for 15 minutes', 'KOM-1 : code de livraison verrouillé après 5 essais erronés (livreur r1), pendant 15 minutes'],
+    ['KOM-1: delivery code locked after 15 wrong tries (rider r1), until a supervisor unlocks it', 'KOM-1 : code de livraison verrouillé après 15 essais erronés (livreur r1), jusqu’à ce qu’un superviseur le déverrouille'],
   ],
-  '{} {} -> {} return leg{}': [['SOM-1 delivery -> 1 return leg', 'SOM-1 livraison -> 1 étape de retour'], ['SOM-1 delivery -> 2 return legs', 'SOM-1 livraison -> 2 étapes de retour']],
-  '{} {} -> {}': [['SOM-1 pickup -> Amadou', 'SOM-1 enlèvement -> Amadou']],
-  '{}: {} marked {} by hand ({})': [['SOM-1: PKG-ABCD2345 marked pickup by hand (label torn)', 'SOM-1 : PKG-ABCD2345 marqué « enlèvement » à la main (label torn)']],
+  '{} {} -> {} return leg{}': [['KOM-1 delivery -> 1 return leg', 'KOM-1 livraison -> 1 étape de retour'], ['KOM-1 delivery -> 2 return legs', 'KOM-1 livraison -> 2 étapes de retour']],
+  '{} {} -> {}': [['KOM-1 pickup -> Amadou', 'KOM-1 enlèvement -> Amadou']],
+  '{}: {} marked {} by hand ({})': [['KOM-1: PKG-ABCD2345 marked pickup by hand (label torn)', 'KOM-1 : PKG-ABCD2345 marqué « enlèvement » à la main (label torn)']],
   '{} · {} parcel(s)': [['TR-1 · 3 parcel(s)', 'TR-1 · 3 colis']],
   '{} -> {} · {} parcel(s)': [['TR-1 -> TR-2 · 3 parcel(s)', 'TR-1 -> TR-2 · 3 colis']],
   '{} · {} missing': [['TR-1 · 2 missing', 'TR-1 · 2 manquants']],
@@ -53,11 +53,11 @@ const CASES: Record<string, [sample: string, french: string][]> = {
     ['Bin A-01: 1 line(s) counted, variance -4', 'Emplacement A-01 : 1 ligne comptée, écart -4'],
   ],
   '{} · {} · {}': [
-    ["EX-1 · SOM-1 · $5.00 refunded to the customer's wallet", `EX-1 · SOM-1 · 5,00${NB}$ remboursés sur le portefeuille du client`],
-    ["EX-1 · SOM-1 · $5.00 refunded to the customer's wallet on delivery", `EX-1 · SOM-1 · 5,00${NB}$ remboursés sur le portefeuille du client à la livraison`],
-    ['EX-1 · SOM-1 · price difference $5.00', `EX-1 · SOM-1 · différence de prix 5,00${NB}$`],
+    ["EX-1 · KOM-1 · $5.00 refunded to the customer's wallet", `EX-1 · KOM-1 · 5,00${NB}$ remboursés sur le portefeuille du client`],
+    ["EX-1 · KOM-1 · $5.00 refunded to the customer's wallet on delivery", `EX-1 · KOM-1 · 5,00${NB}$ remboursés sur le portefeuille du client à la livraison`],
+    ['EX-1 · KOM-1 · price difference $5.00', `EX-1 · KOM-1 · différence de prix 5,00${NB}$`],
   ],
-  '{} · order {}': [['Awa Diallo · order SOM-1', 'Awa Diallo · commande SOM-1']],
+  '{} · order {}': [['Awa Diallo · order KOM-1', 'Awa Diallo · commande KOM-1']],
 };
 
 // ── Reading the sources ──────────────────────────────────────────────────
@@ -183,7 +183,7 @@ describe('audit-log detail in French', () => {
 
   it('leaves data-only details (names, references, free text) to the reader', () => {
     expect(auditDetailFr('Entrepôt Limete')).toBeNull();
-    expect(auditDetailFr('SOM-1001')).toBeNull();
+    expect(auditDetailFr('KOM-1001')).toBeNull();
     expect(auditDetailFr('')).toBeNull();
     expect(auditDetailFr(null)).toBeNull();
   });

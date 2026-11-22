@@ -68,10 +68,10 @@ back through the delivery/logistics events), `markReceived`, settle/refund, rest
 
 | notice (`title`) | recipient | body | French title |
 |---|---|---|---|
-| `Return waiting for support` | `admin_support` role | `RET-… · SOM-…` | Retour en attente du support |
-| `Dispute waiting for support` | `admin_support` role | `DP-… · SOM-…` | Litige en attente du support |
-| `Replacement requested` | `admin_support` role | `REP-… · SOM-… · <item>[: <reason>]` | Remplacement demandé |
-| `Exchange requested` | `admin_support` role (not when staff filed it) | `EXC-… · SOM-…: <from> → <to>` | Échange demandé |
+| `Return waiting for support` | `admin_support` role | `RET-… · KOM-…` | Retour en attente du support |
+| `Dispute waiting for support` | `admin_support` role | `DP-… · KOM-…` | Litige en attente du support |
+| `Replacement requested` | `admin_support` role | `REP-… · KOM-… · <item>[: <reason>]` | Remplacement demandé |
+| `Exchange requested` | `admin_support` role (not when staff filed it) | `EXC-… · KOM-…: <from> → <to>` | Échange demandé |
 | `Return requested`, `Dispute opened`, `... reply`, `Return received` | as before (support / customer) | | unchanged |
 
 **Removed notices to sellers** (the strings stay in `localize.ts`, old stored rows still need their French): `Return requested on your order`,
@@ -102,10 +102,10 @@ Customer copy that mentions the seller step, the seller's answer, "escalate" or 
 - Stock failure when approving now reads: `Not enough stock to send a replacement. Ask the seller to restock the item, or reject the request.` /
   `Not enough stock for this exchange. Ask the seller to restock the item, or reject the request.` (French in the error catalogue).
 - The seller lapse sweep (`SellerLapseService`) now alerts **support only**, once (`sellerLapsedAt`): titles `Replacement waiting for support`
-  / `Exchange waiting for support` (`REF · SOM-…`). Customer and seller are not told.
+  / `Exchange waiting for support` (`REF · KOM-…`). Customer and seller are not told.
 - The seller keeps ONE notice about these: **`Pickup scheduled`** (the hand-over of the new unit: "a rider will collect your package"),
-  now tagged with the reference: body `SOM-… · REP-…: a rider will collect your package.` (or `EXC-…`) for a replacement / exchange
-  pickup, `SOM-…: a rider will collect your package.` for an ordinary order. French: `SOM-… · REP-… : un livreur viendra récupérer votre colis.`
+  now tagged with the reference: body `KOM-… · REP-…: a rider will collect your package.` (or `EXC-…`) for a replacement / exchange
+  pickup, `KOM-…: a rider will collect your package.` for an ordinary order. French: `KOM-… · REP-… : un livreur viendra récupérer votre colis.`
 
 ---
 
@@ -329,9 +329,9 @@ Push `caseThread:message` (the message + `reference`, `orderReference`) to the s
 
 | notice (`title`) | to | body | type -> opens |
 |---|---|---|---|
-| `Message from KOMORIKO support` | the store (owner; the team through the usual notice fan-out), section on | `RET-… \| EXC-… \| REP-… · SOM-…` | `seller_return` / `seller_exchange` / `seller_replacement` -> `/seller/returns/<id>`, `/seller/exchanges/<id>`, `/seller/replacements/<id>` |
-| `Seller message on RET-…` (or `EXC-…`, `REP-…`) | `admin_support` role | `RET-… · SOM-…` | `return` / `exchange` / `replacement` -> the desk page |
-| `Return opened on your item`, `Return decided`, `Exchange requested on your item`, `Exchange decided`, `Replacement requested on your item`, `Replacement decided` | the store, section on (info only) | `RET-… · SOM-…` | `seller_*` as above |
+| `Message from KOMORIKO support` | the store (owner; the team through the usual notice fan-out), section on | `RET-… \| EXC-… \| REP-… · KOM-…` | `seller_return` / `seller_exchange` / `seller_replacement` -> `/seller/returns/<id>`, `/seller/exchanges/<id>`, `/seller/replacements/<id>` |
+| `Seller message on RET-…` (or `EXC-…`, `REP-…`) | `admin_support` role | `RET-… · KOM-…` | `return` / `exchange` / `replacement` -> the desk page |
+| `Return opened on your item`, `Return decided`, `Exchange requested on your item`, `Exchange decided`, `Replacement requested on your item`, `Replacement decided` | the store, section on (info only) | `RET-… · KOM-…` | `seller_*` as above |
 
 `seller_*` notices follow the `orders` permission for the team (`permissionForNotice`); `caseThread:*` pushes follow it too (`permissionForEvent`). The `dispute|exchange|replacement` heads stay owner-only (they also carry the owner's own purchases).
 

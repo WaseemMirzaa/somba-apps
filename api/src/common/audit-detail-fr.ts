@@ -1,7 +1,7 @@
 /**
  * The French version of an audit-log `detail`.
  *
- * Every audit entry is written with an English `detail` ("SOM-1001 -> shipped", "PO-1 $40 ref ABC", "2 area(s)"). The log is read in the
+ * Every audit entry is written with an English `detail` ("KOM-1001 -> shipped", "PO-1 $40 ref ABC", "2 area(s)"). The log is read in the
  * viewer's language, so a row also carries `detailFr`: the wording of the sentence in French, with references, names, codes, amounts
  * and free text kept as they were. `AuditLog` fills it itself before the row is inserted (see `audit-log.entity.ts`), so no writer can
  * forget it. A detail that is only data (a reference, a name, a code) has no wording to translate: `detailFr` stays null and readers

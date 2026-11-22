@@ -5,7 +5,7 @@ import 'package:lipcart/services/models.dart';
 
 Map<String, dynamic> _order({Object? rider}) => {
       'id': 'o1',
-      'reference': 'SOM-1',
+      'reference': 'KOM-1',
       'status': 'out_for_delivery',
       if (rider != null) 'rider': rider,
     };
