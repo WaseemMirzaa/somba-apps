@@ -17,6 +17,7 @@ import { sellerRequest } from "@/lib/seller-api";
 import { TXN_KIND_OPTIONS, saveCsvText, txnKindLabel, txnKindVariant, useTransactions } from "@/lib/seller-finance";
 import { errMessage, orderStatusLabel, payoutStatusLabel, transactionDetail } from "@/lib/seller-labels";
 import { formatCurrency } from "@/lib/utils";
+import { matchesSearch } from "@/lib/i18n-fields";
 
 const PAGE = 25;
 
@@ -35,8 +36,7 @@ export default function SellerTransactionsPage() {
 
   // The server filters by date; kind and the search box narrow the page that is on screen.
   const rows = useMemo(() => {
-    const q = filters.search.trim().toLowerCase();
-    return (page?.items ?? []).filter((r) => (!filters.status || r.kind === filters.status) && (!q || `${r.reference} ${r.description} ${r.descriptionFr ?? ""}`.toLowerCase().includes(q)));
+    return (page?.items ?? []).filter((r) => (!filters.status || r.kind === filters.status) && matchesSearch(filters.search, [r.reference, r.description, r.descriptionFr]));
   }, [page, filters.search, filters.status]);
 
   async function exportCsv() {

@@ -18,6 +18,7 @@ import { errorMessage } from "@/lib/warehouse-live";
 import { parcelErrorWithHint } from "@/lib/parcel-errors";
 import { useBoxScan } from "@/components/warehouse/use-box-scan";
 import { cn } from "@/lib/utils";
+import { matchesSearch } from "@/lib/i18n-fields";
 
 type TabId = "pickup" | "transfer_out" | "transfer_in" | "transfer" | "delivery" | "express" | "return_pickup" | "replacement_delivery" | "return_transfer" | "return_to_seller";
 
@@ -75,21 +76,16 @@ function DeskContent() {
   const scanMode = modeOverride ?? tabMode;
   const onBox = useBoxScan(scanMode, () => void q.reload());
 
-  const needle = query.trim().toLowerCase();
   const rows = useMemo(
     () =>
       q.tasks
         .filter((t) => activeTab.match(t))
         .filter(
           (t) =>
-            !needle ||
-            [t.orderReference, parcelCode(t), t.riderName ?? "", t.sellerName ?? "", t.to?.name ?? "", t.from?.name ?? "", legItemsText(t.items, fr)]
-              .join(" ")
-              .toLowerCase()
-              .includes(needle),
+            matchesSearch(query, [t.orderReference, parcelCode(t), t.riderName, t.sellerName, t.to?.name, t.from?.name, legItemsText(t.items, fr)]),
         )
         .sort((a, b) => Number(!!b.desk.scanIn || !!b.desk.assign) - Number(!!a.desk.scanIn || !!a.desk.assign) || +new Date(a.createdAt) - +new Date(b.createdAt)),
-    [q.tasks, activeTab, needle, fr],
+    [q.tasks, activeTab, query, fr],
   );
 
   async function onScan(leg: DeskTask) {

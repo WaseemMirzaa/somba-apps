@@ -50,7 +50,7 @@ export default function RiderLayout({ children }: { children: React.ReactNode })
             <p className="text-[10px] font-medium text-emerald-600">{t("riderApp")}</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex rounded-lg border border-[var(--border)] p-0.5 text-[10px]">
+            <div translate="no" className="notranslate flex rounded-lg border border-[var(--border)] p-0.5 text-[10px]">
               <button onClick={() => setLocale("en")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "en" ? "bg-emerald-600 text-white" : "text-slate-500")}>EN</button>
               <button onClick={() => setLocale("fr")} className={cn("rounded px-2 py-0.5 font-semibold", locale === "fr" ? "bg-emerald-600 text-white" : "text-slate-500")}>FR</button>
             </div>

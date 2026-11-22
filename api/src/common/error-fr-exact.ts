@@ -118,6 +118,7 @@ export const ERROR_FR_EXACT: Record<string, string> = {
   'Invalid code.': 'Code invalide.',
   'Invalid expiry date.': 'Date d’expiration invalide.',
   'Not allowed.': 'Action non autorisée.',
+  'Question not found.': 'Question introuvable.',
   'Only a live product can go on flash sale.': 'Seul un produit en ligne peut faire l’objet d’une vente flash.',
   'Open a store first.': 'Ouvrez d’abord une boutique.',
   'Plan id must be 2-20 characters: lowercase letters, digits, - or _.': 'L’identifiant d’une offre compte de 2 à 20 caractères : lettres minuscules, chiffres, - ou _.',

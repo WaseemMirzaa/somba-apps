@@ -13,6 +13,7 @@ import { useSellerData } from "@/lib/seller";
 import { errMessage } from "@/lib/seller-labels";
 import { campaignActions } from "@/lib/seller-promo";
 import { autoTranslateHint } from "@/lib/i18n-fields";
+import { matchesSearch } from "@/lib/i18n-fields";
 
 const MAX_PRODUCTS = 200;
 
@@ -58,7 +59,7 @@ export function CampaignForm({ initial }: { initial?: CampaignFormInitial }) {
 
   // Only listings that can ever be sold: not rejected by moderation.
   const candidates = useMemo(() => sellerProductList.filter((p) => p.status !== "rejected"), [sellerProductList]);
-  const shown = candidates.filter((p) => !q.trim() || p.name.toLowerCase().includes(q.trim().toLowerCase()));
+  const shown = candidates.filter((p) => matchesSearch(q, [p.name]));
   const covered = scope === "all" ? candidates : candidates.filter((p) => picked.includes(p.id));
 
   const discount = form.discount === "" ? 0 : Number(form.discount);

@@ -312,7 +312,7 @@ export function DashboardLayout({
 
           <NotificationBell portal={portal} fr={locale === "fr"} />
 
-          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-slate-50 p-1">
+          <div translate="no" className="notranslate flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-slate-50 p-1">
             <button
               onClick={() => setLocale("en")}
               className={cn(

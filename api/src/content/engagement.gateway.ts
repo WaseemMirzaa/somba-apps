@@ -4,7 +4,7 @@ import { AuditService } from '../ops/audit.service';
 import { sellerContext } from '../sellers/seller-context';
 import type { AuthedSocket, SocketUser } from '../sellers/gateway-support';
 import { fail, ok, requireUser } from '../sellers/gateway-support';
-import { ReviewsService, MODERATORS, publicQuestion } from './reviews.service';
+import { ReviewsService, MODERATORS, QUESTION_READERS, publicQuestion } from './reviews.service';
 
 /**
  * Reviews and product Q&A on the shared Socket.IO server (RealtimeGateway authenticates the socket).
@@ -178,6 +178,33 @@ export class EngagementGateway {
       const user = requireUser(client);
       if (user.role !== 'seller') return fail('Sellers only.');
       return ok({ count: await this.reviews.countUnanswered(await this.storeIds(user)) });
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /**
+   * The admin Q&A list (docs/contracts/admin-controls.md): all questions, `status` unanswered | answered | all, search `q`, `sellerId`,
+   * `productId`, `limit`, `cursor`. Super Admin, Operations, Moderation (who may also answer) and Support (read only).
+   */
+  @SubscribeMessage('questions:adminList')
+  async adminList(@ConnectedSocket() client: AuthedSocket, @MessageBody() body?: Record<string, unknown>) {
+    try {
+      const user = requireUser(client);
+      if (!QUESTION_READERS.includes(user.role)) return fail('Not allowed.');
+      return ok(await this.reviews.adminList(body ?? {}));
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  /** One question in full (same readers as `questions:adminList`). */
+  @SubscribeMessage('questions:adminGet')
+  async adminGet(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { id: string }) {
+    try {
+      const user = requireUser(client);
+      if (!QUESTION_READERS.includes(user.role)) return fail('Not allowed.');
+      return ok(await this.reviews.adminGet(body?.id));
     } catch (e) {
       return fail((e as Error).message);
     }

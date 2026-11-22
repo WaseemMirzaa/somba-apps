@@ -49,6 +49,14 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="fr" suppressHydrationWarning className={`${inter.variable} ${jakarta.variable} h-full antialiased`}>
+      <head>
+        {/* Keep <html lang> on the chosen language from the first paint, so the browser does not translate the UI as French. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var l=localStorage.getItem("somba-locale")||localStorage.getItem("somba-locale-account");if(l==="en"||l==="fr")document.documentElement.lang=l}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
         <LocaleProvider>
           <RealtimeProvider>

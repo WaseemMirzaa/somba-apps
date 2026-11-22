@@ -18,8 +18,9 @@ export function LanguageToggle({ className }: { className?: string }) {
   return (
     <div
       role="group"
+      translate="no"
       aria-label={locale === "fr" ? "Langue" : "Language"}
-      className={cn("inline-flex items-center gap-1 rounded-xl border border-[var(--border)] bg-white/95 p-1 shadow-sm backdrop-blur", className)}
+      className={cn("notranslate inline-flex items-center gap-1 rounded-xl border border-[var(--border)] bg-white/95 p-1 shadow-sm backdrop-blur", className)}
     >
       {options.map((o) => (
         <button

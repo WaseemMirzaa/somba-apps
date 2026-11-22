@@ -37,6 +37,7 @@ import {
   ShieldCheck,
   ScrollText,
   MessagesSquare,
+  MessageCircleQuestion,
   PanelTop,
 } from "lucide-react";
 
@@ -111,6 +112,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
       // The seller portal's read-only after-sale sections (server group `sellerAfterSaleManage`: Super Admin, Operations, Support).
       { href: "/admin/seller-portal", label: "sellerPortal", icon: PanelTop, i18n: true },
+      // Customer questions on products (server `questions:adminList`: Super Admin, Operations, Moderation answer; Support reads).
+      { href: "/admin/questions", label: "productQuestions", icon: MessageCircleQuestion, i18n: true },
     ],
   },
   {
@@ -137,6 +140,7 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       { href: "/admin/products", label: "products", icon: Package, i18n: true },
       { href: "/admin/sellers", label: "sellers", icon: Users, i18n: true },
       { href: "/admin/reviews", label: "reviews", icon: Star, i18n: true },
+      { href: "/admin/questions", label: "productQuestions", icon: MessageCircleQuestion, i18n: true },
     ],
   },
   {
@@ -170,6 +174,8 @@ const DEPARTMENT_SECTIONS: AdminNavSection[] = [
       // Which after-sale sections stores see (read-only), and the private seller threads (`sellerAfterSaleManage`).
       { href: "/admin/seller-portal", label: "sellerPortal", icon: PanelTop, i18n: true },
       { href: "/admin/customers", label: "customers", icon: Users, i18n: true },
+      // Customer questions on products, read-only for Support (it may not answer: the server's MODERATORS rule).
+      { href: "/admin/questions", label: "productQuestions", icon: MessageCircleQuestion, i18n: true },
       // Support may suspend accounts (`customers:setActive`), so it sees the fraud alerts whose action is a block.
       { href: "/admin/fraud", label: "fraudPayments", icon: AlertTriangle, i18n: true },
     ],
@@ -203,8 +209,13 @@ export function getAdminSections(dept: AdminDepartment): AdminNavSection[] {
   if (dept === "super") {
     // Geography belongs to both Operations and Warehouse Admin; the Super Admin lists it once, next to Warehouses.
     // The Stores page is Moderation's for the Super Admin (Operations reaches it for the express toggle).
+    // Product questions are listed once for the Super Admin, under Moderation (Operations and Support keep their own entry).
     const sections = DEPARTMENT_SECTIONS.map((section) =>
-      section.id === "operations" ? { ...section, items: section.items.filter((i) => i.href !== "/admin/geography" && i.href !== "/admin/sellers" && i.href !== "/admin/seller-portal") } : section,
+      section.id === "operations"
+        ? { ...section, items: section.items.filter((i) => i.href !== "/admin/geography" && i.href !== "/admin/sellers" && i.href !== "/admin/seller-portal" && i.href !== "/admin/questions") }
+        : section.id === "support"
+          ? { ...section, items: section.items.filter((i) => i.href !== "/admin/questions") }
+          : section,
     );
     return [SUPER_SECTION, ...sections];
   }
