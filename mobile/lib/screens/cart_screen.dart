@@ -14,6 +14,7 @@ import '../widgets/not_served_notice.dart';
 import '../widgets/product_actions.dart' show blockedByVacation;
 import '../widgets/product_image.dart';
 import 'checkout_screen.dart';
+import '../widgets/keyboard.dart';
 
 class CartScreen extends StatefulWidget {
   final Locale locale;
@@ -479,6 +480,7 @@ class _CartScreenState extends State<CartScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
+                  onTapOutside: (_) => dismissKeyboard(),
                   controller: _promoCtrl,
                   textCapitalization: TextCapitalization.characters,
                   onSubmitted: (_) => _applyPromo(),
