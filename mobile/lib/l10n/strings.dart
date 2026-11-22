@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart' show ApiException;
 import 'messages.dart';
+import 'messages_wallet_off.dart' show kWalletOffKeys;
 import 'server_errors.dart';
 
 export 'strings_keys.dart';
@@ -68,8 +69,13 @@ class Strings {
   Locale get locale => Locale(lang);
   String get brand => 'KOMORIKO';
 
+  /// The wallet switch (`walletEnabled` off), set by `RealtimeStore.applySettings`: while true, a text that names the wallet is
+  /// read from its wallet-free twin (`kWalletOffKeys`), so no screen has to know about the switch.
+  static bool walletOff = false;
+
   /// Looks a text up; `{name}` placeholders are replaced from [args].
   String t(String key, [Map<String, Object?>? args]) {
+    if (walletOff) key = kWalletOffKeys[key] ?? key;
     final m = kMessages[key];
     if (m == null) {
       assert(false, 'Missing string key: $key');

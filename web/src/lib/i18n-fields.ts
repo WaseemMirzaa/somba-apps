@@ -42,6 +42,7 @@ export function localizedNotice(
 /** The stock decisions the server writes on a return / dispute, in French (an agent's own words stay as typed). */
 const RESOLUTION_FR: Record<string, string> = {
   "Refunded to wallet": "Remboursé sur le portefeuille",
+  "Refunded to original payment method": "Remboursé sur le moyen de paiement d’origine",
   "Partially refunded": "Remboursement partiel",
   "Replacement approved": "Remplacement approuvé",
   Rejected: "Refusé",

@@ -29,7 +29,7 @@ import { useToast } from "@/context/toast-context";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { localized } from "@/lib/i18n-fields";
 import { formatCurrency } from "@/lib/utils";
-import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent, useSupportTickets, useVerificationStatus, isVerificationError } from "@/lib/shop-live";
+import { MOBILE_MONEY_METHODS, paymentMethodName, useSocketEvent, useSupportTickets, useVerificationStatus, useWalletEnabled, isVerificationError } from "@/lib/shop-live";
 import type { BackendUser, Payment } from "@/lib/realtime/types";
 
 const menuItems = [
@@ -218,6 +218,7 @@ function WalletCard() {
 function AccountContent() {
   const { t, locale } = useLocale();
   const fr = locale === "fr";
+  const walletOn = useWalletEnabled(); // the wallet switch (live): off = no wallet card
   const { logout } = useAuth();
   const router = useRouter();
   const { tickets } = useSupportTickets();
@@ -235,7 +236,7 @@ function AccountContent() {
 
       <ProfileCard />
       <VerificationCard />
-      <WalletCard />
+      {walletOn && <WalletCard />}
 
       <div className="grid gap-3">
         {menuItems.map((item) => {

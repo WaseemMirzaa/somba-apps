@@ -684,7 +684,7 @@ class _AccountDeleteScreenState extends State<AccountDeleteScreen> {
     final locale = Locale(s.lang);
     final has = blockers.map((b) => b.kind).toSet();
     final ctas = <(String, VoidCallback)>[
-      if (has.contains('wallet_balance') || has.contains('pending_topup') || has.contains('pending_refund'))
+      if (RealtimeStore.instance.walletEnabled && (has.contains('wallet_balance') || has.contains('pending_topup') || has.contains('pending_refund')))
         (s.delaccCtaWallet, () => _open(WalletScreen(locale: locale))),
       if (has.contains('open_order')) (s.delaccCtaOrders, () => _open(OrdersScreen(locale: locale))),
       if (has.contains('open_return') || has.contains('open_dispute')) (s.delaccCtaReturns, () => _open(ReturnsListScreen(locale: locale))),

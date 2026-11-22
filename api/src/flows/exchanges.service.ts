@@ -48,6 +48,9 @@ export type ExchangeView = Omit<Exchange, 'attachments'> & {
   sellerReasonI18n?: TextI18n;
 };
 
+/** The customer pays an exchange's price difference from the wallet: with the wallet switched off, only exchanges that cost nothing extra can be filed. */
+export const EXCHANGE_NEEDS_WALLET = 'This exchange costs more than the original item and the wallet is not available right now. Choose an item of the same price or less.';
+
 /** Exchange one purchased item for another variant/product. */
 @Injectable()
 export class ExchangesService {
@@ -66,6 +69,13 @@ export class ExchangesService {
     // The store's read-only view (docs/contracts/admin-controls.md §13): pushes and notices while a section is on.
     @Optional() private readonly sellerView?: SellerAfterSaleViewService,
   ) {}
+
+  private differenceRefunder: ((ex: { orderId: string; reference: string }, amountUsd: number) => Promise<boolean>) | null = null;
+
+  /** Set by PartialRefundService (which owns refunds): pays a cheaper exchange's difference back to the original method while the wallet is off. */
+  registerDifferenceRefunder(fn: (ex: { orderId: string; reference: string }, amountUsd: number) => Promise<boolean>): void {
+    this.differenceRefunder = fn;
+  }
 
   /** Translate first, then store (null: stored untranslated, as before). The writer's account language is the hint. */
   private translateFor(text: string, userId?: string): Promise<SaveTranslation | null> {
@@ -249,6 +259,7 @@ export class ExchangesService {
       // C-X3: the customer pays a price difference up front, from the wallet; it comes back if the exchange is refused.
       // (An exchange filed by staff moves no money: finance settles it.)
       if (!ops && diff > 0) {
+        if ((await this.settings.get('walletEnabled')) === 'false') throw new BadRequestException(EXCHANGE_NEEDS_WALLET);
         try {
           await this.wallet.apply(order.customerId, 'debit', diff, `Exchange ${ex.reference}: price difference`, m);
         } catch (e) {
@@ -361,6 +372,8 @@ export class ExchangesService {
   /** The new item arrived: a cheaper item pays the difference back to the wallet. */
   private async settleDifference(ex: Exchange): Promise<void> {
     if (ex.priceDiffUsd < 0 && ex.customerId) {
+      // Wallet switched off and the order was paid by phone / card: the difference goes back to where the money came from.
+      if (this.differenceRefunder && (await this.differenceRefunder(ex, Math.abs(ex.priceDiffUsd)))) return;
       await this.wallet.apply(ex.customerId, 'refund', Math.abs(ex.priceDiffUsd), `Exchange ${ex.reference}: price difference refunded`);
     }
   }

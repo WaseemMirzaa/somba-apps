@@ -65,10 +65,10 @@ export interface RefundEntry {
   orderId?: string | null;
   orderReference?: string | null;
   amountUsd: number;
-  refundTo: "wallet" | "phone";
+  refundTo: "wallet" | "phone" | "card";
   status: "completed" | "sending" | "failed";
   refundRef?: string | null;
-  kind: "admin" | "cancellation" | "return" | "dispute" | "seller_cancel" | "late_payment" | "legacy";
+  kind: "admin" | "cancellation" | "return" | "dispute" | "seller_cancel" | "late_payment" | "exchange" | "legacy";
   disputeId?: string | null;
   disputeReference?: string | null;
   memo?: string | null;
@@ -89,7 +89,8 @@ const KIND: Record<RefundEntry["kind"], { en: string; fr: string }> = {
   return: { en: "Return", fr: "Retour" },
   dispute: { en: "Dispute", fr: "Litige" },
   seller_cancel: { en: "Items cancelled by the seller", fr: "Articles annulés par le vendeur" },
-  late_payment: { en: "Late payment kept in the wallet", fr: "Paiement tardif crédité au portefeuille" },
+  late_payment: { en: "Late payment (kept in the wallet, or sent back while the wallet is off)", fr: "Paiement tardif (crédité au portefeuille, ou renvoyé quand le portefeuille est désactivé)" },
+  exchange: { en: "Exchange price difference", fr: "Différence de prix d'un échange" },
   legacy: { en: "Earlier refund", fr: "Remboursement antérieur" },
 };
 
@@ -104,6 +105,9 @@ export function refundReason(e: Pick<RefundEntry, "kind" | "disputeReference">, 
 export function refundDestination(e: Pick<RefundEntry, "refundTo" | "status">, fr: boolean): string {
   if (e.refundTo === "phone") {
     return e.status === "sending" ? (fr ? "vers le téléphone · en cours" : "to phone · sending") : fr ? "vers le téléphone" : "to phone";
+  }
+  if (e.refundTo === "card") {
+    return e.status === "sending" ? (fr ? "vers la carte · en cours" : "to card · sending") : fr ? "vers la carte" : "to card";
   }
   return e.status === "failed" ? (fr ? "portefeuille (échec téléphone)" : "wallet (phone refund failed)") : fr ? "vers le portefeuille" : "to wallet";
 }

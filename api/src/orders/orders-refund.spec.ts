@@ -26,6 +26,7 @@ beforeEach(async () => {
     processForOrder: async () => ({ status: 'succeeded', method: 'wallet' }),
     forOrder: (orderId: string) => w.ds.getRepository(Payment).findOne({ where: { orderId }, order: { createdAt: 'DESC' } }),
     refundCancelledOrder: async () => 0,
+    automaticOriginal: async () => null, // the wallet switch is on
   };
   const notifications = { toUser: async () => undefined, toRole: async () => undefined, toAdmins: async () => undefined, toUsers: async () => undefined };
   orders = new OrdersService(

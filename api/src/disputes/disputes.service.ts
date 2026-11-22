@@ -123,6 +123,9 @@ interface Viewer {
   hubId?: string | null;
 }
 
+/** The stock resolution line of a refund: into the wallet, or (the wallet being switched off) back to the original payment method. */
+const refundedPhrase = (to: string): string => (to === 'wallet' ? 'Refunded to wallet' : 'Refunded to original payment method');
+
 @Injectable()
 export class DisputesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DisputesService.name);
@@ -747,10 +750,12 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     }
     const toWallet = (input.refundTo ?? d.refundTo) !== 'phone';
     let refundUsd = 0;
+    let refundedTo: string = 'wallet';
     let replacementNote = '';
     if (outcome === 'refund_full') {
       const paid = await this.payments.refund(d.orderId, toWallet, { kind: 'dispute', disputeId: d.id, disputeReference: d.reference }); // throws if it cannot be refunded
       refundUsd = paid.refund.amountUsd;
+      refundedTo = paid.refund.refundTo;
     } else if (outcome === 'refund_partial') {
       const amount = cents(Number(input.amountUsd));
       if (!(amount > 0)) throw new BadRequestException('Enter the amount to refund.');
@@ -762,13 +767,14 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
         source: { kind: 'dispute', disputeId: d.id, disputeReference: d.reference },
       });
       refundUsd = done.refundedUsd;
+      refundedTo = done.to;
     } else if (outcome === 'replacement') {
       const made = await this.replacements.createFromDispute(d, input.items);
       replacementNote = made.map((r) => r.reference).join(', ');
     }
     const resolution =
       reason ||
-      (outcome === 'refund_full' ? 'Refunded to wallet' : outcome === 'refund_partial' ? 'Partially refunded' : outcome === 'replacement' ? 'Replacement approved' : 'Rejected');
+      (outcome === 'refund_full' ? refundedPhrase(refundedTo) : outcome === 'refund_partial' ? 'Partially refunded' : outcome === 'replacement' ? 'Replacement approved' : 'Rejected');
     const closed = await this.close(d, outcome === 'reject' ? 'rejected' : 'resolved', outcome, resolution, OPEN_STAGES, undefined, refundUsd, resolutionTr);
     void replacementNote;
     return closed;
@@ -828,18 +834,23 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
     const typed = opts.resolution === undefined || opts.resolution === null ? '' : String(opts.resolution).slice(0, 1000);
     const resolutionTr = await this.translateResolution(typed);
     let refundUsd = 0;
+    let refundedTo: string = 'wallet';
     if (opts.refund) {
-      if (dispute.type === 'return') refundUsd = (await this.refundReturnedItems(dispute)).refundedUsd;
-      else {
+      if (dispute.type === 'return') {
+        const paid = await this.refundReturnedItems(dispute);
+        refundUsd = paid.refundedUsd;
+        refundedTo = paid.to;
+      } else {
         const paid = await this.payments.refund(dispute.orderId, dispute.refundTo !== 'phone', { kind: 'dispute', disputeId: dispute.id, disputeReference: dispute.reference }); // throws if it can't be refunded
         refundUsd = paid.refund.amountUsd;
+        refundedTo = paid.refund.refundTo;
       }
     }
     return this.close(
       dispute,
       'resolved',
       opts.refund ? (dispute.type === 'return' ? 'return_refund' : 'refund_full') : 'reject',
-      String(opts.resolution ?? (opts.refund ? 'Refunded to wallet' : 'Resolved')),
+      String(opts.resolution ?? (opts.refund ? refundedPhrase(refundedTo) : 'Resolved')),
       OPEN_STAGES,
       undefined,
       refundUsd,
@@ -1039,7 +1050,7 @@ export class DisputesService implements OnModuleInit, OnModuleDestroy {
         (await this.disputes.findOne({ where: { id: d.id } }))!,
         'resolved',
         'return_refund',
-        'Refunded to wallet',
+        refundedPhrase(paid.to),
         ['received', 'approved', 'pickup'],
         undefined,
         paid.refundedUsd,

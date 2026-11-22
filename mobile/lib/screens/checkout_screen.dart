@@ -244,6 +244,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         return false;
       }
     }
+    if (payment == 'wallet' && !store.walletEnabled) {
+      // Switched off just now (the server also refuses it): back to a method that works.
+      setState(() => payment = 'airtel_money');
+      _toast(s.walletOff);
+      return false;
+    }
     if (payment == 'wallet' && store.walletBalance + 0.001 < shop.cartTotals(_lines, quoteFeeUsd: deliveryFee).total) {
       _toast(s.checkoutWalletLow);
       return false;
@@ -352,6 +358,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final s = Strings.of(context);
     final lang = s.lang;
     final store = RealtimeStore.instance;
+    // The wallet was switched off while this screen was open (live): a wallet choice falls back to a method that works.
+    if (payment == 'wallet' && !store.walletEnabled) payment = 'airtel_money';
     // The fee is the server's quote for this address and these lines; `orders:create` charges exactly it.
     _quote.update(_address, _lines);
     final quote = _quote.quote;
@@ -455,8 +463,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           const SizedBox(height: 22),
           _sectionTitle(s.payment),
           const SizedBox(height: 10),
-          _methodTile('wallet', Icons.account_balance_wallet_rounded,
-              '${s.payWallet} · ${money(store.walletBalance)}'),
+          if (store.walletEnabled)
+            _methodTile('wallet', Icons.account_balance_wallet_rounded,
+                '${s.payWallet} · ${money(store.walletBalance)}'),
           for (final m in mobileMoneyMethods) _methodTile(m, Icons.smartphone_rounded, s.paymentLabel(m)),
           if (isMobileMoney(payment)) ...[
             const SizedBox(height: 4),

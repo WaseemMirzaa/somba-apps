@@ -1,5 +1,6 @@
 "use client";
 
+import { useWalletEnabled } from "@/lib/shop-live";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -30,6 +31,7 @@ function SwapForm() {
   const { id } = useParams<{ id: string }>();
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const walletOn = useWalletEnabled();
   const router = useRouter();
   const rt = useRealtime();
   const { toast } = useToast();
@@ -196,7 +198,11 @@ function SwapForm() {
               <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600" data-testid="swap-diff">
                 {fr ? "Différence de prix estimée" : "Estimated price difference"}:{" "}
                 <strong>{estDiff === 0 ? (fr ? "aucune" : "none") : estDiff > 0 ? `+${formatCurrency(estDiff, locale)}` : `-${formatCurrency(-estDiff, locale)}`}</strong>.{" "}
-                {estDiff > 0
+                {estDiff > 0 && !walletOn
+                  ? fr ? "Cet article coûte plus cher que l'original et payer une différence de prix n'est pas disponible pour le moment : choisissez un article du même prix ou moins cher." : "This item costs more than the original and paying a price difference is not available right now: choose an item of the same price or less."
+                  : estDiff < 0 && !walletOn
+                    ? fr ? "La différence vous est remboursée à la livraison." : "The difference is refunded to you on delivery."
+                  : estDiff > 0
                   ? fr ? `Ce montant est retenu sur votre portefeuille (solde : ${formatCurrency(rt.walletBalance, locale)}) dès la demande ; il est rendu si l'échange est refusé.` : `This amount is held from your wallet (balance: ${formatCurrency(rt.walletBalance, locale)}) when you ask, and returned if the exchange is declined.`
                   : estDiff < 0
                     ? fr ? "La différence est remboursée sur votre portefeuille à la livraison." : "The difference is refunded to your wallet on delivery."

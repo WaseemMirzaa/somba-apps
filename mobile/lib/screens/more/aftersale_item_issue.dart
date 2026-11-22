@@ -108,6 +108,11 @@ class _ItemIssueScreenState extends State<ItemIssueScreen> {
       return;
     }
     final diff = _diff;
+    if (diff != null && diff > 0 && !RealtimeStore.instance.walletEnabled) {
+      // The difference is paid from the wallet: with it switched off only an item of the same price or less can be asked for.
+      showSnack(context, s.asExDiffPay(exactMoney(s, diff)));
+      return;
+    }
     if (diff != null && diff > 0 && RealtimeStore.instance.walletBalance + 0.004 < diff) {
       setState(() => _walletShort = diff);
       showSnack(context, s.asExWalletLow(exactMoney(s, diff)));

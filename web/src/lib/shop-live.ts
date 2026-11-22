@@ -65,6 +65,8 @@ export interface PublicSettings {
   feePaidBySeller: boolean;
   /** `showPlatformFee`: show the fee as its own line; false = folded into the total ("incl. delivery"). */
   showPlatformFee: boolean;
+  /** `walletEnabled`: false = no wallet anywhere (page, top-up, pay with wallet, wallet refund choice). Default on. */
+  walletEnabled: boolean;
 }
 
 const EMPTY_SETTINGS: PublicSettings = {
@@ -89,6 +91,7 @@ const EMPTY_SETTINGS: PublicSettings = {
   vatPct: 16,
   feePaidBySeller: false,
   showPlatformFee: true,
+  walletEnabled: true,
 };
 
 const num = (v: string | undefined, d: number) => {
@@ -119,6 +122,7 @@ function parseSettings(raw: Record<string, string>): PublicSettings {
     vatPct: num(raw.vatPct, 16),
     feePaidBySeller: raw.deliveryFeePaidBy === "seller",
     showPlatformFee: raw.showPlatformFee !== "false",
+    walletEnabled: raw.walletEnabled !== "false",
   };
 }
 
@@ -153,6 +157,11 @@ export function useTranslationEnabled(): boolean {
     };
   }, [rt.status]);
   return on;
+}
+
+/** The wallet switch (`walletEnabled`, default on): false = hide every wallet entry; live via `settings:updated`. */
+export function useWalletEnabled(): boolean {
+  return usePublicSettings().walletEnabled;
 }
 
 /** Public platform settings (return window, delivery fee rules...) — live via `settings:updated`. */
@@ -200,6 +209,7 @@ export function usePublicSettings(): PublicSettings {
         vatPct: raw.vatPct ?? str("vatPct"),
         deliveryFeePaidBy: raw.deliveryFeePaidBy ?? (cur.feePaidBySeller ? "seller" : "customer"),
         showPlatformFee: raw.showPlatformFee ?? (cur.showPlatformFee ? "true" : "false"),
+        walletEnabled: raw.walletEnabled ?? (cur.walletEnabled ? "true" : "false"),
       });
     });
   });

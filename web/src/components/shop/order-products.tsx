@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/context/locale-context";
 import { formatCurrency } from "@/lib/utils";
+import { useWalletEnabled } from "@/lib/shop-live";
 import { localizeVariant, pickText, variantDisplay } from "@/lib/i18n-fields";
 import type { PackageStatus } from "@/lib/realtime/types";
 import { isPartiallyDelivered } from "@/lib/split-delivery";
@@ -63,6 +64,7 @@ export function packageStatusLabel(status: PackageStatus, fr: boolean): string {
 function ProductRow({ item, showDelivered }: { item: OrderProductEntry; showDelivered?: boolean }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const walletOn = useWalletEnabled();
   const name = pickText(fr, item.name, item.nameFr);
   const cancelled = isCancelledLine(item);
   const refunded = item.refundedUsd && item.refundedUsd > 0 ? item.refundedUsd : 0;
@@ -89,7 +91,9 @@ function ProductRow({ item, showDelivered }: { item: OrderProductEntry; showDeli
             </p>
             {refunded > 0 && (
               <p className="text-emerald-700">
-                {fr ? `Remboursé ${formatCurrency(refunded, locale)} sur votre portefeuille` : `Refunded ${formatCurrency(refunded, locale)} to your wallet`}
+                {walletOn
+                  ? fr ? `Remboursé ${formatCurrency(refunded, locale)} sur votre portefeuille` : `Refunded ${formatCurrency(refunded, locale)} to your wallet`
+                  : fr ? `Remboursé ${formatCurrency(refunded, locale)}` : `Refunded ${formatCurrency(refunded, locale)}`}
               </p>
             )}
           </div>

@@ -295,6 +295,7 @@ async function run() {
     setRepo.create({ key: 'requirePinnedAddress', value: 'false' }),
     setRepo.create({ key: 'requireSellerPickupPin', value: 'false' }),
     setRepo.create({ key: 'commissionPct', value: '12' }),
+    setRepo.create({ key: 'walletEnabled', value: 'true' }),
     setRepo.create({ key: 'vatEnabled', value: 'false' }),
     setRepo.create({ key: 'vatPct', value: '16' }),
     setRepo.create({ key: 'deliveryFeePaidBy', value: 'customer' }),

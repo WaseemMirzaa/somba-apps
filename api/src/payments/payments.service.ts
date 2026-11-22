@@ -22,6 +22,7 @@ import { pushOrderToOps } from '../logistics/hub-scope';
 import { DESK_ROLES } from '../logistics/tiers';
 import { RealtimeEmitter } from '../realtime/realtime-emitter';
 import { WalletService } from '../wallet/wallet.service';
+import { WALLET_OFF, WALLET_OFF_REFUND_NO_ROUTE, walletOn } from '../wallet/wallet-switch';
 import { SettingsService } from '../content/settings.service';
 import { ProductsService } from '../products/products.service';
 import { DEFAULT_LIMIT, pageOf } from '../common/paging';
@@ -169,7 +170,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   /** Which payment methods may be used right now (policy + configuration). */
   async assertMethodAllowed(method: string): Promise<void> {
-    if (method === 'wallet') return;
+    if (method === 'wallet') return this.assertWalletOn();
     if (isMobileMoney(method)) {
       if (!this.mobileMoney) {
         throw new BadRequestException('Mobile money is not available yet. Please use another method.');
@@ -186,6 +187,62 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     throw new BadRequestException('Unknown payment method.');
+  }
+
+  /** The wallet switch (`settings.walletEnabled`): on unless an admin stored 'false'. */
+  async walletEnabled(): Promise<boolean> {
+    return walletOn(await this.settings?.get?.('walletEnabled'));
+  }
+
+  /** Pay with the wallet, top it up or buy a plan with it: refused while the wallet is switched off. */
+  async assertWalletOn(): Promise<void> {
+    if (!(await this.walletEnabled())) throw new BadRequestException(WALLET_OFF);
+  }
+
+  /**
+   * While the wallet is off, money of a payment that was NOT made with the wallet goes back where it came from (phone or card),
+   * never to the wallet. True when a refund of this payment must leave the wallet alone.
+   */
+  async mustAvoidWallet(payment: Pick<Payment, 'method'>): Promise<boolean> {
+    return payment.method !== 'wallet' && !(await this.walletEnabled());
+  }
+
+  /**
+   * The original-method route an AUTOMATIC refund (a cancellation, a seller cancelling lines, a late payment) takes while the
+   * wallet is off: 'phone' / 'card', or null (the wallet is on, the payment was made with the wallet, or the payment cannot go
+   * back automatically: pawaPay / Stripe not connected, or another phone or card refund of it is still in flight. Then the money
+   * goes to the wallet, as it always did, so it is never lost; it is there when the wallet is switched back on).
+   */
+  async automaticOriginal(payment: Pick<Payment, 'method' | 'providerRef' | 'refundRef' | 'refundStatus'>): Promise<RefundOriginal | null> {
+    if (!(await this.mustAvoidWallet(payment))) return null;
+    if (payment.refundRef && payment.refundStatus === 'sending') return null;
+    return this.refundToOriginal(payment);
+  }
+
+  /**
+   * Send a recorded phone / card refund to the processor (after the transaction that recorded it). True: sent, or unanswered
+   * (the status check settles it). False: the processor refused; the entry is already taken back off the payment and the ledger,
+   * so the caller pays the customer another way (the wallet).
+   */
+  async dispatchOriginalRefund(payment: Payment, entry: PaymentRefund, amountUsd: number, original: RefundOriginal): Promise<boolean> {
+    try {
+      if (original === 'phone') {
+        await this.pawapay!.refund({ refundId: entry.refundRef!, depositId: payment.providerRef!, amountUsd, reference: payment.reference });
+      } else {
+        const stripeId = await this.sendCardRefund(payment, amountUsd, entry.refundRef!);
+        if (stripeId) entry.refundRef = stripeId;
+      }
+      return true;
+    } catch (e) {
+      if (e instanceof PawapayUnavailableError) {
+        this.logger.warn(`Refund ${entry.refundRef} for ${payment.reference} unconfirmed: ${e.message}`);
+        return true;
+      }
+      if (original === 'card' && !(e instanceof CardRefundRefusedError)) throw e;
+      this.logger.warn(`${original === 'phone' ? 'pawaPay' : 'Stripe'} refused ${entry.refundRef}: ${(e as Error).message}; refunding to the wallet`);
+      await this.payments.manager.transaction((m) => revertRefund(m, entry));
+      return false;
+    }
   }
 
   static normalisePhone(raw: unknown): string {
@@ -267,6 +324,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    * pending) gets the FIRST payment back instead of a second approval prompt, so a double tap or a retry cannot charge twice.
    */
   async startTopUp(userId: string, amountUsd: number, method: string, phone: unknown, clientRequestId?: unknown): Promise<Payment> {
+    await this.assertWalletOn();
     if (!isMobileMoney(method)) {
       throw new BadRequestException(`Top-up method must be one of: ${MOBILE_MONEY_METHODS.join(', ')}.`);
     }
@@ -360,6 +418,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   ): Promise<Payment> {
     const amount = Number(plan.priceUsd.toFixed(2));
     if (method === 'wallet') {
+      await this.assertWalletOn();
       const payment = await this.payments.manager.transaction(async (m) => {
         await this.wallet.apply(userId, 'debit', amount, `Seller plan ${plan.id}`, m);
         return m.save(
@@ -767,6 +826,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** The id a phone (pawaPay refundId) or card (our idempotency key) refund is recorded and sent under. */
+  newRefundRef(original: RefundOriginal): string {
+    return original === 'phone' ? this.pawapay!.newId() : PaymentsService.newCardRefundRef();
+  }
+
   static newCardRefundRef(): string {
     return `rfd_${randomUUID()}`;
   }
@@ -925,6 +989,11 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     // Success. If it arrives AFTER we gave up (timeout / cancelled order), the
     // customer's money is real, so it must not vanish: credit it to their wallet.
     let wasPending = false;
+    // A late approval of an order payment while the wallet is off goes back to the phone / card instead of being parked in the wallet.
+    const fresh = payment.purpose === 'topup' ? null : await this.payments.findOne({ where: { id: payment.id } });
+    const lateOriginal = fresh && fresh.status === 'failed' ? await this.automaticOriginal(fresh) : null;
+    const lateRef = lateOriginal === 'phone' ? this.pawapay!.newId() : lateOriginal === 'card' ? PaymentsService.newCardRefundRef() : null;
+    let lateEntry: PaymentRefund | null = null;
     const won = await this.payments.manager.transaction(async (m) => {
       if (payment.purpose === 'topup') {
         if (!(await this.claim(m, payment.id, ['pending', 'failed'], 'succeeded', null))) return false;
@@ -935,13 +1004,27 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         wasPending = true;
         return true;
       }
+      const memo = `Payment ${payment.reference} arrived after order ${payment.orderReference} was closed`;
+      if (lateOriginal) {
+        // C-refund: the payment is whole again for a moment, then the ledger refunds all of it to where it came from.
+        if (!(await this.claim(m, payment.id, ['failed'], 'succeeded', null))) return false;
+        ({ entry: lateEntry } = await recordRefund(m, { payment, amountUsd: payment.amountUsd, to: lateOriginal, kind: 'late_payment', memo, refundRef: lateRef }));
+        return true;
+      }
       // Late success on a payment we already failed: park the money in the wallet.
       if (!(await this.claim(m, payment.id, ['failed'], 'refunded'))) return false;
-      const memo = `Payment ${payment.reference} arrived after order ${payment.orderReference} was closed`;
       await this.wallet.apply(payment.userId, 'refund', payment.amountUsd, memo, m);
       await recordParkedPayment(m, payment, memo); // C-refund: recorded like every refund
       return true;
     });
+    if (won && lateOriginal && lateEntry && !(await this.dispatchOriginalRefund(fresh!, lateEntry as PaymentRefund, payment.amountUsd, lateOriginal))) {
+      // The processor refused: the money is parked in the wallet after all, never lost.
+      await this.payments.manager.transaction(async (m) => {
+        if (!(await this.claim(m, payment.id, ['succeeded'], 'refunded'))) return;
+        await this.wallet.apply(payment.userId, 'refund', payment.amountUsd, `Payment ${payment.reference} arrived after order ${payment.orderReference} was closed`, m);
+        await recordParkedPayment(m, payment, `Payment ${payment.reference} arrived after order ${payment.orderReference} was closed`);
+      });
+    }
     const saved = (await this.payments.findOne({ where: { id: payment.id } }))!;
     if (!won) return saved;
     this.publish(saved);
@@ -1010,17 +1093,29 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (payment.status !== 'succeeded') return 0;
     // C-refund: only what is left on the payment goes back (lines a seller or a return already refunded are out).
     const due = refundableUsd(payment, order.items);
+    // Wallet switched off and the order was not paid with the wallet: the money goes back to the phone / card.
+    const original = due >= 0.01 ? await this.automaticOriginal(payment) : null;
+    const refundRef = original === 'phone' ? this.pawapay!.newId() : original === 'card' ? PaymentsService.newCardRefundRef() : null;
+    let recorded: PaymentRefund | null = null;
     const won = await this.payments.manager.transaction(async (m) => {
       if (due < 0.01) return this.claim(m, payment.id, ['succeeded'], 'refunded'); // nothing left to pay back: the payment is just closed
       try {
-        await recordRefund(m, { payment, amountUsd: due, to: 'wallet', kind: 'cancellation', memo: `Refund for cancelled order ${order.reference}` });
+        ({ entry: recorded } = await recordRefund(m, { payment, amountUsd: due, to: original ?? 'wallet', kind: 'cancellation', memo: `Refund for cancelled order ${order.reference}`, refundRef }));
       } catch (e) {
         if (e instanceof BadRequestException) return false; // a concurrent cancel refunded it first: exactly one wins
         throw e;
       }
-      await this.wallet.apply(payment.userId, 'refund', due, `Refund for cancelled order ${order.reference}`, m);
+      if (!original) await this.wallet.apply(payment.userId, 'refund', due, `Refund for cancelled order ${order.reference}`, m);
       return true;
     });
+    if (won && original && recorded && !(await this.dispatchOriginalRefund(payment, recorded as PaymentRefund, due, original))) {
+      // The processor refused: the customer is not left out, the wallet gets it (finance can see it in the refund log).
+      await this.payments.manager.transaction(async (m) => {
+        await recordRefund(m, { payment, amountUsd: due, to: 'wallet', kind: 'cancellation', memo: `Refund for cancelled order ${order.reference}` });
+        await this.wallet.apply(payment.userId, 'refund', due, `Refund for cancelled order ${order.reference}`, m);
+      });
+      this.logger.warn(`The ${original} refund of cancelled order ${order.reference} was refused; credited to the wallet.`);
+    }
     if (won) this.publish((await this.payments.findOne({ where: { id: payment.id } }))!);
     return won ? due : 0;
   }
@@ -1069,10 +1164,15 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (payment.status !== 'succeeded') {
       throw new BadRequestException('Only a completed payment can be refunded.');
     }
+    // Wallet switched off: a payment that was not made with the wallet never refunds into it (whatever the caller asked for).
+    const avoidWallet = await this.mustAvoidWallet(payment);
+    if (avoidWallet) toWallet = false;
     const original = toWallet === false ? this.refundToOriginal(payment) : null;
     if (toWallet === false && !original) {
       throw new BadRequestException(
-        isMobileMoney(payment.method)
+        avoidWallet
+          ? WALLET_OFF_REFUND_NO_ROUTE
+          : isMobileMoney(payment.method)
           ? "Refunds to the phone need pawaPay to be connected. Refund to the customer's wallet."
           : payment.method === 'stripe_card'
             ? "Refunds to the card need Stripe to be connected. Refund to the customer's wallet."

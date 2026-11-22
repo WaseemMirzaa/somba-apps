@@ -1,5 +1,6 @@
 "use client";
 
+import { useWalletEnabled } from "@/lib/shop-live";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailSection, InfoGrid } from "@/components/ui/info-grid";
@@ -65,6 +66,7 @@ export function ReplacementStatusView({ r }: { r: ReplacementRow }) {
 export function ExchangeStatusView({ r }: { r: ExchangeRow }) {
   const { locale } = useLocale();
   const fr = locale === "fr";
+  const walletOn = useWalletEnabled();
   const steps = swapSteps(r, fr);
   const status = SWAP_STATUS[r.status];
   const diff = r.priceDiffUsd;
@@ -94,8 +96,8 @@ export function ExchangeStatusView({ r }: { r: ExchangeRow }) {
                 ),
               full: true,
             },
-            ...(diff > 0 ? [{ label: fr ? "Portefeuille" : "Wallet", value: r.status === "rejected" ? (fr ? "Montant retenu rendu à votre portefeuille." : "The held amount went back to your wallet.") : fr ? `${formatCurrency(r.heldUsd, locale)} retenus sur votre portefeuille à la demande.` : `${formatCurrency(r.heldUsd, locale)} held from your wallet when you asked.`, full: true }] : []),
-            ...(diff < 0 ? [{ label: fr ? "Portefeuille" : "Wallet", value: r.status === "delivered" ? (fr ? "Remboursé sur votre portefeuille à la livraison." : "Refunded to your wallet on delivery.") : fr ? "Remboursé sur votre portefeuille à la livraison." : "Refunded to your wallet when delivered.", full: true }] : []),
+            ...(diff > 0 ? [{ label: walletOn ? (fr ? "Portefeuille" : "Wallet") : fr ? "Paiement" : "Payment", value: r.status === "rejected" ? (walletOn ? (fr ? "Montant retenu rendu à votre portefeuille." : "The held amount went back to your wallet.") : fr ? "Le montant retenu vous a été rendu." : "The held amount was returned to you.") : walletOn ? (fr ? `${formatCurrency(r.heldUsd, locale)} retenus sur votre portefeuille à la demande.` : `${formatCurrency(r.heldUsd, locale)} held from your wallet when you asked.`) : fr ? `${formatCurrency(r.heldUsd, locale)} retenus à la demande.` : `${formatCurrency(r.heldUsd, locale)} held when you asked.`, full: true }] : []),
+            ...(diff < 0 ? [{ label: walletOn ? (fr ? "Portefeuille" : "Wallet") : fr ? "Remboursement" : "Refund", value: !walletOn ? (fr ? "Remboursé à la livraison." : "Refunded on delivery.") : r.status === "delivered" ? (fr ? "Remboursé sur votre portefeuille à la livraison." : "Refunded to your wallet on delivery.") : fr ? "Remboursé sur votre portefeuille à la livraison." : "Refunded to your wallet when delivered.", full: true }] : []),
             ...(r.reason ? [{ label: fr ? "Motif" : "Reason", value: <TranslatableText kind="exchange_reason" id={r.id} auto text={r.reason} i18n={r.reasonI18n} />, full: true }] : []),
             ...(r.sellerReason ? [{ label: fr ? "Réponse du support KOMORIKO" : "KOMORIKO support's answer", value: <TranslatableText kind="exchange_reply" id={r.id} auto text={r.sellerReason} i18n={r.sellerReasonI18n} />, full: true }] : []),
           ]} />

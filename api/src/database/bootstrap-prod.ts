@@ -154,6 +154,7 @@ async function run() {
     requirePinnedAddress: 'true', // checkout needs a map pin on the delivery address
     requireSellerPickupPin: 'true', // a seller pins their pickup location before listing products
     commissionPct: '12',
+    walletEnabled: 'true', // the wallet (top-up, pay with wallet, wallet refunds): an admin can switch it off (Admin -> Settings)
     vatEnabled: 'false', // charging VAT is the owner's call: off until an admin turns it on (Admin -> Settings)
     vatPct: '16', // the VAT rate of a category that sets none
     deliveryFeePaidBy: 'customer', // 'seller' takes the delivery fee off the seller's payout instead

@@ -1,5 +1,6 @@
 "use client";
 
+import { useWalletEnabled } from "@/lib/shop-live";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { RequireSignIn } from "@/components/shop/require-sign-in";
@@ -10,6 +11,7 @@ function ExchangePicker() {
   const { locale } = useLocale();
   const fr = locale === "fr";
   const delivered = useMyOrders().filter((o) => o.status === "delivered");
+  const walletOn = useWalletEnabled();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -17,8 +19,8 @@ function ExchangePicker() {
       <div className="card-premium space-y-2 p-6 text-sm text-slate-600">
         <p>
           {fr
-            ? "Choisissez une commande livrée. Un remplacement envoie une unité neuve du même article ; un échange change la taille, la couleur ou l'option (la différence de prix passe par votre portefeuille). Un livreur de l'entrepôt apporte le nouvel article et reprend l'ancien."
-            : "Pick a delivered order. A replacement sends a new unit of the same item; an exchange swaps the size, colour or option (any price difference goes through your wallet). A warehouse rider brings the new item and collects the old one."}
+            ? `Choisissez une commande livrée. Un remplacement envoie une unité neuve du même article ; un échange change la taille, la couleur ou l'option${walletOn ? " (la différence de prix passe par votre portefeuille)" : ""}. Un livreur de l'entrepôt apporte le nouvel article et reprend l'ancien.`
+            : `Pick a delivered order. A replacement sends a new unit of the same item; an exchange swaps the size, colour or option${walletOn ? " (any price difference goes through your wallet)" : ""}. A warehouse rider brings the new item and collects the old one.`}
         </p>
       </div>
       {delivered.length === 0 ? (

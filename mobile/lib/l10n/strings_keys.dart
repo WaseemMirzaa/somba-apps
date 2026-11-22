@@ -38,6 +38,9 @@ extension StringsKeys on Strings {
   String get platformFee => t('platformFee');
   String get total => t('total');
 
+  /// "The wallet is not available right now.": what a wallet screen reached while the wallet is switched off says.
+  String get walletOff => t('wallet_off');
+
   /// The one summed VAT line of a cart, a checkout and an order (shown only when VAT was charged).
   String get vat => t('vat');
 

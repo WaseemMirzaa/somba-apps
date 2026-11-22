@@ -7,10 +7,11 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, Update
  *  - `return`: the returned items were paid back once the goods reached the warehouse;
  *  - `dispute`: an admin decided a dispute with a full or partial refund;
  *  - `seller_cancel`: a seller cancelled some lines of a paid order;
+ *  - `exchange`: the price difference of a cheaper exchange item, paid back to the phone / card while the wallet is switched off;
  *  - `late_payment`: a mobile-money approval arrived after the order was closed, so the money was parked in the wallet;
  *  - `legacy`: refunded before this ledger existed (written by the migration; the money is real, the detail is not known).
  */
-export type RefundKind = 'admin' | 'cancellation' | 'return' | 'dispute' | 'seller_cancel' | 'late_payment' | 'legacy';
+export type RefundKind = 'admin' | 'cancellation' | 'return' | 'dispute' | 'seller_cancel' | 'late_payment' | 'exchange' | 'legacy';
 
 /** completed | sending (a phone or card refund the processor has not confirmed yet) | failed (it could not; the wallet got it instead). */
 export type RefundStatus = 'completed' | 'sending' | 'failed';

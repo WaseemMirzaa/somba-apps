@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/strings.dart';
 import '../../services/aftersale_models.dart';
 import '../../services/aftersale_store.dart';
+import '../../services/realtime_store.dart';
 import '../../services/models.dart';
 import '../../theme/app_theme.dart';
 import '../../util/format.dart';
@@ -468,7 +469,7 @@ class _ReturnRequestScreenState extends State<ReturnRequestScreen> {
       ),
       const SizedBox(height: AppSpace.lg),
       PhotoPickerField(attachments: _photos, label: s.asPhotosLabel),
-      if (_mobileMoney) ...[
+      if (_mobileMoney && RealtimeStore.instance.walletEnabled) ...[
         const SizedBox(height: AppSpace.lg),
         Text(s.asRefundTo, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
