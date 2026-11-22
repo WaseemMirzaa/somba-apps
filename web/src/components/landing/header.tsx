@@ -65,7 +65,7 @@ export function LandingHeader() {
           </div>
 
           <div className="ml-auto flex items-center gap-1">
-            <div className="hidden items-center gap-1 rounded-xl border border-[var(--border)] bg-slate-50 p-1 sm:flex">
+            <div translate="no" className="notranslate hidden items-center gap-1 rounded-xl border border-[var(--border)] bg-slate-50 p-1 sm:flex">
               <button
                 onClick={() => setLocale("en")}
                 aria-label="English"
@@ -184,7 +184,7 @@ export function LandingHeader() {
             <div className="mb-4 overflow-x-auto">
               <PortalSwitcher compact />
             </div>
-            <div className="flex gap-2">
+            <div translate="no" className="notranslate flex gap-2">
               <button
                 onClick={() => setLocale("en")}
                 className={cn("flex-1 rounded-xl py-2.5 text-sm font-medium", locale === "en" ? "bg-white text-[var(--primary)]" : "border border-white/30 text-white")}

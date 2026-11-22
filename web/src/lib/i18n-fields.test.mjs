@@ -7,7 +7,7 @@ import ts from "typescript";
 const src = readFileSync(new URL("./i18n-fields.ts", import.meta.url), "utf8");
 const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
 const {
-  pickText, localized, localizedNotice, foldText, matchesSearch, labeledGroups, localizeVariantText,
+  pickText, localized, localizedNotice, foldText, foldSearch, normalizeOrderRef, routeOrderKey, matchesSearch, labeledGroups, localizeVariantText,
   isMachineText, fieldOrigin, ownText, frInForm,
   noticeTypeLabel, variantDisplay, localizeVariant, daysLabel, categoryLabel, productNameFor, resolutionText,
 } = await import(`data:text/javascript,${encodeURIComponent(outputText)}`);
@@ -149,4 +149,18 @@ test("resolutionText: the API's French first, known stock phrases mapped, an age
   assert.equal(resolutionText({ resolution: "Item was damaged, refunded in full" }, true), "Item was damaged, refunded in full");
   assert.equal(resolutionText({ resolution: null }, true), "");
   assert.equal(resolutionText(null, false), "");
+});
+
+test("an old SOM- order reference is read as KOM- (one shared helper)", () => {
+  assert.equal(normalizeOrderRef("SOM-12345"), "KOM-12345");
+  assert.equal(normalizeOrderRef("#som-12 and SOM-9"), "#KOM-12 and KOM-9");
+  assert.equal(normalizeOrderRef("SOMBA10"), "SOMBA10");
+  assert.equal(normalizeOrderRef("BLOSSOM-1"), "BLOSSOM-1");
+  assert.equal(foldSearch("#SOM-220126447"), "kom-220126447");
+  assert.equal(foldSearch("SOM-AbC"), "kom-abc");
+  assert.equal(routeOrderKey("SOM-220126447"), "KOM-220126447");
+  assert.equal(routeOrderKey("KOM-1"), "KOM-1");
+  assert.equal(routeOrderKey("%23som-7"), "#KOM-7");
+  assert.equal(routeOrderKey(undefined), "");
+  assert.equal(matchesSearch("#som-77", ["KOM-77"]), true);
 });

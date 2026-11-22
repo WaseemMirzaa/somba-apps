@@ -109,7 +109,7 @@ test("Product questions: Super Admin, Operations, Moderation and Support reach t
 });
 
 test("the EN / FR toggles opt out of browser translation, and html lang follows the stored choice at first paint", () => {
-  for (const f of ["../components/layout/dashboard-layout.tsx", "../components/ui/language-toggle.tsx", "../app/rider/layout.tsx"]) {
+  for (const f of ["../components/layout/dashboard-layout.tsx", "../components/ui/language-toggle.tsx", "../app/rider/layout.tsx", "../components/landing/header.tsx", "../components/landing/marketing-header.tsx"]) {
     assert.match(readFileSync(new URL(f, import.meta.url), "utf8"), /translate="no"/, f);
   }
   assert.match(readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8"), /somba-locale/);

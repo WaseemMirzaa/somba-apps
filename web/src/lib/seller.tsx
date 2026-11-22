@@ -15,7 +15,7 @@ import {
 } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
-import { frInForm, pickText, variantDisplay } from "@/lib/i18n-fields";
+import { frInForm, pickText, routeOrderKey, variantDisplay } from "@/lib/i18n-fields";
 import { campaignStatusLabel, sellerBadgeLabel } from "@/lib/seller-labels";
 import { readVariantLabels, readVariants } from "@/lib/variants";
 import { formatCurrency } from "@/lib/utils";
@@ -993,7 +993,7 @@ function buildSellerData(input: BuildInput) {
       sellerProductList.find((p) => p.id === String(id)),
     getSellerInventory: (sku: string) => sellerInventoryList.find((i) => i.sku === sku),
     getSellerOrder: (id: string) =>
-      sellerOrderList.find((o) => o.id === id || o.orderId === id),
+      sellerOrderList.find((o) => o.id === routeOrderKey(id) || o.orderId === id),
     getShipment: (id: string) => shipmentList.find((s) => s.id === id),
     getShipmentByOrderId: (orderId: string) => shipmentList.find((s) => s.orderId === orderId),
     // Links from notifications carry the record id; lists use the reference.
@@ -1475,7 +1475,7 @@ export function SellerDataProvider({ children }: { children: React.ReactNode }) 
         return toLabelPack(res);
       },
       lookupSellerOrder: async (idOrReference) => {
-        const res = await request<{ items?: SellerOrderView[] }>("orders:sellerList", { id: idOrReference, limit: 1 });
+        const res = await request<{ items?: SellerOrderView[] }>("orders:sellerList", { id: routeOrderKey(idOrReference), limit: 1 });
         const found = res?.items?.[0];
         if (!found) return false;
         setExtraOrders((cur) => upsert(cur, found));

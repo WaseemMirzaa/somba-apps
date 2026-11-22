@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRealtime } from "@/context/realtime-context";
 import { useLocale } from "@/context/locale-context";
-import { pickText } from "@/lib/i18n-fields";
+import { pickText, routeOrderKey } from "@/lib/i18n-fields";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { errMsg } from "@/lib/admin-live";
 import type { Order, Product } from "@/lib/realtime/types";
@@ -212,7 +212,7 @@ export function useAdminData(want: { customers?: boolean; fraud?: boolean } = {}
     loading: feedLoading || loading,
     error: rt.status === "error" ? (rt.error ?? "Cannot reach the server.") : error,
     reload: refresh,
-    getOrder: (id: string) => orderEntities.find((o) => o.id === id || o.orderId === id),
+    getOrder: (id: string) => orderEntities.find((o) => o.id === routeOrderKey(id) || o.orderId === id),
     getCustomer: (id: string | number) => customerEntities.find((c) => c.id === String(id)),
     getModerationProduct: (id: string | number) => moderationQueue.find((p) => p.id === String(id)),
     ...actions,

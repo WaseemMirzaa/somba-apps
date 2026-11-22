@@ -71,8 +71,9 @@ export function MarketingHeader({ overlay = false }: { overlay?: boolean }) {
               </Link>
             )}
             <div
+              translate="no"
               className={cn(
-                "hidden items-center gap-1 rounded-xl border p-1 sm:flex",
+                "notranslate hidden items-center gap-1 rounded-xl border p-1 sm:flex",
                 overlay ? "border-white/20 bg-white/10" : "border-[var(--border)] bg-slate-50"
               )}
             >
