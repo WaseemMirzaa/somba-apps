@@ -180,6 +180,7 @@ extension StringsKeys on Strings {
   String get locTitle => t('loc_title');
   String get locMoveMap => t('loc_move_map');
   String get locFinding => t('loc_finding');
+  String get locLocating => t('loc_locating');
   String get locStreetLabel => t('loc_street_label');
   String get locStreetHint => t('loc_street_hint');
   String get locConfirm => t('loc_confirm');

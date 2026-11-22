@@ -139,6 +139,7 @@ const Map<String, (String, String)> _kMessagesBase = {
   'loc_title': ('Delivery location', 'Lieu de livraison'),
   'loc_move_map': ('Move the map to put the pin on your door', 'Déplacez la carte pour placer l’épingle sur votre porte'),
   'loc_finding': ('Finding the address…', 'Recherche de l’adresse…'),
+  'loc_locating': ('Locating you…', 'Localisation en cours…'),
   'loc_street_label': ('Exact street address', 'Adresse exacte'),
   'loc_street_hint': ('Number and street, e.g. 12 Avenue de la Paix', 'Numéro et rue, ex. 12 avenue de la Paix'),
   'loc_confirm': ('Confirm location', 'Confirmer la position'),
