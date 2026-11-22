@@ -27,6 +27,9 @@ String? streetAddressError(String value, Strings s) {
   return null;
 }
 
+/// Pause after the map settles before the address is looked up, so quick pans send one request, not several.
+const lookupDebounce = Duration(milliseconds: 400);
+
 /// Uber-style location picker: a full-screen map with a pin fixed in the centre (the map moves, not the pin),
 /// place search at the top and, at the bottom, the address under the pin with a mandatory exact street address.
 /// Pops with the [PickedPlace] (its `parts.line1` is the street the customer confirmed), or null when backed out.
@@ -62,9 +65,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   bool _streetEdited = false; // the customer's own street text wins over later lookups
   int _lookupSeq = 0;
   Timer? _searchDebounce;
+  Timer? _lookupTimer;
+  int _interactions = 0; // counts what the customer did by hand (pan, typed street, chosen result): a late position must not undo it
+  bool _programmatic = false; // the camera is moving because the app moved it, not the customer
+  LatLng? _pendingCenter; // a position that arrived before the native map was created
   List<PlaceSuggestion> _suggestions = const [];
   bool _searched = false;
-  bool _locating = false;
+  late bool _locating = widget.initialPin == null && widget.locateOnOpen; // visible from the first frame
   String? _streetErr, _notice;
 
   @override
@@ -92,6 +99,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _lookupTimer?.cancel();
     _search.dispose();
     _searchFocus.dispose();
     _street.dispose();
@@ -101,21 +109,39 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   // ---------------------------------------------------------------- map
   void _onMove(LatLng pos) {
+    if (!_programmatic && (pos.latitude != _center.latitude || pos.longitude != _center.longitude)) _interactions++;
     _center = pos;
+    _lookupTimer?.cancel(); // still moving: the lookup waits for the next pause
     if (!_moving) setState(() => _moving = true);
   }
 
   void _onIdle() {
+    _programmatic = false;
     setState(() => _moving = false);
     if (_skipNextLookup) {
       _skipNextLookup = false;
       return;
     }
-    _lookup();
+    _scheduleLookup();
+  }
+
+  /// Looks the pin up once the map has rested for [lookupDebounce]. The address line shows "finding" meanwhile and
+  /// whatever lookup was still in flight is dropped. Confirm stays available throughout.
+  void _scheduleLookup() {
+    _lookupTimer?.cancel();
+    _lookupSeq++;
+    setState(() {
+      _resolving = true;
+      _notice = null;
+    });
+    _lookupTimer = Timer(lookupDebounce, () {
+      if (mounted) _lookup();
+    });
   }
 
   /// Reverse-geocodes the centre. A newer lookup cancels the result of an older one.
   Future<void> _lookup() async {
+    _lookupTimer?.cancel();
     final seq = ++_lookupSeq;
     final at = _center;
     setState(() {
@@ -151,7 +177,14 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
 
   Future<void> _moveTo(LatLng pos) async {
     _center = pos;
-    await _map?.animateCamera(CameraUpdate.newLatLngZoom(pos, 17));
+    final map = _map;
+    if (map == null) return;
+    _programmatic = true;
+    try {
+      await map.animateCamera(CameraUpdate.newLatLngZoom(pos, 17));
+    } finally {
+      _programmatic = false;
+    }
   }
 
   // ---------------------------------------------------------------- search
@@ -187,6 +220,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _session = _newSession(); // a finished selection ends the billing session
       if (!mounted) return;
       _lookupSeq++; // drop any lookup still in flight
+      _lookupTimer?.cancel();
+      _interactions++;
       _skipNextLookup = _map != null; // the camera move it triggers needs no second lookup
       _setPlace(place, overwriteStreet: true);
       await _moveTo(LatLng(place.lat, place.lng));
@@ -209,24 +244,28 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
   Future<void> _useMyLocation({bool quiet = false}) async {
     _closeSearch();
     setState(() => _locating = true);
+    final before = _interactions;
+    // A position that arrives after the customer moved the map, picked a result or typed a street is dropped.
+    bool stale() => _interactions != before;
     try {
       final p = await currentPosition();
-      if (!mounted) return;
+      if (!mounted || stale()) return;
       final pos = LatLng(p.lat, p.lng);
       if (_map == null) {
         _center = pos;
-        await _lookup();
+        _pendingCenter = pos; // the map jumps there when it is created, and its idle event adds nothing further
+        _scheduleLookup();
       } else {
         await _moveTo(pos); // the camera's idle event does the lookup
       }
     } on LocationException catch (e) {
       // Services off, permission refused or blocked, no signal: each says what to do. The map stays usable by hand.
       if (!quiet && mounted) showLocationProblem(context, e.problem);
-      if (mounted) await _lookup();
+      if (mounted && !stale()) await _lookup();
     } catch (e) {
       debugPrint('Locate failed: $e');
       if (!quiet && mounted) showLocationProblem(context, LocationProblem.unavailable);
-      if (mounted) await _lookup();
+      if (mounted && !stale()) await _lookup();
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -242,7 +281,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
       _snack(err);
       return;
     }
-    final p = _place;
+    final p = _resolving ? null : _place; // a lookup still running: the old address is not this pin's
     final parts = p?.parts ?? const PickedParts();
     Navigator.pop(
       context,
@@ -268,16 +307,26 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(m)));
 
+  void _onMapCreated(GoogleMapController c) {
+    _map = c;
+    final pending = _pendingCenter;
+    if (pending != null) {
+      _pendingCenter = null;
+      _programmatic = true;
+      c.moveCamera(CameraUpdate.newLatLngZoom(pending, 17));
+    }
+  }
+
   // ---------------------------------------------------------------- UI
   Widget _buildMap(BuildContext context) {
     final b = widget.mapBuilder;
     if (b != null) {
-      return b(context, initial: _center, onMove: _onMove, onIdle: _onIdle, onCreated: (c) => _map = c);
+      return b(context, initial: _center, onMove: _onMove, onIdle: _onIdle, onCreated: _onMapCreated);
     }
     return GoogleMap(
       key: const ValueKey('picker-map'),
       initialCameraPosition: CameraPosition(target: _center, zoom: widget.initialPin == null ? 13 : 17),
-      onMapCreated: (c) => _map = c,
+      onMapCreated: _onMapCreated,
       onCameraMove: (p) => _onMove(p.target),
       onCameraIdle: _onIdle,
       myLocationEnabled: false,
@@ -423,13 +472,13 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
         Text(s.locTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
         const SizedBox(height: 4),
         Row(children: [
-          if (_resolving || _moving) ...[
+          if (_resolving || _moving || _locating) ...[
             const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
             const SizedBox(width: 8),
           ],
           Expanded(
             child: Text(
-              _resolving || _moving ? s.locFinding : (_notice ?? formatted ?? s.locMoveMap),
+              _resolving || _moving ? s.locFinding : _locating ? s.locLocating : (_notice ?? formatted ?? s.locMoveMap),
               key: const ValueKey('picker-address'),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -447,6 +496,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           error: _streetErr,
           onChanged: (_) {
             _streetEdited = true;
+            _interactions++;
             if (_streetErr != null) setState(() => _streetErr = null);
           },
         ),

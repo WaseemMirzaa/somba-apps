@@ -2,6 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'maps_config.dart';
 
+/// A pin's address is looked up on every pause of the map: past this wait the picker keeps the bare pin instead.
+const reverseGeocodeTimeout = Duration(seconds: 5);
+
 /// One Google address component, normalised from either the Places (New) or the Geocoding shape.
 typedef AddrComponent = ({List<String> types, String long});
 
@@ -124,7 +127,7 @@ class PlacesClient {
   Future<PickedPlace> reverseGeocode(double lat, double lng) async {
     final res = await _http
         .get(Uri.parse('https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&language=$language&key=$_key'))
-        .timeout(const Duration(seconds: 10));
+        .timeout(reverseGeocodeTimeout);
     final body = _json(res, 'Reverse geocoding');
     final status = body['status'];
     if (status != null && status != 'OK' && status != 'ZERO_RESULTS') {
