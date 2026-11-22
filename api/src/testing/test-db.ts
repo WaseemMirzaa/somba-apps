@@ -28,6 +28,7 @@ export function recordingEmitter() {
     toRoles: (roles: string[], event: string, payload: unknown) => void sent.push({ to: roles.join(','), event, payload }),
     toRolesOnly: (roles: string[], event: string, payload: unknown) => void sent.push({ to: roles.join(','), event, payload }),
     toRole: (role: string, event: string, payload: unknown) => void sent.push({ to: role, event, payload }),
+    broadcast: (event: string, payload: unknown) => void sent.push({ to: '*', event, payload }),
     toHub: (hubId: string, event: string, payload: unknown) => void sent.push({ to: `hub:${hubId}`, event, payload }),
     toUser: (id: string, event: string, payload: unknown) => void sent.push({ to: `user:${id}`, event, payload }),
   };

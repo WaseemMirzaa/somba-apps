@@ -81,7 +81,7 @@ describe('cms:updated', () => {
     const rooms = adminRooms(emitter.sent, 'cms:updated');
     expect(rooms).toHaveLength(1);
     for (const role of ALL_ADMINS) expect(heard(rooms, role)).toBe(['admin', 'admin_marketing'].includes(role));
-    expect(emitter.sent.some((e) => e.event === 'cms:updated' && e.to.startsWith('customer'))).toBe(true);
+    expect(emitter.sent.some((e) => e.event === 'cms:updated' && e.to === '*')).toBe(true); // everyone, guests included
     await ds.destroy();
   });
 });

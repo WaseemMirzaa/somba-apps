@@ -539,6 +539,8 @@ extension StringsKeys on Strings {
   String get termsTitle => t('terms_title');
   String get termsBody => t('terms_body');
   String get langSwitchTo => t('lang_switch_to');
+  String get cmsCardMissing => t('cms_card_missing');
+  String get cmsCardLinkFailed => t('cms_card_link_failed');
   String whenDate(Object? date) => t('when_date', {'date': date});
   String get orderCancelQ => t('order_cancel_q');
   String get orderCancelUnpaid => t('order_cancel_unpaid');

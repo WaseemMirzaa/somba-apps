@@ -462,6 +462,7 @@ class RealtimeStore extends ChangeNotifier {
       _replace(categories, d, CategoryDto.fromJson);
       notifyListeners();
     });
+    _socket.on('cms:updated', applyCmsUpdate);
     _socket.on('cart:updated', (d) {
       serverCart.value = _map(d);
       notifyListeners();
@@ -539,6 +540,7 @@ class RealtimeStore extends ChangeNotifier {
               .map(_map)
               .where((b) => b['type'] == 'banner' && b['active'] != false)
               .map(BannerDto.fromJson));
+        banners.sort(BannerDto.byOrder);
       }),
     ]);
     await Future.wait([
@@ -1061,6 +1063,19 @@ class RealtimeStore extends ChangeNotifier {
     } else {
       products[idx] = p;
     }
+    notifyListeners();
+  }
+
+  /// One home card changed on the server (`cms:updated`): add or replace it, or drop it when it was deleted, switched off
+  /// or is not a banner. The server sends a switched-off card as a stub (id, key, `active: false`).
+  void applyCmsUpdate(dynamic d) {
+    if (d is! Map) return;
+    final m = _map(d);
+    final id = textOrNull(m['id']);
+    final key = textOrNull(m['key']);
+    banners.removeWhere((b) => (id != null && b.id == id) || (key != null && b.key == key));
+    if (m['deleted'] != true && m['active'] != false && m['type'] == 'banner') banners.add(BannerDto.fromJson(m));
+    banners.sort(BannerDto.byOrder);
     notifyListeners();
   }
 

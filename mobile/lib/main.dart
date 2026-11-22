@@ -15,6 +15,7 @@ import 'services/maps_config.dart';
 import 'services/notification_sound.dart';
 import 'services/push_service.dart';
 import 'services/realtime_store.dart';
+import 'widgets/keyboard.dart';
 import 'theme/app_theme.dart';
 import 'util/format.dart';
 
@@ -177,6 +178,8 @@ class _SombaAppState extends State<SombaApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       theme: AppTheme.light(),
+      navigatorObservers: [KeyboardDismissObserver()],
+      builder: (context, child) => KeyboardDismisser(child: child ?? const SizedBox.shrink()),
       // Rebuild on market/currency change so prices re-render app-wide.
       home: ValueListenableBuilder(
         valueListenable: marketNotifier,

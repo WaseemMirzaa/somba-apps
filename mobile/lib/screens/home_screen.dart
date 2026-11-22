@@ -7,9 +7,12 @@ import '../services/engage_store.dart';
 import '../services/realtime_store.dart';
 import '../l10n/strings.dart';
 import '../theme/app_theme.dart';
+import '../services/models.dart';
 import '../widgets/category_image.dart';
+import '../widgets/cms_card.dart';
 import '../widgets/common.dart';
 import '../widgets/flash_section.dart';
+import '../widgets/language_switcher.dart';
 import '../widgets/product_actions.dart';
 import '../widgets/product_card.dart';
 import 'cart_screen.dart';
@@ -36,22 +39,13 @@ class _HomeScreenState extends State<HomeScreen> {
   int _feedTab = 0;
   Timer? _autoplay;
 
-  static const _gradients = [
-    AppColors.brandGradient,
-    AppColors.dealGradient,
-    LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0EA5E9), Color(0xFF2563EB)]),
-  ];
-  static const _icons = [Icons.auto_awesome_rounded, Icons.local_fire_department_rounded, Icons.local_shipping_rounded];
-
-  /// The admin's banners (CMS), or a single neutral welcome banner when none exist.
-  List<_Banner> _banners(Strings s) {
-    final cms = RealtimeStore.instance.banners;
-    if (cms.isEmpty) return [_Banner(_gradients[0], _icons[0], '', s.heroTitle, s.heroSubtitle)];
-    return [
-      for (var i = 0; i < cms.length; i++)
-        _Banner(_gradients[i % _gradients.length], _icons[i % _icons.length], '', cms[i].displayTitle(s.lang), cms[i].displayBody(s.lang)),
-    ];
+  /// The cards to show now: the admin's, in order, inside their schedule; one neutral welcome card when there are none.
+  List<BannerDto> _live() {
+    final now = DateTime.now();
+    return [for (final b in RealtimeStore.instance.banners) if (b.isLiveAt(now)) b];
   }
+
+  int _liveCount = 0;
 
   @override
   void initState() {
@@ -61,7 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
     EngageStore.instance.addListener(_onStore); // flash sales start, end and tick live
     _autoplay = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_pageController.hasClients) return;
-      final count = RealtimeStore.instance.banners.isEmpty ? 1 : RealtimeStore.instance.banners.length;
+      final live = _live().length;
+      // A card's schedule can start or end while the page is open: redraw when the number on show changes.
+      if (live != _liveCount && mounted) setState(() {});
+      final count = live == 0 ? 1 : live;
       if (count < 2) return;
       final next = (_page + 1) % count;
       _pageController.animateToPage(next,
@@ -203,7 +200,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   const Icon(Icons.location_on_rounded, color: Colors.white70, size: 18),
                   const SizedBox(width: 5),
-                  GestureDetector(
+                  // The address takes what is left and shortens with "…" so the language switcher and the cart never overflow.
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () async {
                       await Navigator.push(context, MaterialPageRoute(builder: (_) => AddressBookScreen(locale: widget.locale, pickMode: true)));
@@ -217,22 +218,23 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w500)),
                       Row(
                         children: [
-                          Text(_addressLabel(),
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                          Flexible(
+                            child: Text(_addressLabel(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                          ),
                           const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
                         ],
                       ),
                     ],
                     ),
+                      ),
+                    ),
                   ),
-                  const Spacer(),
-                  CircleIconButton(
-                    icon: Icons.translate_rounded,
-                    background: Colors.white.withValues(alpha: 0.18),
-                    color: Colors.white,
-                    onTap: () => widget.onLocaleChanged(lang == 'en' ? const Locale('fr') : const Locale('en')),
-                  ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpace.sm),
+                  LanguageSwitcher(locale: widget.locale, onChanged: widget.onLocaleChanged, tone: LanguageSwitcherTone.onBrand),
+                  const SizedBox(width: AppSpace.sm),
                   CircleIconButton(
                     icon: Icons.shopping_bag_outlined,
                     background: Colors.white.withValues(alpha: 0.18),
@@ -304,13 +306,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ---- Hero carousel ----
   Widget _heroCarousel(Strings s) {
-    final banners = _banners(s);
+    final cards = _live();
+    _liveCount = cards.length;
+    // Fewer cards than before (one was switched off or deleted): come back to a card that exists.
+    if (_page >= (cards.isEmpty ? 1 : cards.length)) {
+      _page = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) _pageController.jumpToPage(0);
+      });
+    }
+    final banners = cards.isEmpty ? [BannerDto(title: s.heroTitle, titleFr: s.heroTitle, body: s.heroSubtitle, bodyFr: s.heroSubtitle)] : cards;
     return Column(
       children: [
         const SizedBox(height: 18),
         SizedBox(
-          // Grows with the text size so a two-line title and body still fit (they are capped at two lines each).
-          height: MediaQuery.textScalerOf(context).scale(168).clamp(168, 230),
+          // Grows with the text size so a two-line title, a two-line body and the button still fit.
+          height: MediaQuery.textScalerOf(context).scale(188).clamp(188, 260),
           child: PageView.builder(
             controller: _pageController,
             itemCount: banners.length,
@@ -319,42 +330,12 @@ class _HomeScreenState extends State<HomeScreen> {
               final b = banners[i];
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: b.gradient,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: AppShadow.soft,
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        right: -20,
-                        top: -20,
-                        child: Icon(b.icon, size: 150, color: Colors.white.withValues(alpha: 0.14)),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(22),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              b.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, height: 1.1, letterSpacing: -0.5),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(b.body,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.5)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                child: CmsHomeCard(
+                  key: ValueKey('hero-card-$i'),
+                  banner: b,
+                  index: i,
+                  lang: s.lang,
+                  onOpen: b.hasLink ? () => openCardLink(context, b, widget.locale) : null,
                 ),
               );
             },
@@ -519,13 +500,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
-
-class _Banner {
-  final Gradient gradient;
-  final IconData icon;
-  final String tag;
-  final String title;
-  final String body;
-  _Banner(this.gradient, this.icon, this.tag, this.title, this.body);
 }

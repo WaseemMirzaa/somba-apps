@@ -280,19 +280,93 @@ class ProductDto {
 }
 
 class BannerDto {
+  /// The block's id and key (null for a banner built by hand, as the older tests do).
+  final String? id;
+  final String? key;
   final String title;
   final String body;
 
   /// The French wording (empty on older servers).
   final String titleFr;
   final String bodyFr;
-  const BannerDto({required this.title, required this.body, this.titleFr = '', this.bodyFr = ''});
 
-  factory BannerDto.fromJson(Map<String, dynamic> j) =>
-      BannerDto(title: (j['title'] ?? '').toString(), body: (j['body'] ?? '').toString(), titleFr: textOrNull(j['titleFr']) ?? '', bodyFr: textOrNull(j['bodyFr']) ?? '');
+  /// The card picture (null: the app draws the gradient of [colorKey]).
+  final String? imageUrl;
+
+  /// What a tap opens: `product`, `category`, `store` (id in [linkTarget]), `deals` or `url`; null when the card is not tappable.
+  final String? linkType;
+  final String? linkTarget;
+
+  /// The button label in English and French (null: no button).
+  final String? ctaText;
+  final String? ctaTextFr;
+  final int sortOrder;
+
+  /// Visible from / until (null: no limit).
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+
+  /// Colour token of the fallback gradient (`brand`, `deal`, `blue`, `green`, `teal`, `amber`, `ink`).
+  final String? colorKey;
+  const BannerDto({
+    required this.title,
+    required this.body,
+    this.titleFr = '',
+    this.bodyFr = '',
+    this.id,
+    this.key,
+    this.imageUrl,
+    this.linkType,
+    this.linkTarget,
+    this.ctaText,
+    this.ctaTextFr,
+    this.sortOrder = 0,
+    this.startsAt,
+    this.endsAt,
+    this.colorKey,
+  });
+
+  factory BannerDto.fromJson(Map<String, dynamic> j) {
+    DateTime? when(Object? v) => v is String ? DateTime.tryParse(v)?.toLocal() : null;
+    return BannerDto(
+      id: textOrNull(j['id']),
+      key: textOrNull(j['key']),
+      title: (j['title'] ?? '').toString(),
+      body: (j['body'] ?? '').toString(),
+      titleFr: textOrNull(j['titleFr']) ?? '',
+      bodyFr: textOrNull(j['bodyFr']) ?? '',
+      imageUrl: textOrNull(j['imageUrl']),
+      linkType: textOrNull(j['linkType']),
+      linkTarget: textOrNull(j['linkTarget']),
+      ctaText: textOrNull(j['ctaText']),
+      ctaTextFr: textOrNull(j['ctaTextFr']),
+      sortOrder: j['sortOrder'] is num ? (j['sortOrder'] as num).toInt() : 0,
+      startsAt: when(j['startsAt']),
+      endsAt: when(j['endsAt']),
+      colorKey: textOrNull(j['colorKey']),
+    );
+  }
 
   String displayTitle(String lang) => pickLang(lang, title, titleFr);
   String displayBody(String lang) => pickLang(lang, body, bodyFr);
+
+  /// The button label in the viewer's language; the other language when that one is empty; null: no button.
+  String? displayCta(String lang) {
+    final t = pickLang(lang, ctaText, ctaTextFr);
+    return t.isEmpty ? null : t;
+  }
+
+  /// A card can be tapped when it says what it opens.
+  bool get hasLink => linkType != null && (linkType == 'deals' || linkTarget != null);
+
+  /// Inside its schedule at [now] (the server already hides a block that is off).
+  bool isLiveAt(DateTime now) => (startsAt == null || !startsAt!.isAfter(now)) && (endsAt == null || endsAt!.isAfter(now));
+
+  /// Carousel order: the admin's position first, then the title so the order is the same on every phone.
+  static int byOrder(BannerDto a, BannerDto b) {
+    final c = a.sortOrder.compareTo(b.sortOrder);
+    return c != 0 ? c : a.title.compareTo(b.title);
+  }
 }
 
 class ReviewDto {
