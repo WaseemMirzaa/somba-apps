@@ -223,6 +223,8 @@ async function main(app: INestApplicationContext) {
       twofa?: boolean;
       hubId?: string | null;
       tier?: User['warehouseTier'];
+      /** A picture file of the demo manifest (the customer's drawn avatar). */
+      avatar?: string;
     },
     scenario: string,
     roleLabel: string,
@@ -245,6 +247,7 @@ async function main(app: INestApplicationContext) {
           active: def.active ?? true,
           hubId: def.hubId ?? null,
           warehouseTier: def.tier ?? null,
+          avatar: def.avatar ? images.url(def.avatar) : null,
         }),
       );
       pw = groupOf(def.role) === 'public' ? publicPassword : staffPassword;
@@ -263,6 +266,14 @@ async function main(app: INestApplicationContext) {
         patch.warehouseTier = def.tier;
       if (user.active !== (def.active ?? true))
         patch.active = def.active ?? true;
+      // The drawn avatar: given to an account that has none, and followed when the server's address changed. A picture the person
+      // chose themselves (any other address) is never replaced.
+      if (def.avatar) {
+        const want = images.url(def.avatar);
+        const file = want.slice(want.lastIndexOf('/'));
+        if (!user.avatar || (user.avatar !== want && user.avatar.endsWith(file)))
+          patch.avatar = want;
+      }
       if (Object.keys(patch).length) {
         await userRepo.update({ id: user.id }, patch);
         user = (await userRepo.findOne({ where: { id: user.id } }))!;

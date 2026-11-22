@@ -1,7 +1,7 @@
 # Demo picture credits
 
 Every picture is a JPEG copied to the uploads folder under the fixed name in `manifest.json`.
-Photos come from Unsplash (Unsplash License: free to use, attribution appreciated). The six store logos were drawn for this demo (CC0).
+Photos come from Unsplash (Unsplash License: free to use, attribution appreciated). The six store logos and the customer avatars (initials on a colour, no real face) were drawn for this demo (CC0).
 No photo carries a readable brand. No file comes from a paid or restricted source.
 
 | File | Photographer | Unsplash page | Licence |
@@ -76,6 +76,24 @@ No photo carries a readable brand. No file comes from a paid or restricted sourc
 | MK-TOY-2.jpg | [Susan Holt Simpson](https://unsplash.com/@shs521) | [Rd01U0tPmQI](https://unsplash.com/photos/Rd01U0tPmQI) | Unsplash License |
 | MK-WCH-1.jpg | [Ivan Shilov](https://unsplash.com/@mycreate) | [KiAYZZjpjkQ](https://unsplash.com/photos/KiAYZZjpjkQ) | Unsplash License |
 | MK-YOG-1.jpg | [Tuaans](https://unsplash.com/@tuaans_) | [YmaOkRjoBVc](https://unsplash.com/photos/YmaOkRjoBVc) | Unsplash License |
+| avatar-customer.business.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.cancelled.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.cart.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.expat.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.fr.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.fraud.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.full.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.new.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.newfr.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.regular.en.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.regular.fr.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.suspended.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.unverified.jpg | drawn for this demo | n/a | CC0 |
+| avatar-customer.vip.jpg | drawn for this demo | n/a | CC0 |
+| avatar-reviewer.1.jpg | drawn for this demo | n/a | CC0 |
+| avatar-reviewer.2.jpg | drawn for this demo | n/a | CC0 |
+| avatar-reviewer.3.jpg | drawn for this demo | n/a | CC0 |
+| avatar-reviewer.4.jpg | drawn for this demo | n/a | CC0 |
 | banner-A.jpg | [Eva Blue](https://unsplash.com/@evablue) | [SfPOkp6-2eA](https://unsplash.com/photos/SfPOkp6-2eA) | Unsplash License |
 | banner-B.jpg | [Rosa Ferreira](https://unsplash.com/@rjdcf) | [NV7JE-epsPg](https://unsplash.com/photos/NV7JE-epsPg) | Unsplash License |
 | banner-C.jpg | [David Trinks](https://unsplash.com/@dtrinksrph) | [1s7QKaogJ9c](https://unsplash.com/photos/1s7QKaogJ9c) | Unsplash License |
@@ -103,4 +121,4 @@ No photo carries a readable brand. No file comes from a paid or restricted sourc
 | review-8.jpg | [Aaina Sharma](https://unsplash.com/@aaina) | [rI2MXeP6sss](https://unsplash.com/photos/rI2MXeP6sss) | Unsplash License |
 | support-1.jpg | [Mediamodifier](https://unsplash.com/@mediamodifier) | [S3Lig53867M](https://unsplash.com/photos/S3Lig53867M) | Unsplash License |
 
-96 pictures, 7.2 MB in total.
+114 pictures, 7.4 MB in total.

@@ -21,6 +21,8 @@ export interface DemoAccount {
   /** 'main' = the platform's own warehouse (Entrepôt Kinshasa), 'demo' = the demo warehouse. */
   hub?: 'main' | 'demo';
   tier?: 'operator' | 'supervisor' | 'manager';
+  /** Picture file of the demo manifest (`deploy/demo/images`): a customer's drawn avatar (initials on a colour, no real face). */
+  avatar?: string;
   scenario: string;
 }
 
@@ -37,6 +39,8 @@ const a = (
   role,
   verified: true,
   scenario,
+  // Every customer has a drawn avatar named after the account key (`avatar-customer.full.jpg`).
+  ...(role === 'customer' ? { avatar: `avatar-${key}.jpg` } : {}),
   ...extra,
 });
 
@@ -111,6 +115,62 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
     'customer',
     'Supporting account: a past buyer (reviews, helpful votes).',
     { phone: '+243 900 000 114' },
+  ),
+  a(
+    'customer.vip',
+    'Marie-Claire Tshimanga',
+    'customer',
+    'The VIP, French language: a large wallet, three pinned addresses, 14 orders over 90 days (twelve delivered, with reviews and "rate me" orders, then one out for delivery, one on the way, one being prepared and one just placed), a cart and a wishlist.',
+    { phone: '+243 900 000 141', locale: 'fr' },
+  ),
+  a(
+    'customer.regular.fr',
+    'Joël Kabasele',
+    'customer',
+    'A regular, French language: ten orders over 75 days, a return refused by support, an exchange that was delivered, one order out for delivery, one on the way, one just placed.',
+    { phone: '+243 900 000 142', locale: 'fr' },
+  ),
+  a(
+    'customer.regular.en',
+    'Priscilla Nsimba',
+    'customer',
+    'A regular, English language: eleven orders over 85 days and one case at each after-sale stage (a return waiting for a rider, a return she withdrew, a dispute settled with a partial refund, a replacement delivered, a replacement refused), an order with one line cancelled by the seller.',
+    { phone: '+243 900 000 143' },
+  ),
+  a(
+    'customer.business',
+    'Olivier Kasongo',
+    'customer',
+    'A business buyer (Kasongo & Fils, a hardware shop in Kasa-Vubu), French language: bulk orders (30 to 50 units a line), a two-store basket, a coupon, a large wallet, and an express order when express is on.',
+    { phone: '+243 900 000 144', locale: 'fr' },
+  ),
+  a(
+    'customer.cancelled',
+    'Fabrice Lumbu',
+    'customer',
+    'Only cancelled and returned history: cancelled by the customer, by the seller and by KOMORIKO support, an order nobody could deliver, and a returned order, each with its refund to the wallet.',
+    { phone: '+243 900 000 145' },
+  ),
+  a(
+    'customer.expat',
+    'Sarah Whitfield',
+    'customer',
+    'An international customer paying with mobile money: paid by Airtel and Orange, awaiting payment, declined and expired payments (these need the mobile-money sandbox or manual mode, see the guide), plus wallet orders.',
+    { phone: '+243 900 000 146' },
+  ),
+  a(
+    'customer.newfr',
+    'Aimée Mavungu',
+    'customer',
+    'A new customer, French language: one address, a small wallet, a wishlist and no orders yet.',
+    { phone: '+243 900 000 147', locale: 'fr' },
+  ),
+  a(
+    'customer.cart',
+    'Amina Diallo',
+    'customer',
+    'A new customer who is ready to buy: a cart worth more than the coupon minimums, items saved for later, a wishlist, a pinned address and a wallet; apply DEMOWELCOME or MAISON5 at checkout.',
+    { phone: '+243 900 000 148' },
   ),
   // ── Staff ──
   a(

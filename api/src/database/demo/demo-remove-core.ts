@@ -28,6 +28,8 @@ import {
   Order,
   OrderItem,
   Parcel,
+  ParcelGroup,
+  ParcelGroupOrder,
   ParcelScan,
   Payment,
   PaymentRefund,
@@ -111,6 +113,8 @@ interface Ids {
   tasks: string[];
   /** Parcel labels of demo orders and demo returns (their scans go with them). */
   parcels: string[];
+  /** Label sets (one per packed order or same-day group) of demo customers: their order memberships go with them. */
+  groups: string[];
   disputes: string[];
   exchanges: string[];
   replacements: string[];
@@ -221,6 +225,7 @@ async function collect(ds: DataSource): Promise<Ids> {
     ['orderId', ids.orders],
     ['returnId', ids.disputes],
   ]);
+  ids.groups = await col(ParcelGroup, 'id', [['customerId', ids.users]]);
   // Batches of the demo warehouse or of a demo rider: the demo's only when every parcel in them is a demo parcel.
   const batchTerms = where([
     ['hubId', ids.hubs],
@@ -547,6 +552,8 @@ function steps(i: Ids): Step[] {
       ],
     },
     { label: 'parcels', entity: Parcel, terms: [['id', i.parcels]] },
+    { label: 'parcel_group_orders', entity: ParcelGroupOrder, terms: [['orderId', i.orders], ['groupId', i.groups]] },
+    { label: 'parcel_groups', entity: ParcelGroup, terms: [['id', i.groups]] },
     { label: 'delivery_tasks', entity: DeliveryTask, terms: [['id', i.tasks]] },
     {
       label: 'transfer_runs',
