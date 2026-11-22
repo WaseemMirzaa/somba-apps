@@ -20,6 +20,74 @@ beforeEach(async () => {
 });
 afterEach(async () => ds.destroy());
 
+describe('CMS home cards', () => {
+  const cms = () => new CmsService(ds.getRepository(CmsBlock), emitter as never, translations);
+  const base = { title: 'Sale', body: 'Big', type: 'banner' };
+
+  it('stores picture, link, button, colour and schedule; new blocks go to the end', async () => {
+    const svc = cms();
+    const a = await svc.upsert({ key: 'a', ...base, imageUrl: 'https://cdn.example.com/a.jpg', linkType: 'product', linkTarget: 'p1', ctaText: 'Shop', ctaTextFr: 'Acheter', colorKey: 'deal', startsAt: '2026-01-01T00:00:00Z', endsAt: '2026-12-31T00:00:00Z' });
+    expect(a).toMatchObject({ imageUrl: 'https://cdn.example.com/a.jpg', linkType: 'product', linkTarget: 'p1', ctaText: 'Shop', ctaTextFr: 'Acheter', colorKey: 'deal', sortOrder: 10 });
+    const b = await svc.upsert({ key: 'b', ...base });
+    expect(b.sortOrder).toBe(20);
+    expect(b).toMatchObject({ imageUrl: null, linkType: null, colorKey: null });
+  });
+
+  it('rejects a bad link, colour, picture, schedule, and a button with nowhere to go', async () => {
+    const svc = cms();
+    await expect(svc.upsert({ key: 'x', ...base, linkType: 'nope' })).rejects.toThrow('Choose what the card opens');
+    await expect(svc.upsert({ key: 'x', ...base, linkType: 'product' })).rejects.toThrow('Choose the product, category or store');
+    await expect(svc.upsert({ key: 'x', ...base, linkType: 'url', linkTarget: 'http://x.com' })).rejects.toThrow('must start with https://');
+    await expect(svc.upsert({ key: 'x', ...base, colorKey: 'pink' })).rejects.toThrow('Choose one of the card colours.');
+    await expect(svc.upsert({ key: 'x', ...base, imageUrl: 'javascript:alert(1)' })).rejects.toThrow('uploaded image');
+    await expect(svc.upsert({ key: 'x', ...base, startsAt: '2026-05-01', endsAt: '2026-04-01' })).rejects.toThrow('end date must be after');
+    await expect(svc.upsert({ key: 'x', ...base, startsAt: 'soon' })).rejects.toThrow('valid start and end date');
+    await expect(svc.upsert({ key: 'x', ...base, ctaText: 'Go' })).rejects.toThrow('needs somewhere to go');
+    await expect(svc.upsert({ key: 'x', ...base, sortOrder: -1 })).rejects.toThrow('card position');
+    expect(await ds.getRepository(CmsBlock).count()).toBe(0);
+  });
+
+  it('deals needs no target; clearing the link clears the target; a partial edit keeps what it does not name', async () => {
+    const svc = cms();
+    await svc.upsert({ key: 'a', ...base, linkType: 'deals', linkTarget: 'ignored', ctaText: 'See deals' });
+    expect((await svc.list(true))[0]).toMatchObject({ linkType: 'deals', linkTarget: null });
+    await svc.upsert({ key: 'a', linkType: 'store', linkTarget: 's1' });
+    await svc.upsert({ key: 'a', active: false });
+    expect((await svc.list(true))[0]).toMatchObject({ linkType: 'store', linkTarget: 's1', ctaText: 'See deals', active: false });
+    await svc.upsert({ key: 'a', ctaText: null, linkType: null });
+    expect((await svc.list(true))[0]).toMatchObject({ linkType: null, linkTarget: null, ctaText: null });
+  });
+
+  it('shoppers see only active blocks inside their schedule, in sortOrder; admins see all', async () => {
+    const svc = cms();
+    await svc.upsert({ key: 'now', ...base, sortOrder: 30 });
+    await svc.upsert({ key: 'first', ...base, sortOrder: 5, startsAt: '2020-01-01', endsAt: '2099-01-01' });
+    await svc.upsert({ key: 'future', ...base, startsAt: '2099-01-01' });
+    await svc.upsert({ key: 'over', ...base, endsAt: '2020-01-01' });
+    await svc.upsert({ key: 'off', ...base, active: false });
+    expect((await svc.list(false)).map((b) => b.key)).toEqual(['first', 'now']);
+    expect((await svc.list(true)).length).toBe(5);
+  });
+
+  it('reorder renumbers, delete removes, and both tell everyone (hidden blocks only as a stub)', async () => {
+    const svc = cms();
+    for (const k of ['a', 'b', 'c']) await svc.upsert({ key: k, ...base });
+    emitter.sent.length = 0;
+    const out = await svc.reorder({ keys: ['c', 'a'] });
+    expect(out.map((b) => b.key)).toEqual(['c', 'a', 'b']);
+    expect(out.map((b) => b.sortOrder)).toEqual([10, 20, 30]);
+    expect(emitter.sent.filter((e) => e.to === '*' && e.event === 'cms:updated').length).toBeGreaterThan(0);
+    await svc.upsert({ key: 'b', active: false, body: 'secret draft' });
+    const stub = emitter.sent.filter((e) => e.to === '*' && e.payload?.key === 'b').pop()!;
+    expect(stub.payload).toEqual({ id: expect.any(String), key: 'b', type: 'banner', active: false });
+    emitter.sent.length = 0;
+    await svc.remove({ key: 'a' });
+    expect(emitter.sent[0]).toMatchObject({ to: '*', event: 'cms:updated', payload: { key: 'a', deleted: true } });
+    expect((await svc.list(true)).map((b) => b.key)).toEqual(['c', 'b']);
+    await expect(svc.remove({ key: 'a' })).rejects.toThrow('no longer exists');
+  });
+});
+
 describe('CMS blocks', () => {
   const cms = () => new CmsService(ds.getRepository(CmsBlock), emitter as never, translations);
 

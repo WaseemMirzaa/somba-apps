@@ -122,6 +122,16 @@ export interface CmsServerRow {
   bodyFr?: string | null;
   type: string;
   active: boolean;
+  /** Home-card fields (see `lib/cms-cards.ts`); an older server sends none of them. */
+  imageUrl?: string | null;
+  linkType?: string | null;
+  linkTarget?: string | null;
+  ctaText?: string | null;
+  ctaTextFr?: string | null;
+  sortOrder?: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  colorKey?: string | null;
   updatedAt?: string;
 }
 export interface BroadcastServerRow {

@@ -63,6 +63,8 @@ export const AUDIT_ACTION_LABELS: Record<string, { en: string; fr: string }> = {
   "category.update": { en: "Category updated", fr: "Catégorie modifiée" },
   "category.remove": { en: "Category removed", fr: "Catégorie supprimée" },
   "cms.upsert": { en: "CMS content saved", fr: "Contenu CMS enregistré" },
+  "cms.delete": { en: "CMS content deleted", fr: "Contenu CMS supprimé" },
+  "cms.reorder": { en: "CMS cards reordered", fr: "Cartes CMS réordonnées" },
   "coverage.removed": { en: "Coverage area removed", fr: "Zone de couverture retirée" },
   "delivery.code_failed": { en: "Delivery code refused", fr: "Code de livraison refusé" },
   "delivery.code_locked": { en: "Delivery code locked", fr: "Code de livraison verrouillé" },

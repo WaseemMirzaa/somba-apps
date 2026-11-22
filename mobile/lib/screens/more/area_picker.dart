@@ -3,6 +3,7 @@ import '../../l10n/strings.dart';
 import '../../services/geo_models.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/keyboard.dart';
 
 /// One row of an area sheet: an area, and the group (a Kinshasa district) it is listed under.
 typedef AreaOption = ({AreaDto area, AreaDto? group});
@@ -116,6 +117,7 @@ class _AreaSheetState extends State<AreaSheet> {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: TextField(
               key: const ValueKey('area-search'),
+              onTapOutside: (_) => dismissKeyboard(),
               // Place names: the keyboard must not "correct" Masina to something else.
               autocorrect: false,
               enableSuggestions: false,

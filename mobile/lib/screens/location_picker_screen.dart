@@ -9,6 +9,7 @@ import '../services/places_client.dart';
 import '../theme/app_theme.dart';
 import '../widgets/feedback.dart';
 import '../widgets/kit.dart';
+import '../widgets/keyboard.dart';
 
 /// The map under the fixed centre pin. Tests pass their own (the native map cannot run there).
 typedef PickerMapBuilder = Widget Function(
@@ -413,6 +414,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
           Expanded(
             child: TextField(
               key: const ValueKey('picker-search'),
+              onTapOutside: (_) => dismissKeyboard(),
               controller: _search,
               focusNode: _searchFocus,
               onChanged: _onQuery,

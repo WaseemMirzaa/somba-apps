@@ -1564,6 +1564,32 @@ export class RealtimeGateway
     }
   }
 
+  @SubscribeMessage('cms:delete')
+  async cmsDelete(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { key: string }) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'content')) return fail('Not allowed.');
+      const gone = await this.cms.remove(body);
+      await this.auditAction(user, 'cms.delete', 'cms', gone.key);
+      return ok(gone);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
+  @SubscribeMessage('cms:reorder')
+  async cmsReorder(@ConnectedSocket() client: AuthedSocket, @MessageBody() body: { keys: string[] }) {
+    try {
+      const user = this.requireUser(client);
+      if (!this.can(user.role, 'content')) return fail('Not allowed.');
+      const list = await this.cms.reorder(body);
+      await this.auditAction(user, 'cms.reorder', 'cms', (body?.keys ?? []).slice(0, 10).join(','));
+      return ok(list);
+    } catch (e) {
+      return fail((e as Error).message);
+    }
+  }
+
   @SubscribeMessage('settings:get')
   async settingsGet(@ConnectedSocket() client: AuthedSocket) {
     // Everyone may read the public pricing/checkout settings; the rest is admin-only.

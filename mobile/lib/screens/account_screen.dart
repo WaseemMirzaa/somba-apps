@@ -15,6 +15,7 @@ import 'more/auth_screens.dart' show VerifyEmailScreen;
 import 'more/catalog_extra.dart';
 import 'more/following_screen.dart';
 import 'more/returns_extra.dart';
+import '../widgets/language_switcher.dart';
 
 class AccountScreen extends StatelessWidget {
   final Locale locale;
@@ -287,28 +288,14 @@ class AccountScreen extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.translate_rounded, color: AppColors.primary, size: 21),
+              child: const Center(child: LanguageBadge()),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(s.language,
                   style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5)),
             ),
-            SegmentedButton<String>(
-              style: SegmentedButton.styleFrom(
-                selectedBackgroundColor: AppColors.primary,
-                selectedForegroundColor: Colors.white,
-                side: const BorderSide(color: AppColors.line),
-                visualDensity: VisualDensity.compact,
-              ),
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: 'en', label: Text('EN')),
-                ButtonSegment(value: 'fr', label: Text('FR')),
-              ],
-              selected: {locale.languageCode},
-              onSelectionChanged: (v) => onLocaleChanged(Locale(v.first)),
-            ),
+            LanguageSwitcher(locale: locale, onChanged: onLocaleChanged),
           ],
         ),
       ),

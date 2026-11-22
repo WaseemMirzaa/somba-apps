@@ -9,6 +9,7 @@ import '../../util/text_fold.dart';
 import '../../widgets/category_image.dart';
 import '../../widgets/kit.dart';
 import 'shop_extra.dart';
+import '../../widgets/keyboard.dart';
 
 /// A filter/sort query over the product catalogue (AliExpress-style).
 class ProductQuery {
@@ -328,6 +329,7 @@ class _SearchField extends StatelessWidget {
     return TextField(
       controller: controller,
       autofocus: autofocus,
+      onTapOutside: (_) => dismissKeyboard(),
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(

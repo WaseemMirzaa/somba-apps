@@ -255,7 +255,7 @@ async function run() {
   const cmsRepo = ds.getRepository(CmsBlock);
   const blocks = await cmsRepo.save([
     cmsRepo.create({ key: 'home-hero', title: 'KOMORIKO — shop everything', body: 'Fast delivery across Kinshasa.', type: 'banner', active: true }),
-    cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'strip', active: true }),
+    cmsRepo.create({ key: 'promo-strip', title: 'Free delivery over $50', body: 'Use SOMBA10 for 10% off.', type: 'banner', active: true }),
   ]);
   await authorFr('cms_block', blocks[0].id, 'title', blocks[0].title, 'KOMORIKO — achetez tout');
   await authorFr('cms_block', blocks[0].id, 'body', blocks[0].body, 'Livraison rapide à Kinshasa.');

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'keyboard.dart';
 
 /// AppBar with a circular back button, used across secondary screens.
 PreferredSizeWidget backAppBar(BuildContext context, String title, {List<Widget>? actions}) {
@@ -7,7 +8,10 @@ PreferredSizeWidget backAppBar(BuildContext context, String title, {List<Widget>
     titleSpacing: 4,
     leading: Padding(
       padding: const EdgeInsets.all(8),
-      child: _RoundBtn(icon: Icons.arrow_back_rounded, onTap: () => Navigator.of(context).maybePop()),
+      child: _RoundBtn(icon: Icons.arrow_back_rounded, onTap: () {
+        dismissKeyboard(); // back with the keyboard open closes it first
+        Navigator.of(context).maybePop();
+      }),
     ),
     title: Text(title),
     actions: actions,
@@ -71,6 +75,7 @@ class AppField extends StatelessWidget {
           keyboardType: keyboard,
           maxLines: obscure ? 1 : maxLines,
           onChanged: onChanged,
+          onTapOutside: (_) => dismissKeyboard(),
           // A multi-line field takes the buttons' corner radius (a pill that tall looks like a stadium).
           decoration: (!obscure && maxLines > 1 ? AppInput.multiline(hint: hint, error: error) : const InputDecoration()).copyWith(
             hintText: hint,

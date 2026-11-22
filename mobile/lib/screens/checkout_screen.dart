@@ -21,6 +21,7 @@ import 'order_success_screen.dart';
 import 'payment_pending_screen.dart';
 import 'more/account_more.dart';
 import 'more/support_extra.dart';
+import '../widgets/keyboard.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Locale locale;
@@ -462,6 +463,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             KeyedSubtree(
               key: _phoneKey,
               child: TextField(
+                onTapOutside: (_) => dismissKeyboard(),
                 key: const ValueKey('mm-phone'),
                 controller: _phone,
                 focusNode: _phoneFocus,
@@ -493,6 +495,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
+                  onTapOutside: (_) => dismissKeyboard(),
                   key: const ValueKey('checkout-promo'),
                   controller: _promo,
                   textCapitalization: TextCapitalization.characters,

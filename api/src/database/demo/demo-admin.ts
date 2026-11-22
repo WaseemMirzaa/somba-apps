@@ -46,6 +46,10 @@ async function cmsAndPromos(ctx: DemoCtx): Promise<void> {
     {
       key: 'demo-home-hero',
       type: 'banner',
+      colorKey: 'brand',
+      linkType: 'deals',
+      ctaText: 'See the deals',
+      ctaTextFr: 'Voir les offres',
       title: 'Demo shop: everything for the home',
       titleFr: 'Boutique démo : tout pour la maison',
       body: 'Fashion, food and electronics from Kinshasa stores. Free delivery on your first order over $50.',
@@ -55,6 +59,7 @@ async function cmsAndPromos(ctx: DemoCtx): Promise<void> {
     {
       key: 'demo-promo-strip',
       type: 'banner',
+      colorKey: 'blue',
       title: 'Use code DEMO10 for 10% off',
       titleFr: 'Code DEMO10 : 10 % de réduction',
       body: 'On orders over $20. Demo data, visible to everyone while it is installed.',
@@ -64,6 +69,7 @@ async function cmsAndPromos(ctx: DemoCtx): Promise<void> {
     {
       key: 'demo-delivery',
       type: 'banner',
+      colorKey: 'teal',
       title: 'Delivered by our own riders',
       titleFr: 'Livré par nos propres livreurs',
       body: 'Track your parcel from the seller to your door, and give the 4-digit code to the rider.',
