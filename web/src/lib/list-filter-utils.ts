@@ -1,5 +1,5 @@
 import type { ListFilterValues } from "@/components/ui/list-filters";
-import { foldText } from "@/lib/i18n-fields";
+import { foldSearch, foldText } from "@/lib/i18n-fields";
 
 export type ListFilterConfig<T> = {
   searchFields?: (keyof T | ((item: T) => string | undefined))[];
@@ -35,7 +35,7 @@ export function applyListFilters<T>(
   config: ListFilterConfig<T> = {}
 ): T[] {
   // Accents and case are ignored on both sides: "electronique" finds "Électronique".
-  const search = foldText(filters.search);
+  const search = foldSearch(filters.search);
   const from = parseDate(filters.fromDate);
   const to = parseDate(filters.toDate);
   const status = filters.status.trim().toLowerCase();

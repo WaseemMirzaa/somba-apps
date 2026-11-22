@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { socketClient } from "@/lib/realtime/socket-client";
 import { useRealtime } from "@/context/realtime-context";
 import { useCatalog } from "@/lib/catalog";
-import { pickText } from "@/lib/i18n-fields";
+import { pickText, routeOrderKey } from "@/lib/i18n-fields";
 import type { Dispute, Order, Payment } from "@/lib/realtime/types";
 import { stageText } from "@/lib/after-sale";
 import { paymentMethodLabel } from "@/lib/payment-methods";
@@ -188,7 +188,8 @@ export function useMyOrder(id: string | undefined): OrderDetail | undefined {
   const all = useMyOrders();
   return useMemo(() => {
     if (!id) return undefined;
-    return all.find((x) => x.id === id || x.reference === id);
+    const key = routeOrderKey(id); // an old SOM-… reference in the link opens the KOM-… order
+    return all.find((x) => x.id === id || x.reference === key);
   }, [all, id]);
 }
 

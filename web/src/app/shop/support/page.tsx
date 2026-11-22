@@ -17,6 +17,7 @@ import { useSupportTickets, ticketStatusLabel, type SupportTicketRow } from "@/l
 import { MessageSquare } from "lucide-react";
 import { shownText } from "@/lib/text-i18n";
 import { contactSupportPrefill } from "@/lib/contact-support";
+import { routeOrderKey } from "@/lib/i18n-fields";
 
 const CATEGORIES = [
   { id: "general", en: "General", fr: "Général" },
@@ -50,7 +51,7 @@ function SupportContent() {
 
   const orders = rt.orders;
   const prefilled = useMemo(
-    () => (orderParam ? orders.find((o) => o.id === orderParam || o.reference === orderParam) : undefined),
+    () => (orderParam ? orders.find((o) => o.id === orderParam || o.reference === routeOrderKey(orderParam)) : undefined),
     [orderParam, orders],
   );
   useEffect(() => {

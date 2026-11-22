@@ -147,10 +147,42 @@ export function foldText(v: unknown): string {
     .trim();
 }
 
+// ── Order references (SOM- → KOM-) ────────────────────────────────────────────────────────────────────────────────
+// Order references are `KOM-…`; orders placed before the rename were `SOM-…` and people still hold that text (a printed label, a bookmark,
+// a screenshot). Same rule as the API's `normalizeOrderRef`: every web search box and every order link runs through here, so `SOM-12345`,
+// `som-12345` and `#SOM-12345` all mean `KOM-12345`.
+
+export const ORDER_REF_PREFIX = "KOM-";
+
+/** A reference-looking `SOM-` + id character, at the start or after a non-word character (`SOMBA10` and `BLOSSOM-1` are left alone). */
+const OLD_REF = /(^|[^A-Za-z0-9])som-(?=[0-9A-Za-z])/gi;
+
+/** Rewrites every old `SOM-…` reference in `text` to `KOM-…`; anything else is returned unchanged. */
+export function normalizeOrderRef(text: string): string {
+  return text.replace(OLD_REF, "$1" + ORDER_REF_PREFIX);
+}
+
+/** The id-or-reference a route carries, decoded and with an old `SOM-` reference turned into `KOM-`. */
+export function routeOrderKey(param: string | undefined | null): string {
+  if (!param) return "";
+  let s = param;
+  try {
+    s = decodeURIComponent(param);
+  } catch {
+    /* keep the raw text */
+  }
+  return normalizeOrderRef(s.trim());
+}
+
+/** A search query ready to compare with `foldText`-ed fields: folded, and an old `SOM-…` order reference read as `KOM-…`. One place, used by every list search. */
+export function foldSearch(query: unknown): string {
+  // "#KOM-12" (the way a reference is often typed or copied) finds "KOM-12": the # is not part of the stored reference
+  return foldText(normalizeOrderRef(String(query ?? "")).replace(/#(?=kom-)/gi, ""));
+}
+
 /** Every word of the query appears (accent- and case-insensitive) in at least one of the fields. */
 export function matchesSearch(query: string, fields: readonly (string | null | undefined)[]): boolean {
-  // an old SOM-… order reference is the same order as KOM-… (references were renamed)
-  const words = foldText(query).replace(/(^|[^a-z0-9])som-/g, "$1kom-").split(/\s+/).filter(Boolean);
+  const words = foldSearch(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return true;
   const haystack = fields.map(foldText).join(" ");
   return words.every((w) => haystack.includes(w));

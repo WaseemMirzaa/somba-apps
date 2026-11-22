@@ -47,7 +47,7 @@ import { useState } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { dayLabel } from "@/lib/delivery-estimate";
 import { useLocale } from "@/context/locale-context";
-import { localized, variantDisplay } from "@/lib/i18n-fields";
+import { localized, routeOrderKey, variantDisplay } from "@/lib/i18n-fields";
 import { adminBreadcrumb } from "@/lib/admin-i18n";
 import { useAuth } from "@/context/auth-context";
 import { canActOnOrders, canSeeOrderAddress } from "@/lib/staff-access";
@@ -85,7 +85,7 @@ export default function AdminOrderDetailPage() {
   const mayAct = canActOnOrders(role);
   const mayAddress = canSeeOrderAddress(role);
   const listHref = mayAct ? "/admin/orders" : getAdminHome((persona.department ?? "super") as AdminDepartment);
-  const live = rt.orders.find((o) => o.id === id || o.reference === id);
+  const live = rt.orders.find((o) => o.id === id || o.reference === routeOrderKey(id));
   // The legs that bring parcels to the customer: one delivery (or express run), several when the order was split.
   const customerTasks = rt.deliveries
     .filter((d) => live && d.orderId === live.id && (!d.kind || isCustomerLeg(d.kind)))
