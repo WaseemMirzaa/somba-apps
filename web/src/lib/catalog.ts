@@ -53,6 +53,8 @@ export interface ShopProduct {
   totalDeliveryDays: number;
   sellerExpressDelivery: boolean;
   sellerHandlingDays: number;
+  /** The VAT % charged on this product (0 while VAT is off); an older server sends none (0). */
+  vatPct: number;
   /** Options the shopper must choose (empty = none). These labels are the purchase keys. */
   variants: VariantGroup[];
   /** Display labels of the options per language (null = show the canonical labels). */
@@ -141,6 +143,7 @@ export function toShopProduct(p: Product): ShopProduct {
     totalDeliveryDays: p.totalDeliveryDays ?? p.deliveryDays ?? 3,
     sellerExpressDelivery: !!p.sellerExpressDelivery,
     sellerHandlingDays: p.sellerHandlingDays ?? 0,
+    vatPct: p.vatPct ?? 0,
     variants: readVariants(p.variants),
     variantLabels: readVariantLabels(p.variantLabels),
     sourceLang: p.sourceLang === "fr" ? "fr" : "en",

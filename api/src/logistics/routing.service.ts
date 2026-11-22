@@ -182,6 +182,13 @@ export class RoutingService {
     return Number.isFinite(n) && n >= 0 && n <= 720 ? Math.round(n) : DEFAULT_SPLIT_AFTER_HOURS;
   }
 
+  /** Who pays the delivery fee (`deliveryFeePaidBy`) and whether the customer sees it as its own line (`showPlatformFee`), for the quote a customer reads. */
+  async feeRules(): Promise<{ feePaidBy: 'customer' | 'seller'; showFee: boolean }> {
+    const all = await this.settings.all();
+    const feePaidBy = all.deliveryFeePaidBy === 'seller' ? 'seller' : 'customer';
+    return { feePaidBy, showFee: feePaidBy === 'customer' && all.showPlatformFee !== 'false' };
+  }
+
   /** The store row behind a seller id (a store id, or the owner's user id on demo data). */
   private async sellerRows(ids: string[]): Promise<Map<string, Seller>> {
     const out = new Map<string, Seller>();

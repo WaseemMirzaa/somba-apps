@@ -37,6 +37,8 @@ export interface SellerBalance {
   commissionPct: number;
   /** Commission already deducted from `earned` (sum of the amounts stored on the lines). */
   commissionUsd: number;
+  /** Delivery fees already deducted from `earned` (orders whose fee the seller pays; 0 otherwise). */
+  deliveryFeeUsd: number;
   /** The platform's minimum payout, and how long delivered money is held before it can be withdrawn. */
   minPayoutUsd: number;
   holdHours: number;
@@ -58,21 +60,27 @@ export const lineGross = (i: Pick<OrderItem, 'priceUsd' | 'qty' | 'couponDiscoun
 export function lineEarning(order: Pick<Order, 'subtotalUsd' | 'discountUsd'>, i: OrderItem) {
   const grossUsd = lineGross(i);
   const commissionUsd = round2(Number(i.commissionUsd) || 0);
+  // The delivery fee a seller-paid order deducts from THIS line's seller (VAT is never in here: it is not seller revenue).
+  const deliveryFeeUsd = round2(Number(i.sellerFeeUsd) || 0);
   const refund = lineRefund(i, order);
   return {
     grossUsd,
     commissionUsd,
+    deliveryFeeUsd,
     refund,
-    /** Gross and commission left once the refunded share is out. */
+    /** Gross, commission and delivery fee left once the refunded share is out. */
     keptGrossUsd: round2(grossUsd - refund.grossUsd),
     keptCommissionUsd: round2(commissionUsd - refund.commissionUsd),
-    netUsd: round2(grossUsd - commissionUsd - refund.netUsd),
+    keptDeliveryFeeUsd: round2(deliveryFeeUsd - refund.deliveryFeeUsd),
+    netUsd: round2(grossUsd - commissionUsd - deliveryFeeUsd - refund.netUsd),
   };
 }
 
 export interface StatementTotals {
   grossUsd: number;
   commissionUsd: number;
+  /** Delivery fees deducted on this statement's sales (seller-paid orders). */
+  deliveryFeeUsd: number;
   refundsUsd: number;
   netUsd: number;
   openingBalanceUsd: number;
@@ -173,6 +181,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
     const eligible: { order: Order; item: OrderItem }[] = [];
     let gross = 0;
     let commission = 0;
+    let deliveryFee = 0;
     let clearing = 0;
     let nextClearanceAt: Date | null = null;
     let inProgress = 0;
@@ -198,11 +207,12 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
             eligible.push({ order: o, item: i });
             gross += line.keptGrossUsd;
             commission += line.keptCommissionUsd;
+            deliveryFee += line.keptDeliveryFeeUsd;
           }
         }
       }
     }
-    const earned = round2(gross - commission);
+    const earned = round2(gross - commission - deliveryFee);
     const open = await this.payouts.find({ where: { sellerId: userId, status: In([...LIVE_PAYOUT]) } });
     const committed = round2(open.reduce((t, p) => t + p.amountUsd, 0));
     const available = round2(earned - committed);
@@ -213,6 +223,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
       owedUsd: Math.max(0, round2(-available)),
       commissionPct,
       commissionUsd: round2(commission),
+      deliveryFeeUsd: round2(deliveryFee),
       minPayoutUsd,
       holdHours,
       clearingUsd: round2(clearing),
@@ -336,6 +347,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
         grossUsd: 0,
         commissionPct: base.commissionPct,
         commissionUsd: 0,
+        deliveryFeeUsd: 0,
         refundUsd: round2(-delta),
         netUsd: round2(delta),
         deliveredAt: base.deliveredAt,
@@ -364,6 +376,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
           grossUsd: worth.grossUsd,
           commissionPct: Number(item.commissionPct) || 0,
           commissionUsd: worth.commissionUsd,
+          deliveryFeeUsd: worth.deliveryFeeUsd,
           refundUsd: worth.refund.netUsd,
           netUsd: worth.netUsd,
           deliveredAt: order.updatedAt ?? null,
@@ -389,6 +402,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
       lines,
       grossUsd: sum((l) => l.grossUsd),
       commissionUsd: sum((l) => l.commissionUsd),
+      deliveryFeeUsd: sum((l) => l.deliveryFeeUsd),
       refundsUsd: sum((l) => l.refundUsd),
       netUsd: sum((l) => l.netUsd),
     };
@@ -421,6 +435,7 @@ export class PayoutsService implements OnModuleInit, OnModuleDestroy {
       : {
           grossUsd: payout.statementGrossUsd ?? 0,
           commissionUsd: payout.statementCommissionUsd ?? 0,
+          deliveryFeeUsd: round2(rows.reduce((t, l) => t + (Number(l.deliveryFeeUsd) || 0), 0)),
           refundsUsd: payout.statementRefundsUsd ?? 0,
           netUsd: payout.statementNetUsd ?? 0,
           openingBalanceUsd: payout.openingBalanceUsd ?? 0,

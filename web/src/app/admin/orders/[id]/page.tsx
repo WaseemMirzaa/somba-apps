@@ -377,6 +377,8 @@ export default function AdminOrderDetailPage() {
           <InfoGrid columns={3} items={[
             { label: fr ? "Articles" : "Items", value: formatCurrency(itemsValue, locale) },
             { label: fr ? "Livraison" : "Delivery", value: formatCurrency(live.deliveryFeeUsd, locale) },
+            { label: fr ? "Frais de livraison payés par" : "Delivery fee paid by", value: live.deliveryFeePaidBy === "seller" ? (fr ? "Vendeur (déduits de son versement)" : "Seller (deducted from the payout)") : fr ? "Client" : "Customer" },
+            { label: fr ? "TVA" : "VAT", value: formatCurrency(live.vatUsd ?? 0, locale) },
             { label: fr ? "Remise campagne" : "Campaign discount", value: formatCurrency(live.campaignDiscountUsd ?? 0, locale) },
             { label: fr ? "Remise code promo" : "Promo discount", value: formatCurrency(live.discountUsd ?? 0, locale) },
             { label: fr ? "Total" : "Total", value: formatCurrency(live.totalUsd, locale) },

@@ -49,4 +49,12 @@ describe('delivery:quote is role-aware', () => {
     expect(seesFeeBreakdown('seller')).toBe(false);
     expect(seesFeeBreakdown('admin_support')).toBe(true);
   });
+
+  it('fee rules: seller pays = a shopper\'s quote carries no fee (staff keep the real one); hidden fee is flagged', () => {
+    const q = quoteFor(full(), 'customer', { feePaidBy: 'seller', showFee: false }) as Record<string, unknown>;
+    expect(q).toMatchObject({ feeUsd: 0, platformFeeUsd: 0, feePaidBySeller: true, showFee: false });
+    expect(quoteFor(full(), 'admin', { feePaidBy: 'seller' })).toMatchObject({ feeUsd: 6.5, platformFeeUsd: 6.5, feePaidBySeller: true });
+    expect(quoteFor(full(), 'customer', { feePaidBy: 'customer', showFee: false })).toMatchObject({ platformFeeUsd: 6.5, feePaidBySeller: false, showFee: false });
+    expect(quoteFor(full(), 'customer')).toMatchObject({ platformFeeUsd: 6.5, feePaidBySeller: false, showFee: true });
+  });
 });

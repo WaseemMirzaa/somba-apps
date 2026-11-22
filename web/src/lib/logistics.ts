@@ -252,6 +252,10 @@ export interface DeliveryQuote {
   feeUsd: number;
   /** The ONE fee a customer sees ("Platform commission"): the sum of every fee they pay, delivery included. Absent on an old server (use `feeUsd`). */
   platformFeeUsd?: number;
+  /** The seller pays the delivery fee: the quote carries 0 for a customer (the order charges none). */
+  feePaidBySeller?: boolean;
+  /** Show the fee as its own line; false = it is folded into the order total ("incl. delivery"). */
+  showFee?: boolean;
   /** The breakdown below is sent to staff and admins only (the customer's quote has none of it): never read it on a customer screen. */
   deliveryUsd?: number;
   transferUsd?: number;

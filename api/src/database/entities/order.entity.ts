@@ -75,6 +75,14 @@ export class Order {
   @Column({ type: 'float', default: 0 })
   campaignDiscountUsd: number;
 
+  /** VAT of the order (the sum of its lines' `vatUsd`), already inside `totalUsd`. */
+  @Column({ type: 'float', default: 0 })
+  vatUsd: number;
+
+  /** Who pays the delivery fee, as set when the order was placed: 'customer' (inside `totalUsd`) or 'seller' (out of the seller's payout). */
+  @Column({ type: 'varchar', length: 10, default: 'customer' })
+  deliveryFeePaidBy: 'customer' | 'seller';
+
   @Column({ type: 'float', default: 0 })
   totalUsd: number;
 

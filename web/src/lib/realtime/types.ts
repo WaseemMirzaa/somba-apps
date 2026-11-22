@@ -84,6 +84,12 @@ export interface OrderItem {
   commissionPct?: number;
   /** Commission on this line in USD, frozen when the order was placed. */
   commissionUsd?: number;
+  /** VAT rate (%) this line was placed with (0 while VAT was off). */
+  vatPct?: number;
+  /** VAT charged on this line in USD. */
+  vatUsd?: number;
+  /** The line's share of the delivery fee when the seller pays it (seller and staff views only; customers never receive it). */
+  sellerFeeUsd?: number;
 }
 
 /** How an order reaches its customer: through the warehouse, or `express` straight from the seller. */
@@ -179,6 +185,14 @@ export interface Order {
   deliveryFeeUsd: number;
   /** The ONE fee a customer sees ("Platform commission"): the sum of every fee they pay. Only on the customer's own view; staff read `deliveryFeeUsd`. */
   platformFeeUsd?: number;
+  /** VAT of the order (already inside `totalUsd`); 0 / absent when none was charged. */
+  vatUsd?: number;
+  /** Who pays the delivery fee, as set when the order was placed. */
+  deliveryFeePaidBy?: "customer" | "seller";
+  /** Customer view: the seller pays the delivery fee, so `platformFeeUsd` is 0 and the page shows no fee row. */
+  feePaidBySeller?: boolean;
+  /** Customer view: show the fee as its own line; false = it is folded into the total ("incl. delivery"). */
+  showFee?: boolean;
   /** Promo-code discount already deducted from the total. */
   discountUsd?: number;
   /** Campaign discount already deducted from subtotalUsd / totalUsd. */
@@ -251,6 +265,8 @@ export interface Product {
   /** The store offers express delivery (the platform switch decides whether an order can use it). */
   sellerExpressDelivery?: boolean;
   sellerVacationNotice?: { en: string; fr: string } | null;
+  /** The VAT (%) charged on this listing: its category's rate, else the default; 0 while VAT is off. The order is authoritative. */
+  vatPct?: number;
   /** The stored listing price (before flash sale / campaign). */
   basePrice?: number;
   /** Percent off from the winning campaign; 0 when no campaign set the price. */
@@ -288,6 +304,8 @@ export interface Category {
    * (customers and guests never receive it).
    */
   commissionPct?: number | null;
+  /** VAT (%) charged on listings in this category; null = the default rate (`settings.vatPct`). Customers may see it. */
+  vatPct?: number | null;
 }
 
 export interface Address {

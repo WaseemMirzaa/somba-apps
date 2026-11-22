@@ -37,5 +37,8 @@ class AppliedPromo {
   final String code;
   final double discountUsd;
   final double forSubtotal;
-  const AppliedPromo({required this.code, required this.discountUsd, required this.forSubtotal});
+
+  /// The store a store coupon belongs to (it discounts only that store's lines); null for a platform code.
+  final String? sellerId;
+  const AppliedPromo({required this.code, required this.discountUsd, required this.forSubtotal, this.sellerId});
 }

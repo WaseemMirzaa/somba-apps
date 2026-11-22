@@ -27,6 +27,8 @@ export interface FinanceBalance {
   owedUsd: number;
   commissionPct: number;
   commissionUsd: number;
+  /** Delivery fees already deducted from `earned` (orders whose fee the seller pays; 0 when the customer pays it). */
+  deliveryFeeUsd?: number;
   minPayoutUsd: number;
   holdHours: number;
   clearingUsd: number;
@@ -54,6 +56,8 @@ export interface EarningRow {
   couponUsd: number;
   commissionPct: number;
   commissionUsd: number;
+  /** The line's share of the delivery fee when the seller pays it (0 otherwise). */
+  deliveryFeeUsd?: number;
   netUsd: number;
   state: EarningState;
   clearanceEndsAt: string | null;
@@ -86,6 +90,9 @@ export interface StatementMonth {
   units: number;
   grossUsd: number;
   commissionUsd: number;
+  /** Delivery fees charged to the seller this month (seller-paid orders), and the part credited back with returns. */
+  deliveryFeeUsd?: number;
+  deliveryFeeCreditedUsd?: number;
   refundsUsd: number;
   commissionCreditedUsd: number;
   netUsd: number;
@@ -103,6 +110,7 @@ export interface StatementLine {
   grossUsd: number;
   commissionPct: number;
   commissionUsd: number;
+  deliveryFeeUsd?: number;
   netUsd: number;
 }
 
@@ -125,6 +133,7 @@ export interface TxnRow {
   descriptionFr?: string;
   grossUsd: number;
   commissionUsd: number;
+  deliveryFeeUsd?: number;
   amountUsd: number;
   status: string;
   counts: boolean;
@@ -284,9 +293,11 @@ export async function fetchAllEarnings(query: EarningsQuery): Promise<EarningRow
 
 /** Rows of the earnings CSV, in the language of the portal. */
 export function earningsCsvRows(rows: EarningRow[], fr: boolean): (string | number)[][] {
+  // The delivery-fee column appears only when a seller-paid line is in the file: every other file reads as it always did.
+  const withFee = rows.some((r) => (r.deliveryFeeUsd ?? 0) !== 0);
   const head = fr
-    ? ["Commande", "Produit", "Option", "Qté", "Date de commande", "Date de livraison", "Brut (USD)", "Coupon (USD)", "Taux de commission (%)", "Commission (USD)", "Net (USD)", "État", "Disponible le", "Versement", "Versé le"]
-    : ["Order", "Product", "Option", "Qty", "Ordered", "Delivered", "Gross (USD)", "Coupon (USD)", "Commission rate (%)", "Commission (USD)", "Net (USD)", "State", "Clears on", "Payout", "Paid out on"];
+    ? ["Commande", "Produit", "Option", "Qté", "Date de commande", "Date de livraison", "Brut (USD)", "Coupon (USD)", "Taux de commission (%)", "Commission (USD)", ...(withFee ? ["Frais de livraison (USD)"] : []), "Net (USD)", "État", "Disponible le", "Versement", "Versé le"]
+    : ["Order", "Product", "Option", "Qty", "Ordered", "Delivered", "Gross (USD)", "Coupon (USD)", "Commission rate (%)", "Commission (USD)", ...(withFee ? ["Delivery fee (USD)"] : []), "Net (USD)", "State", "Clears on", "Payout", "Paid out on"];
   return [
     head,
     ...rows.map((r) => [
@@ -300,6 +311,7 @@ export function earningsCsvRows(rows: EarningRow[], fr: boolean): (string | numb
       r.couponUsd.toFixed(2),
       r.commissionPct,
       r.commissionUsd.toFixed(2),
+      ...(withFee ? [(r.deliveryFeeUsd ?? 0).toFixed(2)] : []),
       r.netUsd.toFixed(2),
       earningStateLabel(r.state, fr),
       r.clearanceEndsAt ? r.clearanceEndsAt.slice(0, 10) : "",

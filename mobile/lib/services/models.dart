@@ -178,6 +178,10 @@ class ProductDto {
   /// [deliveryDays] stands for the whole delivery time.
   final int? prepDays;
 
+  /// The VAT % the server charges on this listing (its category's rate, else the default; 0 while VAT is off or on an older
+  /// server). The cart estimate multiplies by it; the order is authoritative.
+  final double vatPct;
+
   /// When this copy was received (see `nextStamp`): a newer `store:vacation` push beats it, an older one does not.
   final int stamp;
 
@@ -219,6 +223,7 @@ class ProductDto {
     this.sellerHandlingDays = 0,
     this.totalDeliveryDays,
     this.prepDays,
+    this.vatPct = 0,
     int? stamp,
   })  : basePrice = basePrice ?? price,
         stamp = stamp ?? nextStamp();
@@ -269,6 +274,7 @@ class ProductDto {
       sellerHandlingDays: ((j['sellerHandlingDays'] is num ? (j['sellerHandlingDays'] as num).toInt() : 0)).clamp(0, 14),
       totalDeliveryDays: j['totalDeliveryDays'] is num && (j['totalDeliveryDays'] as num) >= 1 ? (j['totalDeliveryDays'] as num).round() : null,
       prepDays: j['prepDays'] is num && (j['prepDays'] as num) >= 0 ? (j['prepDays'] as num).round().clamp(0, 30) : null,
+      vatPct: j['vatPct'] is num ? ((j['vatPct'] as num).toDouble()).clamp(0, 50).toDouble() : 0,
     );
   }
 }
@@ -630,6 +636,15 @@ class OrderDto {
   /// The ONE fee line the customer sees ("Platform commission"): the sum of every fee they pay, delivery included.
   /// An older server sends only [deliveryFeeUsd], which is then the same number.
   final double platformFeeUsd;
+
+  /// The VAT of the order, already inside [totalUsd] (0 = none was charged: show no VAT row).
+  final double vatUsd;
+
+  /// The seller pays the delivery fee: the customer paid none ([platformFeeUsd] is 0) and no fee row is shown.
+  final bool feePaidBySeller;
+
+  /// Show the fee as its own row; false = the admin folded it into the total ("incl. delivery").
+  final bool showFee;
   final double discountUsd;
   final String? promoCode;
   final double totalUsd;
@@ -684,6 +699,9 @@ class OrderDto {
     this.subtotalUsd = 0,
     this.deliveryFeeUsd = 0,
     double? platformFeeUsd,
+    this.vatUsd = 0,
+    this.feePaidBySeller = false,
+    this.showFee = true,
     this.discountUsd = 0,
     this.promoCode,
     this.createdAt,
@@ -785,6 +803,9 @@ class OrderDto {
         subtotalUsd: (j['subtotalUsd'] as num?)?.toDouble() ?? 0,
         deliveryFeeUsd: (j['deliveryFeeUsd'] as num?)?.toDouble() ?? 0,
         platformFeeUsd: (j['platformFeeUsd'] as num?)?.toDouble(),
+        vatUsd: (j['vatUsd'] as num?)?.toDouble() ?? 0,
+        feePaidBySeller: j['feePaidBySeller'] == true,
+        showFee: j['showFee'] != false,
         discountUsd: (j['discountUsd'] as num?)?.toDouble() ?? 0,
         promoCode: j['promoCode'] as String?,
         totalUsd: (j['totalUsd'] as num?)?.toDouble() ?? 0,

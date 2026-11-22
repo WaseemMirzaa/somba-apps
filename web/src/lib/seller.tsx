@@ -583,6 +583,8 @@ function buildSellerData(input: BuildInput) {
     const amount = money(orderAmount(o));
     // The commission stored on each line when the order was placed (today's rate only as a fallback).
     const commission = money(liveCommission(o.items ?? [], commissionPct));
+    // The delivery fee this seller pays on their live lines when the platform charges sellers for delivery (0 otherwise; VAT is never theirs).
+    const deliveryFee = money((o.items ?? []).filter((it) => it.fulfilment !== "cancelled").reduce((t, it) => t + (it.sellerFeeUsd ?? 0), 0));
     const date = dayOf(o.createdAt);
     const items = o.items ?? [];
     // Ready / at-hub state comes from the server (package status + each line's fulfilment), never from local storage.
@@ -628,9 +630,10 @@ function buildSellerData(input: BuildInput) {
       date,
       createdAt: o.createdAt,
       commission,
+      deliveryFee,
       /** The rate stored on the lines when the order was placed: a number, "mixed", or null (older payload). */
       commissionRate: commissionRateOf(items),
-      netEarnings: money(amount - commission),
+      netEarnings: money(amount - commission - deliveryFee),
       paymentStatus,
       /** Money already refunded to the customer for this seller's cancelled lines. */
       refunded,

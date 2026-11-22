@@ -320,6 +320,7 @@ export default function SellerOrderDetailPage() {
               label: fr ? "Commission" : "Commission",
               value: `${formatCurrency(order.commission, locale)}${order.commissionRate === "mixed" ? (fr ? " (taux variés)" : " (mixed rates)") : typeof order.commissionRate === "number" ? ` (${order.commissionRate}%)` : ""}`,
             },
+            ...(order.deliveryFee > 0 ? [{ label: fr ? "Frais de livraison" : "Delivery fee", value: formatCurrency(order.deliveryFee, locale) }] : []),
             { label: fr ? "Gains nets" : "Net Earnings", value: formatCurrency(order.netEarnings, locale) },
           ]} />
         </DetailGridSection>

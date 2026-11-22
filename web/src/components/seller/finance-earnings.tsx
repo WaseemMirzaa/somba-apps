@@ -166,6 +166,9 @@ export function FinanceEarnings({ compact = false }: { compact?: boolean }) {
                     </span>
                   ),
                 },
+                ...((page?.items ?? []).some((r) => (r.deliveryFeeUsd ?? 0) > 0)
+                  ? [{ key: "deliveryFeeUsd", label: fr ? "Frais de livraison" : "Delivery fee", render: (row: Record<string, unknown>) => ((row.deliveryFeeUsd as number) > 0 ? money(row.deliveryFeeUsd as number) : "—") }]
+                  : []),
                 { key: "netUsd", label: "Net", render: (row) => <strong>{money(row.netUsd as number)}</strong> },
                 {
                   key: "state",

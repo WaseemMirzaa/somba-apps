@@ -137,7 +137,7 @@ export class LogisticsGateway {
         estimateDays: est.estimateDays,
         estimatedDeliveryDate: est.estimatedDeliveryDate,
         splitAfterHours: await this.routing.splitAfterHours(),
-      }, client.data.user?.role ?? 'guest'));
+      }, client.data.user?.role ?? 'guest', await this.routing.feeRules()));
     } catch (e) {
       // A refusal for an area nobody serves also carries { areaId, areaName, areaNameEn, servedCities } for the client to render.
       return { ...fail((e as Error).message), ...notServedFields(e) };

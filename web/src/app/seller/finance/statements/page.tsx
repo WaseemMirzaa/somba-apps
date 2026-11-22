@@ -69,6 +69,7 @@ export default function SellerStatementsPage() {
               { key: "units", label: fr ? "Unités" : "Units" },
               { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (row) => money(row.grossUsd as number) },
               { key: "commissionUsd", label: "Commission", render: (row) => money(row.commissionUsd as number) },
+              ...(visible.some((r) => (r.deliveryFeeUsd ?? 0) > 0) ? [{ key: "deliveryFeeUsd", label: fr ? "Frais de livraison" : "Delivery fee", render: (row: Record<string, unknown>) => money((row.deliveryFeeUsd as number) ?? 0) }] : []),
               { key: "refundsUsd", label: fr ? "Remboursements" : "Refunds", render: (row) => money(row.refundsUsd as number) },
               { key: "netUsd", label: "Net", render: (row) => <strong>{money(row.netUsd as number)}</strong> },
               {
@@ -104,6 +105,12 @@ export default function SellerStatementsPage() {
                   { l: fr ? "Commandes" : "Orders", v: String(d.totals.orders) },
                   { l: fr ? "Brut" : "Gross", v: money(d.totals.grossUsd) },
                   { l: "Commission", v: `− ${money(d.totals.commissionUsd)}` },
+                  ...((d.totals.deliveryFeeUsd ?? 0) > 0 || (d.totals.deliveryFeeCreditedUsd ?? 0) > 0
+                    ? [
+                        { l: fr ? "Frais de livraison" : "Delivery fees", v: `− ${money(d.totals.deliveryFeeUsd ?? 0)}` },
+                        { l: fr ? "Frais recrédités" : "Delivery fees credited back", v: money(d.totals.deliveryFeeCreditedUsd ?? 0) },
+                      ]
+                    : []),
                   { l: fr ? "Remboursements" : "Refunds", v: `− ${money(d.totals.refundsUsd)}` },
                   { l: fr ? "Commission recréditée" : "Commission credited back", v: money(d.totals.commissionCreditedUsd) },
                   { l: fr ? "Net du mois" : "Month net", v: money(d.totals.netUsd) },
@@ -125,6 +132,7 @@ export default function SellerStatementsPage() {
                   { key: "productName", label: fr ? "Produit" : "Product", render: (row) => `${localized(row, "productName", fr)}${row.variant && row.variant !== "Default" ? ` · ${localized(row, "variant", fr)}` : ""} × ${row.qty}` },
                   { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (row) => money(row.grossUsd as number) },
                   { key: "commissionUsd", label: "Commission", render: (row) => `${money(row.commissionUsd as number)} (${row.commissionPct} %)` },
+                  ...(d.lines.some((l) => (l.deliveryFeeUsd ?? 0) !== 0) ? [{ key: "deliveryFeeUsd", label: fr ? "Frais de livraison" : "Delivery fee", render: (row: Record<string, unknown>) => money((row.deliveryFeeUsd as number) ?? 0) }] : []),
                   { key: "netUsd", label: "Net", render: (row) => <strong className={(row.netUsd as number) < 0 ? "text-red-600" : ""}>{money(row.netUsd as number)}</strong> },
                 ]}
                 data={d.lines as unknown as Record<string, unknown>[]}

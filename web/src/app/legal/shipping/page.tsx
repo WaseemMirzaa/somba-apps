@@ -26,6 +26,12 @@ export default function ShippingPolicyPage() {
       <p>{fr
         ? "Vous ne payez qu'une seule ligne en plus de vos articles : la « Commission de la plateforme ». Elle regroupe tous les frais que vous payez, livraison comprise, et dépend de votre adresse et de la route du colis. Le montant exact est calculé et affiché avant le paiement, et c'est celui qui est facturé."
         : "You pay a single line on top of your items: the “Platform commission”. It covers every fee you pay, delivery included, and depends on your address and the parcel's route. The exact amount is worked out and shown before you pay, and that is what you are charged."}</p>
+      <p>{fr
+        ? "Selon la configuration de la plateforme, les frais de livraison peuvent être pris en charge par le vendeur : vous ne payez alors aucune ligne de frais, seulement vos articles (et la TVA, voir ci-dessous). La plateforme peut aussi inclure ces frais dans le « Total » (indiqué « livraison incluse ») au lieu de les afficher sur une ligne à part ; le montant facturé reste le même."
+        : "Depending on how the platform is set up, the delivery fee may be paid by the seller: you then pay no fee line, only your items (and VAT, see below). The platform may also fold the fee into the “Total” (marked “incl. delivery”) instead of showing it on its own line; the amount charged is the same."}</p>
+      <p>{fr
+        ? "TVA : lorsqu'elle est appliquée, la TVA s'ajoute au prix de vos articles à la commande et s'affiche sur une seule ligne « TVA ». Son taux dépend de la catégorie du produit ; chaque article garde le taux en vigueur au moment de la commande. En cas d'annulation ou de remboursement d'un article, la TVA correspondante vous est remboursée avec lui."
+        : "VAT: when it applies, VAT is added to the price of your items at checkout and shown on a single “VAT” line. The rate depends on the product's category, and each item keeps the rate in force when you ordered. If an item is cancelled or refunded, its VAT is refunded with it."}</p>
       <h2>{fr ? "4. Délais" : "4. Delivery times"}</h2>
       <p>{fr
         ? "Le délai estimé est indiqué sur chaque fiche produit : il comprend le délai de livraison du vendeur et son délai de préparation. Il court à partir de la confirmation du paiement. Une boutique en vacances ne prend pas de nouvelles commandes jusqu'à son retour."

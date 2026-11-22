@@ -8,6 +8,7 @@ import '../util/variants.dart' show defaultVariant;
 import 'catalog_live.dart';
 import 'catalog_models.dart';
 import 'promos.dart';
+import '../util/cart_totals.dart' as totals;
 
 class CartItem {
   /// Latest known listing (refreshed from the live catalogue, so prices shown
@@ -204,6 +205,7 @@ class ShopState {
           code: (res['code'] ?? code).toString(),
           discountUsd: (res['discount'] as num).toDouble(),
           forSubtotal: sub,
+          sellerId: res['sellerId']?.toString(),
         );
         return null;
       }
@@ -416,6 +418,33 @@ class ShopState {
   }
 
   double get subtotal => cart.fold(0.0, (s, i) => s + i.product.price * i.qty);
+
+  /// The money of [lines] (the whole cart, or a buy-now line): goods - the applied code's discount + VAT + the delivery fee when
+  /// the customer pays it. [quoteFeeUsd] is the fee the server's quote shows. The same arithmetic as the server, from the public
+  /// settings (`vatEnabled`, `deliveryFeePaidBy`, `showPlatformFee`) and each listing's `vatPct`; the order is authoritative.
+  totals.CartTotals cartTotals(List<CartItem> lines, {required double quoteFeeUsd}) {
+    final store = RealtimeStore.instance;
+    final sub = lines.fold(0.0, (s, i) => s + i.product.price * i.qty);
+    final promoStore = appliedPromo?.sellerId;
+    return totals.cartTotals(
+      lines: [
+        for (final l in lines)
+          totals.TotalsLine(
+            priceUsd: l.product.price,
+            qty: l.qty,
+            vatPct: l.product.vatPct,
+            // A store coupon discounts only that store's lines.
+            discountable: promoStore == null || l.product.sellerId == promoStore,
+          ),
+      ],
+      discountUsd: promoDiscount(sub),
+      feeUsd: quoteFeeUsd,
+      vatEnabled: store.vatEnabled,
+      feePaidBySeller: store.feePaidBySeller,
+      showPlatformFee: store.showPlatformFee,
+    );
+  }
+
   int get cartCount => cart.fold(0, (s, i) => s + i.qty);
 
   void addRecentlyViewed(String uuid) {

@@ -13,6 +13,8 @@ import { useLocale } from "@/context/locale-context";
 import { useRealtime } from "@/context/realtime-context";
 import { addressPin, useDeliveryQuote } from "@/lib/logistics";
 import { platformFee, platformFeeLabel } from "@/lib/quote-text";
+import { useCartTotals } from "@/lib/cart-totals";
+import { inclDeliveryNote, vatLabel } from "@/lib/vat";
 import { DeliveryQuoteCard, NotServedNotice, QuoteFeeValue, SellerAreaNotice } from "@/components/shop/delivery-quote";
 import { chainText } from "@/lib/areas";
 import { formatCurrency } from "@/lib/utils";
@@ -58,7 +60,8 @@ export default function ShopCartPage() {
   const deepestArea = address?.areaChain?.[address.areaChain.length - 1] ?? null;
   const notServed = quoteNotServed ?? (address && address.served === false ? { area: deepestArea?.name ?? address.commune ?? address.city ?? "", areaEn: deepestArea?.nameEn ?? undefined } : null);
   const delivery = platformFee(quote);
-  const total = Math.max(0, subtotal - discount) + delivery;
+  const totals = useCartTotals(lines, discount, delivery, promoSellerId);
+  const total = totals.total;
 
   const grouped = lines.reduce<Record<string, typeof lines>>((acc, item) => {
     (acc[item.seller || "KOMORIKO"] ??= []).push(item);
@@ -272,12 +275,19 @@ export default function ShopCartPage() {
               <span>{fr ? "Réduction" : "Discount"}</span><span>-<DualCurrency amount={discount} /></span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span>{platformFeeLabel(fr)}</span>
-            <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={fr ? "Selon votre adresse" : "Based on your address"} />
-          </div>
+          {totals.vat > 0 && (
+            <div className="flex justify-between" data-testid="cart-vat">
+              <span>{vatLabel(fr)}</span><DualCurrency amount={totals.vat} />
+            </div>
+          )}
+          {totals.showFeeLine && (
+            <div className="flex justify-between" data-testid="cart-fee">
+              <span>{platformFeeLabel(fr)}</span>
+              <QuoteFeeValue quote={quote} loading={quoteLoading} error={quoteError} fr={fr} notServed={notServed} missing={fr ? "Selon votre adresse" : "Based on your address"} />
+            </div>
+          )}
           <div className="flex justify-between border-t border-[var(--border)] pt-2 text-lg font-bold">
-            <span>Total</span>
+            <span>Total{totals.feeInTotal && <span className="ml-1 text-xs font-normal text-slate-500" data-testid="cart-incl-delivery">({inclDeliveryNote(fr)})</span>}</span>
             <DualCurrency amount={total} className="text-blue-700" />
           </div>
         </div>

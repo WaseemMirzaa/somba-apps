@@ -17,8 +17,8 @@ import Link from "next/link";
 import { Pencil, Trash2, ImageIcon, X } from "lucide-react";
 
 /** `commissionPct`: the seller commission (%) of this category; blank = the default rate (Settings). 0 is a real rate. */
-type Form = { name: string; nameFr: string; icon: string; image: string; sortOrder: string; commissionPct: string };
-const EMPTY: Form = { name: "", nameFr: "", icon: "🏷️", image: "", sortOrder: "0", commissionPct: "" };
+type Form = { name: string; nameFr: string; icon: string; image: string; sortOrder: string; commissionPct: string; vatPct: string };
+const EMPTY: Form = { name: "", nameFr: "", icon: "🏷️", image: "", sortOrder: "0", commissionPct: "", vatPct: "" };
 
 /** The commission box as the server wants it: null for blank (use the default), else the number; NaN when it is not a number from 0 to 60. */
 const commissionOf = (raw: string): number | null => {
@@ -26,6 +26,14 @@ const commissionOf = (raw: string): number | null => {
   if (t === "") return null;
   const n = Number(t);
   return Number.isFinite(n) && n >= 0 && n <= 60 ? n : Number.NaN;
+};
+
+/** The VAT box as the server wants it: null for blank (use the default VAT), else the number; NaN when it is not a number from 0 to 50. */
+const vatOf = (raw: string): number | null => {
+  const t = raw.trim().replace(",", ".");
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n >= 0 && n <= 50 ? n : Number.NaN;
 };
 
 /** The French name a form should show: the API serves the English name there until a translation exists. */
@@ -72,7 +80,7 @@ export default function AdminCategoriesPage() {
 
   function openEdit(c: Category) {
     setEditing(c);
-    setForm({ name: c.name, nameFr: frOf(c), icon: c.icon ?? "", image: c.image ?? "", sortOrder: String(c.sortOrder ?? 0), commissionPct: c.commissionPct == null ? "" : String(c.commissionPct) });
+    setForm({ name: c.name, nameFr: frOf(c), icon: c.icon ?? "", image: c.image ?? "", sortOrder: String(c.sortOrder ?? 0), commissionPct: c.commissionPct == null ? "" : String(c.commissionPct), vatPct: c.vatPct == null ? "" : String(c.vatPct) });
     setError(null);
     setOpen(true);
   }
@@ -92,6 +100,13 @@ export default function AdminCategoriesPage() {
       toast(msg, "error");
       return;
     }
+    const vat = vatOf(form.vatPct);
+    if (Number.isNaN(vat)) {
+      const msg = fr ? "La TVA doit être un nombre entre 0 et 50 (laissez vide pour la TVA par défaut)." : "VAT must be a number between 0 and 50 (leave it blank for the default VAT).";
+      setError(msg);
+      toast(msg, "error");
+      return;
+    }
     setSaving(true);
     setError(null);
     // L6: a blank French name stays blank (the platform translates it); it is never filled with the English one.
@@ -104,6 +119,8 @@ export default function AdminCategoriesPage() {
       sortOrder: Number(form.sortOrder) || 0,
       // null = back to the default rate (the server reads blank and null the same way).
       commissionPct: rate,
+      // null = back to the default VAT (Settings).
+      vatPct: vat,
     };
     try {
       if (editing) await socketClient.request("categories:update", { id: editing.id, patch: payload });
@@ -191,6 +208,13 @@ export default function AdminCategoriesPage() {
               >
                 {c.commissionPct == null ? (fr ? "Taux par défaut" : "Default rate") : `${c.commissionPct}%`}
               </span>
+              <span
+                className="shrink-0 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-800"
+                data-testid="category-vat"
+                title={fr ? "TVA" : "VAT"}
+              >
+                {c.vatPct == null ? (fr ? "TVA par défaut" : "Default VAT") : `${fr ? "TVA" : "VAT"} ${c.vatPct}%`}
+              </span>
               {typeof (c.usedBy ?? c.productCount) === "number" && (
                 <Link
                   href="/admin/products"
@@ -250,6 +274,22 @@ export default function AdminCategoriesPage() {
                   {fr
                     ? "Entre 0 et 60. Laissez vide pour utiliser le taux par défaut (Paramètres). 0 est un vrai taux : aucune commission sur cette catégorie. Ne s'applique qu'aux nouvelles commandes ; les clients ne le voient jamais."
                     : "Between 0 and 60. Leave blank to use the default rate (Settings). 0 is a real rate: no commission on this category. Applies to new orders only; customers never see it."}
+                </p>
+              </div>
+              <div>
+                <label htmlFor="category-vat" className="mb-1 block text-sm font-medium text-slate-700">{fr ? "TVA (%)" : "VAT (%)"}</label>
+                <input
+                  id="category-vat"
+                  className="input-premium w-32 px-3 py-2 text-sm"
+                  inputMode="decimal"
+                  value={form.vatPct}
+                  onChange={(e) => setForm((f) => ({ ...f, vatPct: e.target.value }))}
+                  placeholder={fr ? "Par défaut" : "Default"}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {fr
+                    ? "Entre 0 et 50. Laissez vide pour la TVA par défaut (Paramètres). 0 est un vrai taux : pas de TVA sur cette catégorie. S'applique aux nouvelles commandes, et seulement quand la TVA est activée ; les clients voient le montant sur leur commande."
+                    : "Between 0 and 50. Leave blank to use the default VAT (Settings). 0 is a real rate: no VAT on this category. Applies to new orders, and only while VAT is switched on; customers see the amount on their order."}
                 </p>
               </div>
               <div>

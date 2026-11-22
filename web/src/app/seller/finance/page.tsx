@@ -100,6 +100,7 @@ export default function SellerFinancePage() {
           <StatCard title={fr ? "En cours de livraison (net)" : "In delivery (net)"} value={money(b?.inProgressUsd ?? 0)} icon={Truck} />
           <StatCard title={fr ? "Déjà versé" : "Paid out"} value={money(totals?.paidOutUsd ?? 0)} icon={CheckCircle2} />
           <StatCard title={fr ? "Commission payée" : "Commission paid"} value={money(b?.commissionUsd ?? 0)} icon={Percent} />
+          {(b?.deliveryFeeUsd ?? 0) > 0 && <StatCard title={fr ? "Frais de livraison payés" : "Delivery fees paid"} value={money(b?.deliveryFeeUsd ?? 0)} icon={Truck} />}
           <StatCard title={fr ? "Retours (ventes annulées)" : "Returned (sales taken back)"} value={money(totals?.returnedUsd ?? 0)} icon={RotateCcw} />
         </div>
       )}
@@ -142,6 +143,7 @@ export default function SellerFinancePage() {
                 { key: "kind", label: "Type", render: (row) => <Badge variant={txnKindVariant(String(row.kind))}>{txnKindLabel(String(row.kind), fr)}</Badge> },
                 { key: "grossUsd", label: fr ? "Brut" : "Gross", render: (row) => (row.kind === "payout" ? "—" : money(row.grossUsd as number)) },
                 { key: "commissionUsd", label: "Commission", render: (row) => (row.kind === "payout" ? "—" : money(row.commissionUsd as number)) },
+                ...((txns.data?.items ?? []).some((r) => (r.deliveryFeeUsd ?? 0) > 0) ? [{ key: "deliveryFeeUsd", label: fr ? "Frais de livraison" : "Delivery fee", render: (row: Record<string, unknown>) => (row.kind === "payout" || !((row.deliveryFeeUsd as number) > 0) ? "—" : money(row.deliveryFeeUsd as number)) }] : []),
                 { key: "amountUsd", label: fr ? "Montant" : "Amount", render: (row) => <strong className={(row.amountUsd as number) < 0 ? "text-red-600" : ""}>{money(row.amountUsd as number)}</strong> },
                 { key: "at", label: t("date"), render: (row) => localDay(row.at as string) },
               ]}
@@ -198,6 +200,11 @@ export default function SellerFinancePage() {
             {fr
               ? `Le taux de commission par défaut est de ${b?.commissionPct ?? "—"} % sur les nouvelles commandes ; une catégorie peut avoir un taux différent. Chaque commande garde le taux enregistré à sa création, un changement de taux ne modifie jamais vos commandes passées. Commission sur vos ventes à ce jour : ${money(b?.commissionUsd ?? 0)}. Le détail de chaque mois figure sur une facture de commission (Documents fiscaux).`
               : `The default commission rate is ${b?.commissionPct ?? "—"}% on new orders; a category can have a different rate. Each order keeps the rate stored when it was placed, so a rate change never alters your past orders. Commission on your sales so far: ${money(b?.commissionUsd ?? 0)}. Each month's detail is on a commission invoice (Tax documents).`}
+          </p>
+          <p className="mt-2 text-sm text-slate-600">
+            {fr
+              ? "TVA : si elle est activée, elle s'ajoute au prix payé par le client et n'est jamais un revenu pour vous : elle n'entre ni dans vos gains, ni dans vos versements, ni dans la commission. Frais de livraison : si la plateforme les met à la charge des vendeurs, ils sont déduits de vos gains, commande par commande (colonne « Frais de livraison »), au prorata de vos articles."
+              : "VAT: when it is switched on, it is added to the price the customer pays and is never your revenue: it is not in your earnings, your payouts or the commission. Delivery fee: when the platform sets sellers to pay it, it is deducted from your earnings order by order (the \"Delivery fee\" column), in proportion to your items."}
           </p>
         </CardContent>
       </Card>

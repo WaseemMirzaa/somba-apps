@@ -109,4 +109,16 @@ export class OrderItem {
   /** Commission in USD on this line: round2(priceUsd * qty * commissionPct / 100). */
   @Column({ type: 'float', default: 0 })
   commissionUsd: number;
+
+  /** VAT % this line was placed with (0 while VAT was off; a later rate change never rewrites it). */
+  @Column({ type: 'float', default: 0 })
+  vatPct: number;
+
+  /** VAT charged on this line: round2((price x qty - its share of the promo discount) x vatPct / 100). Not seller revenue. */
+  @Column({ type: 'float', default: 0 })
+  vatUsd: number;
+
+  /** This line's share of the delivery fee when the SELLER pays it (`orders.deliveryFeePaidBy = 'seller'`); 0 otherwise. Comes off the seller's earnings. */
+  @Column({ type: 'float', default: 0 })
+  sellerFeeUsd: number;
 }

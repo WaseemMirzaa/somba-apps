@@ -38,7 +38,16 @@ interface ToggleField {
   hint: string;
   hintFr: string;
 }
-type Field = TextField | ToggleField;
+interface ChoiceField {
+  key: string;
+  kind: "choice";
+  label: string;
+  labelFr: string;
+  hint: string;
+  hintFr: string;
+  options: { value: string; label: string; labelFr: string }[];
+}
+type Field = TextField | ToggleField | ChoiceField;
 
 const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
   {
@@ -47,6 +56,27 @@ const GROUPS: { title: string; titleFr: string; fields: Field[] }[] = [
     fields: [
       { key: "fxRate", kind: "text", label: "FX rate (1 USD = ? CDF)", labelFr: "Taux de change (1 USD = ? CDF)", hint: "Used to show prices in CDF. Shoppers see it immediately.", hintFr: "Sert à afficher les prix en CDF. Visible immédiatement.", inputMode: "decimal" },
       { key: "commissionPct", kind: "text", label: "Seller commission (%) — default", labelFr: "Commission vendeur (%) — par défaut", hint: "Between 0 and 60. The default rate: a category can set its own (Categories). Applies to new orders; past orders keep the rate stored when they were placed.", hintFr: "Entre 0 et 60. Le taux par défaut : une catégorie peut avoir le sien (Catégories). S'applique aux nouvelles commandes ; les commandes passées gardent le taux enregistré à leur création.", inputMode: "decimal" },
+    ],
+  },
+  {
+    title: "VAT and delivery fee",
+    titleFr: "TVA et frais de livraison",
+    fields: [
+      { key: "vatEnabled", kind: "toggle", label: "Charge VAT", labelFr: "Facturer la TVA", hint: "On: VAT is added on top of item prices at checkout and shown to the customer as one \"VAT\" line. Off: no VAT is charged or shown. It is never part of seller earnings, payouts or commission.", hintFr: "Activé : la TVA s'ajoute aux prix des articles à la commande et s'affiche pour le client sur une seule ligne « TVA ». Désactivé : aucune TVA n'est facturée ni affichée. Elle ne fait jamais partie des gains, versements ou commissions des vendeurs." },
+      { key: "vatPct", kind: "text", label: "Default VAT (%)", labelFr: "TVA par défaut (%)", hint: "Between 0 and 50. The rate of every category without its own (Categories). Each order line keeps the rate it was placed with.", hintFr: "Entre 0 et 50. Le taux de chaque catégorie sans taux propre (Catégories). Chaque ligne de commande garde le taux de sa création.", inputMode: "decimal", range: { min: 0, max: 50 } },
+      {
+        key: "deliveryFeePaidBy",
+        kind: "choice",
+        label: "Delivery fee paid by",
+        labelFr: "Frais de livraison payés par",
+        hint: "Customer: the fee is on the customer's total (today). Seller: the customer pays goods and VAT only, and the fee is deducted from the seller's payout (Finance shows a \"Delivery fee\" per order). Applies to new orders.",
+        hintFr: "Client : les frais sont dans le total du client (actuel). Vendeur : le client ne paie que les articles et la TVA, et les frais sont déduits du versement du vendeur (Finance affiche des « Frais de livraison » par commande). S'applique aux nouvelles commandes.",
+        options: [
+          { value: "customer", label: "Customer", labelFr: "Client" },
+          { value: "seller", label: "Seller", labelFr: "Vendeur" },
+        ],
+      },
+      { key: "showPlatformFee", kind: "toggle", label: "Show the platform fee line to customers", labelFr: "Afficher la ligne des frais de la plateforme aux clients", hint: "Applies when the customer pays the fee. Off: the fee is still charged, but it is folded into the Total (\"incl. delivery\") instead of its own line.", hintFr: "S'applique quand le client paie les frais. Désactivé : les frais sont toujours facturés, mais intégrés au Total (« livraison incluse ») au lieu d'avoir leur propre ligne." },
     ],
   },
   {
@@ -260,7 +290,23 @@ export default function AdminSettingsPage() {
                   return (
                     <div key={f.key} className="space-y-1.5">
                       <label className="text-sm font-medium text-slate-800">{fr ? f.labelFr : f.label}</label>
-                      {f.kind === "toggle" ? (
+                      {f.kind === "choice" ? (
+                        <div className="flex gap-2">
+                          <select
+                            className="input-premium w-full px-4 py-2 text-sm"
+                            aria-label={fr ? f.labelFr : f.label}
+                            value={draft[f.key] ?? f.options[0].value}
+                            onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
+                          >
+                            {f.options.map((o) => (
+                              <option key={o.value} value={o.value}>{fr ? o.labelFr : o.label}</option>
+                            ))}
+                          </select>
+                          <Button size="sm" variant="secondary" disabled={!dirty(f.key) || busy} onClick={() => saveOne(f.key)}>
+                            {busy ? "…" : fr ? "Enregistrer" : "Save"}
+                          </Button>
+                        </div>
+                      ) : f.kind === "toggle" ? (
                         <div className="flex items-center gap-3">
                           <button
                             type="button"

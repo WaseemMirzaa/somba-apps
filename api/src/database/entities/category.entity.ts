@@ -27,4 +27,11 @@ export class Category {
    */
   @Column({ type: 'float', nullable: true })
   commissionPct: number | null;
+
+  /**
+   * VAT (%) charged on listings in this category; NULL = the global default (`settings.vatPct`). 0 is a real rate. Unlike the
+   * seller commission, customers may see it (it is added to their order).
+   */
+  @Column({ type: 'float', nullable: true })
+  vatPct: number | null;
 }

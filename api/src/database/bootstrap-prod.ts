@@ -154,6 +154,10 @@ async function run() {
     requirePinnedAddress: 'true', // checkout needs a map pin on the delivery address
     requireSellerPickupPin: 'true', // a seller pins their pickup location before listing products
     commissionPct: '12',
+    vatEnabled: 'false', // charging VAT is the owner's call: off until an admin turns it on (Admin -> Settings)
+    vatPct: '16', // the VAT rate of a category that sets none
+    deliveryFeePaidBy: 'customer', // 'seller' takes the delivery fee off the seller's payout instead
+    showPlatformFee: 'true', // the customer sees the fee as its own line
     productModeration: 'true', // new seller listings wait for a moderator
     requireDeliveryCode: 'true', // riders must enter the customer's 4-digit code on handover
     requireParcelScan: 'true', // riders (and the desk) must scan every parcel label at each hand-over

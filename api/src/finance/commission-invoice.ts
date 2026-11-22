@@ -22,7 +22,17 @@ export interface InvoiceData {
   locale: 'en' | 'fr';
   seller: { name: string; legalName: string | null; taxNumber: string | null; rccm: string | null };
   lines: InvoiceLine[];
-  totals: { orders: number; units: number; grossUsd: number; commissionUsd: number; creditedUsd: number; netUsd: number };
+  totals: {
+    orders: number;
+    units: number;
+    grossUsd: number;
+    commissionUsd: number;
+    creditedUsd: number;
+    /** Delivery fees charged to the seller on orders whose fee the seller pays, and the part credited back with returns (omitted / 0: none). */
+    deliveryFeeUsd?: number;
+    deliveryFeeCreditedUsd?: number;
+    netUsd: number;
+  };
 }
 
 const TEXT = {
@@ -49,6 +59,9 @@ const TEXT = {
     commissionDue: 'Commission charged',
     credited: 'Commission credited (returns)',
     total: 'TOTAL COMMISSION DUE',
+    deliveryFees: 'Delivery fees charged (paid by the seller)',
+    deliveryFeesCredited: 'Delivery fees credited (returns)',
+    totalDue: 'TOTAL DUE',
     net: 'Net to the seller',
     note: 'Commission is charged on delivered sales, after store coupons the seller funded. Commission on goods that were returned is credited. All amounts in US dollars.',
     page: 'Page',
@@ -78,6 +91,9 @@ const TEXT = {
     commissionDue: 'Commission facturée',
     credited: 'Commission créditée (retours)',
     total: 'TOTAL DE COMMISSION DÛ',
+    deliveryFees: 'Frais de livraison facturés (à la charge du vendeur)',
+    deliveryFeesCredited: 'Frais de livraison crédités (retours)',
+    totalDue: 'TOTAL DÛ',
     net: 'Net pour le vendeur',
     note: 'La commission est calculée sur les ventes livrées, après les coupons financés par la boutique. La commission sur les articles retournés est créditée. Tous les montants sont en dollars américains.',
     page: 'Page',
@@ -215,9 +231,17 @@ export function renderCommissionInvoice(d: InvoiceData): Buffer {
   row(t.gross, money(d.totals.grossUsd, d.locale));
   row(t.commissionDue, money(d.totals.commissionUsd, d.locale));
   row(t.credited, money(-d.totals.creditedUsd, d.locale));
+  // Orders whose delivery fee the seller pays: the fee is billed with the commission (it comes off the payout the same way).
+  const fee = d.totals.deliveryFeeUsd ?? 0;
+  const feeCredited = d.totals.deliveryFeeCreditedUsd ?? 0;
+  const withFees = fee > 0 || feeCredited > 0;
+  if (withFees) {
+    row(t.deliveryFees, money(fee, d.locale));
+    row(t.deliveryFeesCredited, money(-feeCredited, d.locale));
+  }
   doc.line(R - 260, y - 6, R, y - 6, { gray: 0.3, width: 0.8 });
   y += 4;
-  row(t.total, money(d.totals.commissionUsd - d.totals.creditedUsd, d.locale), true);
+  row(withFees ? t.totalDue : t.total, money(d.totals.commissionUsd - d.totals.creditedUsd + fee - feeCredited, d.locale), true);
   row(t.net, money(d.totals.netUsd, d.locale));
   y += 14;
   // Note, wrapped to the page width

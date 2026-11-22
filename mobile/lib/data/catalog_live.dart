@@ -43,6 +43,7 @@ Product productFromDto(ProductDto d) => Product(
       sellerHandlingDays: d.sellerHandlingDays,
       totalDeliveryDays: d.totalDeliveryDays,
       prepDays: d.prepDays,
+      vatPct: d.vatPct,
       stamp: d.stamp,
     );
 

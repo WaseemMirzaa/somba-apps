@@ -11,11 +11,11 @@ const EN: Words = {
   // orders
   'h.order': 'Order', 'h.date': 'Date', 'h.status': 'Status', 'h.package': 'Package', 'h.customer': 'Customer', 'h.city': 'City',
   'h.payment': 'Payment', 'h.product': 'Product', 'h.option': 'Option', 'h.qty': 'Qty', 'h.unitPrice': 'Unit price USD',
-  'h.coupon': 'Coupon USD', 'h.commission': 'Commission USD', 'h.net': 'Net USD',
+  'h.coupon': 'Coupon USD', 'h.commission': 'Commission USD', 'h.deliveryFee': 'Delivery fee USD', 'h.net': 'Net USD',
   // statements / transactions
   'h.statement': 'Statement', 'h.kind': 'Kind', 'h.sales': 'Sales USD', 'h.commissionPct': 'Commission %', 'h.reference': 'Reference',
   'h.description': 'Description', 'h.amount': 'Amount USD',
-  't.orders': 'Orders', 't.units': 'Units', 't.sales': 'Sales USD', 't.commission': 'Commission USD', 't.returns': 'Returns USD', 't.net': 'Net USD',
+  't.orders': 'Orders', 't.units': 'Units', 't.sales': 'Sales USD', 't.commission': 'Commission USD', 't.deliveryFee': 'Delivery fees USD', 't.returns': 'Returns USD', 't.net': 'Net USD',
   't.paid': 'Payouts paid USD',
   // Kinds, statuses and payment methods are written as their codes in English (as the files always were): see FR.
 };
@@ -23,10 +23,10 @@ const EN: Words = {
 const FR: Words = {
   'h.order': 'Commande', 'h.date': 'Date', 'h.status': 'Statut', 'h.package': 'Colis', 'h.customer': 'Client', 'h.city': 'Ville',
   'h.payment': 'Paiement', 'h.product': 'Produit', 'h.option': 'Option', 'h.qty': 'Qté', 'h.unitPrice': 'Prix unitaire USD',
-  'h.coupon': 'Coupon USD', 'h.commission': 'Commission USD', 'h.net': 'Net USD',
+  'h.coupon': 'Coupon USD', 'h.commission': 'Commission USD', 'h.deliveryFee': 'Frais de livraison USD', 'h.net': 'Net USD',
   'h.statement': 'Relevé', 'h.kind': 'Type', 'h.sales': 'Ventes USD', 'h.commissionPct': 'Commission %', 'h.reference': 'Référence',
   'h.description': 'Description', 'h.amount': 'Montant USD',
-  't.orders': 'Commandes', 't.units': 'Unités', 't.sales': 'Ventes USD', 't.commission': 'Commission USD', 't.returns': 'Retours USD', 't.net': 'Net USD',
+  't.orders': 'Commandes', 't.units': 'Unités', 't.sales': 'Ventes USD', 't.commission': 'Commission USD', 't.deliveryFee': 'Frais de livraison USD', 't.returns': 'Retours USD', 't.net': 'Net USD',
   't.paid': 'Versements payés USD',
   'k.sale': 'vente', 'k.refund': 'remboursement', 'k.payout': 'versement',
   's.pending': 'en attente', 's.confirmed': 'confirmée', 's.processing': 'en préparation', 's.shipped': 'expédiée', 's.out_for_delivery': 'en cours de livraison',

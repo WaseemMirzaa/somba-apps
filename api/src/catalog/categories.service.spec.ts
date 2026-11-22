@@ -109,6 +109,32 @@ describe('seller commission per category', () => {
   });
 });
 
+describe('VAT per category', () => {
+  it('is NULL (use the default) until an admin sets it; blank clears it; 0 is a real rate', async () => {
+    const c = await svc.create({ name: 'Gadgets', nameFr: 'Bidules' });
+    expect(c.vatPct).toBeNull();
+    expect((await svc.update(c.id, { vatPct: 8 }))!.vatPct).toBe(8);
+    expect((await svc.update(c.id, { vatPct: '0' }))!.vatPct).toBe(0);
+    expect((await svc.update(c.id, { vatPct: '' }))!.vatPct).toBeNull();
+    expect((await svc.update(c.id, { icon: 'x' }))!.vatPct).toBeNull();
+    expect((await svc.create({ name: 'Books', vatPct: 0 })).vatPct).toBe(0);
+  });
+
+  it('must be 0 to 50', async () => {
+    const c = await svc.create({ name: 'Gadgets' });
+    for (const bad of [-1, 50.5, 51, 'lots', NaN]) await expect(svc.update(c.id, { vatPct: bad })).rejects.toThrow('VAT must be a number between 0 and 50.');
+    expect((await svc.update(c.id, { vatPct: 50 }))!.vatPct).toBe(50);
+  });
+
+  it('customers may see it (unlike the seller commission) and vatRates reads it back', async () => {
+    const c = await svc.create({ name: 'Gadgets', vatPct: 8, commissionPct: 5 });
+    const shopper = (await svc.list())[0] as unknown as Record<string, unknown>;
+    expect(shopper.vatPct).toBe(8);
+    expect('commissionPct' in shopper).toBe(false);
+    expect([...(await svc.vatRates([c.id, 'nope'])).entries()]).toEqual([[c.id, 8]]);
+  });
+});
+
 describe('C-I3: renaming keeps the products', () => {
   it('products point at categoryId, so they follow a rename and show the new name', async () => {
     const c = await svc.create({ name: 'Gadgets', nameFr: 'Bidules' });

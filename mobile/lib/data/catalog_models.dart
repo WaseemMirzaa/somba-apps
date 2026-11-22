@@ -72,6 +72,9 @@ class Product {
 
   /// The seller's preparation time in days (null on older servers).
   final int? prepDays;
+
+  /// The VAT % charged on this listing (0 while VAT is off); see `ProductDto.vatPct`.
+  final double vatPct;
   final int stamp;
 
   const Product({
@@ -112,6 +115,7 @@ class Product {
     this.sellerHandlingDays = 0,
     this.totalDeliveryDays,
     this.prepDays,
+    this.vatPct = 0,
     this.stamp = 0,
   });
 

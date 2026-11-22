@@ -17,6 +17,8 @@ class DeliveryQuote {
   const DeliveryQuote({
     required this.feeUsd,
     double? platformFeeUsd,
+    this.feePaidBySeller = false,
+    this.showFee = true,
     this.destinationHubId,
     this.destinationHubName,
     this.destinationHubCity,
@@ -48,6 +50,12 @@ class DeliveryQuote {
 
   /// The ONE fee line the customer sees: "Platform commission".
   final double platformFeeUsd;
+
+  /// The seller pays the delivery fee: the quote carries 0 for a customer and the order charges none.
+  final bool feePaidBySeller;
+
+  /// Show the fee as its own line; false = folded into the total ("incl. delivery").
+  final bool showFee;
   final String? destinationHubId;
   final String? destinationHubName;
   final String? destinationHubCity;
@@ -161,6 +169,8 @@ class DeliveryQuote {
       feeUsd: _num(j['feeUsd']),
       // An older server sends only `feeUsd`: then it is the platform fee.
       platformFeeUsd: j['platformFeeUsd'] is num ? (j['platformFeeUsd'] as num).toDouble() : null,
+      feePaidBySeller: j['feePaidBySeller'] == true,
+      showFee: j['showFee'] != false,
       destinationHubId: textOrNull(j['destinationHubId']) ?? (hub is Map ? textOrNull(hub['id']) : null),
       destinationHubName: textOrNull(j['destinationHubName']) ?? (hub is Map ? textOrNull(hub['name']) : null),
       destinationHubCity: hub is Map ? textOrNull(hub['city']) : null,

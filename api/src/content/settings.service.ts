@@ -12,8 +12,18 @@ import { translationMode } from '../translation/translation-mode';
 import { FRAUD_SETTING_KEYS, FRAUD_THRESHOLDS } from '../ops/fraud-rules.config';
 import { AFTER_SALE_SETTING_KEYS } from '../sellers/after-sale-access';
 
+/**
+ * VAT and the delivery-fee payer (public: the apps and the shop compute the cart estimate from them; the order stays authoritative).
+ * `vatEnabled` 'false' = no VAT is charged or shown (the default); `vatPct` = the rate of a category without its own;
+ * `deliveryFeePaidBy` 'customer' (the fee is on the customer's total, today's behaviour) | 'seller' (it comes off the seller's payout);
+ * `showPlatformFee` 'true' | 'false': whether the customer sees the fee as its own line (hidden = folded into the total).
+ */
+export const VAT_SETTING_KEYS = ['vatEnabled', 'vatPct', 'deliveryFeePaidBy', 'showPlatformFee'] as const;
+
+export const VAT_SETTING_DEFAULTS: Record<(typeof VAT_SETTING_KEYS)[number], string> = { vatEnabled: 'false', vatPct: '16', deliveryFeePaidBy: 'customer', showPlatformFee: 'true' };
+
 /** Settings every client may read (they drive pricing/checkout display). Everything else is admin-only. */
-export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'deliveryZones', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressMaxKm'] as const;
+export const PUBLIC_SETTINGS = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'deliveryZones', 'requirePinnedAddress', 'requireSellerPickupPin', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressMaxKm', ...VAT_SETTING_KEYS] as const;
 /**
  * The delivery price numbers (base, per km, cap, warehouse transfer, express). Staff-only: a customer sees one "Platform
  * commission" line per order, never how it is built, so the numbers it is built from are not sent to customers, guests,
@@ -28,7 +38,7 @@ export const CONTACT_SETTINGS = ['supportPhone', 'supportEmail', 'supportWhatsap
 const isContactKey = (k: string) => (CONTACT_SETTINGS as readonly string[]).includes(k);
 // `deliveryZones` stays readable for old clients but is never written or used: zones are gone (nearest-warehouse routing).
 /** The only keys that can be written, each with its own validation. */
-const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm', ...AFTER_SALE_SETTING_KEYS, ...FRAUD_SETTING_KEYS] as const;
+const WRITABLE = ['returnWindowDays', 'sellerResponseHours', 'fxRate', 'commissionPct', 'deliveryBaseUsd', 'deliveryPerKmUsd', 'deliveryMaxUsd', 'deliveryTransferUsd', 'requirePinnedAddress', 'requireSellerPickupPin', 'productModeration', 'minPayoutUsd', 'payoutClearanceHours', 'hubAddress', 'requireDeliveryCode', 'requireParcelScan', 'requireVerifiedForCheckout', 'sellerPlans', 'seller2faRequired', 'requireStaffTwoFactor', 'allowInterCityDelivery', 'interCityTransferDays', 'localDeliveryDays', 'splitDeliveryAfterHours', 'expressDeliveryEnabled', 'expressDeliveryDays', 'expressBaseUsd', 'expressPerKmUsd', 'expressMaxUsd', 'expressMaxKm', ...VAT_SETTING_KEYS, ...AFTER_SALE_SETTING_KEYS, ...FRAUD_SETTING_KEYS] as const;
 
 /**
  * Key/value platform config: FX rate, delivery fee numbers,
@@ -71,6 +81,8 @@ export class SettingsService {
    */
   async clientView(): Promise<Record<string, string>> {
     return {
+      // The money settings always carry a value (a server that never stored them behaves as these say), so no client has to guess.
+      ...VAT_SETTING_DEFAULTS,
       ...(await this.publicView()),
       cardPayments: cardPaymentsMode(),
       // What this server can actually do, from its environment (never stored): the apps use them to say "not available"
@@ -88,6 +100,13 @@ export class SettingsService {
         return String(num(value, 'Exchange rate', { min: 1, max: 100000 }));
       case 'commissionPct':
         return String(num(value, 'Commission', { min: 0, max: 60 }));
+      case 'vatEnabled':
+      case 'showPlatformFee':
+        return oneOf(String(value), ['true', 'false'] as const, key === 'vatEnabled' ? 'VAT switch' : 'Show platform fee switch');
+      case 'vatPct':
+        return String(num(value, 'VAT', { min: 0, max: 50 }));
+      case 'deliveryFeePaidBy':
+        return oneOf(String(value), ['customer', 'seller'] as const, 'Delivery fee payer');
       case 'supportPhone':
       case 'supportWhatsapp': {
         const v = String(value ?? '').trim();
